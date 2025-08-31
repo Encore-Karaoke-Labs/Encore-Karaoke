@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Encore Link</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --background-color: #0a0a14;
+        --primary-accent: #89cff0;
+        --secondary-accent: #ffd700;
+        --text-color: #ffffff;
+        --border-color: rgba(255, 255, 255, 0.2);
+        --button-bg: rgba(10, 10, 20, 0.7);
+        --button-hover-bg: rgba(137, 207, 240, 0.3);
+      }
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      body {
+        font-family: "Rajdhani", sans-serif;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        margin: 0;
+        padding: 1rem;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        min-height: 100vh;
+      }
+      .container {
+        width: 100%;
+        max-width: 480px;
+        transition: max-width 0.3s ease-in-out;
+      }
+      header {
+        text-align: center;
+        margin-bottom: 1.5rem;
+      }
+      header h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--primary-accent);
+        letter-spacing: 0.2rem;
+        text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+        margin: 0;
+      }
+      button {
+        font-family: "Rajdhani", sans-serif;
+        background: var(--button-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: background-color 0.2s, transform 0.1s;
+        user-select: none;
+        font-weight: 700;
+        font-size: 1.2rem;
+        padding: 1rem;
+      }
+      button:hover {
+        background-color: var(--button-hover-bg);
+      }
+      button:active {
+        transform: scale(0.95);
+        background-color: var(--button-hover-bg);
+      }
+      button:disabled {
+        background: transparent;
+        border-color: transparent;
+        cursor: default;
+      }
+      button:disabled:hover {
+        background: transparent;
+      }
+      /* View Toggling */
+      .remote-view,
+      .search-view {
+        display: none;
+      }
+      .remote-view.active {
+        display: block;
+      }
+      .search-view.active {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      /* Remote View Grid */
+      .remote-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.75rem;
+      }
+      .control-btn {
+        font-size: 1rem;
+        padding: 0.8rem;
+      }
+      .reserve-btn {
+        grid-column: 3 / 5;
+        background-color: var(--primary-accent);
+        color: var(--background-color);
+        border: none;
+        font-size: 1.2rem;
+      }
+      .numpad-btn {
+        font-size: 2rem;
+        padding: 1.5rem 0;
+      }
+      .numpad-btn[data-type="backspace"] {
+        font-size: 1.5rem;
+      }
+
+      /* Search View */
+      .search-input-remote {
+        font-family: "Rajdhani", sans-serif;
+        font-size: 1.5rem;
+        background: rgba(0, 0, 0, 0.4);
+        border: 2px solid var(--border-color);
+        border-radius: 0.5rem;
+        color: white;
+        padding: 0.8rem 1.2rem;
+        width: 100%;
+        text-align: center;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .search-input-remote:focus {
+        border-color: var(--primary-accent);
+      }
+      .search-controls {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+      }
+      .search-submit-btn,
+      .search-ok-btn {
+        background-color: var(--primary-accent);
+        color: var(--background-color);
+        border: none;
+      }
+
+      /* =================================== */
+      /* Tablet and Larger Screen Adjustments */
+      /* =================================== */
+      @media (min-width: 768px) {
+        body {
+          padding: 2rem; /* More breathing room on larger screens */
+        }
+        .container {
+          max-width: 680px; /* Wider container for tablets */
+        }
+        header {
+          margin-bottom: 2.5rem; /* More space below header */
+        }
+        header h1 {
+          font-size: 2.5rem; /* Larger title */
+          letter-spacing: 0.3rem;
+        }
+        button {
+          font-size: 1.3rem; /* Base button font size increase */
+          padding: 1.2rem;
+          border-radius: 0.75rem; /* Slightly larger radius */
+        }
+
+        /* Remote View Grid */
+        .remote-grid {
+          gap: 1.25rem; /* Increase gap between buttons */
+        }
+        .control-btn {
+          font-size: 1.1rem;
+          padding: 1rem;
+        }
+        .reserve-btn {
+          font-size: 1.4rem;
+        }
+        .numpad-btn {
+          font-size: 2.5rem; /* Much larger numbers for easy tapping */
+          padding: 2.25rem 0;
+        }
+        .numpad-btn[data-type="backspace"] {
+          font-size: 2rem;
+        }
+
+        /* Search View */
+        .search-view {
+          gap: 1.5rem; /* More space between search elements */
+        }
+        .search-input-remote {
+          font-size: 1.8rem;
+          padding: 1rem 1.5rem;
+          border-radius: 0.75rem;
+        }
+        .search-controls {
+          gap: 1.5rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>ENCORE LINK</h1>
+      </header>
+      <main>
+        <!-- Main Remote View -->
+        <div class="remote-view active">
+          <div class="remote-grid">
+            <!-- Row 1 -->
+            <button class="control-btn" data-type="yt_search">YouTube</button>
+            <button class="control-btn" data-type="stop" data-value="Escape">
+              Stop
+            </button>
+            <button
+              class="control-btn reserve-btn"
+              data-type="reserve"
+              data-value="Enter"
+            >
+              Reserve
+            </button>
+
+            <!-- Numpad -->
+            <button class="numpad-btn" data-type="digit" data-value="1">
+              1
+            </button>
+            <button class="numpad-btn" data-type="digit" data-value="2">
+              2
+            </button>
+            <button class="numpad-btn" data-type="digit" data-value="3">
+              3
+            </button>
+            <button class="control-btn" data-type="key_up" data-value="ArrowUp">
+              Key &uarr;
+            </button>
+
+            <button class="numpad-btn" data-type="digit" data-value="4">
+              4
+            </button>
+            <button class="numpad-btn" data-type="digit" data-value="5">
+              5
+            </button>
+            <button class="numpad-btn" data-type="digit" data-value="6">
+              6
+            </button>
+            <button
+              class="control-btn"
+              data-type="key_down"
+              data-value="ArrowDown"
+            >
+              Key &darr;
+            </button>
+
+            <button class="numpad-btn" data-type="digit" data-value="7">
+              7
+            </button>
+            <button class="numpad-btn" data-type="digit" data-value="8">
+              8
+            </button>
+            <button class="numpad-btn" data-type="digit" data-value="9">
+              9
+            </button>
+            <button class="control-btn" data-type="vol_up" data-value="=">
+              Vol &uarr;
+            </button>
+
+            <button
+              class="numpad-btn"
+              data-type="backspace"
+              data-value="Backspace"
+            >
+              &larr;
+            </button>
+            <button class="numpad-btn" data-type="digit" data-value="0">
+              0
+            </button>
+            <button disabled>&nbsp;</button>
+            <!-- Placeholder -->
+            <button class="control-btn" data-type="vol_down" data-value="-">
+              Vol &darr;
+            </button>
+          </div>
+        </div>
+
+        <!-- YouTube Search View -->
+        <div class="search-view">
+          <input
+            type="text"
+            class="search-input-remote"
+            placeholder="Search on YouTube..."
+          />
+          <button class="search-submit-btn">Search</button>
+          <div class="search-controls">
+            <button data-type="nav_up" data-value="ArrowUp">&uarr;</button>
+            <button data-type="nav_down" data-value="ArrowDown">&darr;</button>
+            <button class="search-back-btn">Back</button>
+            <button class="search-ok-btn" data-type="enter" data-value="Enter">
+              OK
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const socket = io({ query: { clientType: "remote" } });
+
+        // DOM Elements
+        const remoteView = document.querySelector(".remote-view");
+        const searchView = document.querySelector(".search-view");
+        const ytSearchBtn = document.querySelector(
+          'button[data-type="yt_search"]',
+        );
+        const backBtn = document.querySelector(".search-back-btn");
+        const searchInput = document.querySelector(".search-input-remote");
+        const searchSubmitBtn = document.querySelector(".search-submit-btn");
+
+        socket.on("connect", () =>
+          console.log("Connected to Encore Link server."),
+        );
+        socket.on("disconnect", () =>
+          console.log("Disconnected from Encore Link server."),
+        );
+
+        // Universal button click handler
+        const handleButtonClick = (e) => {
+          const button = e.currentTarget;
+          const type = button.dataset.type;
+          const value = button.dataset.value;
+          if (type) {
+            socket.emit("remote-command", { type, value });
+          }
+        };
+
+        // Main remote buttons (excluding YT search)
+        document
+          .querySelectorAll(".remote-grid button:not([data-type='yt_search'])")
+          .forEach((button) => {
+            if (button.disabled) return;
+            button.addEventListener("click", handleButtonClick);
+          });
+
+        // Search view buttons
+        document
+          .querySelectorAll(".search-controls button")
+          .forEach((button) => {
+            button.addEventListener("click", handleButtonClick);
+          });
+
+        // View Toggling Logic
+        ytSearchBtn.addEventListener("click", () => {
+          remoteView.classList.remove("active");
+          searchView.classList.add("active");
+          socket.emit("remote-command", { type: "yt_search_open" });
+          searchInput.focus();
+        });
+
+        backBtn.addEventListener("click", () => {
+          searchView.classList.remove("active");
+          remoteView.classList.add("active");
+          socket.emit("remote-command", { type: "yt_search_close" });
+        });
+
+        // Search Submission Logic
+        const submitSearch = () => {
+          const query = searchInput.value.trim();
+          if (query) {
+            socket.emit("remote-command", {
+              type: "yt_search_query",
+              value: query,
+            });
+          }
+        };
+
+        searchSubmitBtn.addEventListener("click", submitSearch);
+        searchInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            submitSearch();
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

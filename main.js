@@ -287,8 +287,43 @@ app.whenReady().then(() => {
   });
 
   io.on("connection", async (socket) => {
+    // --- START: Added for Encore Link ---
+    const clientType = socket.handshake.query.clientType;
+
+    if (clientType === "app") {
+      console.log("[LINK] Main App connected.");
+      socket.join("karaoke-app"); // The app joins a room
+      socket.on("disconnect", () => {
+        console.log("[LINK] Main App disconnected.");
+      });
+      return; // Don't proceed to YouTubeCastReceiver setup for the app's link connection
+    }
+
+    if (clientType === "remote") {
+      console.log("[LINK] Remote connected.");
+      socket.on("remote-command", (data) => {
+        console.log("[LINK] Received command from remote:", data);
+        // Send command to the 'karaoke-app' room
+        io.to("karaoke-app").emit("execute-command", data);
+      });
+      socket.on("disconnect", () => {
+        console.log("[LINK] Remote disconnected.");
+      });
+      return; // Don't proceed to YouTubeCastReceiver setup for remotes
+    }
+    // --- END: Added for Encore Link ---
+
+    // --- Existing YouTubeCastReceiver logic ---
     console.log("connection attempt");
     const details = socket.handshake.auth;
+    if (!details || !details.name) {
+      console.log(
+        "Connection rejected: Not a remote/app and no YT Cast auth details.",
+      );
+      socket.disconnect();
+      return;
+    }
+
     const player = new SocketPlayer(socket);
     const receiver = new YouTubeCastReceiver(player, {
       device: {
@@ -335,6 +370,7 @@ app.whenReady().then(() => {
       }
     });
   });
+
   server.get("/local_ip", (req, res) => {
     res.send(local_ip);
   });

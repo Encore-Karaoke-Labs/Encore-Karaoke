@@ -277,6 +277,155 @@ const Romanizer = {
   },
 };
 
+// --- OSD Modules ---
+const TransposeOSD = {
+  osd: null,
+  timeout: null,
+  visible: false,
+
+  init(container) {
+    const osd = new Html("div")
+      .styleJs({
+        position: "absolute",
+        right: "2rem",
+        bottom: "2rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+        fontFamily: "'Rajdhani', sans-serif",
+        fontWeight: "700",
+        opacity: "0",
+        transition: "opacity 0.3s ease, bottom 0.3s ease",
+        pointerEvents: "none",
+        zIndex: 100000,
+      })
+      .appendTo(container);
+
+    const osdBox = new Html("div")
+      .styleJs({
+        background: "rgba(0,0,0,0.7)",
+        border: "1px solid rgba(255,255,255,0.3)",
+        borderRadius: "0.5rem",
+        padding: "0.6rem 1.2rem",
+        minWidth: "240px",
+      })
+      .appendTo(osd);
+
+    new Html("div")
+      .styleJs({
+        color: "#FFD700",
+        fontSize: "1rem",
+        letterSpacing: "0.1rem",
+        marginBottom: "0.25rem",
+      })
+      .text("TRANSPOSE")
+      .appendTo(osdBox);
+
+    this.transposeDisplay = new Html("div")
+      .styleJs({
+        color: "#89CFF0",
+        fontSize: "2rem",
+        letterSpacing: "0.2rem",
+        textAlign: "center",
+      })
+      .appendTo(osdBox);
+
+    this.osd = osd;
+  },
+
+  show(semitones) {
+    if (this.timeout) clearTimeout(this.timeout);
+    const sign = semitones > 0 ? "+" : "";
+    this.transposeDisplay.text(`${sign}${semitones}`);
+
+    this.osd.styleJs({
+      opacity: "1",
+      bottom: VolumeOSD.visible ? "8rem" : "2rem",
+    });
+
+    this.visible = true;
+    this.timeout = setTimeout(() => {
+      this.osd.styleJs({ opacity: "0" });
+      this.visible = false;
+    }, 3000);
+  },
+};
+
+const VolumeOSD = {
+  osd: null,
+  timeout: null,
+  visible: false,
+
+  init(container) {
+    const osd = new Html("div")
+      .styleJs({
+        position: "absolute",
+        right: "2rem",
+        bottom: "2rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+        fontFamily: "'Rajdhani', sans-serif",
+        fontWeight: "700",
+        opacity: "0",
+        transition: "opacity 0.3s ease",
+        pointerEvents: "none",
+        zIndex: 100000,
+      })
+      .appendTo(container);
+
+    const osdBox = new Html("div")
+      .styleJs({
+        background: "rgba(0,0,0,0.7)",
+        border: "1px solid rgba(255,255,255,0.3)",
+        borderRadius: "0.5rem",
+        padding: "0.6rem 1.2rem",
+        minWidth: "240px",
+      })
+      .appendTo(osd);
+
+    new Html("div")
+      .styleJs({
+        color: "#FFD700",
+        fontSize: "1rem",
+        letterSpacing: "0.1rem",
+        marginBottom: "0.25rem",
+      })
+      .text("VOLUME")
+      .appendTo(osdBox);
+
+    this.volumeDisplay = new Html("div")
+      .styleJs({
+        color: "#89CFF0",
+        fontSize: "2rem",
+        letterSpacing: "0.2rem",
+        textAlign: "center",
+      })
+      .appendTo(osdBox);
+
+    this.osd = osd;
+  },
+
+  show(volume) {
+    if (this.timeout) clearTimeout(this.timeout);
+    this.volumeDisplay.text(`${Math.round(volume * 100)}%`);
+    this.osd.styleJs({ opacity: "1" });
+    this.visible = true;
+
+    if (TransposeOSD.visible) {
+      TransposeOSD.osd.styleJs({ bottom: "8rem" });
+    }
+
+    this.timeout = setTimeout(() => {
+      this.osd.styleJs({ opacity: "0" });
+      this.visible = false;
+      if (TransposeOSD.visible) {
+        TransposeOSD.osd.styleJs({ bottom: "2rem" });
+      }
+    }, 3000);
+  },
+};
+
 const pkg = {
   name: "Encore Home",
   type: "app",
@@ -290,6 +439,9 @@ const pkg = {
 
     wrapper = new Html("div").class("full-ui").appendTo("body");
     Ui.becomeTopUi(Pid, wrapper);
+
+    const socket = io({ query: { clientType: "app" } });
+    socket.on("connect", () => console.log("[LINK] Connected to server."));
 
     const songList = FsSvc.getSongList();
     const songMap = new Map(songList.map((song) => [song.code, song]));
@@ -343,6 +495,11 @@ const pkg = {
         .bgv-container { position: absolute; inset: 0; background-color: #000; overflow: hidden; z-index: 1; }
         .youtube-player-container { position: absolute; inset: 0; z-index: 2; background: #000; }
         .youtube-player-container iframe { width: 100%; height: 100%; border: none; }
+
+        .qr-code-container { position: absolute; bottom: 2rem; left: 2rem; z-index: 11; display: flex; align-items: center; gap: 0.5rem; background: rgba(0,0,0,0.5); padding: 0.5rem; border-radius: 0.25rem; }
+        .qr-code-container img { width: 50px; height: 50px; }
+        .qr-code-container p { margin: 0; font-family: 'Rajdhani', sans-serif; font-size: 0.9rem; color: rgba(255,255,255,0.7); }
+        .mode-player .qr-code-container, .mode-yt-search .qr-code-container { display: none; }
 
         .overlay-ui { display: flex; align-items: stretch; gap: 3rem; position: relative; width: 100%; height: 100%; padding: 2rem 3rem; background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 20%, transparent 50%, rgba(0,0,0,0.9) 100%); transition: opacity 0.3s ease-out; z-index: 10; }
         .hidden { opacity: 0; pointer-events: none; }
@@ -441,7 +598,24 @@ const pkg = {
       songItemElements.push(item);
     });
 
-    // --- YouTube Search UI ---
+    const qrContainer = new Html("div")
+      .class("qr-code-container")
+      .appendTo(wrapper);
+    const qrImg = new Html("img").appendTo(qrContainer);
+    new Html("p").text("Use your phone as a remote!").appendTo(qrContainer);
+
+    try {
+      const response = await fetch("http://127.0.0.1:9864/local_ip");
+      const local_ip = await response.text();
+      const remoteUrl = `http://${local_ip}:9864/remote`;
+      qrImg.attr({
+        src: `http://127.0.0.1:9864/qr?url=${encodeURIComponent(remoteUrl)}`,
+      });
+    } catch (e) {
+      console.error("Could not fetch local IP for QR code", e);
+      qrContainer.classOn("hidden");
+    }
+
     const searchWindow = new Html("div")
       .class("search-window")
       .appendTo(searchUi);
@@ -456,7 +630,6 @@ const pkg = {
       .class("search-results-container")
       .appendTo(searchWindow);
 
-    // --- Player UI ---
     const lrcLyricsContainer = new Html("div")
       .class("lyrics-container")
       .appendTo(playerUi);
@@ -479,7 +652,6 @@ const pkg = {
       .class("progress-bar")
       .appendTo(playerProgress);
 
-    // --- HUD UI ---
     const karaokeHud = new Html("div").class("karaoke-hud").appendTo(wrapper);
     const reservationBox = new Html("div")
       .class("hud-box")
@@ -540,7 +712,7 @@ const pkg = {
 
       if (newMode === "menu") {
         overlay.classOff("hidden");
-        searchInput.elm.blur(); // Explicitly remove focus
+        searchInput.elm.blur();
         updateMenuUI();
       } else if (newMode === "player") {
         playerUi.classOff("hidden");
@@ -939,8 +1111,6 @@ const pkg = {
       state.currentSongIsYouTube = false;
 
       if (wasYouTube) {
-        // If it was a YouTube video, no 'stopped' event will be fired.
-        // We must manually handle the transition.
         if (state.reservationQueue.length > 0) {
           const nextCode = state.reservationQueue.shift();
           updateHud();
@@ -951,17 +1121,11 @@ const pkg = {
           return;
         }
       } else {
-        // For a regular track, the playbackUpdateHandler will take care of
-        // the transition if a song is queued. We just exit and let it fire.
         if (state.reservationQueue.length > 0) {
           return;
         }
       }
 
-      // If we reach here, it means either:
-      // 1. A YouTube video was stopped and the queue was empty.
-      // 2. A regular song was stopped and the queue was empty.
-      // In both cases, the correct action is to return to the menu.
       setMode("menu");
       window.desktopIntegration.ipc.send("setRPC", {
         details: `Browsing ${songList.length} Songs...`,
@@ -983,184 +1147,259 @@ const pkg = {
       }
     };
 
-    keydownHandler = (e) => {
-      const isSearchInputFocused = document.activeElement === searchInput.elm;
-
-      if (isSearchInputFocused) {
-        const handledKeys = ["ArrowUp", "ArrowDown", "Enter", "Escape"];
-        if (e.key === "Backspace" && searchInput.getValue().length === 0) {
-          e.preventDefault();
-          setMode("menu");
-          return;
-        }
-        if (handledKeys.includes(e.key)) {
-          e.preventDefault();
-        } else {
-          return;
-        }
-      } else {
-        e.preventDefault();
+    const handleDigitInput = (digit) => {
+      const target =
+        state.mode === "player" ? "reservationNumber" : "songNumber";
+      if (state[target].length < maxLength) {
+        state[target] += digit;
+        Sfx.playSfx("deck_ui_navigation.wav");
       }
+      if (state.mode === "player") updateReservationUI();
+      else updateMenuUI();
+    };
 
-      if (e.key === "[" || e.key === "]") {
-        BGVPlayer.cycleCategory(e.key === "[" ? -1 : 1);
-        return;
-      }
-
-      if (e.key === "-" || e.key === "=") {
-        const change = e.key === "-" ? -0.05 : 0.05;
-        state.volume = Math.max(0, Math.min(1, state.volume + change));
-        Forte.setTrackVolume(state.volume);
-        VolumeOSD.show(state.volume);
-        const updatedConfig = {
-          ...config,
-          audioConfig: {
-            ...config.audioConfig,
-            mix: {
-              ...config.audioConfig.mix,
-              instrumental: {
-                ...config.audioConfig.mix.instrumental,
-                volume: state.volume,
-              },
-            },
-          },
-        };
-        window.desktopIntegration.ipc.send("updateConfig", updatedConfig);
-        return;
-      }
-
-      if (state.mode === "menu") {
-        if (e.key.toLowerCase() === "y") {
-          setMode("yt-search");
-          return;
-        }
-        if (e.key >= "0" && e.key <= "9") {
-          if (state.songNumber.length < maxLength) {
-            state.songNumber += e.key;
-            Sfx.playSfx("deck_ui_navigation.wav");
-          }
-        } else if (e.key === "Backspace") {
-          if (state.songNumber.length > 0) {
-            state.songNumber = state.songNumber.slice(0, -1);
-            Sfx.playSfx("deck_ui_out_of_game_detail.wav");
-          }
-        } else if (e.key === "ArrowDown") {
-          state.songNumber = "";
-          const newIndex = Math.min(
-            songList.length - 1,
-            state.highlightedIndex < 0 ? 0 : state.highlightedIndex + 1,
-          );
-          if (newIndex !== state.highlightedIndex) {
-            state.highlightedIndex = newIndex;
-            Sfx.playSfx("deck_ui_navigation.wav");
-          }
-        } else if (e.key === "ArrowUp") {
-          state.songNumber = "";
-          const newIndex = Math.max(0, state.highlightedIndex - 1);
-          if (newIndex !== state.highlightedIndex) {
-            state.highlightedIndex = newIndex;
-            Sfx.playSfx("deck_ui_navigation.wav");
-          }
-        } else if (e.key === "Enter") {
-          handleSubmit();
-        }
-        updateMenuUI();
-      } else if (state.mode === "yt-search") {
-        if (e.key === "Escape") {
-          setMode("menu");
-        } else if (e.key === "ArrowDown") {
-          if (isSearchInputFocused) {
-            searchInput.elm.blur();
-            state.highlightedSearchIndex = 0;
-          } else if (state.searchResults.length > 0) {
-            state.highlightedSearchIndex = Math.min(
-              state.searchResults.length - 1,
-              state.highlightedSearchIndex + 1,
-            );
-          }
-          Sfx.playSfx("deck_ui_navigation.wav");
-          updateSearchHighlight();
-        } else if (e.key === "ArrowUp") {
-          if (!isSearchInputFocused && state.highlightedSearchIndex === 0) {
-            state.highlightedSearchIndex = -1;
-            searchInput.elm.focus();
-          } else if (state.searchResults.length > 0) {
-            state.highlightedSearchIndex = Math.max(
-              0,
-              state.highlightedSearchIndex - 1,
-            );
-          }
-          Sfx.playSfx("deck_ui_navigation.wav");
-          updateSearchHighlight();
-        } else if (e.key === "Enter") {
-          if (state.highlightedSearchIndex !== -1) {
-            const video = state.searchResults[state.highlightedSearchIndex];
-            if (video) {
-              const songToPlay = {
-                title: video.title,
-                artist: video.channelTitle,
-                path: `yt://${video.id}`,
-              };
-              Sfx.playSfx("deck_ui_into_game_detail.wav");
-              startPlayer(songToPlay);
-            }
-          }
-        }
-      } else if (state.mode === "player") {
-        if (
-          !state.currentSongIsYouTube &&
-          (e.key === "ArrowUp" || e.key === "ArrowDown")
-        ) {
-          const playbackState = Forte.getPlaybackState();
-          const change = e.key === "ArrowUp" ? 1 : -1;
-          const currentTranspose = playbackState.transpose || 0;
-          const newTranspose = Math.max(
-            -24,
-            Math.min(24, currentTranspose + change),
-          );
-          Forte.setTranspose(newTranspose);
-          TransposeOSD.show(newTranspose);
-          return;
-        }
-
-        if (e.key >= "0" && e.key <= "9") {
-          if (state.reservationNumber.length < maxLength) {
-            state.reservationNumber += e.key;
-            Sfx.playSfx("deck_ui_navigation.wav");
-          }
+    const handleBackspace = () => {
+      if (state.mode === "player") {
+        if (state.reservationNumber.length > 0) {
+          state.reservationNumber = state.reservationNumber.slice(0, -1);
+          Sfx.playSfx("deck_ui_out_of_game_detail.wav");
           updateReservationUI();
-        } else if (e.key === "Backspace") {
-          if (state.reservationNumber.length > 0) {
-            state.reservationNumber = state.reservationNumber.slice(0, -1);
-            Sfx.playSfx("deck_ui_out_of_game_detail.wav");
-            updateReservationUI();
-          } else {
-            Sfx.playSfx("deck_ui_out_of_game_detail.wav");
-            stopPlayer();
-          }
-        } else if (e.key === "Enter") {
-          if (state.reservationNumber.length > 0) {
-            const code = state.reservationNumber.padStart(maxLength, "0");
-            if (songMap.has(code)) {
-              state.reservationQueue.push(code);
-              Sfx.playSfx("deck_ui_into_game_detail.wav");
-              state.reservationNumber = "";
-              updateHud();
-            } else {
-              Sfx.playSfx("deck_ui_out_of_game_detail.wav");
-            }
-          }
-        } else if (e.key === "Escape") {
-          if (state.reservationNumber.length > 0) {
+        } else {
+          Sfx.playSfx("deck_ui_out_of_game_detail.wav");
+          stopPlayer();
+        }
+      } else if (state.mode === "menu") {
+        if (state.songNumber.length > 0) {
+          state.songNumber = state.songNumber.slice(0, -1);
+          Sfx.playSfx("deck_ui_out_of_game_detail.wav");
+          updateMenuUI();
+        }
+      } else if (
+        state.mode === "yt-search" &&
+        searchInput.getValue().length === 0
+      ) {
+        setMode("menu");
+      }
+    };
+
+    const handleEnter = () => {
+      if (state.mode === "menu") {
+        handleSubmit();
+      } else if (state.mode === "player") {
+        if (state.reservationNumber.length > 0) {
+          const code = state.reservationNumber.padStart(maxLength, "0");
+          if (songMap.has(code)) {
+            state.reservationQueue.push(code);
+            Sfx.playSfx("deck_ui_into_game_detail.wav");
             state.reservationNumber = "";
-            Sfx.playSfx("deck_ui_out_of_game_detail.wav");
-            updateReservationUI();
+            updateHud();
           } else {
-            stopPlayer();
+            Sfx.playSfx("deck_ui_out_of_game_detail.wav");
+          }
+        }
+      } else if (state.mode === "yt-search") {
+        if (state.highlightedSearchIndex !== -1) {
+          const video = state.searchResults[state.highlightedSearchIndex];
+          if (video) {
+            const songToPlay = {
+              title: video.title,
+              artist: video.channelTitle,
+              path: `yt://${video.id}`,
+            };
+            Sfx.playSfx("deck_ui_into_game_detail.wav");
+            startPlayer(songToPlay);
           }
         }
       }
     };
+
+    const handleEscape = () => {
+      if (state.mode === "player") {
+        if (state.reservationNumber.length > 0) {
+          state.reservationNumber = "";
+          Sfx.playSfx("deck_ui_out_of_game_detail.wav");
+          updateReservationUI();
+        } else {
+          stopPlayer();
+        }
+      } else if (state.mode === "yt-search") {
+        setMode("menu");
+      }
+    };
+
+    const handleVolume = (direction) => {
+      const change = direction === "up" ? 0.05 : -0.05;
+      state.volume = Math.max(0, Math.min(1, state.volume + change));
+      Forte.setTrackVolume(state.volume);
+      VolumeOSD.show(state.volume);
+      const updatedConfig = {
+        ...config,
+        audioConfig: {
+          ...config.audioConfig,
+          mix: {
+            ...config.audioConfig.mix,
+            instrumental: {
+              ...config.audioConfig.mix.instrumental,
+              volume: state.volume,
+            },
+          },
+        },
+      };
+      window.desktopIntegration.ipc.send("updateConfig", updatedConfig);
+    };
+
+    const handleTranspose = (direction) => {
+      if (state.mode !== "player" || state.currentSongIsYouTube) return;
+      const playbackState = Forte.getPlaybackState();
+      const change = direction === "up" ? 1 : -1;
+      const currentTranspose = playbackState.transpose || 0;
+      const newTranspose = Math.max(
+        -24,
+        Math.min(24, currentTranspose + change),
+      );
+      Forte.setTranspose(newTranspose);
+      TransposeOSD.show(newTranspose);
+    };
+
+    const handleMenuNav = (direction) => {
+      if (state.mode !== "menu") return;
+      const change = direction === "down" ? 1 : -1;
+      state.songNumber = "";
+      let newIndex;
+      if (change > 0) {
+        newIndex = Math.min(
+          songList.length - 1,
+          state.highlightedIndex < 0 ? 0 : state.highlightedIndex + 1,
+        );
+      } else {
+        newIndex = Math.max(0, state.highlightedIndex - 1);
+      }
+      if (newIndex !== state.highlightedIndex) {
+        state.highlightedIndex = newIndex;
+        Sfx.playSfx("deck_ui_navigation.wav");
+      }
+      updateMenuUI();
+    };
+
+    const handleSearchNav = (direction) => {
+      if (state.mode !== "yt-search") return;
+      const change = direction === "down" ? 1 : -1;
+      const isSearchInputFocused = document.activeElement === searchInput.elm;
+      if (isSearchInputFocused && change > 0) {
+        searchInput.elm.blur();
+        state.highlightedSearchIndex = 0;
+      } else if (
+        !isSearchInputFocused &&
+        change < 0 &&
+        state.highlightedSearchIndex === 0
+      ) {
+        state.highlightedSearchIndex = -1;
+        searchInput.elm.focus();
+      } else if (state.searchResults.length > 0) {
+        state.highlightedSearchIndex = Math.max(
+          0,
+          Math.min(
+            state.searchResults.length - 1,
+            state.highlightedSearchIndex + change,
+          ),
+        );
+      }
+      Sfx.playSfx("deck_ui_navigation.wav");
+      updateSearchHighlight();
+    };
+
+    keydownHandler = (e) => {
+      const isSearchInputFocused = document.activeElement === searchInput.elm;
+      if (isSearchInputFocused) {
+        if (e.key === "Backspace" && searchInput.getValue().length === 0) {
+          e.preventDefault();
+          handleBackspace();
+          return;
+        }
+        if (["ArrowUp", "ArrowDown", "Enter", "Escape"].includes(e.key))
+          e.preventDefault();
+        else return;
+      } else {
+        e.preventDefault();
+      }
+
+      if (e.key >= "0" && e.key <= "9") handleDigitInput(e.key);
+      else if (e.key === "Backspace") handleBackspace();
+      else if (e.key === "Enter") handleEnter();
+      else if (e.key === "Escape") handleEscape();
+      else if (e.key === "ArrowUp") {
+        if (state.mode === "menu") handleMenuNav("up");
+        else if (state.mode === "yt-search") handleSearchNav("up");
+        else if (state.mode === "player") handleTranspose("up");
+      } else if (e.key === "ArrowDown") {
+        if (state.mode === "menu") handleMenuNav("down");
+        else if (state.mode === "yt-search") handleSearchNav("down");
+        else if (state.mode === "player") handleTranspose("down");
+      } else if (e.key === "-") handleVolume("down");
+      else if (e.key === "=") handleVolume("up");
+      else if (e.key === "[" || e.key === "]")
+        BGVPlayer.cycleCategory(e.key === "[" ? -1 : 1);
+      else if (e.key.toLowerCase() === "y" && state.mode === "menu")
+        setMode("yt-search");
+    };
+
+    socket.on("execute-command", (data) => {
+      console.log("[LINK] Executing command:", data);
+      switch (data.type) {
+        case "digit":
+          handleDigitInput(data.value);
+          break;
+        case "backspace":
+          handleBackspace();
+          break;
+        case "reserve":
+        case "enter": // Now used by remote's "OK" button in search
+          handleEnter();
+          break;
+        case "stop":
+          handleEscape();
+          break;
+        case "vol_up":
+          handleVolume("up");
+          break;
+        case "vol_down":
+          handleVolume("down");
+          break;
+        case "key_up":
+          handleTranspose("up");
+          break;
+        case "key_down":
+          handleTranspose("down");
+          break;
+
+        // --- STATE-AWARE COMMANDS ---
+        case "yt_search_open":
+          // Only open search if in the main menu
+          if (state.mode === "menu") {
+            setMode("yt-search");
+          }
+          break;
+        case "yt_search_close":
+          // Only close search if it's currently open
+          if (state.mode === "yt-search") {
+            setMode("menu");
+          }
+          break;
+
+        // --- SEARCH-SPECIFIC COMMANDS ---
+        case "nav_up":
+          handleSearchNav("up");
+          break;
+        case "nav_down":
+          handleSearchNav("down");
+          break;
+        case "yt_search_query":
+          // Correctly set the value on the underlying DOM element
+          searchInput.elm.value = data.value;
+          performSearch();
+          break;
+      }
+    });
 
     playbackUpdateHandler = (e) => {
       const { status } = e.detail || {};
@@ -1193,7 +1432,6 @@ const pkg = {
     await BGVPlayer.init(bgvContainer);
     BGVPlayer.start();
 
-    // Ensure everything is loaded before showing UI
     setTimeout(() => {
       wrapper.classOff("loading");
       Ui.transition("fadeIn", wrapper);
@@ -1231,154 +1469,6 @@ const pkg = {
     Sfx.playSfx("deck_ui_out_of_game_detail.wav");
     Ui.giveUpUi(Pid);
     wrapper.cleanup();
-  },
-};
-
-const TransposeOSD = {
-  osd: null,
-  timeout: null,
-  visible: false,
-
-  init(container) {
-    const osd = new Html("div")
-      .styleJs({
-        position: "absolute",
-        right: "2rem",
-        bottom: "2rem",
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.75rem",
-        fontFamily: "'Rajdhani', sans-serif",
-        fontWeight: "700",
-        opacity: "0",
-        transition: "opacity 0.3s ease, bottom 0.3s ease",
-        pointerEvents: "none",
-        zIndex: 100000,
-      })
-      .appendTo(container);
-
-    const osdBox = new Html("div")
-      .styleJs({
-        background: "rgba(0,0,0,0.7)",
-        border: "1px solid rgba(255,255,255,0.3)",
-        borderRadius: "0.5rem",
-        padding: "0.6rem 1.2rem",
-        minWidth: "240px",
-      })
-      .appendTo(osd);
-
-    new Html("div")
-      .styleJs({
-        color: "#FFD700",
-        fontSize: "1rem",
-        letterSpacing: "0.1rem",
-        marginBottom: "0.25rem",
-      })
-      .text("TRANSPOSE")
-      .appendTo(osdBox);
-
-    this.transposeDisplay = new Html("div")
-      .styleJs({
-        color: "#89CFF0",
-        fontSize: "2rem",
-        letterSpacing: "0.2rem",
-        textAlign: "center",
-      })
-      .appendTo(osdBox);
-
-    this.osd = osd;
-  },
-
-  show(semitones) {
-    if (this.timeout) clearTimeout(this.timeout);
-    const sign = semitones > 0 ? "+" : "";
-    this.transposeDisplay.text(`${sign}${semitones}`);
-
-    this.osd.styleJs({
-      opacity: "1",
-      bottom: VolumeOSD.visible ? "8rem" : "2rem",
-    });
-
-    this.visible = true;
-    this.timeout = setTimeout(() => {
-      this.osd.styleJs({ opacity: "0" });
-      this.visible = false;
-    }, 3000);
-  },
-};
-
-const VolumeOSD = {
-  osd: null,
-  timeout: null,
-  visible: false,
-
-  init(container) {
-    const osd = new Html("div")
-      .styleJs({
-        position: "absolute",
-        right: "2rem",
-        bottom: "2rem",
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.75rem",
-        fontFamily: "'Rajdhani', sans-serif",
-        fontWeight: "700",
-        opacity: "0",
-        transition: "opacity 0.3s ease",
-        pointerEvents: "none",
-        zIndex: 100000,
-      })
-      .appendTo(container);
-
-    const osdBox = new Html("div")
-      .styleJs({
-        background: "rgba(0,0,0,0.7)",
-        border: "1px solid rgba(255,255,255,0.3)",
-        borderRadius: "0.5rem",
-        padding: "0.6rem 1.2rem",
-        minWidth: "240px",
-      })
-      .appendTo(osd);
-
-    new Html("div")
-      .styleJs({
-        color: "#FFD700",
-        fontSize: "1rem",
-        letterSpacing: "0.1rem",
-        marginBottom: "0.25rem",
-      })
-      .text("VOLUME")
-      .appendTo(osdBox);
-
-    this.volumeDisplay = new Html("div")
-      .styleJs({
-        color: "#89CFF0",
-        fontSize: "2rem",
-        letterSpacing: "0.2rem",
-        textAlign: "center",
-      })
-      .appendTo(osdBox);
-
-    this.osd = osd;
-  },
-
-  show(volume) {
-    if (this.timeout) clearTimeout(this.timeout);
-    this.volumeDisplay.text(`${Math.round(volume * 100)}%`);
-    this.osd.styleJs({ opacity: "1" });
-    this.visible = true;
-
-    if (TransposeOSD.visible) {
-      TransposeOSD.osd.styleJs({ bottom: "8rem" });
-    }
-
-    this.timeout = setTimeout(() => {
-      this.osd.styleJs({ opacity: "0" });
-      this.visible = false;
-      if (TransposeOSD.visible) {
-        TransposeOSD.osd.styleJs({ bottom: "2rem" });
-      }
-    }, 3000);
   },
 };
 
