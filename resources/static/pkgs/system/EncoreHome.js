@@ -873,6 +873,7 @@ const pkg = {
       });
 
       if (state.currentSongIsYouTube) {
+        BGVPlayer.stop();
         bgvContainer.classOn("hidden");
         youtubePlayerContainer.classOff("hidden");
         const videoId = song.path.substring(5);
@@ -886,6 +887,13 @@ const pkg = {
         midiLyricsContainer.classOn("hidden");
         playerProgress.classOn("hidden");
       } else {
+        // If BGV was stopped (e.g., for a previous YT video), restart it.
+        if (
+          BGVPlayer.videoElements.length > 0 &&
+          !BGVPlayer.videoElements[0].hasAttribute("src")
+        ) {
+          BGVPlayer.start();
+        }
         bgvContainer.classOff("hidden");
         youtubePlayerContainer.classOn("hidden");
         youtubeIframe.attr({ src: "" });
@@ -1124,6 +1132,14 @@ const pkg = {
         if (state.reservationQueue.length > 0) {
           return;
         }
+      }
+
+      // If BGV was stopped (e.g., for YouTube), restart it for the menu.
+      if (
+        BGVPlayer.videoElements.length > 0 &&
+        !BGVPlayer.videoElements[0].hasAttribute("src")
+      ) {
+        BGVPlayer.start();
       }
 
       setMode("menu");
