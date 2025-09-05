@@ -4,6 +4,9 @@ import {
   Sequencer,
 } from "https://cdn.jsdelivr.net/npm/spessasynth_lib@3.27.8/+esm";
 import Html from "/libs/html.js"; // Import the Html library
+// --- START: SCORING ENGINE ---
+import { PitchDetector } from "https://cdn.jsdelivr.net/npm/pitchy@4.1.0/+esm";
+// --- END: SCORING ENGINE ---
 
 // --- START: Added for PeerJS Mic ---
 // Helper to dynamically load a script
@@ -43,24 +46,44 @@ const sfxCache = new Map();
 
 // --- Combined Service State ---
 const state = {
-  vocalEngine: {
-    connected: false,
-    running: false,
-    config: { input_device: null, output_device: null, buffer_size: 1024 },
-    devices: { inputs: [], outputs: [] },
+  // --- START: SCORING ENGINE (Replaces Vocal Engine) ---
+  scoring: {
+    enabled: false,
+    micStream: null,
+    micSourceNode: null,
+    micAnalyser: null,
+    vocalGuideAnalyser: null,
+    pitchDetector: null,
+    score: 0,
+    // --- NEW CUMULATIVE SCORING STATE V3 ---
+    highestScoreThisSong: 0, // Tracks the peak score to prevent visual dips
+    guideVocalDelayNode: null, // For latency compensation
+    totalScorableNotes: 0,
+    notesHit: 0,
+    isVocalGuideNoteActive: false,
+    hasHitCurrentNote: false,
+    guideNoteDebounceStart: 0,
+    // --- END NEW STATE ---
+    micDevices: [],
+    currentMicDeviceId: "default",
   },
+  // --- END: SCORING ENGINE ---
   playback: {
     status: "stopped",
     buffer: null,
     synthesizer: null,
     sequencer: null,
     isMidi: false,
+    isMultiplexed: false,
     decodedLyrics: [],
     startTime: 0,
     pauseTime: 0,
     devices: [],
     currentDeviceId: "default",
     transpose: 0,
+    multiplexPan: -1, // Default pan to left (instrumental)
+    leftPannerGain: null,
+    rightPannerGain: null,
   },
   mic: {
     peerId: null,
@@ -85,6 +108,118 @@ function dispatchPlaybackUpdate() {
   );
 }
 
+// --- START: SCORING ENGINE ---
+// Create reusable buffers for performance.
+let guideAnalyserBuffer = null;
+let micAnalyserBuffer = null;
+
+// --- NEW SCORING CONSTANTS ---
+const GUIDE_CLARITY_THRESHOLD = 0.9;
+const MIC_CLARITY_THRESHOLD = 0.85;
+const NOTE_DEBOUNCE_DURATION_MS = 50;
+const LATENCY_COMPENSATION_S = 0.15; // 150ms latency compensation
+
+/**
+ * Calculates the score based on a debounced, cumulative, latency-compensated algorithm.
+ */
+function updateScore() {
+  if (
+    !state.scoring.enabled ||
+    !state.scoring.pitchDetector ||
+    !state.scoring.vocalGuideAnalyser ||
+    !state.scoring.micAnalyser
+  ) {
+    return;
+  }
+
+  const pitchDetector = state.scoring.pitchDetector;
+  const guideAnalyser = state.scoring.vocalGuideAnalyser;
+  const micAnalyser = state.scoring.micAnalyser;
+
+  if (!guideAnalyserBuffer) {
+    guideAnalyserBuffer = new Float32Array(guideAnalyser.fftSize);
+  }
+  if (!micAnalyserBuffer) {
+    micAnalyserBuffer = new Float32Array(micAnalyser.fftSize);
+  }
+
+  guideAnalyser.getFloatTimeDomainData(guideAnalyserBuffer);
+  micAnalyser.getFloatTimeDomainData(micAnalyserBuffer);
+
+  const [guidePitch, guideClarity] = pitchDetector.findPitch(
+    guideAnalyserBuffer,
+    audioContext.sampleRate,
+  );
+  const [micPitch, micClarity] = pitchDetector.findPitch(
+    micAnalyserBuffer,
+    audioContext.sampleRate,
+  );
+
+  // 1. Guide Note State Machine
+  if (guideClarity > GUIDE_CLARITY_THRESHOLD) {
+    if (state.scoring.guideNoteDebounceStart === 0) {
+      state.scoring.guideNoteDebounceStart = performance.now();
+    }
+    if (
+      !state.scoring.isVocalGuideNoteActive &&
+      performance.now() - state.scoring.guideNoteDebounceStart >
+        NOTE_DEBOUNCE_DURATION_MS
+    ) {
+      state.scoring.isVocalGuideNoteActive = true;
+      state.scoring.hasHitCurrentNote = false;
+      state.scoring.totalScorableNotes++;
+    }
+  } else {
+    state.scoring.guideNoteDebounceStart = 0;
+    state.scoring.isVocalGuideNoteActive = false;
+  }
+
+  // 2. User Scoring Logic
+  if (
+    state.scoring.isVocalGuideNoteActive &&
+    !state.scoring.hasHitCurrentNote &&
+    micClarity > MIC_CLARITY_THRESHOLD &&
+    micPitch > 50
+  ) {
+    let normalizedMicPitch = micPitch;
+    while (normalizedMicPitch < guidePitch * 0.75) {
+      normalizedMicPitch *= 2;
+    }
+    while (normalizedMicPitch > guidePitch * 1.5) {
+      normalizedMicPitch /= 2;
+    }
+
+    const centsDifference = 1200 * Math.log2(normalizedMicPitch / guidePitch);
+    if (Math.abs(centsDifference) < 50) {
+      state.scoring.notesHit++;
+      state.scoring.hasHitCurrentNote = true;
+    }
+  }
+
+  // 3. Final Score Calculation
+  if (state.scoring.totalScorableNotes > 0) {
+    state.scoring.score = Math.round(
+      (state.scoring.notesHit / state.scoring.totalScorableNotes) * 100,
+    );
+  } else {
+    state.scoring.score = 0;
+  }
+
+  // 4. Update the highest score tracker
+  state.scoring.highestScoreThisSong = Math.max(
+    state.scoring.highestScoreThisSong,
+    state.scoring.score,
+  );
+
+  // Dispatch event with the HIGHEST score, so the UI never dips.
+  document.dispatchEvent(
+    new CustomEvent("CherryTree.Forte.Scoring.Update", {
+      detail: { score: state.scoring.highestScoreThisSong },
+    }),
+  );
+}
+// --- END: SCORING ENGINE ---
+
 function timingLoop() {
   if (state.playback.status !== "playing") {
     animationFrameId = null;
@@ -96,6 +231,11 @@ function timingLoop() {
       detail: { currentTime, duration },
     }),
   );
+
+  if (state.scoring.enabled) {
+    updateScore();
+  }
+
   if (currentTime >= duration && duration > 0) {
     animationFrameId = null;
     return;
@@ -142,19 +282,21 @@ const pkg = {
     `,
       )
       .appendTo("head");
-
     toastElement = new Html("div").classOn("forte-toast").appendTo("body");
-    // --- End Toast UI ---
 
     try {
       audioContext = new (window.AudioContext || window.webkitAudioContext)({
         latencyHint: "interactive",
+        sampleRate: 44100, // Standard sample rate
       });
       masterGain = audioContext.createGain();
       masterGain.connect(audioContext.destination);
       state.playback.currentDeviceId = audioContext.sinkId || "default";
       console.log("[FORTE SVC] Web Audio API context initialized.");
       pkg.data.getPlaybackDevices();
+
+      // Initialize microphone input for scoring
+      await pkg.data.initializeScoringEngine();
 
       try {
         await audioContext.audioWorklet.addModule(
@@ -295,48 +437,6 @@ const pkg = {
       );
     }
     // --- END: Added for PeerJS Mic ---
-
-    socket = io("ws://localhost:8765");
-    socket.on("connect", () => {
-      state.vocalEngine.connected = true;
-      console.log("[FORTE SVC] Connected to vocal engine server.");
-      document.dispatchEvent(
-        new CustomEvent("CherryTree.Forte.Connection.Update", {
-          detail: { connected: true },
-        }),
-      );
-    });
-    socket.on("disconnect", () => {
-      state.vocalEngine.connected = false;
-      state.vocalEngine.running = false;
-      console.warn("[FORTE SVC] Disconnected from vocal engine server.");
-      document.dispatchEvent(
-        new CustomEvent("CherryTree.Forte.Connection.Update", {
-          detail: { connected: false },
-        }),
-      );
-    });
-    socket.on("engine_status", (data) => {
-      state.vocalEngine.running = data.running;
-      state.vocalEngine.config = data.config || state.vocalEngine.config;
-      document.dispatchEvent(
-        new CustomEvent("CherryTree.Forte.Status.Update", {
-          detail: state.vocalEngine,
-        }),
-      );
-    });
-    socket.on("audio_devices", (data) => {
-      state.vocalEngine.devices = data;
-      document.dispatchEvent(
-        new CustomEvent("CherryTree.Forte.Devices.Update", { detail: data }),
-      );
-    });
-    socket.on("error", (data) => {
-      console.error("[FORTE SVC] Error from vocal engine:", data.message);
-      document.dispatchEvent(
-        new CustomEvent("CherryTree.Forte.Error", { detail: data }),
-      );
-    });
   },
 
   data: {
@@ -456,15 +556,21 @@ const pkg = {
         state.playback.sequencer = null;
       }
       state.playback.decodedLyrics = [];
-      state.playback.transpose = 0; // Reset transpose when loading new track
+      state.playback.transpose = 0;
+      state.playback.isMultiplexed = false;
+      state.playback.multiplexPan = -1; // Default pan to left (instrumental)
 
       const isMidi =
         url.toLowerCase().endsWith(".mid") ||
         url.toLowerCase().endsWith(".midi") ||
-        url.toLowerCase().endsWith(".kar"); // KAR is also MIDI
+        url.toLowerCase().endsWith(".kar");
       state.playback.isMidi = isMidi;
 
-      // Update toast text on load
+      if (!isMidi && url.toLowerCase().includes(".multiplexed.")) {
+        state.playback.isMultiplexed = true;
+        console.log("[FORTE SVC] Multiplexed audio track detected.");
+      }
+
       if (toastElement) {
         toastElement.text(isMidi ? "Classic Karaoke" : "Real Sound");
       }
@@ -543,18 +649,18 @@ const pkg = {
         state.playback.buffer = null;
         state.playback.sequencer = null;
         state.playback.isMidi = false;
+        state.playback.isMultiplexed = false;
         return false;
       }
     },
 
     playTrack: () => {
-      // Show toast on play
       if (toastElement) {
         if (toastTimeout) clearTimeout(toastTimeout);
         toastElement.classOn("visible");
         toastTimeout = setTimeout(() => {
           toastElement.classOff("visible");
-        }, 3000); // Hide after 3 seconds
+        }, 3000);
       }
 
       if (audioContext.state === "suspended") {
@@ -572,22 +678,66 @@ const pkg = {
         sourceNode = audioContext.createBufferSource();
         sourceNode.buffer = state.playback.buffer;
 
-        // Set playback rate for transposition
         const rate = Math.pow(2, state.playback.transpose / 12);
         sourceNode.playbackRate.value = rate;
 
-        sourceNode.connect(masterGain);
+        if (state.playback.isMultiplexed) {
+          // --- START: SCORING ENGINE ---
+          // Enable scoring and RESET all cumulative scoring variables
+          state.scoring.enabled = true;
+          state.scoring.score = 0;
+          state.scoring.highestScoreThisSong = 0;
+          state.scoring.notesHit = 0;
+          state.scoring.totalScorableNotes = 0;
+          state.scoring.isVocalGuideNoteActive = false;
+          state.scoring.hasHitCurrentNote = false;
+          state.scoring.guideNoteDebounceStart = 0;
+
+          // Create the analysis graph
+          const vocalGuideAnalyser = audioContext.createAnalyser();
+          vocalGuideAnalyser.fftSize = 2048;
+          state.scoring.vocalGuideAnalyser = vocalGuideAnalyser;
+
+          // --- LATENCY COMPENSATION ---
+          const delayNode = audioContext.createDelay();
+          delayNode.delayTime.value = LATENCY_COMPENSATION_S;
+          state.scoring.guideVocalDelayNode = delayNode;
+          // --- END LATENCY COMPENSATION ---
+
+          const splitter = audioContext.createChannelSplitter(2);
+          const merger = audioContext.createChannelMerger(1);
+          const leftGain = audioContext.createGain();
+          const rightGain = audioContext.createGain();
+
+          state.playback.leftPannerGain = leftGain;
+          state.playback.rightPannerGain = rightGain;
+
+          sourceNode.connect(splitter);
+          splitter.connect(leftGain, 0);
+          splitter.connect(rightGain, 1);
+
+          // Latency-compensated analysis path: splitter -> delay -> analyser
+          splitter.connect(delayNode, 1);
+          delayNode.connect(vocalGuideAnalyser);
+
+          // Audio output path (unaffected by delay)
+          leftGain.connect(merger, 0, 0);
+          rightGain.connect(merger, 0, 0);
+          merger.connect(masterGain);
+
+          pkg.data.setMultiplexPan(state.playback.multiplexPan);
+          console.log("[FORTE SVC] Playing track in multiplexed panner mode.");
+        } else {
+          sourceNode.connect(masterGain);
+        }
+
         sourceNode.onended = () => {
           if (state.playback.status === "playing") {
-            state.playback.status = "stopped";
-            state.playback.pauseTime = 0;
-            sourceNode = null;
-            dispatchPlaybackUpdate();
+            pkg.data.stopTrack(); // Use stopTrack to ensure cleanup
           }
         };
         const offset = state.playback.pauseTime;
         sourceNode.start(0, offset);
-        // Store the real time when this playback segment started
         state.playback.startTime = audioContext.currentTime;
         state.playback.status = "playing";
       }
@@ -601,19 +751,31 @@ const pkg = {
     pauseTrack: () => {
       if (state.playback.status !== "playing") return;
 
+      // Disable scoring and clean up analysis nodes
+      state.scoring.enabled = false;
+      if (state.scoring.guideVocalDelayNode) {
+        state.scoring.guideVocalDelayNode.disconnect();
+        state.scoring.guideVocalDelayNode = null;
+      }
+      if (state.scoring.vocalGuideAnalyser) {
+        state.scoring.vocalGuideAnalyser.disconnect();
+        state.scoring.vocalGuideAnalyser = null;
+      }
+
       if (state.playback.isMidi) {
         state.playback.sequencer.pause();
         state.playback.status = "paused";
       } else {
         if (!sourceNode) return;
 
-        // Calculate current position in the buffer before stopping
         const rate = sourceNode.playbackRate.value;
         const elapsedRealTime =
           audioContext.currentTime - state.playback.startTime;
         state.playback.pauseTime += elapsedRealTime * rate;
 
         sourceNode.stop();
+        state.playback.leftPannerGain = null;
+        state.playback.rightPannerGain = null;
         state.playback.status = "paused";
         sourceNode = null;
       }
@@ -626,13 +788,23 @@ const pkg = {
     },
 
     stopTrack: () => {
-      // Hide toast on stop
       if (toastElement) {
         if (toastTimeout) clearTimeout(toastTimeout);
         toastElement.classOff("visible");
       }
 
       if (state.playback.status === "stopped") return;
+
+      // Disable scoring and clean up analysis nodes
+      state.scoring.enabled = false;
+      if (state.scoring.guideVocalDelayNode) {
+        state.scoring.guideVocalDelayNode.disconnect();
+        state.scoring.guideVocalDelayNode = null;
+      }
+      if (state.scoring.vocalGuideAnalyser) {
+        state.scoring.vocalGuideAnalyser.disconnect();
+        state.scoring.vocalGuideAnalyser = null;
+      }
 
       if (state.playback.isMidi) {
         if (state.playback.sequencer) {
@@ -646,6 +818,9 @@ const pkg = {
         }
       }
 
+      state.playback.leftPannerGain = null;
+      state.playback.rightPannerGain = null;
+      state.playback.multiplexPan = -1; // Also reset to default on stop
       state.playback.status = "stopped";
       state.playback.pauseTime = 0;
       dispatchPlaybackUpdate();
@@ -662,13 +837,34 @@ const pkg = {
       masterGain.gain.setValueAtTime(clampedLevel, audioContext.currentTime);
     },
 
+    setMultiplexPan: (panValue) => {
+      const pan = Math.max(-1, Math.min(1, panValue));
+      state.playback.multiplexPan = pan;
+
+      const { leftPannerGain, rightPannerGain } = state.playback;
+
+      if (leftPannerGain && rightPannerGain) {
+        const leftGainValue = (1 - pan) / 2;
+        const rightGainValue = (1 + pan) / 2;
+
+        leftPannerGain.gain.setValueAtTime(
+          leftGainValue,
+          audioContext.currentTime,
+        );
+        rightPannerGain.gain.setValueAtTime(
+          rightGainValue,
+          audioContext.currentTime,
+        );
+      }
+      dispatchPlaybackUpdate();
+    },
+
     setTranspose: (semitones) => {
       const clampedSemitones = Math.max(
         -24,
         Math.min(24, Math.round(semitones)),
       );
 
-      // If playing audio, update time tracking before changing the rate
       if (
         !state.playback.isMidi &&
         state.playback.status === "playing" &&
@@ -678,7 +874,7 @@ const pkg = {
         const elapsedRealTime =
           audioContext.currentTime - state.playback.startTime;
         state.playback.pauseTime += elapsedRealTime * currentRate;
-        state.playback.startTime = audioContext.currentTime; // Reset startTime for the next calculation
+        state.playback.startTime = audioContext.currentTime;
       }
 
       state.playback.transpose = clampedSemitones;
@@ -686,7 +882,6 @@ const pkg = {
       if (state.playback.isMidi && state.playback.synthesizer) {
         state.playback.synthesizer.transpose(clampedSemitones);
       } else if (!state.playback.isMidi && sourceNode) {
-        // Apply transposition to audio via playbackRate
         const newRate = Math.pow(2, clampedSemitones / 12);
         sourceNode.playbackRate.setValueAtTime(
           newRate,
@@ -707,94 +902,128 @@ const pkg = {
           currentTime = state.playback.sequencer.currentTime;
         }
       } else if (state.playback.buffer) {
-        // --- FIX STARTS HERE ---
-        // The intrinsic duration of the audio buffer is constant. It does not change with playback rate.
-        // Reporting a dynamic duration was causing the UI to jump and end the song prematurely.
         duration = state.playback.buffer.duration;
-        // --- FIX ENDS HERE ---
 
         if (state.playback.status === "playing" && sourceNode) {
           const currentRate = sourceNode.playbackRate.value;
           const elapsedRealTime =
             audioContext.currentTime - state.playback.startTime;
-          // Current position is the last paused position plus progress made in this segment, scaled by the rate.
           currentTime =
             state.playback.pauseTime + elapsedRealTime * currentRate;
         } else {
-          // When paused or stopped, the position is simply the stored pauseTime.
           currentTime = state.playback.pauseTime;
         }
       }
 
       return {
         status: state.playback.status,
-        // Clamp currentTime to duration to prevent it from overshooting at the very end
         currentTime: Math.min(currentTime, duration),
         duration,
         currentDeviceId: state.playback.currentDeviceId,
         isMidi: state.playback.isMidi,
+        isMultiplexed: state.playback.isMultiplexed,
         decodedLyrics: state.playback.decodedLyrics,
         transpose: state.playback.transpose,
+        multiplexPan: state.playback.multiplexPan,
+        score: state.scoring.highestScoreThisSong, // Report the highest score
       };
     },
 
-    getVocalEngineStatus: () => state.vocalEngine,
-    getVocalDevices: () => state.vocalEngine.devices,
-    startVocalEngine: (settings) => {
-      if (socket?.connected) {
-        socket.emit("change_settings", settings);
-        setTimeout(() => socket.emit("start_engine", {}), 100);
+    initializeScoringEngine: async () => {
+      if (!audioContext) return;
+      console.log("[FORTE SVC] Initializing Scoring Engine...");
+      await pkg.data.getMicDevices();
+      await pkg.data.startMicInput(state.scoring.currentMicDeviceId);
+    },
+
+    getMicDevices: async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        state.scoring.micDevices = devices
+          .filter((d) => d.kind === "audioinput")
+          .map((d) => ({ label: d.label, deviceId: d.deviceId }));
+        return state.scoring.micDevices;
+      } catch (e) {
+        console.error("[FORTE SVC] Could not enumerate mic devices:", e);
+        return [];
       }
     },
-    stopVocalEngine: () => {
-      if (socket?.connected) {
-        socket.emit("stop_engine", {});
-      }
+
+    setMicDevice: async (deviceId) => {
+      console.log(`[FORTE SVC] Setting mic device to: ${deviceId}`);
+      await pkg.data.startMicInput(deviceId);
+      state.scoring.currentMicDeviceId = deviceId;
     },
-    applyVocalEngineSettings: (settings) => {
-      if (socket?.connected) {
-        socket.emit("change_settings", settings);
+
+    startMicInput: async (deviceId = "default") => {
+      if (state.scoring.micStream) {
+        state.scoring.micStream.getTracks().forEach((track) => track.stop());
+        state.scoring.micStream = null;
       }
-    },
-    setVocalEffects: (effects) => {
-      if (socket?.connected) {
-        socket.emit("set_effects", effects);
+      if (state.scoring.micSourceNode) {
+        state.scoring.micSourceNode.disconnect();
+        state.scoring.micSourceNode = null;
       }
-    },
-    clearVocalEffects: () => {
-      if (socket?.connected) {
-        socket.emit("set_effects", []);
-      }
-    },
-    updateVocalEffect: (updatePayload) => {
-      if (socket?.connected) {
-        socket.emit("update_effect", updatePayload);
+
+      try {
+        // --- START: MODIFIED FOR RAW AUDIO ---
+        // Request the microphone stream with all browser processing disabled.
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: { exact: deviceId },
+            // These constraints are crucial for getting clean, unprocessed audio for singing.
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+        });
+        // --- END: MODIFIED FOR RAW AUDIO ---
+
+        state.scoring.micStream = stream;
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048; // Standard for pitch detection
+
+        // IMPORTANT: The mic is only connected to the analyser, not to the output.
+        // This prevents feedback and latency issues.
+        source.connect(analyser);
+
+        state.scoring.micSourceNode = source;
+        state.scoring.micAnalyser = analyser;
+
+        // Initialize the pitch detector if it doesn't exist
+        if (!state.scoring.pitchDetector) {
+          state.scoring.pitchDetector = PitchDetector.forFloat32Array(
+            analyser.fftSize,
+          );
+        }
+        console.log("[FORTE SVC] Microphone input started for scoring.");
+      } catch (e) {
+        console.error("[FORTE SVC] Failed to get microphone input:", e);
       }
     },
   },
 
   end: async function () {
     console.log("[FORTE SVC] Shutting down service.");
-    // --- Clean up Toast UI ---
     if (toastElement) toastElement.cleanup();
     if (toastStyleElement) toastStyleElement.cleanup();
     toastElement = null;
     toastStyleElement = null;
     if (toastTimeout) clearTimeout(toastTimeout);
-    // --- End Cleanup ---
 
-    if (socket?.connected) {
-      socket.disconnect();
+    if (state.scoring.micStream) {
+      // Stop mic track
+      state.scoring.micStream.getTracks().forEach((track) => track.stop());
     }
+
     if (audioContext && audioContext.state !== "closed") {
       audioContext.close();
     }
-    // --- START: Added for Sound Effects ---
     if (sfxAudioContext && sfxAudioContext.state !== "closed") {
       sfxAudioContext.close();
     }
     sfxCache.clear();
-    // --- END: Added for Sound Effects ---
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
       animationFrameId = null;
@@ -802,7 +1031,6 @@ const pkg = {
     if (state.playback.synthesizer) {
       state.playback.synthesizer.close();
     }
-    // --- START: Added for PeerJS Mic ---
     if (peer) {
       peer.destroy();
       console.log("[FORTE SVC] PeerJS client destroyed.");
@@ -812,7 +1040,6 @@ const pkg = {
       conn.call.close();
     });
     micConnections.clear();
-    // --- END: Added for PeerJS Mic ---
     console.log("[FORTE SVC] Shutdown complete.");
   },
 };

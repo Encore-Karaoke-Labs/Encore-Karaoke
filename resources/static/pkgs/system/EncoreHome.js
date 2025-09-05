@@ -7,6 +7,7 @@ let keydownHandler = null;
 let timeUpdateHandler = null;
 let playbackUpdateHandler = null;
 let lyricEventHandler = null; // Listener for our custom lyric events
+let scoreUpdateHandler = null; // Listener for real-time score updates
 let lastPlaybackStatus = null;
 let tokenizer = null;
 
@@ -277,7 +278,185 @@ const Romanizer = {
   },
 };
 
-// --- OSD Modules ---
+// --- START: OSD Modules & Manager ---
+function updateOsdPositions() {
+  let currentBottom = 2; // in rem
+  const osdHeight = 6; // approximate height of one OSD box in rem
+
+  if (VolumeOSD.visible) {
+    VolumeOSD.osd.styleJs({ bottom: `${currentBottom}rem` });
+    currentBottom += osdHeight;
+  }
+  if (TransposeOSD.visible) {
+    TransposeOSD.osd.styleJs({ bottom: `${currentBottom}rem` });
+    currentBottom += osdHeight;
+  }
+  if (MultiplexPanOSD.visible) {
+    MultiplexPanOSD.osd.styleJs({ bottom: `${currentBottom}rem` });
+    currentBottom += osdHeight;
+  }
+  if (ScoreOSD.visible) {
+    ScoreOSD.osd.styleJs({ bottom: `${currentBottom}rem` });
+    currentBottom += osdHeight;
+  }
+}
+
+const ScoreOSD = {
+  osd: null,
+  visible: false,
+
+  init(container) {
+    const osd = new Html("div")
+      .styleJs({
+        position: "absolute",
+        right: "2rem",
+        bottom: "2rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+        fontFamily: "'Rajdhani', sans-serif",
+        fontWeight: "700",
+        opacity: "0",
+        transition: "opacity 0.3s ease, bottom 0.3s ease",
+        pointerEvents: "none",
+        zIndex: 100000,
+      })
+      .appendTo(container);
+
+    const osdBox = new Html("div")
+      .styleJs({
+        background: "rgba(0,0,0,0.7)",
+        border: "1px solid rgba(255,255,255,0.3)",
+        borderRadius: "0.5rem",
+        padding: "0.6rem 1.2rem",
+        minWidth: "240px",
+      })
+      .appendTo(osd);
+
+    new Html("div")
+      .styleJs({
+        color: "#FFD700",
+        fontSize: "1rem",
+        letterSpacing: "0.1rem",
+        marginBottom: "0.25rem",
+      })
+      .text("SCORE")
+      .appendTo(osdBox);
+
+    this.scoreDisplay = new Html("div")
+      .styleJs({
+        color: "#89CFF0",
+        fontSize: "2rem",
+        letterSpacing: "0.2rem",
+        textAlign: "center",
+      })
+      .appendTo(osdBox);
+
+    this.osd = osd;
+  },
+
+  show(score) {
+    if (!this.visible) {
+      this.osd.styleJs({ opacity: "1" });
+      this.visible = true;
+      updateOsdPositions();
+    }
+    this.scoreDisplay.text(score);
+  },
+
+  hide() {
+    if (this.visible) {
+      this.osd.styleJs({ opacity: "0" });
+      this.visible = false;
+      updateOsdPositions();
+    }
+  },
+};
+
+const MultiplexPanOSD = {
+  osd: null,
+  timeout: null,
+  visible: false,
+
+  init(container) {
+    const osd = new Html("div")
+      .styleJs({
+        position: "absolute",
+        right: "2rem",
+        bottom: "2rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+        fontFamily: "'Rajdhani', sans-serif",
+        fontWeight: "700",
+        opacity: "0",
+        transition: "opacity 0.3s ease, bottom 0.3s ease",
+        pointerEvents: "none",
+        zIndex: 100000,
+      })
+      .appendTo(container);
+
+    const osdBox = new Html("div")
+      .styleJs({
+        background: "rgba(0,0,0,0.7)",
+        border: "1px solid rgba(255,255,255,0.3)",
+        borderRadius: "0.5rem",
+        padding: "0.6rem 1.2rem",
+        minWidth: "240px",
+      })
+      .appendTo(osd);
+
+    new Html("div")
+      .styleJs({
+        color: "#FFD700",
+        fontSize: "1rem",
+        letterSpacing: "0.1rem",
+        marginBottom: "0.25rem",
+      })
+      .text("VOCAL BALANCE")
+      .appendTo(osdBox);
+
+    this.panDisplay = new Html("div")
+      .styleJs({
+        color: "#89CFF0",
+        fontSize: "2rem",
+        letterSpacing: "0.2rem",
+        textAlign: "center",
+      })
+      .appendTo(osdBox);
+
+    this.osd = osd;
+  },
+
+  show(panValue) {
+    if (this.timeout) clearTimeout(this.timeout);
+
+    let displayText = "";
+    if (panValue <= -0.99) {
+      displayText = "INSTRUMENTAL";
+    } else if (panValue >= 0.99) {
+      displayText = "VOCAL GUIDE";
+    } else if (panValue > -0.01 && panValue < 0.01) {
+      displayText = "BALANCED";
+    } else if (panValue < 0) {
+      displayText = `◀ ${Math.abs(Math.round(panValue * 100))}% INST`;
+    } else {
+      displayText = `VOC ${Math.round(panValue * 100)}% ▶`;
+    }
+    this.panDisplay.text(displayText);
+
+    this.osd.styleJs({ opacity: "1" });
+    this.visible = true;
+    updateOsdPositions();
+
+    this.timeout = setTimeout(() => {
+      this.osd.styleJs({ opacity: "0" });
+      this.visible = false;
+      updateOsdPositions();
+    }, 3000);
+  },
+};
+
 const TransposeOSD = {
   osd: null,
   timeout: null,
@@ -338,15 +517,14 @@ const TransposeOSD = {
     const sign = semitones > 0 ? "+" : "";
     this.transposeDisplay.text(`${sign}${semitones}`);
 
-    this.osd.styleJs({
-      opacity: "1",
-      bottom: VolumeOSD.visible ? "8rem" : "2rem",
-    });
-
+    this.osd.styleJs({ opacity: "1" });
     this.visible = true;
+    updateOsdPositions();
+
     this.timeout = setTimeout(() => {
       this.osd.styleJs({ opacity: "0" });
       this.visible = false;
+      updateOsdPositions();
     }, 3000);
   },
 };
@@ -368,7 +546,7 @@ const VolumeOSD = {
         fontFamily: "'Rajdhani', sans-serif",
         fontWeight: "700",
         opacity: "0",
-        transition: "opacity 0.3s ease",
+        transition: "opacity 0.3s ease, bottom 0.3s ease",
         pointerEvents: "none",
         zIndex: 100000,
       })
@@ -409,22 +587,19 @@ const VolumeOSD = {
   show(volume) {
     if (this.timeout) clearTimeout(this.timeout);
     this.volumeDisplay.text(`${Math.round(volume * 100)}%`);
+
     this.osd.styleJs({ opacity: "1" });
     this.visible = true;
-
-    if (TransposeOSD.visible) {
-      TransposeOSD.osd.styleJs({ bottom: "8rem" });
-    }
+    updateOsdPositions();
 
     this.timeout = setTimeout(() => {
       this.osd.styleJs({ opacity: "0" });
       this.visible = false;
-      if (TransposeOSD.visible) {
-        TransposeOSD.osd.styleJs({ bottom: "2rem" });
-      }
+      updateOsdPositions();
     }, 3000);
   },
 };
+// --- END: OSD Modules & Manager ---
 
 const pkg = {
   name: "Encore Home",
@@ -445,6 +620,7 @@ const pkg = {
       "deck_ui_into_game_detail.wav",
       "deck_ui_navigation.wav",
       "deck_ui_out_of_game_detail.wav",
+      "score_tally.wav",
     ];
     for (let i = 0; i < 10; i++) {
       sfxToLoad.push(`numbers/${i}.wav`);
@@ -473,6 +649,7 @@ const pkg = {
       highlightedSearchIndex: -1,
       isSearching: false,
       currentSongIsYouTube: false,
+      currentSongIsMultiplexed: false, // Track if the current song can be scored
     };
     const maxLength = 5;
 
@@ -481,7 +658,6 @@ const pkg = {
       state: `Main Menu`,
     });
 
-    await Forte.setVocalEffects(config.audioConfig.mix.vocal.effects);
     await Forte.setTrackVolume(config.audioConfig.mix.instrumental.volume);
 
     const bgvContainer = new Html("div")
@@ -502,6 +678,8 @@ const pkg = {
 
     VolumeOSD.init(wrapper);
     TransposeOSD.init(wrapper);
+    MultiplexPanOSD.init(wrapper);
+    ScoreOSD.init(wrapper);
 
     new Html("style")
       .text(
@@ -574,6 +752,41 @@ const pkg = {
         .up-next-title { font-size: 1.4rem; color: #fff; text-shadow: 1px 1px 3px #000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .up-next-artist { font-size: 1rem; color: #fff; opacity: 0.7; }
         .mode-menu .karaoke-hud, .mode-yt-search .karaoke-hud { display: none; }
+        
+        .post-song-score-screen {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 50;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+        .post-song-score-screen.visible {
+            opacity: 1;
+        }
+        .score-title {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 3rem;
+            font-weight: 700;
+            color: #FFD700;
+            letter-spacing: 0.2rem;
+            text-shadow: 0 0 10px #FFD700;
+        }
+        .final-score {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 15rem;
+            font-weight: 900;
+            line-height: 1;
+            text-shadow: 0 0 10px #fff, 0 0 20px #89CFF0, 0 0 30px #89CFF0;
+            color: #f0f0f0;
+        }
     `,
       )
       .appendTo(wrapper);
@@ -683,6 +896,17 @@ const pkg = {
     const upNextArtistEl = new Html("div")
       .class("up-next-artist")
       .appendTo(upNextBox);
+
+    const postSongScoreScreen = new Html("div")
+      .class("post-song-score-screen")
+      .appendTo(wrapper);
+    new Html("div")
+      .class("score-title")
+      .text("YOUR SCORE")
+      .appendTo(postSongScoreScreen);
+    const finalScoreDisplay = new Html("div")
+      .class("final-score")
+      .appendTo(postSongScoreScreen);
 
     const updateReservationUI = () => {
       const placeholder = "-----";
@@ -870,8 +1094,14 @@ const pkg = {
           "CherryTree.Forte.Playback.LyricEvent",
           lyricEventHandler,
         );
+      if (scoreUpdateHandler)
+        document.removeEventListener(
+          "CherryTree.Forte.Scoring.Update",
+          scoreUpdateHandler,
+        );
       timeUpdateHandler = null;
       lyricEventHandler = null;
+      scoreUpdateHandler = null;
 
       lyricsScroller.clear();
       midiLineDisplay1.clear();
@@ -922,6 +1152,7 @@ const pkg = {
         await Forte.loadTrack(trackUrl.href);
 
         const playbackState = Forte.getPlaybackState();
+        state.currentSongIsMultiplexed = playbackState.isMultiplexed;
         let lrcParsedLyrics = [],
           lrcLyricLines = [],
           currentLrcIndex = -1;
@@ -1032,6 +1263,18 @@ const pkg = {
               .filter(Boolean);
           }
         }
+
+        if (state.currentSongIsMultiplexed) {
+          scoreUpdateHandler = (e) => {
+            const { score } = e.detail;
+            ScoreOSD.show(score);
+          };
+          document.addEventListener(
+            "CherryTree.Forte.Scoring.Update",
+            scoreUpdateHandler,
+          );
+        }
+
         const PRE_ROLL_DELAY_MS = 2500;
         setTimeout(() => {
           if (state.mode !== "player") return;
@@ -1114,8 +1357,6 @@ const pkg = {
       bgvContainer.classOff("hidden");
       lyricsScroller.styleJs({ transform: "translateY(0)" });
 
-      const wasYouTube = state.currentSongIsYouTube;
-
       Forte.stopTrack();
 
       if (timeUpdateHandler)
@@ -1128,12 +1369,21 @@ const pkg = {
           "CherryTree.Forte.Playback.LyricEvent",
           lyricEventHandler,
         );
+      if (scoreUpdateHandler)
+        document.removeEventListener(
+          "CherryTree.Forte.Scoring.Update",
+          scoreUpdateHandler,
+        );
+      ScoreOSD.hide();
       timeUpdateHandler = null;
       lyricEventHandler = null;
+      scoreUpdateHandler = null;
       lastPlaybackStatus = null;
       state.currentSongIsYouTube = false;
+      state.currentSongIsMultiplexed = false;
 
-      if (wasYouTube) {
+      // This function now only handles the transition back to the menu or next song
+      const transitionToNextState = () => {
         if (state.reservationQueue.length > 0) {
           const nextCode = state.reservationQueue.shift();
           updateHud();
@@ -1143,25 +1393,21 @@ const pkg = {
           }
           return;
         }
-      } else {
-        if (state.reservationQueue.length > 0) {
-          return;
+
+        if (
+          BGVPlayer.videoElements.length > 0 &&
+          !BGVPlayer.videoElements[0].hasAttribute("src")
+        ) {
+          BGVPlayer.start();
         }
-      }
 
-      // If BGV was stopped (e.g., for YouTube), restart it for the menu.
-      if (
-        BGVPlayer.videoElements.length > 0 &&
-        !BGVPlayer.videoElements[0].hasAttribute("src")
-      ) {
-        BGVPlayer.start();
-      }
-
-      setMode("menu");
-      window.desktopIntegration.ipc.send("setRPC", {
-        details: `Browsing ${songList.length} Songs...`,
-        state: `Main Menu`,
-      });
+        setMode("menu");
+        window.desktopIntegration.ipc.send("setRPC", {
+          details: `Browsing ${songList.length} Songs...`,
+          state: `Main Menu`,
+        });
+      };
+      return transitionToNextState;
     };
 
     const handleSubmit = () => {
@@ -1196,7 +1442,7 @@ const pkg = {
           state.reservationNumber = state.reservationNumber.slice(0, -1);
           updateReservationUI();
         } else {
-          stopPlayer();
+          stopPlayer()(); // Immediately call the returned transition function
         }
       } else if (state.mode === "menu") {
         if (state.songNumber.length > 0) {
@@ -1244,7 +1490,7 @@ const pkg = {
           state.reservationNumber = "";
           updateReservationUI();
         } else {
-          stopPlayer();
+          stopPlayer()(); // Immediately call the returned transition function
         }
       } else if (state.mode === "yt-search") {
         setMode("menu");
@@ -1283,6 +1529,21 @@ const pkg = {
       );
       Forte.setTranspose(newTranspose);
       TransposeOSD.show(newTranspose);
+    };
+
+    const handleMultiplexPan = (direction) => {
+      const playbackState = Forte.getPlaybackState();
+      if (state.mode !== "player" || !playbackState.isMultiplexed) return;
+
+      const change = direction === "right" ? 0.2 : -0.2;
+      const newPan = parseFloat(
+        Math.max(-1, Math.min(1, playbackState.multiplexPan + change)).toFixed(
+          1,
+        ),
+      );
+
+      Forte.setMultiplexPan(newPan);
+      MultiplexPanOSD.show(newPan);
     };
 
     const handleMenuNav = (direction) => {
@@ -1357,6 +1618,10 @@ const pkg = {
         if (state.mode === "menu") handleMenuNav("down");
         else if (state.mode === "yt-search") handleSearchNav("down");
         else if (state.mode === "player") handleTranspose("down");
+      } else if (e.key === "ArrowLeft") {
+        handleMultiplexPan("left");
+      } else if (e.key === "ArrowRight") {
+        handleMultiplexPan("right");
       } else if (e.key === "-") handleVolume("down");
       else if (e.key === "=") handleVolume("up");
       else if (e.key === "[" || e.key === "]")
@@ -1393,7 +1658,12 @@ const pkg = {
         case "key_down":
           handleTranspose("down");
           break;
-
+        case "pan_left":
+          handleMultiplexPan("left");
+          break;
+        case "pan_right":
+          handleMultiplexPan("right");
+          break;
         // --- STATE-AWARE COMMANDS ---
         case "yt_search_open":
           // Only open search if in the main menu
@@ -1430,18 +1700,27 @@ const pkg = {
         lastPlaybackStatus === "playing" &&
         status === "stopped"
       ) {
-        if (state.reservationQueue.length > 0) {
-          lyricsScroller.styleJs({ transform: "translateY(0)" });
-          const nextCode = state.reservationQueue.shift();
-          updateHud();
-          const nextSong = songMap.get(nextCode);
-          if (nextSong) {
-            setTimeout(() => startPlayer(nextSong), 120);
-            lastPlaybackStatus = status;
-            return;
-          }
+        const wasMultiplexed = state.currentSongIsMultiplexed;
+
+        const processNextInQueue = () => {
+          postSongScoreScreen.classOff("visible"); // Ensure it's hidden
+          const transitionFn = stopPlayer();
+          transitionFn(); // This will either play the next song or go to the menu
+        };
+
+        if (wasMultiplexed) {
+          const finalScore = Forte.getPlaybackState().score;
+          finalScoreDisplay.text(finalScore);
+          postSongScoreScreen.classOn("visible");
+          Forte.playSfx("/assets/audio/score_tally.wav");
+
+          setTimeout(() => {
+            processNextInQueue();
+          }, 5000); // Show score for 5 seconds
+        } else {
+          // If not a multiplexed song, proceed immediately
+          processNextInQueue();
         }
-        stopPlayer();
       }
       lastPlaybackStatus = status;
     };
@@ -1477,16 +1756,21 @@ const pkg = {
         "CherryTree.Forte.Playback.LyricEvent",
         lyricEventHandler,
       );
+    if (scoreUpdateHandler)
+      document.removeEventListener(
+        "CherryTree.Forte.Scoring.Update",
+        scoreUpdateHandler,
+      );
 
     keydownHandler = null;
     timeUpdateHandler = null;
     playbackUpdateHandler = null;
     lyricEventHandler = null;
+    scoreUpdateHandler = null;
     lastPlaybackStatus = null;
 
     BGVPlayer.stop();
     Forte.stopTrack();
-    Forte.stopVocalEngine();
     Ui.cleanup(Pid);
     Ui.giveUpUi(Pid);
     wrapper.cleanup();

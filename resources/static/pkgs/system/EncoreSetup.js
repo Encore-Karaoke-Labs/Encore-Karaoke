@@ -4,75 +4,33 @@ import settingsLib from "../../libs/settingsLib.js";
 let wrapper, card, Ui, Pid, Sfx, Forte, FsSvc, root;
 let currentStep = 0;
 
-// --- Config Object ---
+// --- Config Object (Simplified for new Forte API) ---
 let config = {
   setupComplete: false,
   libraryPath: "",
   audioConfig: {
-    bufferSize: 1024,
     mix: {
       instrumental: {
         outputDevice: null,
         volume: 1,
       },
-      vocal: {
+      // Vocal effects and buffer size are removed.
+      // We only need to store the mic used for scoring.
+      scoring: {
         inputDevice: null,
-        outputDevice: null,
-        volume: 1,
-        effects: [
-          { plugin: "NoiseGate", params: { threshold_db: -35 } },
-          { plugin: "HighpassFilter", params: { cutoff_frequency_hz: 100 } },
-          { plugin: "Gain", params: { gain_db: 5.0 } },
-          { plugin: "Compressor", params: { threshold_db: -18, ratio: 3.5 } },
-          { plugin: "Gain", params: { gain_db: 3.0 } },
-          {
-            plugin: "HighShelfFilter",
-            params: { cutoff_frequency_hz: 4438, gain_db: 2.4 },
-          },
-          { plugin: "Reverb", params: { room_size: 0.7, wet_level: 0.15 } },
-          {
-            plugin: "PeakFilter",
-            params: { cutoff_frequency_hz: 676, gain_db: -2.5 },
-          },
-        ],
       },
     },
   },
 };
 
 // --- State Management ---
-let vocalDevices, playbackDevices;
+let micDevices, playbackDevices;
 let encoreLibraries = null;
-let selectedInputIndex = 0,
-  selectedOutputIndex = 0,
+let selectedMicIndex = 0,
   selectedPlaybackDeviceIndex = 0,
   selectedLibraryIndex = 0;
 let mainVolume = 1.0;
-const bufferSizes = [256, 512, 1024, 2048, 4096];
-let selectedBufferSize = 1024;
 let backgroundScanInterval = null;
-
-/**
- * Constructs the full vocal effects chain from the current state.
- */
-function getFullEffectChain() {
-  return config.audioConfig.mix.vocal.effects;
-}
-
-/**
- * A centralized function to apply all current audio settings to the vocal engine.
- */
-function applyVocalEngineSettings() {
-  if (!vocalDevices) return;
-  const settings = {
-    input_device: config.audioConfig.mix.vocal.inputDevice,
-    output_device: config.audioConfig.mix.vocal.outputDevice,
-    buffer_size: config.audioConfig.bufferSize,
-  };
-  Forte.applyVocalEngineSettings(settings);
-  // Re-apply the effects chain immediately after a device change.
-  setTimeout(() => Forte.setVocalEffects(getFullEffectChain()), 150);
-}
 
 function startBackgroundScan() {
   if (backgroundScanInterval) return;
@@ -85,7 +43,8 @@ function startBackgroundScan() {
       if (!encoreLibraries[selectedLibraryIndex]) {
         selectedLibraryIndex = 0;
       }
-      if (currentStep === 4) {
+      if (currentStep === 3) {
+        // Adjusted step index
         renderStep(currentStep);
       }
     }
@@ -191,58 +150,39 @@ const setupSteps = [
     },
   },
   {
-    title: "Audio Setup",
+    title: "Microphone & Audio Setup",
     content: (cardBody) => {
       new Html("p")
-        .text(
-          "Let's configure your audio devices. You should hear your voice with effects on this step.",
+        .html(
+          "Select your microphone for <strong>scoring</strong> and your main audio output for music playback. <br/><strong>Note:</strong> You will not hear your own voice during this setup.",
         )
         .appendTo(cardBody);
+
       const inputDisplay = new Html("div")
         .class("device-display")
         .appendTo(cardBody);
       const inputName = new Html("span").text(
-        vocalDevices.inputs[selectedInputIndex],
+        micDevices[selectedMicIndex]?.label || "Default",
       );
       const inputBtn = new Html("button")
         .text("Change")
         .class("button-tertiary")
         .on("click", () => {
-          showDeviceModal("Select Input Device", vocalDevices.inputs, (i) => {
-            selectedInputIndex = i;
-            config.audioConfig.mix.vocal.inputDevice = vocalDevices.inputs[i];
-            applyVocalEngineSettings();
+          const deviceLabels = micDevices.map((d) => d.label);
+          showDeviceModal("Select Scoring Microphone", deviceLabels, (i) => {
+            selectedMicIndex = i;
+            // --- FIX #1: Correct path to scoring object ---
+            config.audioConfig.mix.scoring.inputDevice = micDevices[i].deviceId;
+            Forte.setMicDevice(micDevices[i].deviceId);
             renderStep(currentStep);
           });
         });
-      new Html("label").text("Voice Input (Microphone)").appendTo(inputDisplay);
+      new Html("label")
+        .text("Scoring Input (Microphone)")
+        .appendTo(inputDisplay);
       inputName.appendTo(inputDisplay);
       inputBtn.appendTo(inputDisplay);
-      const outputDisplay = new Html("div")
-        .class("device-display")
-        .appendTo(cardBody);
-      const outputName = new Html("span").text(
-        vocalDevices.outputs[selectedOutputIndex],
-      );
-      const outputBtn = new Html("button")
-        .text("Change")
-        .class("button-tertiary")
-        .on("click", () => {
-          showDeviceModal(
-            "Select Monitoring Output",
-            vocalDevices.outputs,
-            (i) => {
-              selectedOutputIndex = i;
-              config.audioConfig.mix.vocal.outputDevice =
-                vocalDevices.outputs[i];
-              applyVocalEngineSettings();
-              renderStep(currentStep);
-            },
-          );
-        });
-      new Html("label").text("Voice Monitoring Output").appendTo(outputDisplay);
-      outputName.appendTo(outputDisplay);
-      outputBtn.appendTo(outputDisplay);
+
       const playbackDisplay = new Html("div")
         .class("device-display")
         .appendTo(cardBody);
@@ -256,6 +196,8 @@ const setupSteps = [
           const deviceLabels = playbackDevices.map((d) => d.label);
           showDeviceModal("Select Main Audio Output", deviceLabels, (i) => {
             selectedPlaybackDeviceIndex = i;
+            config.audioConfig.mix.instrumental.outputDevice =
+              playbackDevices[i].deviceId;
             Forte.setPlaybackDevice(playbackDevices[i].deviceId);
             renderStep(currentStep);
           });
@@ -263,164 +205,8 @@ const setupSteps = [
       new Html("label").text("Main Audio Output").appendTo(playbackDisplay);
       playbackName.appendTo(playbackDisplay);
       playbackBtn.appendTo(playbackDisplay);
-      const bufferDisplay = new Html("div")
-        .class("device-display")
-        .appendTo(cardBody);
-      const bufferName = new Html("span").text(`${selectedBufferSize} samples`);
-      const bufferBtn = new Html("button")
-        .text("Change")
-        .class("button-tertiary")
-        .on("click", () => {
-          const bufferOptions = bufferSizes.map((s) => `${s} samples`);
-          showDeviceModal(
-            "Select Buffer Size (Advanced)",
-            bufferOptions,
-            (i) => {
-              selectedBufferSize = bufferSizes[i];
-              config.audioConfig.bufferSize = bufferSizes[i];
-              applyVocalEngineSettings();
-              renderStep(currentStep);
-            },
-          );
-        });
-      new Html("label")
-        .text("Audio Buffer Size (Latency)")
-        .appendTo(bufferDisplay);
-      bufferName.appendTo(bufferDisplay);
-      bufferBtn.appendTo(bufferDisplay);
-      return [inputBtn.elm, outputBtn.elm, playbackBtn.elm, bufferBtn.elm];
-    },
-    actions: (cardFooter) => {
-      const backBtn = new Html("button")
-        .text("Back")
-        .appendTo(cardFooter)
-        .class("button-secondary")
-        .on("click", prevStep);
-      const nextBtn = new Html("button")
-        .text("Next")
-        .appendTo(cardFooter)
-        .class("button-primary")
-        .on("click", nextStep);
-      return [backBtn.elm, nextBtn.elm];
-    },
-  },
-  {
-    title: "Vocal Effects",
-    content: (cardBody) => {
-      new Html("p")
-        .text(
-          "Adjust your vocal effects. You should hear the changes to your voice in real time.",
-        )
-        .appendTo(cardBody);
 
-      // This helper function is now architected to avoid stale closure issues.
-      const createEffectControl = (
-        label,
-        effectIndex,
-        paramName,
-        min,
-        max,
-        step,
-        valueFormatter,
-      ) => {
-        const container = new Html("div")
-          .class("slider-control-group")
-          .appendTo(cardBody);
-        new Html("label").text(label).appendTo(container);
-        const controlRow = new Html("div")
-          .class("slider-control")
-          .appendTo(container);
-
-        const valueDisplay = new Html("div")
-          .class("value-display")
-          .text(
-            valueFormatter(
-              config.audioConfig.mix.vocal.effects[effectIndex].params[
-                paramName
-              ],
-            ),
-          )
-          .appendTo(controlRow);
-
-        const update = (newValue) => {
-          const roundedValue = parseFloat(newValue.toFixed(2));
-          config.audioConfig.mix.vocal.effects[effectIndex].params[paramName] =
-            roundedValue;
-          Forte.updateVocalEffect({
-            plugin: config.audioConfig.mix.vocal.effects[effectIndex].plugin,
-            index: effectIndex,
-            params: { [paramName]: roundedValue },
-          });
-          valueDisplay.text(valueFormatter(roundedValue));
-        };
-
-        const minusBtn = new Html("button")
-          .class("slider-button")
-          .text("-")
-          .on("click", () =>
-            update(
-              Math.max(
-                min,
-                config.audioConfig.mix.vocal.effects[effectIndex].params[
-                  paramName
-                ] - step,
-              ),
-            ),
-          )
-          .appendTo(controlRow);
-
-        // Re-insert value display in the middle
-        controlRow.elm.appendChild(valueDisplay.elm);
-
-        const plusBtn = new Html("button")
-          .class("slider-button")
-          .text("+")
-          .on("click", () =>
-            update(
-              Math.min(
-                max,
-                config.audioConfig.mix.vocal.effects[effectIndex].params[
-                  paramName
-                ] + step,
-              ),
-            ),
-          )
-          .appendTo(controlRow);
-
-        return [minusBtn.elm, plusBtn.elm];
-      };
-
-      const controls = [
-        createEffectControl(
-          "Pre-Gain",
-          2,
-          "gain_db",
-          -12,
-          12,
-          0.1,
-          (v) => `${v.toFixed(1)} dB`,
-        ),
-        createEffectControl(
-          "Post-Compressor Gain",
-          4,
-          "gain_db",
-          -12,
-          12,
-          0.1,
-          (v) => `${v.toFixed(1)} dB`,
-        ),
-        createEffectControl(
-          "Reverb Mix",
-          6,
-          "wet_level",
-          0,
-          1,
-          0.01,
-          (v) => `${Math.round(v * 100)}%`,
-        ),
-      ];
-
-      return controls.flat();
+      return [inputBtn.elm, playbackBtn.elm];
     },
     actions: (cardFooter) => {
       const backBtn = new Html("button")
@@ -441,7 +227,7 @@ const setupSteps = [
     content: (cardBody) => {
       new Html("p")
         .text(
-          "Adjust the main volume to a comfortable level. You should hear both your voice and the background music.",
+          "Adjust the main volume to a comfortable level. You should hear background music to help you test.",
         )
         .appendTo(cardBody);
       const sliderControl = new Html("div")
@@ -620,30 +406,19 @@ async function finishSetup() {
   config.setupComplete = true;
   config.libraryPath = selectedLib?.path || "";
   config.audioConfig.mix.instrumental.volume = mainVolume;
+  // --- FIX #2: Correct path to scoring object ---
+  config.audioConfig.mix.scoring.inputDevice =
+    micDevices[selectedMicIndex]?.deviceId || "default";
 
   console.log("Setup Finished! Final config:", config);
 
   await window.desktopIntegration.ipc.send("updateConfig", config);
 
   Sfx.playSfx("game_start.wav");
-  Forte.stopVocalEngine();
   root.end();
 }
 
 async function renderStep(stepIndex, flags = {}) {
-  const previousStepIndex = currentStep;
-  const previousStep = setupSteps[previousStepIndex];
-  if (previousStep) {
-    const audioSteps = ["Audio Setup", "Vocal Effects", "Volume Balance"];
-    const nextStep = setupSteps[stepIndex];
-    // Stop the engine ONLY if we are leaving the entire audio section.
-    if (
-      audioSteps.includes(previousStep.title) &&
-      !audioSteps.includes(nextStep?.title)
-    ) {
-      Forte.stopVocalEngine();
-    }
-  }
   currentStep = stepIndex;
   const step = setupSteps[currentStep];
 
@@ -700,20 +475,6 @@ async function renderStep(stepIndex, flags = {}) {
   }
   Ui.init(Pid, "horizontal", navRows);
 
-  const audioSteps = ["Audio Setup", "Vocal Effects", "Volume Balance"];
-  if (
-    audioSteps.includes(step.title) &&
-    !Forte.getVocalEngineStatus().running
-  ) {
-    const settings = {
-      input_device: vocalDevices.inputs[selectedInputIndex],
-      output_device: vocalDevices.outputs[selectedOutputIndex],
-      buffer_size: selectedBufferSize,
-    };
-    Forte.startVocalEngine(settings);
-    setTimeout(() => Forte.setVocalEffects(getFullEffectChain()), 150);
-  }
-
   const newHeight = card.elm.scrollHeight;
   if (oldHeight > 0 && !flags.isScanning) {
     card.elm.style.height = `${oldHeight}px`;
@@ -742,24 +503,20 @@ const pkg = {
     Sfx = Root.Processes.getService("SfxLib").data;
     Forte = Root.Processes.getService("ForteSvc").data;
     FsSvc = Root.Processes.getService("FsSvc").data;
-    [vocalDevices, playbackDevices] = await Promise.all([
-      Forte.getVocalDevices(),
+
+    [micDevices, playbackDevices] = await Promise.all([
+      Forte.getMicDevices(),
       Forte.getPlaybackDevices(),
     ]);
-    const currentVocalConfig = Forte.getVocalEngineStatus().config;
-    if (currentVocalConfig.input_device)
-      selectedInputIndex = vocalDevices.inputs.indexOf(
-        currentVocalConfig.input_device,
-      );
-    if (currentVocalConfig.output_device)
-      selectedOutputIndex = vocalDevices.outputs.indexOf(
-        currentVocalConfig.output_device,
-      );
+
     const initialPlaybackState = Forte.getPlaybackState();
     selectedPlaybackDeviceIndex = playbackDevices.findIndex(
       (d) => d.deviceId === initialPlaybackState.currentDeviceId,
     );
     if (selectedPlaybackDeviceIndex === -1) selectedPlaybackDeviceIndex = 0;
+
+    selectedMicIndex = micDevices.findIndex((d) => d.deviceId === "default");
+    if (selectedMicIndex === -1) selectedMicIndex = 0;
 
     wrapper = new Html("div").class("full-ui").appendTo("body").styleJs({
       background: "linear-gradient(135deg, #E0F7FA 0%, #F8E8FF 100%)",
@@ -813,7 +570,6 @@ const pkg = {
   end: async function () {
     stopBackgroundScan();
     Forte.stopTrack();
-    Forte.stopVocalEngine();
     Ui.cleanup(Pid);
     Sfx.playSfx("deck_ui_out_of_game_detail.wav");
     await anime({

@@ -33,12 +33,6 @@ const pkg = {
         document.addEventListener(
           "CherryTree.FsSvc.SongList.Ready",
           async () => {
-            const settings = {
-              input_device: config.audioConfig.mix.vocal.inputDevice,
-              output_device: config.audioConfig.mix.vocal.outputDevice,
-              buffer_size: config.audioConfig.bufferSize,
-            };
-            await forte.startVocalEngine(settings);
             await root.Libs.startPkg("system:EncoreHome", []);
           },
           { once: true },
