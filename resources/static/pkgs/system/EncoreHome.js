@@ -9,9 +9,6 @@ let playbackUpdateHandler = null;
 let lyricEventHandler = null; // Listener for our custom lyric events
 let scoreUpdateHandler = null; // Listener for real-time score updates
 let lastPlaybackStatus = null;
-// --- REMOVED: Kuromoji tokenizer and its loader ---
-// let tokenizer = null;
-// kuromoji.builder(...);
 
 const config = await window.desktopIntegration.ipc.invoke("getConfig");
 
@@ -38,8 +35,8 @@ const BGVPlayer = {
         .attr({
           muted: true,
           autoplay: false,
-          playsInline: true, // Better mobile support
-          defaultMuted: true, // Extra safety for muting
+          playsInline: true,
+          defaultMuted: true,
         })
         .styleJs({
           position: "absolute",
@@ -49,14 +46,14 @@ const BGVPlayer = {
           height: "100%",
           objectFit: "cover",
           opacity: i === 0 ? "1" : "0",
-          transform: "scale(1.01)", // Prevent edge flickering during fade
+          transform: "scale(1.01)",
           transition: `opacity ${this.FADE_DURATION}ms ease-in-out`,
-          willChange: "opacity", // Optimize for animations
+          willChange: "opacity",
         })
         .appendTo(this.bgvContainer);
 
       const elm = videoEl.elm;
-      elm.volume = 0; // Triple-ensure muting
+      elm.volume = 0;
       elm.addEventListener("volumechange", () => (elm.volume = 0));
       this.videoElements.push(elm);
     }
@@ -109,7 +106,6 @@ const BGVPlayer = {
       .appendTo(this.osdBox);
 
     this.osd = osd;
-    await this.fetchAndPreparePlaylist();
   },
 
   showOSD() {
@@ -122,41 +118,69 @@ const BGVPlayer = {
     }, 3000);
   },
 
-  async fetchAndPreparePlaylist() {
+  async loadManifestCategories() {
     const manifestUrl = "http://127.0.0.1:9864/assets/video/bgv/manifest.json";
-    const baseUrl = "http://127.0.0.1:9864/assets/video/bgv/";
     try {
       const response = await fetch(manifestUrl);
-      const categories = await response.json();
-      this.categories = categories;
-
-      this.categoryDisplay.text(this.selectedCategory);
-      await this.updatePlaylistForCategory();
+      this.categories = await response.json();
     } catch (error) {
       console.error("[BGV] Failed to load video manifest:", error);
       this.bgvContainer.text("Could not load background videos.");
+      this.categories = []; // Ensure it's an array on failure
+    }
+  },
+
+  addDynamicCategory(category) {
+    if (category && category.BGV_LIST && category.BGV_LIST.length > 0) {
+      this.categories.push(category);
     }
   },
 
   async updatePlaylistForCategory() {
-    if (this.isManualMode) return;
-    const baseUrl = "http://127.0.0.1:9864/assets/video/bgv/";
+    const assetBaseUrl = "http://127.0.0.1:9864/assets/video/bgv/";
     this.playlist = [];
+    this.categoryDisplay.text(this.selectedCategory);
+
+    let allVideos = [];
 
     if (this.selectedCategory === "Auto") {
-      this.playlist = this.categories.flatMap((cat) =>
-        cat.BGV_LIST.map((videoPath) => baseUrl + videoPath),
-      );
+      for (const cat of this.categories) {
+        if (cat.isAbsolute) {
+          // For MTVs with full paths
+          const urls = cat.BGV_LIST.map((videoPath) => {
+            const url = new URL("http://127.0.0.1:9864/getFile");
+            url.searchParams.append("path", videoPath);
+            return url.href;
+          });
+          allVideos.push(...urls);
+        } else {
+          // For regular BGVs with relative paths
+          const urls = cat.BGV_LIST.map(
+            (videoPath) => assetBaseUrl + videoPath,
+          );
+          allVideos.push(...urls);
+        }
+      }
     } else {
       const category = this.categories.find(
         (c) => c.BGV_CATEGORY === this.selectedCategory,
       );
       if (category) {
-        this.playlist = category.BGV_LIST.map(
-          (videoPath) => baseUrl + videoPath,
-        );
+        if (category.isAbsolute) {
+          allVideos = category.BGV_LIST.map((videoPath) => {
+            const url = new URL("http://127.0.0.1:9864/getFile");
+            url.searchParams.append("path", videoPath);
+            return url.href;
+          });
+        } else {
+          allVideos = category.BGV_LIST.map(
+            (videoPath) => assetBaseUrl + videoPath,
+          );
+        }
       }
     }
+
+    this.playlist = allVideos;
 
     for (let i = this.playlist.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -191,15 +215,15 @@ const BGVPlayer = {
 
   cycleCategory(direction) {
     if (this.isManualMode) return;
-    const allCategories = [
+    const allCategoryNames = [
       "Auto",
       ...this.categories.map((c) => c.BGV_CATEGORY),
     ];
-    let currentIndex = allCategories.indexOf(this.selectedCategory);
+    let currentIndex = allCategoryNames.indexOf(this.selectedCategory);
     currentIndex =
-      (currentIndex + direction + allCategories.length) % allCategories.length;
-    this.selectedCategory = allCategories[currentIndex];
-    this.categoryDisplay.text(this.selectedCategory);
+      (currentIndex + direction + allCategoryNames.length) %
+      allCategoryNames.length;
+    this.selectedCategory = allCategoryNames[currentIndex];
     this.showOSD();
     this.updatePlaylistForCategory();
   },
@@ -215,6 +239,7 @@ const BGVPlayer = {
     activePlayer.onended = () => this.playNext();
     this.currentIndex = (this.currentIndex + 1) % this.playlist.length;
     setTimeout(() => {
+      if (this.isManualMode) return; // Don't preload if mode changed
       preloadPlayer.src = this.playlist[this.currentIndex];
       preloadPlayer.load();
     }, this.PRELOAD_DELAY);
@@ -232,6 +257,7 @@ const BGVPlayer = {
     this.activePlayerIndex = 1 - this.activePlayerIndex;
     nextPlayer.onended = () => this.playNext();
     setTimeout(() => {
+      if (this.isManualMode) return;
       this.currentIndex = (this.currentIndex + 1) % this.playlist.length;
       currentPlayer.src = this.playlist[this.currentIndex];
       currentPlayer.load();
@@ -253,8 +279,7 @@ const BGVPlayer = {
     if (!this.isManualMode) return;
     this.isManualMode = false;
     this.activeManualPlayer = null;
-    await this.cleanStop();
-    this.start();
+    await this.updatePlaylistForCategory();
   },
 
   stop() {
@@ -262,7 +287,7 @@ const BGVPlayer = {
   },
 };
 
-// --- Romanizer Module (UPDATED) ---
+// --- Romanizer Module ---
 const Romanizer = {
   getPlaceholder(text, placeholderChar) {
     return text.replace(/\S/g, placeholderChar);
@@ -306,7 +331,7 @@ const InfoBar = {
   contentEl: null,
   timeout: null,
   isPersistent: false,
-  maxLength: 5, // Should match state.maxLength
+  maxLength: 5,
 
   init(container, maxLength) {
     this.maxLength = maxLength;
@@ -315,7 +340,7 @@ const InfoBar = {
     this.contentEl = new Html("div")
       .class("info-bar-content")
       .appendTo(this.bar);
-    this.showDefault(); // Set initial state
+    this.showDefault();
   },
 
   show(label, content, options = {}) {
@@ -436,7 +461,7 @@ const pkg = {
     let songItemElements = [];
     const maxLength = 5;
     let state = {
-      mode: "menu", // 'menu', 'player', 'yt-search'
+      mode: "menu",
       songNumber: "",
       highlightedIndex: -1,
       reservationNumber: "",
@@ -639,7 +664,6 @@ const pkg = {
       )
       .appendTo(wrapper);
 
-    // --- Main Menu UI ---
     wrapper.classOn("loading");
     const leftPanel = new Html("div").class("left-panel").appendTo(overlay);
     const rightPanel = new Html("div").class("right-panel").appendTo(overlay);
@@ -805,23 +829,18 @@ const pkg = {
           valueDisplay.text("0%");
         },
       );
-
       postSongScoreScreen.classOn("visible");
       Forte.playSfx("/assets/audio/score_tally.wav");
-
       await new Promise((r) => setTimeout(r, 500));
       await animateNumber(finalScoreDisplay, scoreData.finalScore, 2000, true);
-
       await Promise.all([
         animateGauge(keyRhythmGauge, scoreData.details.pitchAndRhythm, 1500),
         animateGauge(vibratoGauge, scoreData.details.vibrato, 1500),
         animateGauge(upbandGauge, scoreData.details.upband, 1500),
         animateGauge(downbandGauge, scoreData.details.downband, 1500),
       ]);
-
       await new Promise((r) => setTimeout(r, 4000));
       postSongScoreScreen.classOff("visible");
-
       await new Promise((r) => setTimeout(r, 500));
     }
 
@@ -842,7 +861,6 @@ const pkg = {
         pointerEvents: "none",
       })
       .appendTo(wrapper);
-
     new Html("h1")
       .styleJs({ fontSize: "3rem", letterSpacing: "0.1em", color: "#89CFF0" })
       .text("CALIBRATING AUDIO")
@@ -856,11 +874,9 @@ const pkg = {
       state.mode = newMode;
       wrapper.classOff("mode-menu", "mode-player", "mode-yt-search");
       wrapper.classOn(`mode-${newMode}`);
-
       overlay.classOn("hidden");
       playerUi.classOn("hidden");
       searchUi.classOn("hidden");
-
       if (newMode === "menu") {
         overlay.classOff("hidden");
         searchInput.elm.blur();
@@ -878,7 +894,6 @@ const pkg = {
     const updateMenuUI = () => {
       let activeSong = null;
       let displayCode = state.songNumber.padStart(maxLength, "0");
-
       if (state.songNumber.length > 0) {
         state.highlightedIndex = -1;
         activeSong = songMap.get(displayCode);
@@ -886,7 +901,6 @@ const pkg = {
         activeSong = songList[state.highlightedIndex];
         if (activeSong) displayCode = activeSong.code;
       }
-
       numberDisplay.text(displayCode);
       if (activeSong) {
         numberDisplay.classOn("active");
@@ -925,7 +939,6 @@ const pkg = {
     const renderSearchResults = () => {
       searchResultsContainer.clear();
       state.highlightedSearchIndex = -1;
-
       if (state.isSearching) {
         searchResultsContainer.text("Searching...");
         return;
@@ -934,7 +947,6 @@ const pkg = {
         searchResultsContainer.text("No results found.");
         return;
       }
-
       state.searchResults.forEach((result) => {
         const item = new Html("div")
           .class("search-result-item")
@@ -965,11 +977,9 @@ const pkg = {
     const performSearch = async () => {
       const query = searchInput.getValue().trim();
       if (!query) return;
-
       state.isSearching = true;
       state.searchResults = [];
       renderSearchResults();
-
       try {
         const response = await fetch(
           `http://127.0.0.1:9864/yt-search?q=${encodeURIComponent(query)}`,
@@ -995,15 +1005,11 @@ const pkg = {
     });
 
     const startPlayer = async (song) => {
-      // --- REMOVED: Unnecessary init call ---
-      // await Romanizer.init();
-
       if (nextLineUpdateTimeout) clearTimeout(nextLineUpdateTimeout);
       countdownTimers.forEach(clearTimeout);
       nextLineUpdateTimeout = null;
       countdownTimers = [];
       countdownDisplay.classOff("visible").text("");
-
       if (timeUpdateHandler)
         document.removeEventListener(
           "CherryTree.Forte.Playback.TimeUpdate",
@@ -1022,25 +1028,20 @@ const pkg = {
       timeUpdateHandler = null;
       lyricEventHandler = null;
       scoreUpdateHandler = null;
-
       lrcLineDisplay1.clear();
       lrcLineDisplay2.clear();
       midiLineDisplay1.clear();
       midiLineDisplay2.clear();
       ScoreHUD.hide();
       introCard.classOff("visible");
-
       state.currentSongIsYouTube = song.path.startsWith("yt://");
       state.currentSongIsMV = !!song.videoPath;
-
       state.reservationNumber = "";
       setMode("player");
-
       window.desktopIntegration.ipc.send("setRPC", {
         details: song.title,
         state: song.artist,
       });
-
       if (state.currentSongIsYouTube) {
         BGVPlayer.stop();
         bgvContainer.classOn("hidden");
@@ -1051,7 +1052,6 @@ const pkg = {
           allow:
             "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
         });
-
         lrcLyricsContainer.classOn("hidden");
         midiLyricsContainer.classOn("hidden");
         playerProgress.classOn("hidden");
@@ -1059,7 +1059,6 @@ const pkg = {
         let mvPlayer = null;
         lrcLyricsContainer.styleJs({ opacity: "0" });
         midiLyricsContainer.styleJs({ opacity: "0" });
-
         if (state.currentSongIsMV) {
           console.log(`[Encore] Playing MV: ${song.videoPath}`);
           const videoUrl = new URL("http://127.0.0.1:9864/getFile");
@@ -1068,44 +1067,34 @@ const pkg = {
         } else {
           BGVPlayer.resumePlaylist();
         }
-
         bgvContainer.classOff("hidden");
         youtubePlayerContainer.classOn("hidden");
         youtubeIframe.attr({ src: "" });
-
         lrcLyricsContainer.classOff("hidden");
         midiLyricsContainer.classOff("hidden");
         playerProgress.classOff("hidden");
-
         const trackUrl = new URL("http://127.0.0.1:9864/getFile");
         trackUrl.searchParams.append("path", song.path);
         await Forte.loadTrack(trackUrl.href);
-
         const playbackState = Forte.getPlaybackState();
         state.currentSongIsMultiplexed = playbackState.isMultiplexed;
-
         if (state.currentSongIsMultiplexed) {
           ScoreHUD.show(0);
         }
-
         introCardTitle.text(song.title);
         introCardArtist.text(song.artist);
         introCard.classOn("visible");
-
         let lrcParsedLyrics = [],
           currentLrcIndex = -1;
-
         const scheduleCountdown = (targetTime, currentTime) => {
           countdownTimers.forEach(clearTimeout);
           countdownTimers = [];
-
           const delays = {
             show3: (targetTime - 3 - currentTime) * 1000,
             show2: (targetTime - 2 - currentTime) * 1000,
             show1: (targetTime - 1 - currentTime) * 1000,
             hide: (targetTime - currentTime) * 1000,
           };
-
           if (delays.show3 > 0) {
             countdownTimers.push(
               setTimeout(() => {
@@ -1135,17 +1124,13 @@ const pkg = {
             );
           }
         };
-
         if (playbackState.isMidi) {
           midiLyricsContainer.styleJs({ display: "flex" });
           lrcLyricsContainer.styleJs({ display: "none" });
-
           const allSyllables = [];
           const lines = [];
           let currentLineSyllables = [];
           let displayableSyllableIndex = 0;
-
-          // --- REFACTORED: MIDI lyrics with async romanizer ---
           for (const syllableText of playbackState.decodedLyrics) {
             const isNewLine = /[\r\n\/\\]/.test(syllableText);
             const cleanText = syllableText.replace(/[\r\n\/\\]/g, "");
@@ -1167,10 +1152,8 @@ const pkg = {
             }
           }
           if (currentLineSyllables.length > 0) lines.push(currentLineSyllables);
-
           const displayLines = [midiLineDisplay1, midiLineDisplay2];
           let currentSongLineIndex = -1;
-
           const renderLine = (displayEl, lineData) => {
             displayEl.clear();
             if (!lineData) return;
@@ -1193,7 +1176,6 @@ const pkg = {
               }
             });
           };
-
           displayLines.forEach((line) =>
             line.clear().classOff("active", "next"),
           );
@@ -1201,25 +1183,19 @@ const pkg = {
           renderLine(displayLines[1], lines[1]);
           displayLines[0].classOn("active");
           displayLines[1].classOn("next");
-
           lyricEventHandler = (e) => {
             const { index } = e.detail;
             if (index >= allSyllables.length) return;
-
             const activeSyllable = allSyllables[index];
             if (activeSyllable.lineIndex !== currentSongLineIndex) {
               currentSongLineIndex = activeSyllable.lineIndex;
-
               const activeDisplay = displayLines[currentSongLineIndex % 2];
               const nextDisplay = displayLines[(currentSongLineIndex + 1) % 2];
-
               activeDisplay.classOn("active").classOff("next");
               nextDisplay.classOff("active").classOn("next");
-
               const lineToRender = lines[currentSongLineIndex + 1];
               renderLine(nextDisplay, lineToRender);
             }
-
             const newSyllableEl = wrapper.qs(
               `.lyric-syllable-container[data-index="${index}"]`,
             );
@@ -1235,7 +1211,6 @@ const pkg = {
           const lrcText = await FsSvc.readFile(song.lrcPath);
           const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
           if (lrcText) {
-            // --- REFACTORED: LRC lyrics with async romanizer ---
             const lines = lrcText.split("\n");
             const lyricPromises = lines.map(async (line) => {
               const match = line.match(timeRegex);
@@ -1254,7 +1229,6 @@ const pkg = {
             );
           }
         }
-
         if (state.currentSongIsMultiplexed) {
           scoreUpdateHandler = (e) => {
             const scoreData = e.detail;
@@ -1265,15 +1239,12 @@ const pkg = {
             scoreUpdateHandler,
           );
         }
-
         const PRE_ROLL_DELAY_MS = 2500;
         setTimeout(() => {
           if (state.mode !== "player") return;
-
           introCard.classOff("visible");
           lrcLyricsContainer.styleJs({ opacity: "1" });
           midiLyricsContainer.styleJs({ opacity: "1" });
-
           if (lrcParsedLyrics.length > 0) {
             const lrcDisplayLines = [lrcLineDisplay1, lrcLineDisplay2];
             const renderLrcLine = (displayEl, lineData) => {
@@ -1296,7 +1267,6 @@ const pkg = {
             renderLrcLine(lrcDisplayLines[0], lrcParsedLyrics[0]);
             renderLrcLine(lrcDisplayLines[1], lrcParsedLyrics[1]);
             lrcDisplayLines[1].classOn("next");
-
             if (lrcParsedLyrics[0].time > 8.0) {
               scheduleCountdown(lrcParsedLyrics[0].time, 0);
             }
@@ -1307,15 +1277,12 @@ const pkg = {
         timeUpdateHandler = (e) => {
           const { currentTime, duration } = e.detail;
           progressBar.styleJs({ width: `${(currentTime / duration) * 100}%` });
-
           if (mvPlayer) {
             const TOLERANCE_MS = 50;
             const HARD_SYNC_THRESHOLD_MS = 500;
             const CORRECTION_RATE = 1.05;
-
             const targetVideoTime = currentTime + state.videoSyncOffset / 1000;
             const driftMs = (targetVideoTime - mvPlayer.currentTime) * 1000;
-
             if (Math.abs(driftMs) > HARD_SYNC_THRESHOLD_MS) {
               console.warn(
                 `[MV Sync] Hard resync. Drift: ${driftMs.toFixed(
@@ -1336,7 +1303,6 @@ const pkg = {
               }
             }
           }
-
           if (lrcParsedLyrics.length === 0 || playbackState.isMidi) return;
           let newIndex = -1;
           for (let i = lrcParsedLyrics.length - 1; i >= 0; i--)
@@ -1346,10 +1312,8 @@ const pkg = {
             }
           if (newIndex !== currentLrcIndex) {
             if (nextLineUpdateTimeout) clearTimeout(nextLineUpdateTimeout);
-
             currentLrcIndex = newIndex;
             if (newIndex < 0) return;
-
             const lrcDisplayLines = [lrcLineDisplay1, lrcLineDisplay2];
             const renderLrcLine = (displayEl, lineData) => {
               displayEl.clear();
@@ -1365,16 +1329,12 @@ const pkg = {
                   .appendTo(displayEl);
               }
             };
-
             const activeDisplay = lrcDisplayLines[currentLrcIndex % 2];
             const nextDisplay = lrcDisplayLines[(currentLrcIndex + 1) % 2];
-
             activeDisplay.classOn("active").classOff("next");
             nextDisplay.classOff("active").classOn("next");
-
             const currentLine = lrcParsedLyrics[currentLrcIndex];
             const nextLine = lrcParsedLyrics[currentLrcIndex + 1];
-
             let lineDurationMs = 5000;
             if (nextLine) {
               lineDurationMs = (nextLine.time - currentLine.time) * 1000;
@@ -1382,9 +1342,7 @@ const pkg = {
                 scheduleCountdown(nextLine.time, currentTime);
               }
             }
-
             const delay = lineDurationMs / 2;
-
             nextLineUpdateTimeout = setTimeout(() => {
               renderLrcLine(nextDisplay, nextLine);
             }, delay);
@@ -1402,15 +1360,12 @@ const pkg = {
       youtubePlayerContainer.classOn("hidden");
       youtubeIframe.attr({ src: "" });
       bgvContainer.classOff("hidden");
-
       Forte.stopTrack();
-
       if (nextLineUpdateTimeout) clearTimeout(nextLineUpdateTimeout);
       countdownTimers.forEach(clearTimeout);
       nextLineUpdateTimeout = null;
       countdownTimers = [];
       countdownDisplay.classOff("visible").text("");
-
       if (timeUpdateHandler)
         document.removeEventListener(
           "CherryTree.Forte.Playback.TimeUpdate",
@@ -1470,17 +1425,14 @@ const pkg = {
     const handleDigitInput = (digit) => {
       const target =
         state.mode === "player" ? "reservationNumber" : "songNumber";
-
       if (state[target].length >= maxLength) {
         state[target] = digit;
       } else {
         state[target] += digit;
       }
-
       if (state.mode !== "player") {
         Forte.playSfx(`/assets/audio/numbers/${digit}.wav`);
       }
-
       if (state.mode === "player") InfoBar.showReservation(state[target]);
       else updateMenuUI();
     };
@@ -1538,7 +1490,6 @@ const pkg = {
     const handleEscape = () => {
       if (state.mode === "player") {
         if (state.isTransitioning) return;
-
         if (state.reservationNumber.length > 0) {
           state.reservationNumber = "";
           InfoBar.showDefault();
@@ -1599,15 +1550,12 @@ const pkg = {
 
     const handleVideoSync = (direction) => {
       if (state.mode !== "player" || !state.currentSongIsMV) return;
-
       const change = direction === "up" ? 10 : -10;
       state.videoSyncOffset += change;
-
       const sign = state.videoSyncOffset > 0 ? "+" : "";
       InfoBar.show("VIDEO SYNC", `${sign}${state.videoSyncOffset} ms`, {
         duration: 3000,
       });
-
       const updatedConfig = JSON.parse(JSON.stringify(config));
       if (!updatedConfig.videoConfig) {
         updatedConfig.videoConfig = {};
@@ -1619,14 +1567,12 @@ const pkg = {
     const handleMultiplexPan = (direction) => {
       const playbackState = Forte.getPlaybackState();
       if (state.mode !== "player" || !playbackState.isMultiplexed) return;
-
       const change = direction === "right" ? 0.2 : -0.2;
       const newPan = parseFloat(
         Math.max(-1, Math.min(1, playbackState.multiplexPan + change)).toFixed(
           1,
         ),
       );
-
       Forte.setMultiplexPan(newPan);
       let displayText = "";
       if (newPan <= -0.99) {
@@ -1702,7 +1648,6 @@ const pkg = {
       } else {
         e.preventDefault();
       }
-
       if (e.key >= "0" && e.key <= "9") handleDigitInput(e.key);
       else if (e.key === "Backspace") handleBackspace();
       else if (e.key === "Enter") handleEnter();
@@ -1792,7 +1737,6 @@ const pkg = {
       if (state.isTransitioning) {
         return;
       }
-
       const { status } = e.detail || {};
       if (
         state.mode === "player" &&
@@ -1802,21 +1746,16 @@ const pkg = {
         state.isTransitioning = true;
         const wasMultiplexed = state.currentSongIsMultiplexed;
         const wasMV = state.currentSongIsMV;
-
         ScoreHUD.hide();
-
         if (wasMV) {
           await BGVPlayer.resumePlaylist();
         }
-
         if (wasMultiplexed) {
           const finalScoreData = Forte.getPlaybackState().score;
           await showPostSongScreen(finalScoreData);
         }
-
         stopPlayer();
         transitionAfterSong();
-
         setTimeout(() => {
           state.isTransitioning = false;
         }, 1500);
@@ -1833,12 +1772,22 @@ const pkg = {
     wrapper.classOn("loading");
     await new Promise((r) => setTimeout(r, 500));
     calibrationScreen.cleanup();
-
     await BGVPlayer.init(bgvContainer);
-    if (!BGVPlayer.isManualMode) {
-      BGVPlayer.start();
+    await BGVPlayer.loadManifestCategories();
+    const mtvPaths = songList
+      .filter((song) => song.videoPath)
+      .map((song) => song.videoPath);
+    if (mtvPaths.length > 0) {
+      BGVPlayer.addDynamicCategory({
+        BGV_CATEGORY: "MTV",
+        BGV_LIST: mtvPaths,
+        isAbsolute: true,
+      });
+      console.log(
+        `[BGV] Injected "MTV" category with ${mtvPaths.length} videos.`,
+      );
     }
-
+    await BGVPlayer.updatePlaylistForCategory();
     setTimeout(() => {
       wrapper.classOff("loading");
       Ui.transition("fadeIn", wrapper);
@@ -1867,14 +1816,12 @@ const pkg = {
         "CherryTree.Forte.Scoring.Update",
         scoreUpdateHandler,
       );
-
     keydownHandler = null;
     timeUpdateHandler = null;
     playbackUpdateHandler = null;
     lyricEventHandler = null;
     scoreUpdateHandler = null;
     lastPlaybackStatus = null;
-
     BGVPlayer.stop();
     Forte.stopTrack();
     Ui.cleanup(Pid);

@@ -108,6 +108,7 @@ const state = {
     multiplexPan: -1, // Default pan to left (instrumental)
     leftPannerGain: null,
     rightPannerGain: null,
+    volume: 1,
   },
   mic: {
     peerId: null,
@@ -466,7 +467,7 @@ const pkg = {
         window.webkitAudioContext)();
       sfxGain = sfxAudioContext.createGain();
       sfxGain.connect(sfxAudioContext.destination);
-      sfxGain.gain.value = 1; // Default volume for SFX
+      sfxGain.gain.value = state.playback.volume; // Default volume for SFX
       console.log("[FORTE SVC] SFX Audio context initialized.");
     } catch (e) {
       console.error(
@@ -993,6 +994,8 @@ const pkg = {
       if (!masterGain) return;
       const clampedLevel = Math.max(0, Math.min(1, level));
       masterGain.gain.setValueAtTime(clampedLevel, audioContext.currentTime);
+      sfxGain.gain.setValueAtTime(clampedLevel, audioContext.currentTime);
+      state.playback.volume = clampedLevel;
     },
 
     setMultiplexPan: (panValue) => {
