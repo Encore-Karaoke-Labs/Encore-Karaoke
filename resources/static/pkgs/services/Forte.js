@@ -35,6 +35,7 @@ let toastTimeout = null;
 // --- Web Audio API State for Karaoke Track Playback ---
 let audioContext;
 let masterGain;
+let masterCompressor; // Added Mastering Compressor
 let sourceNode = null;
 let animationFrameId = null;
 
@@ -431,7 +432,19 @@ const pkg = {
         sampleRate: 44100, // Standard sample rate
       });
       masterGain = audioContext.createGain();
-      masterGain.connect(audioContext.destination);
+
+      masterCompressor = audioContext.createDynamicsCompressor();
+
+      masterCompressor.threshold.setValueAtTime(-18, audioContext.currentTime); // dB: Don't compress quiet parts. -18dB is a good starting point.
+      masterCompressor.knee.setValueAtTime(30, audioContext.currentTime); // dB: A soft knee for a more gradual, musical compression.
+      masterCompressor.ratio.setValueAtTime(12, audioContext.currentTime); // Ratio: A 12:1 ratio is strong, acting like a soft limiter.
+      masterCompressor.attack.setValueAtTime(0.003, audioContext.currentTime); // Seconds: Fast attack to catch peaks quickly.
+      masterCompressor.release.setValueAtTime(0.25, audioContext.currentTime); // Seconds: A moderate release to avoid "pumping".
+
+      // Reroute the audio chain: masterGain -> compressor -> destination
+      masterGain.connect(masterCompressor);
+      masterCompressor.connect(audioContext.destination);
+
       state.playback.currentDeviceId = audioContext.sinkId || "default";
       console.log("[FORTE SVC] Web Audio API context initialized.");
       pkg.data.getPlaybackDevices();
@@ -863,26 +876,29 @@ const pkg = {
             )}s`,
           );
 
+          // --- START: FIX FOR MULTIPLEX VOLUME ---
           const splitter = audioContext.createChannelSplitter(2);
-          const merger = audioContext.createChannelMerger(1);
           const leftGain = audioContext.createGain();
           const rightGain = audioContext.createGain();
+          const monoMixer = audioContext.createGain(); // Use a GainNode to sum signals
 
           state.playback.leftPannerGain = leftGain;
           state.playback.rightPannerGain = rightGain;
 
           sourceNode.connect(splitter);
-          splitter.connect(leftGain, 0);
-          splitter.connect(rightGain, 1);
+          splitter.connect(leftGain, 0); // Instrumental (Left channel)
+          splitter.connect(rightGain, 1); // Vocal Guide (Right channel)
 
-          // Latency-compensated analysis path: splitter -> delay -> analyser
+          // Latency-compensated analysis path for scoring (unchanged)
+          // Note: We connect the splitter's output directly, before the panner gain.
           splitter.connect(delayNode, 1);
           delayNode.connect(vocalGuideAnalyser);
 
-          // Audio output path (unaffected by delay)
-          leftGain.connect(merger, 0, 0);
-          rightGain.connect(merger, 0, 0);
-          merger.connect(masterGain);
+          // Audio output path: Both gains now feed the summing monoMixer
+          leftGain.connect(monoMixer);
+          rightGain.connect(monoMixer);
+          monoMixer.connect(masterGain); // The combined mono signal goes to the master gain
+          // --- END: FIX FOR MULTIPLEX VOLUME ---
 
           pkg.data.setMultiplexPan(state.playback.multiplexPan);
           console.log("[FORTE SVC] Playing track in multiplexed panner mode.");
@@ -1278,6 +1294,7 @@ const pkg = {
     }
 
     if (audioContext && audioContext.state !== "closed") {
+      if (masterCompressor) masterCompressor.disconnect();
       audioContext.close();
     }
     if (sfxAudioContext && sfxAudioContext.state !== "closed") {
