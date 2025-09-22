@@ -17,5 +17,16 @@
   {
     "BGV_CATEGORY": "3D",
     "BGV_LIST": ["3d/1.mp4"]
+  },
+  {
+    "BGV_CATEGORY": "Gaming",
+    "BGV_LIST": [
+      "gaming/Cinematic.mp4",
+      "gaming/DOLLY-CLOSEUP-ToLobbySpawn1.mp4",
+      "gaming/DOLLY-CLOSEUP-ToPlayer1.mp4",
+      "gaming/DOLLY-CLOSEUP-ToStairs1.mp4",
+      "gaming/DOLLY-CLOSEUP-ToStairs2.mp4",
+      "gaming/PAN-FAR-Pathway1.mp4"
+    ]
   }
 ]
