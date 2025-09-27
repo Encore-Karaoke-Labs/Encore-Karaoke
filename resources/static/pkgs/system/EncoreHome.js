@@ -10,10 +10,12 @@ let lyricEventHandler = null; // Listener for our custom lyric events
 let scoreUpdateHandler = null; // Listener for real-time score updates
 let lastPlaybackStatus = null;
 
+let songList;
+
 const config = await window.desktopIntegration.ipc.invoke("getConfig");
 
 // --- BGVPlayer Module ---
-// ... (This module is unchanged)
+// ... (This module is unchanged from previous version)
 const BGVPlayer = {
   videoElements: [],
   playlist: [],
@@ -24,8 +26,6 @@ const BGVPlayer = {
   PRELOAD_DELAY: 500, // ms
   categories: [], // Store available categories
   selectedCategory: "Auto", // Default to Auto mode
-  osdTimeout: null,
-  osdVisible: false,
   isManualMode: false, // Flag for when an MV is playing
   activeManualPlayer: null, // Holds the video element playing an MV
 
@@ -58,65 +58,6 @@ const BGVPlayer = {
       elm.addEventListener("volumechange", () => (elm.volume = 0));
       this.videoElements.push(elm);
     }
-
-    const osd = new Html("div")
-      .styleJs({
-        position: "absolute",
-        left: "2rem",
-        bottom: "2rem",
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.75rem",
-        fontFamily: "'Rajdhani', sans-serif",
-        fontWeight: "700",
-        opacity: "0",
-        transition: "opacity 0.3s ease",
-        pointerEvents: "none",
-        zIndex: 100000,
-      })
-      .appendTo(wrapper);
-
-    this.osdBox = new Html("div")
-      .styleJs({
-        background: "rgba(0,0,0,0.7)",
-        border: "1px solid rgba(255,255,255,0.3)",
-        borderRadius: "0.5rem",
-        padding: "0.6rem 1.2rem",
-        minWidth: "240px",
-        zIndex: 2147483647,
-      })
-      .appendTo(osd);
-
-    new Html("div")
-      .styleJs({
-        color: "#FFD700",
-        fontSize: "1rem",
-        letterSpacing: "0.1rem",
-        marginBottom: "0.25rem",
-      })
-      .text("BGV MODE")
-      .appendTo(this.osdBox);
-
-    this.categoryDisplay = new Html("div")
-      .styleJs({
-        color: "#89CFF0",
-        fontSize: "2rem",
-        letterSpacing: "0.2rem",
-        textAlign: "center",
-      })
-      .appendTo(this.osdBox);
-
-    this.osd = osd;
-  },
-
-  showOSD() {
-    if (this.osdTimeout) clearTimeout(this.osdTimeout);
-    this.osd.styleJs({ opacity: "1" });
-    this.osdVisible = true;
-    this.osdTimeout = setTimeout(() => {
-      this.osd.styleJs({ opacity: "0" });
-      this.osdVisible = false;
-    }, 3000);
   },
 
   async loadManifestCategories() {
@@ -140,7 +81,6 @@ const BGVPlayer = {
   async updatePlaylistForCategory() {
     const assetBaseUrl = "http://127.0.0.1:9864/assets/video/bgv/";
     this.playlist = [];
-    this.categoryDisplay.text(this.selectedCategory);
 
     let allVideos = [];
 
@@ -223,7 +163,6 @@ const BGVPlayer = {
       (currentIndex + direction + allCategoryNames.length) %
       allCategoryNames.length;
     this.selectedCategory = allCategoryNames[currentIndex];
-    this.showOSD();
     this.updatePlaylistForCategory();
   },
 
@@ -322,14 +261,15 @@ const Romanizer = {
 };
 
 // --- InfoBar Module ---
-// ... (This module is unchanged)
 const InfoBar = {
   bar: null,
   labelEl: null,
   contentEl: null,
   timeout: null,
-  isPersistent: false,
   maxLength: 5,
+  isTempVisible: false,
+  oldLabel: null,
+  oldContent: null,
 
   init(container, maxLength) {
     this.maxLength = maxLength;
@@ -338,29 +278,49 @@ const InfoBar = {
     this.contentEl = new Html("div")
       .class("info-bar-content")
       .appendTo(this.bar);
-    this.showDefault();
   },
 
   show(label, content, options = {}) {
     if (this.timeout) clearTimeout(this.timeout);
 
-    this.isPersistent = !options.duration;
-
-    this.labelEl.text(label);
-    this.contentEl.html(content);
-
     if (options.duration) {
+      // If this is the first temporary message in a sequence, store the persistent state.
+      if (!this.isTempVisible) {
+        this.oldLabel = this.labelEl.getText();
+        this.oldContent = this.contentEl.getHtml();
+      }
+      this.isTempVisible = true;
+
+      this.labelEl.text(label);
+      this.contentEl.html(content);
+      this.bar.classOn("temp-visible");
+
       this.timeout = setTimeout(() => {
+        this.isTempVisible = false;
         this.timeout = null;
-        if (!this.isPersistent) {
-          this.showDefault();
-        }
+        this.bar.classOff("temp-visible");
+
+        // After fade out, restore the old content.
+        setTimeout(() => {
+          // Only restore if another temp message hasn't appeared in the meantime
+          if (!this.isTempVisible) {
+            this.labelEl.text(this.oldLabel);
+            this.contentEl.html(this.oldContent);
+          }
+        }, 300); // Must match CSS transition duration
       }, options.duration);
+    } else {
+      // This is a persistent message. Clear any temporary state.
+      this.isTempVisible = false;
+      this.oldLabel = null;
+      this.oldContent = null;
+
+      this.labelEl.text(label);
+      this.contentEl.html(content);
     }
   },
 
   showDefault() {
-    this.isPersistent = false;
     const { reservationQueue } = this.context();
     if (reservationQueue.length > 0) {
       const nextSong = reservationQueue[0];
@@ -380,7 +340,6 @@ const InfoBar = {
     } else {
       this.show("UP NEXT", "—");
     }
-    this.isPersistent = false;
   },
 
   showReservation(reservationNumber) {
@@ -456,7 +415,7 @@ const pkg = {
     const socket = io({ query: { clientType: "app" } });
     socket.on("connect", () => console.log("[LINK] Connected to server."));
 
-    const songList = FsSvc.getSongList();
+    songList = FsSvc.getSongList();
     const songMap = new Map(songList.map((song) => [song.code, song]));
     let songItemElements = [];
     const maxLength = 5;
@@ -726,13 +685,19 @@ const pkg = {
         .intro-card-title { font-size: 4rem; font-weight: 700; letter-spacing: 0.05em; line-height: 1.1; text-shadow: 2px 2px 8px rgba(0,0,0,0.5); }
         .intro-card-artist { font-size: 1.5rem; font-weight: 500; opacity: 0.8; border-top: 1px solid rgba(255,255,255,0.3); padding-top: 0.75rem; margin-top: 0.5rem; }
         .info-bar { position: absolute; top: 2rem; left: 3rem; right: 3rem; height: 50px; display: flex; align-items: stretch; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.5rem; font-family: 'Rajdhani', sans-serif; color: white; z-index: 25; overflow: hidden; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
-        .mode-player .info-bar { opacity: 1; pointer-events: auto; }
+        .mode-player .info-bar, .info-bar.temp-visible { opacity: 1; pointer-events: auto; }
         .info-bar-label { flex: 0 0 160px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); font-size: 1.2rem; font-weight: 700; color: #FFD700; letter-spacing: 0.1rem; border-right: 1px solid rgba(255,255,255,0.2); }
         .info-bar-content { flex-grow: 1; display: flex; align-items: center; gap: 1rem; padding: 0 1.5rem; font-size: 1.6rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .info-bar-code { font-weight: 700; color: #89CFF0; letter-spacing: 0.1rem; }
         .info-bar-code.is-youtube { color: #FF5555; letter-spacing: 0; }
         .info-bar-title { font-weight: bold; }
         .info-bar-artist { opacity: 0.7; }
+        .bgv-category-item { padding: 0.25rem 0.75rem; margin: 0 0.1rem; border-radius: 0.25rem; opacity: 0.6; transition: all 0.2s ease; font-size: 1.2rem; }
+        .bgv-category-item.selected { opacity: 1; font-weight: bold; color: #000; background-color: #89CFF0; }
+        .info-bar-content .volume-display { display: flex; align-items: center; width: 100%; gap: 1rem; }
+        .info-bar-content .volume-slider-container { flex-grow: 1; height: 12px; background-color: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; overflow: hidden; }
+        .info-bar-content .volume-slider-fill { height: 100%; background-color: #89CFF0; border-radius: 6px; transition: width 0.1s linear; }
+        .info-bar-content .volume-percentage { font-size: 1.6rem; font-weight: 700; width: 70px; text-align: right; }
         .score-hud { position: absolute; bottom: 2rem; right: 3rem; padding: 0.5rem 1.2rem; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.5rem; font-family: 'Rajdhani', sans-serif; color: white; z-index: 26; display: flex; flex-direction: row; align-items: baseline; gap: 0.75rem; opacity: 0; transition: opacity 0.3s ease, bottom 0.3s ease; pointer-events: none; }
         .score-hud.visible { opacity: 1; }
         .score-hud-label { font-size: 1rem; font-weight: 700; color: #FFD700; letter-spacing: 0.1rem; }
@@ -1641,7 +1606,13 @@ const pkg = {
 
     const handleEnter = () => {
       if (state.mode === "menu") {
-        handleSubmit();
+        if (state.reservationQueue.length > 0) {
+          // If we have queued songs in menu mode, start playing them
+          const nextSong = state.reservationQueue.shift();
+          startPlayer(nextSong);
+        } else {
+          handleSubmit();
+        }
       } else if (state.mode === "player") {
         if (state.isSearchOverlayVisible) {
           if (state.highlightedSearchIndex !== -1) {
@@ -1717,9 +1688,18 @@ const pkg = {
       const change = direction === "up" ? 0.05 : -0.05;
       state.volume = Math.max(0, Math.min(1, state.volume + change));
       Forte.setTrackVolume(state.volume);
-      InfoBar.show("VOLUME", `${Math.round(state.volume * 100)}%`, {
-        duration: 3000,
-      });
+
+      const volumePercent = Math.round(state.volume * 100);
+      const volumeContent = `
+        <div class="volume-display">
+            <div class="volume-slider-container">
+                <div class="volume-slider-fill" style="width: ${volumePercent}%"></div>
+            </div>
+            <span class="volume-percentage">${volumePercent}%</span>
+        </div>
+      `;
+      InfoBar.show("VOLUME", volumeContent, { duration: 3000 });
+
       const updatedConfig = {
         ...config,
         audioConfig: {
@@ -1869,9 +1849,23 @@ const pkg = {
       } else if (e.key === "-") handleVolume("down");
       else if (e.key === "=") handleVolume("up");
       else if (e.key === "[" || e.key === "]") {
-        if (state.currentSongIsMV)
+        if (state.currentSongIsMV) {
           handleVideoSync(e.key === "]" ? "up" : "down");
-        else BGVPlayer.cycleCategory(e.key === "[" ? -1 : 1);
+        } else {
+          BGVPlayer.cycleCategory(e.key === "[" ? -1 : 1);
+          const allCategoryNames = [
+            "Auto",
+            ...BGVPlayer.categories.map((c) => c.BGV_CATEGORY),
+          ];
+          const content = allCategoryNames
+            .map((cat) =>
+              cat === BGVPlayer.selectedCategory
+                ? `<span class="bgv-category-item selected">${cat}</span>`
+                : `<span class="bgv-category-item">${cat}</span>`,
+            )
+            .join("");
+          InfoBar.show("BGV", content, { duration: 3000 });
+        }
       } else if (e.key.toLowerCase() === "y") {
         if (state.isTransitioning) return;
         if (state.mode === "menu") setMode("yt-search");
@@ -1884,8 +1878,30 @@ const pkg = {
       }
     };
 
-    socket.on("execute-command", (data) => {
+    socket.on("connect", () => console.log("[LINK] Connected to server."));
+
+    const validateAndReserveSong = (code) => {
+      const displayCode = code.padStart(maxLength, "0");
+      const song = songMap.get(displayCode);
+
+      if (song) {
+        // If we're in menu mode and nothing is playing, start this song immediately
+        if (state.mode === "menu") {
+          startPlayer(song);
+        } else {
+          state.reservationQueue.push(song);
+          InfoBar.showDefault();
+        }
+        return { success: true, song };
+      }
+
+      return { success: false };
+    };
+
+    socket.on("execute-command", (commandObj) => {
+      let data = commandObj.data;
       console.log("[LINK] Executing command:", data);
+      console.log("[LINK] From socket id:", commandObj.identity);
       switch (data.type) {
         case "digit":
           handleDigitInput(data.value);
@@ -1937,6 +1953,29 @@ const pkg = {
         case "yt_search_query":
           searchInput.elm.value = data.value;
           performSearch();
+          break;
+        case "get_song_list":
+          socket.emit("sendData", {
+            identity: commandObj.identity,
+            data: { type: "songlist", contents: songList },
+          });
+          break;
+        case "reserve_code":
+          const result = validateAndReserveSong(data.value);
+          socket.emit("sendData", {
+            identity: commandObj.identity,
+            data: {
+              type: "reserve_response",
+              success: result.success,
+              song: result.success
+                ? {
+                    code: result.song.code,
+                    title: result.song.title,
+                    artist: result.song.artist,
+                  }
+                : null,
+            },
+          });
           break;
       }
     });

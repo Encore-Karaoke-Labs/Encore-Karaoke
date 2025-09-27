@@ -34,11 +34,13 @@
         justify-content: center;
         align-items: flex-start;
         min-height: 100vh;
+        overflow-x: hidden;
       }
       .container {
         width: 100%;
         max-width: 480px;
-        transition: max-width 0.3s ease-in-out;
+        /* REVISION: Added padding-right to the transition property for a smooth shift */
+        transition: max-width 0.3s ease-in-out, padding-right 0.3s ease-in-out;
       }
       header {
         text-align: center;
@@ -82,16 +84,23 @@
       }
       /* View Toggling */
       .remote-view,
-      .search-view {
+      .search-view,
+      .songlist-view {
         display: none;
       }
-      .remote-view.active {
-        display: block;
+      .remote-view.active,
+      .search-view.active,
+      .songlist-view.active {
+        display: block; /* Use block as the base display property */
       }
       .search-view.active {
         display: flex;
         flex-direction: column;
         gap: 1rem;
+      }
+      .songlist-view.active {
+        display: flex;
+        flex-direction: column;
       }
 
       /* Remote View Grid */
@@ -117,6 +126,12 @@
       }
       .numpad-btn[data-type="backspace"] {
         font-size: 1.5rem;
+      }
+      .sl-btn {
+        background-color: var(--secondary-accent);
+        color: var(--background-color);
+        border: none;
+        font-weight: 700;
       }
 
       /* Search View */
@@ -148,32 +163,124 @@
         border: none;
       }
 
+      /* Song List View Styles */
+      .songlist-view {
+        position: fixed;
+        inset: 0;
+        background-color: var(--background-color);
+        z-index: 100;
+        padding: 1rem;
+      }
+      .songlist-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        flex-shrink: 0;
+      }
+      .songlist-back-btn {
+        font-size: 1rem;
+        padding: 0.6rem 1rem;
+      }
+      .songlist-search {
+        flex-grow: 1;
+        font-size: 1.2rem;
+        padding: 0.6rem 1rem;
+      }
+      .songlist-container {
+        flex-grow: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .song-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      .song-item:hover {
+        background-color: var(--button-hover-bg);
+      }
+      .song-code {
+        font-weight: 700;
+        color: var(--primary-accent);
+        flex: 0 0 60px;
+        font-size: 1.1rem;
+      }
+      .song-details {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .song-title {
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .song-artist {
+        font-size: 0.9rem;
+        opacity: 0.7;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Toast Notification */
+      .toast-notification {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translate(-50%, 200%);
+        background: rgba(10, 10, 20, 0.9);
+        color: white;
+        padding: 0.8rem 1.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid var(--primary-accent);
+        z-index: 9999;
+        font-size: 1rem;
+        font-weight: 700;
+        text-align: center;
+        opacity: 0;
+        transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+      }
+      .toast-notification.show {
+        transform: translate(-50%, 0);
+        opacity: 1;
+      }
+
       /* =================================== */
       /* Tablet and Larger Screen Adjustments */
       /* =================================== */
       @media (min-width: 768px) {
         body {
-          padding: 2rem; /* More breathing room on larger screens */
+          padding: 2rem;
+        }
+        /* REVISION: Make space for the side panel */
+        body.songlist-open .container {
+          padding-right: 400px;
         }
         .container {
-          max-width: 680px; /* Wider container for tablets */
+          max-width: 680px;
         }
         header {
-          margin-bottom: 2.5rem; /* More space below header */
+          margin-bottom: 2.5rem;
         }
         header h1 {
-          font-size: 2.5rem; /* Larger title */
+          font-size: 2.5rem;
           letter-spacing: 0.3rem;
         }
         button {
-          font-size: 1.3rem; /* Base button font size increase */
+          font-size: 1.3rem;
           padding: 1.2rem;
-          border-radius: 0.75rem; /* Slightly larger radius */
+          border-radius: 0.75rem;
         }
 
         /* Remote View Grid */
         .remote-grid {
-          gap: 1.25rem; /* Increase gap between buttons */
+          gap: 1.25rem;
         }
         .control-btn {
           font-size: 1.1rem;
@@ -183,7 +290,7 @@
           font-size: 1.4rem;
         }
         .numpad-btn {
-          font-size: 2.5rem; /* Much larger numbers for easy tapping */
+          font-size: 2.5rem;
           padding: 2.25rem 0;
         }
         .numpad-btn[data-type="backspace"] {
@@ -192,7 +299,7 @@
 
         /* Search View */
         .search-view {
-          gap: 1.5rem; /* More space between search elements */
+          gap: 1.5rem;
         }
         .search-input-remote {
           font-size: 1.8rem;
@@ -201,6 +308,24 @@
         }
         .search-controls {
           gap: 1.5rem;
+        }
+
+        /* Song List Tablet Adjustments */
+        .songlist-view {
+          position: fixed;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          left: auto;
+          width: 400px;
+          border-left: 1px solid var(--border-color);
+          box-shadow: -5px 0 20px rgba(0, 0, 0, 0.3);
+          transform: translateX(100%);
+          transition: transform 0.3s ease-in-out;
+          padding: 1.5rem;
+        }
+        .songlist-view.active {
+          transform: translateX(0);
         }
       }
     </style>
@@ -214,6 +339,7 @@
         <!-- Main Remote View -->
         <div class="remote-view active">
           <div class="remote-grid">
+            <!-- Content is identical, omitted for brevity -->
             <!-- Row 1 -->
             <button class="control-btn" data-type="yt_search">YouTube</button>
             <button class="control-btn" data-type="stop" data-value="Escape">
@@ -226,7 +352,6 @@
             >
               Reserve
             </button>
-
             <!-- Numpad -->
             <button class="numpad-btn" data-type="digit" data-value="1">
               1
@@ -240,7 +365,6 @@
             <button class="control-btn" data-type="key_up" data-value="ArrowUp">
               Key &uarr;
             </button>
-
             <button class="numpad-btn" data-type="digit" data-value="4">
               4
             </button>
@@ -257,7 +381,6 @@
             >
               Key &darr;
             </button>
-
             <button class="numpad-btn" data-type="digit" data-value="7">
               7
             </button>
@@ -270,7 +393,6 @@
             <button class="control-btn" data-type="vol_up" data-value="=">
               Vol &uarr;
             </button>
-
             <button
               class="numpad-btn"
               data-type="backspace"
@@ -281,8 +403,9 @@
             <button class="numpad-btn" data-type="digit" data-value="0">
               0
             </button>
-            <button class="mic-btn">MIC</button>
-            <!-- Placeholder -->
+            <button class="sl-btn" data-type="get_song_list" data-value="">
+              SONGLIST
+            </button>
             <button class="control-btn" data-type="vol_down" data-value="-">
               Vol &darr;
             </button>
@@ -291,6 +414,7 @@
 
         <!-- YouTube Search View -->
         <div class="search-view">
+          <!-- Content is identical, omitted for brevity -->
           <input
             type="text"
             class="search-input-remote"
@@ -306,6 +430,20 @@
             </button>
           </div>
         </div>
+
+        <!-- Song List View -->
+        <div class="songlist-view">
+          <!-- Content is identical, omitted for brevity -->
+          <div class="songlist-header">
+            <button class="songlist-back-btn">&larr; Back</button>
+            <input
+              type="text"
+              class="search-input-remote songlist-search"
+              placeholder="Filter list..."
+            />
+          </div>
+          <div class="songlist-container"></div>
+        </div>
       </main>
     </div>
     <script src="/socket.io/socket.io.js"></script>
@@ -313,16 +451,21 @@
       document.addEventListener("DOMContentLoaded", () => {
         const socket = io({ query: { clientType: "remote" } });
 
-        // DOM Elements
+        // --- STATE & HELPERS ---
+        let fullSongList = [];
+        const isTabletOrLarger = () =>
+          window.matchMedia("(min-width: 768px)").matches;
+
+        // --- DOM Elements ---
+        const body = document.body;
         const remoteView = document.querySelector(".remote-view");
         const searchView = document.querySelector(".search-view");
-        const ytSearchBtn = document.querySelector(
-          'button[data-type="yt_search"]',
-        );
-        const backBtn = document.querySelector(".search-back-btn");
+        const songlistView = document.querySelector(".songlist-view");
         const searchInput = document.querySelector(".search-input-remote");
         const searchSubmitBtn = document.querySelector(".search-submit-btn");
-        const micBtn = document.querySelector(".mic-btn");
+        const songlistBackBtn = document.querySelector(".songlist-back-btn");
+        const songlistSearchInput = document.querySelector(".songlist-search");
+        const songlistContainer = document.querySelector(".songlist-container");
 
         socket.on("connect", () =>
           console.log("Connected to Encore Link server."),
@@ -331,7 +474,15 @@
           console.log("Disconnected from Encore Link server."),
         );
 
-        // Universal button click handler
+        socket.on("fromRemote", (payload) => {
+          if (payload.type === "songlist" && Array.isArray(payload.contents)) {
+            fullSongList = payload.contents;
+            renderSongList(fullSongList);
+            showSonglistView();
+          }
+        });
+
+        // --- Universal button click handler ---
         const handleButtonClick = (e) => {
           const button = e.currentTarget;
           const type = button.dataset.type;
@@ -341,47 +492,56 @@
           }
         };
 
-        const micButton = async () => {
-          let micUrl = new URL("https://encore-karaoke.netlify.app/");
-          let data = await (await fetch("/mic/initiate")).json();
-          console.log(data);
-          micUrl.searchParams.set("peerId", data.playerPeerId);
-          micUrl.searchParams.set("code", data.sessionCode);
-          window.open(micUrl.href);
-        };
-
-        micBtn.addEventListener("click", micButton);
-
-        // Main remote buttons (excluding YT search)
         document
-          .querySelectorAll(".remote-grid button:not([data-type='yt_search'])")
+          .querySelectorAll(".remote-grid button, .search-controls button")
           .forEach((button) => {
             if (button.disabled) return;
             button.addEventListener("click", handleButtonClick);
           });
 
-        // Search view buttons
-        document
-          .querySelectorAll(".search-controls button")
-          .forEach((button) => {
-            button.addEventListener("click", handleButtonClick);
-          });
+        // --- REVISED: View Toggling Logic ---
 
-        // View Toggling Logic
-        ytSearchBtn.addEventListener("click", () => {
+        const showRemoteView = () => {
+          socket.emit("remote-command", { type: "yt_search_close", value: "" });
+          remoteView.classList.add("active");
+          searchView.classList.remove("active");
+
+          // This function is also now the "close song list panel" function
+          songlistView.classList.remove("active");
+          body.classList.remove("songlist-open");
+        };
+
+        const showSearchView = () => {
           remoteView.classList.remove("active");
           searchView.classList.add("active");
+          songlistView.classList.remove("active"); // Ensure songlist is closed
+          body.classList.remove("songlist-open");
           socket.emit("remote-command", { type: "yt_search_open" });
           searchInput.focus();
-        });
+        };
 
-        backBtn.addEventListener("click", () => {
-          searchView.classList.remove("active");
-          remoteView.classList.add("active");
-          socket.emit("remote-command", { type: "yt_search_close" });
-        });
+        const showSonglistView = () => {
+          searchView.classList.remove("active"); // Always hide search view
+          songlistView.classList.add("active");
+          body.classList.add("songlist-open");
+          songlistSearchInput.focus();
 
-        // Search Submission Logic
+          // CRITICAL CHANGE: Only hide the remote view on mobile devices.
+          if (!isTabletOrLarger()) {
+            remoteView.classList.remove("active");
+          }
+        };
+
+        // Assign new functions to button events
+        document
+          .querySelector('button[data-type="yt_search"]')
+          .addEventListener("click", showSearchView);
+        document
+          .querySelector(".search-back-btn")
+          .addEventListener("click", showRemoteView);
+        songlistBackBtn.addEventListener("click", showRemoteView);
+
+        // --- Search Submission Logic ---
         const submitSearch = () => {
           const query = searchInput.value.trim();
           if (query) {
@@ -398,6 +558,84 @@
             submitSearch();
           }
         });
+
+        // --- Song List Logic (Unchanged) ---
+        const renderSongList = (songs) => {
+          songlistContainer.innerHTML = "";
+          if (songs.length === 0) {
+            songlistContainer.innerHTML =
+              '<p style="text-align: center; opacity: 0.5;">No songs found.</p>';
+            return;
+          }
+          const fragment = document.createDocumentFragment();
+          songs.forEach((song) => {
+            const item = document.createElement("div");
+            item.className = "song-item";
+            item.dataset.code = song.code;
+            item.innerHTML = `
+                    <div class="song-code">${song.code}</div>
+                    <div class="song-details">
+                        <div class="song-title">${song.title}</div>
+                        <div class="song-artist">${song.artist}</div>
+                    </div>
+                `;
+            fragment.appendChild(item);
+          });
+          songlistContainer.appendChild(fragment);
+        };
+
+        songlistSearchInput.addEventListener("input", (e) => {
+          const searchTerm = e.target.value.toLowerCase();
+          if (!searchTerm) {
+            renderSongList(fullSongList);
+            return;
+          }
+          const filteredList = fullSongList.filter(
+            (song) =>
+              song.title.toLowerCase().includes(searchTerm) ||
+              song.artist.toLowerCase().includes(searchTerm) ||
+              song.code.startsWith(searchTerm),
+          );
+          renderSongList(filteredList);
+        });
+
+        songlistContainer.addEventListener("click", (e) => {
+          const songItem = e.target.closest(".song-item");
+          if (songItem) {
+            const code = songItem.dataset.code;
+            const song = fullSongList.find((s) => s.code === code);
+            if (song) {
+              socket.emit("remote-command", {
+                type: "reserve_code",
+                value: code,
+              });
+              showToast(`Reserved: ${song.title}`);
+              // Only hide the panel on tablets after reserving. Mobile is full screen.
+              if (isTabletOrLarger()) {
+                setTimeout(showRemoteView, 800);
+              }
+            }
+          }
+        });
+
+        // --- Helper: Toast Notification (Unchanged) ---
+        let toastTimeout;
+        const showToast = (message) => {
+          clearTimeout(toastTimeout);
+          const existingToast = document.querySelector(".toast-notification");
+          if (existingToast) existingToast.remove();
+          const toast = document.createElement("div");
+          toast.className = "toast-notification";
+          toast.textContent = message;
+          document.body.appendChild(toast);
+          setTimeout(() => toast.classList.add("show"), 10);
+          toastTimeout = setTimeout(() => {
+            toast.classList.remove("show");
+            toast.addEventListener("transitionend", () => toast.remove(), {
+              once: true,
+            });
+          }, 3000);
+        };
       });
     </script>
   </body>

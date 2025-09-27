@@ -322,6 +322,9 @@ app.whenReady().then(() => {
       socket.on("disconnect", () => {
         console.log("[LINK] Main App disconnected.");
       });
+      socket.on("sendData", (msg) => {
+        io.to(msg.identity).emit("fromRemote", msg.data);
+      });
       return; // Don't proceed to YouTubeCastReceiver setup for the app's link connection
     }
 
@@ -329,8 +332,10 @@ app.whenReady().then(() => {
       console.log("[LINK] Remote connected.");
       socket.on("remote-command", (data) => {
         console.log("[LINK] Received command from remote:", data);
-        // Send command to the 'karaoke-app' room
-        io.to("karaoke-app").emit("execute-command", data);
+        io.to("karaoke-app").emit("execute-command", {
+          identity: socket.id,
+          data,
+        });
       });
       socket.on("disconnect", () => {
         console.log("[LINK] Remote disconnected.");
