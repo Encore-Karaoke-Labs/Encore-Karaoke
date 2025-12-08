@@ -313,7 +313,6 @@ app.whenReady().then(() => {
   });
 
   io.on("connection", async (socket) => {
-    // --- START: Added for Encore Link ---
     const clientType = socket.handshake.query.clientType;
 
     if (clientType === "app") {
@@ -325,7 +324,10 @@ app.whenReady().then(() => {
       socket.on("sendData", (msg) => {
         io.to(msg.identity).emit("fromRemote", msg.data);
       });
-      return; // Don't proceed to YouTubeCastReceiver setup for the app's link connection
+      socket.on("broadcastData", (msg) => {
+        socket.broadcast.emit("fromRemote", msg);
+      });
+      return;
     }
 
     if (clientType === "remote") {
@@ -340,9 +342,14 @@ app.whenReady().then(() => {
       socket.on("disconnect", () => {
         console.log("[LINK] Remote disconnected.");
       });
-      return; // Don't proceed to YouTubeCastReceiver setup for remotes
+      return;
     }
-    // --- END: Added for Encore Link ---
+
+    if (clientType === "enterprise") {
+      console.log("[LINK] POS System authenticating");
+      const authToken = socket.handshake.query.authToken;
+      console.log(authToken);
+    }
 
     // --- Existing YouTubeCastReceiver logic ---
     console.log("connection attempt");

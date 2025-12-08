@@ -492,10 +492,14 @@
         );
 
         socket.on("fromRemote", (payload) => {
+          console.log(payload);
           if (payload.type === "songlist" && Array.isArray(payload.contents)) {
             fullSongList = payload.contents;
             renderSongList(fullSongList);
             showSonglistView();
+          }
+          if (payload.type === "now_playing") {
+            console.log("NOW PLAYING", payload.song);
           }
         });
 

@@ -1840,6 +1840,20 @@ const pkg = {
         details: song.title,
         state: song.artist,
       });
+
+      // --- NEW: Broadcast currently playing song info ---
+      socket.emit("broadcastData", {
+        type: "now_playing",
+        song: {
+          code: song.code || null,
+          title: song.title,
+          artist: song.artist,
+          path: song.path,
+          isYouTube: song.path.startsWith("yt://"),
+          isMV: !!song.videoPath,
+        },
+      });
+
       if (state.currentSongIsYouTube) {
         BGVPlayer.stop();
         bgvContainer.classOn("hidden");
