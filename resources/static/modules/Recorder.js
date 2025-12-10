@@ -13,6 +13,10 @@ export class RecorderModule {
     this.animationFrameId = null;
     this.currentSongInfo = null;
     this.uiRefs = null;
+
+    // Track the active stream so we can kill it later
+    this.currentStream = null;
+
     this.outputResolution = { width: 1920, height: 1080 };
     console.log("[RECORDER] Video Recording feature initialized.");
   }
@@ -25,7 +29,7 @@ export class RecorderModule {
       })
       .styleJs({ display: "none" })
       .appendTo(container).elm;
-    this.ctx = this.canvas.getContext("2d");
+    this.ctx = this.canvas.getContext("2d", { alpha: false }); // Opt: alpha: false helps performance slightly
   }
 
   setUiRefs(refs) {
@@ -53,15 +57,18 @@ export class RecorderModule {
       return;
     }
 
+    // Capture the stream
     const videoStream = this.canvas.captureStream(30);
-    const combinedStream = new MediaStream([
+
+    // Create the combined stream and SAVE REFERENCE to this.currentStream
+    this.currentStream = new MediaStream([
       videoStream.getVideoTracks()[0],
       audioStream.getAudioTracks()[0],
     ]);
 
     this.recordedChunks = [];
     try {
-      this.mediaRecorder = new MediaRecorder(combinedStream, {
+      this.mediaRecorder = new MediaRecorder(this.currentStream, {
         mimeType: "video/webm; codecs=vp9,opus",
         videoBitsPerSecond: 5000000,
       });
@@ -81,6 +88,10 @@ export class RecorderModule {
 
     this.mediaRecorder.onstop = () => {
       const blob = new Blob(this.recordedChunks, { type: "video/webm" });
+
+      // Clear chunks from memory immediately after blob creation
+      this.recordedChunks = [];
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       document.body.appendChild(a);
@@ -107,12 +118,24 @@ export class RecorderModule {
 
   stop() {
     if (!this.isRecording || !this.mediaRecorder) return;
+
     this.mediaRecorder.stop();
     this.isRecording = false;
+
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
+
+    // Stop the MediaStreamTracks to release CPU/Memory
+    if (this.currentStream) {
+      this.currentStream.getTracks().forEach((track) => {
+        track.stop();
+      });
+      this.currentStream = null;
+    }
+
+    this.mediaRecorder = null; // Help Garbage Collector
     this.infoBar.showDefault();
   }
 
@@ -120,12 +143,17 @@ export class RecorderModule {
     if (!this.isRecording) return;
     const w = this.canvas.width;
     const h = this.canvas.height;
+
+    // Performance: Use clearRect only if necessary, or rely on full draw
     this.ctx.clearRect(0, 0, w, h);
+
+    // might deprecate BGV recording soon
 
     // Draw BGV
     let sourceVideo = this.bgvPlayer.isManualMode
       ? this.bgvPlayer.activeManualPlayer
       : this.bgvPlayer.videoElements[this.bgvPlayer.activePlayerIndex];
+
     if (sourceVideo && sourceVideo.readyState >= 2 && !sourceVideo.paused) {
       this.ctx.drawImage(sourceVideo, 0, 0, w, h);
     } else {
@@ -146,12 +174,16 @@ export class RecorderModule {
 
       const line1BaseY = h - 180;
       const line2BaseY = h - 90;
+
+      // Optimization: access textContent only once per frame if possible,
+      // but DOM access here is likely negligible unless running 144hz.
       const line1HasRomanized = this.uiRefs.lrcLineDisplay1.elm.querySelector(
         ".lyric-line-romanized",
       )?.textContent;
       const line2HasRomanized = this.uiRefs.lrcLineDisplay2.elm.querySelector(
         ".lyric-line-romanized",
       )?.textContent;
+
       const line1Y = line1HasRomanized
         ? line2HasRomanized
           ? line1BaseY - 40
