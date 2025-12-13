@@ -2,362 +2,441 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Encore Link</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap"
       rel="stylesheet"
     />
     <style>
       :root {
-        --background-color: #0a0a14;
-        --primary-accent: #89cff0;
-        --secondary-accent: #ffd700;
-        --text-color: #ffffff;
-        --border-color: rgba(255, 255, 255, 0.2);
-        --button-bg: rgba(10, 10, 20, 0.7);
-        --button-hover-bg: rgba(137, 207, 240, 0.3);
+        --bg-color: #0a0a14;
+        --bg-secondary: #141423;
+        --primary: #89cff0;
+        --secondary: #ffd700;
+        --text: #ffffff;
+        --text-dim: rgba(255, 255, 255, 0.6);
+        --border: rgba(255, 255, 255, 0.15);
+        --btn-bg: rgba(255, 255, 255, 0.05);
+        --btn-active: rgba(137, 207, 240, 0.2);
+
+        --radius: 12px;
+        --header-height: 60px;
       }
+
       * {
         box-sizing: border-box;
         -webkit-tap-highlight-color: transparent;
       }
+
       body {
         font-family: "Rajdhani", sans-serif;
-        background-color: var(--background-color);
-        color: var(--text-color);
+        background-color: var(--bg-color);
+        color: var(--text);
         margin: 0;
-        padding: 1rem;
+        height: 100vh;
         display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        min-height: 100vh;
-        overflow-x: hidden;
+        flex-direction: column;
+        overflow: hidden;
       }
-      .container {
+
+      /* --- Main Layout --- */
+      .app-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
         width: 100%;
-        max-width: 480px;
-        /* REVISION: Added padding-right to the transition property for a smooth shift */
-        transition: max-width 0.3s ease-in-out, padding-right 0.3s ease-in-out;
+        max-width: 100%;
       }
-      header {
-        text-align: center;
-        margin-bottom: 1.5rem;
+
+      /* --- Header --- */
+      .app-header {
+        height: var(--header-height);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-color);
+        z-index: 10;
+        flex-shrink: 0;
       }
-      header h1 {
-        font-size: 2rem;
+
+      .app-header h1 {
+        font-size: 1.5rem;
         font-weight: 700;
-        color: var(--primary-accent);
+        color: var(--primary);
         letter-spacing: 0.2rem;
-        text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
         margin: 0;
+        text-shadow: 0 0 10px rgba(137, 207, 240, 0.5);
       }
-      button {
-        font-family: "Rajdhani", sans-serif;
-        background: var(--button-bg);
-        border: 1px solid var(--border-color);
-        color: var(--text-color);
-        border-radius: 0.5rem;
-        cursor: pointer;
-        transition: background-color 0.2s, transform 0.1s;
-        user-select: none;
-        font-weight: 700;
-        font-size: 1.2rem;
+
+      /* --- View Handling --- */
+      .view-container {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .view {
+        position: absolute;
+        inset: 0;
+        background: var(--bg-color);
+        display: flex;
+        flex-direction: column;
+        transform: translateX(100%);
+        transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        z-index: 1;
+        visibility: hidden;
+      }
+
+      .view.active {
+        transform: translateX(0);
+        visibility: visible;
+        z-index: 2;
+      }
+
+      /* Remote is the base view, simpler transition logic handled differently on mobile */
+      #remote-view {
+        transform: translateX(0);
+        visibility: visible;
+        z-index: 1;
         padding: 1rem;
-      }
-      button:hover {
-        background-color: var(--button-hover-bg);
-      }
-      button:active {
-        transform: scale(0.95);
-        background-color: var(--button-hover-bg);
-      }
-      button:disabled {
-        background: transparent;
-        border-color: transparent;
-        cursor: default;
-      }
-      button:disabled:hover {
-        background: transparent;
-      }
-      /* View Toggling */
-      .remote-view,
-      .search-view,
-      .songlist-view {
-        display: none;
-      }
-      .remote-view.active,
-      .search-view.active,
-      .songlist-view.active {
-        display: block; /* Use block as the base display property */
-      }
-      .search-view.active {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-      }
-      .songlist-view.active {
-        display: flex;
-        flex-direction: column;
+        overflow-y: auto;
       }
 
-      /* Hide bottom controls when search is active */
-      .search-view.active ~ .remote-view .bottom-controls,
-      .search-view.active + .remote-view .bottom-controls {
-        display: none;
-      }
-
-      /* Remote View Grid */
+      /* --- Remote Grid --- */
       .remote-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 0.75rem;
+        max-width: 450px;
+        margin: 0 auto;
+        padding-bottom: 2rem;
       }
-      .control-btn {
-        font-size: 1rem;
-        padding: 0.8rem;
+      /* Add a new class for the numpad layout */
+      .numpad-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
       }
-      .reserve-btn {
-        grid-column: 3 / 5;
-        background-color: var(--primary-accent);
-        color: var(--background-color);
-        border: none;
-        font-size: 1.2rem;
-      }
-      .numpad-btn {
-        font-size: 2rem;
-        padding: 1.5rem 0;
-      }
-      .numpad-btn[data-type="backspace"] {
-        font-size: 1.5rem;
-      }
-      .sl-btn {
-        background-color: var(--secondary-accent);
-        color: var(--background-color);
-        border: none;
-        font-weight: 700;
-      }
-
-      /* Search View */
-      .search-input-remote {
-        font-family: "Rajdhani", sans-serif;
-        font-size: 1.5rem;
-        background: rgba(0, 0, 0, 0.4);
-        border: 2px solid var(--border-color);
-        border-radius: 0.5rem;
-        color: white;
-        padding: 0.8rem 1.2rem;
-        width: 100%;
-        text-align: center;
-        outline: none;
-        transition: border-color 0.2s;
-      }
-      .search-input-remote:focus {
-        border-color: var(--primary-accent);
-      }
-      .search-controls {
+      .numpad-controls-row {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 1rem;
-      }
-      .search-submit-btn,
-      .search-ok-btn {
-        background-color: var(--primary-accent);
-        color: var(--background-color);
-        border: none;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
       }
 
-      /* Song List View Styles */
-      .songlist-view {
-        position: fixed;
-        inset: 0;
-        background-color: var(--background-color);
-        z-index: 100;
-        padding: 1rem;
-      }
-      .songlist-header {
+      button {
+        font-family: "Rajdhani", sans-serif;
+        background: var(--btn-bg);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 1.2rem;
+        padding: 0; /* Centering handled by flex or height */
         display: flex;
         align-items: center;
-        gap: 1rem;
-        margin-bottom: 1rem;
-        flex-shrink: 0;
+        justify-content: center;
+        transition: all 0.15s ease;
+        user-select: none;
+        height: 60px; /* Uniform height */
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
       }
-      .songlist-back-btn {
-        font-size: 1rem;
-        padding: 0.6rem 1rem;
+
+      button:active {
+        transform: scale(0.96);
+        background: var(--btn-active);
+        border-color: var(--primary);
       }
-      .songlist-search {
-        flex-grow: 1;
-        font-size: 1.2rem;
-        padding: 0.6rem 1rem;
+
+      .btn-primary {
+        background: var(--primary);
+        color: var(--bg-color);
+        border: none;
       }
-      .songlist-container {
-        flex-grow: 1;
+      .btn-secondary {
+        background: var(--secondary);
+        color: var(--bg-color);
+        border: none;
+      }
+      .btn-danger {
+        color: #ff5555;
+        border-color: rgba(255, 85, 85, 0.3);
+      }
+
+      .span-2 {
+        grid-column: span 2;
+      }
+      .span-4 {
+        grid-column: span 4;
+      }
+
+      .numpad-btn {
+        font-size: 1.8rem;
+        height: 70px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .numpad-zero {
+        grid-column: span 2;
+      }
+
+      /* --- Song List & Artist Grid --- */
+      .library-header {
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        gap: 0.5rem;
+        background: var(--bg-secondary);
+      }
+
+      .search-bar {
+        flex: 1;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: white;
+        padding: 0.5rem 1rem;
+        font-family: "Rajdhani";
+        font-size: 1.1rem;
+        outline: none;
+      }
+      .search-bar:focus {
+        border-color: var(--primary);
+      }
+
+      .library-content {
+        flex: 1;
         overflow-y: auto;
+        padding: 1rem;
         -webkit-overflow-scrolling: touch;
       }
+
+      /* Artist Grid Styles */
+      .artist-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr); /* Mobile: 2 cols */
+        gap: 1rem;
+      }
+
+      .artist-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        position: relative;
+        aspect-ratio: 1; /* Square */
+        display: flex;
+        flex-direction: column;
+        cursor: pointer;
+        transition: transform 0.2s;
+      }
+
+      .artist-card:active {
+        transform: scale(0.97);
+      }
+
+      .artist-art {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.8);
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .artist-name {
+        padding: 0.8rem;
+        font-weight: 700;
+        font-size: 1rem;
+        text-align: center;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        backdrop-filter: blur(4px);
+      }
+
+      /* Song List Styles */
+      .song-list-container {
+        display: none;
+        flex-direction: column;
+      }
+      .song-list-container.active {
+        display: flex;
+      }
+
       .song-item {
         display: flex;
         align-items: center;
-        padding: 0.75rem 0.5rem;
-        border-bottom: 1px solid var(--border-color);
+        padding: 1rem 0.5rem;
+        border-bottom: 1px solid var(--border);
         cursor: pointer;
-        transition: background-color 0.2s;
       }
-      .song-item:hover {
-        background-color: var(--button-hover-bg);
+      .song-item:active {
+        background: var(--btn-active);
       }
+
       .song-code {
+        font-size: 1.2rem;
         font-weight: 700;
-        color: var(--primary-accent);
-        flex: 0 0 60px;
-        font-size: 1.1rem;
+        color: var(--primary);
+        width: 60px;
+        flex-shrink: 0;
       }
-      .song-details {
+
+      .song-info {
         display: flex;
         flex-direction: column;
         overflow: hidden;
       }
       .song-title {
+        font-size: 1.1rem;
         font-weight: 700;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        margin-bottom: 2px;
       }
       .song-artist {
         font-size: 0.9rem;
-        opacity: 0.7;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        color: var(--text-dim);
       }
 
-      /* Toast Notification */
-      .toast-notification {
+      /* --- Toast Notification --- */
+      .toast {
         position: fixed;
         bottom: 2rem;
         left: 50%;
-        transform: translate(-50%, 200%);
-        background: rgba(10, 10, 20, 0.9);
-        color: white;
-        padding: 0.8rem 1.5rem;
-        border-radius: 0.5rem;
-        border: 1px solid var(--primary-accent);
-        z-index: 9999;
-        font-size: 1rem;
+        transform: translate(-50%, 100px);
+        background: rgba(20, 20, 30, 0.95);
+        border: 1px solid var(--primary);
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 50px;
         font-weight: 700;
-        text-align: center;
         opacity: 0;
-        transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        z-index: 9999;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
       }
-      .toast-notification.show {
+      .toast.show {
         transform: translate(-50%, 0);
         opacity: 1;
       }
 
-      /* =================================== */
-      /* Tablet and Larger Screen Adjustments */
-      /* =================================== */
+      /* --- TABLET / DESKTOP RESPONSIVE LAYOUT --- */
       @media (min-width: 768px) {
-        body {
+        .app-container {
+          flex-direction: row;
+        }
+
+        .app-header {
+          display: none; /* Hide top header on tablet, use side panel layout */
+        }
+
+        /* Remote Panel (Left) */
+        #remote-view {
+          position: relative;
+          width: 380px;
+          flex-shrink: 0;
+          border-right: 1px solid var(--border);
+          transform: none;
+          visibility: visible;
           padding: 2rem;
+          display: flex;
+          flex-direction: column;
         }
-        /* REVISION: Make space for the side panel */
-        body.songlist-open .container {
-          padding-right: 400px;
-        }
-        .container {
-          max-width: 680px;
-        }
-        header {
-          margin-bottom: 2.5rem;
-        }
-        header h1 {
+
+        .remote-title-desktop {
+          display: block;
+          text-align: center;
           font-size: 2.5rem;
+          color: var(--primary);
+          font-weight: 800;
+          margin-bottom: 2rem;
           letter-spacing: 0.3rem;
+        }
+
+        /* Library Panel (Right) */
+        #songlist-view {
+          position: relative;
+          flex: 1;
+          transform: none;
+          visibility: visible;
+          border-left: 1px solid rgba(0, 0, 0, 0.5);
+          display: flex !important; /* Always show on tablet */
+          z-index: 1;
+        }
+
+        /* Adjust Grid for larger screens */
+        .artist-grid {
+          grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+          gap: 1.5rem;
+        }
+
+        /* Hide buttons that toggle views on desktop since both are visible */
+        .mobile-only {
+          display: none !important;
+        }
+
+        .remote-grid {
+          max-width: 100%;
         }
         button {
           font-size: 1.3rem;
-          padding: 1.2rem;
-          border-radius: 0.75rem;
-        }
-
-        /* Remote View Grid */
-        .remote-grid {
-          gap: 1.25rem;
-        }
-        .control-btn {
-          font-size: 1.1rem;
-          padding: 1rem;
-        }
-        .reserve-btn {
-          font-size: 1.4rem;
+          height: 70px;
         }
         .numpad-btn {
-          font-size: 2.5rem;
-          padding: 2.25rem 0;
+          height: 80px;
+          font-size: 2.2rem;
         }
-        .numpad-btn[data-type="backspace"] {
-          font-size: 2rem;
-        }
+      }
 
-        /* Search View */
-        .search-view {
-          gap: 1.5rem;
-        }
-        .search-input-remote {
-          font-size: 1.8rem;
-          padding: 1rem 1.5rem;
-          border-radius: 0.75rem;
-        }
-        .search-controls {
-          gap: 1.5rem;
-        }
-
-        /* Song List Tablet Adjustments */
-        .songlist-view {
-          position: fixed;
-          top: 0;
-          right: 0;
-          bottom: 0;
-          left: auto;
-          width: 400px;
-          border-left: 1px solid var(--border-color);
-          box-shadow: -5px 0 20px rgba(0, 0, 0, 0.3);
-          transform: translateX(100%);
-          transition: transform 0.3s ease-in-out;
-          padding: 1.5rem;
-        }
-        .songlist-view.active {
-          transform: translateX(0);
+      @media (max-width: 767px) {
+        .remote-title-desktop {
+          display: none;
         }
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <header>
+    <div class="app-container">
+      <!-- Mobile Header -->
+      <header class="app-header">
         <h1>ENCORE LINK</h1>
       </header>
-      <main>
-        <!-- Main Remote View -->
-        <div class="remote-view active">
-          <div class="remote-grid">
-            <!-- Row 1 -->
-            <button class="control-btn" data-type="yt_search">Search</button>
-            <button class="control-btn" data-type="stop" data-value="Escape">
-              Stop
-            </button>
-            <button
-              class="control-btn reserve-btn"
-              data-type="reserve"
-              data-value="Enter"
-            >
-              Reserve
-            </button>
-            <!-- Numpad -->
+
+      <!-- Remote View (Left on Tablet, Main on Mobile) -->
+      <div id="remote-view" class="view active">
+        <div class="remote-title-desktop">ENCORE</div>
+
+        <div class="remote-grid">
+          <!-- Playback Controls (top row, full width) -->
+          <button data-type="stop" data-value="Escape" class="btn-danger">
+            STOP
+          </button>
+          <button
+            data-type="reserve"
+            data-value="Enter"
+            class="btn-primary span-2"
+          >
+            RESERVE
+          </button>
+          <button data-type="toggle_bgv">BGV</button>
+
+          <!-- Numpad (centered, 3x4 grid) -->
+          <div class="numpad-grid" style="grid-column: span 4">
             <button class="numpad-btn" data-type="digit" data-value="1">
               1
             </button>
@@ -366,9 +445,6 @@
             </button>
             <button class="numpad-btn" data-type="digit" data-value="3">
               3
-            </button>
-            <button class="control-btn" data-type="key_up" data-value="ArrowUp">
-              Key &uarr;
             </button>
             <button class="numpad-btn" data-type="digit" data-value="4">
               4
@@ -379,13 +455,6 @@
             <button class="numpad-btn" data-type="digit" data-value="6">
               6
             </button>
-            <button
-              class="control-btn"
-              data-type="key_down"
-              data-value="ArrowDown"
-            >
-              Key &darr;
-            </button>
             <button class="numpad-btn" data-type="digit" data-value="7">
               7
             </button>
@@ -394,9 +463,6 @@
             </button>
             <button class="numpad-btn" data-type="digit" data-value="9">
               9
-            </button>
-            <button class="control-btn" data-type="vol_up" data-value="=">
-              Vol &uarr;
             </button>
             <button
               class="numpad-btn"
@@ -408,255 +474,382 @@
             <button class="numpad-btn" data-type="digit" data-value="0">
               0
             </button>
-            <button class="sl-btn" data-type="get_song_list" data-value="">
-              SONGLIST
-            </button>
-            <button class="control-btn" data-type="vol_down" data-value="-">
-              Vol &darr;
-            </button>
+            <div></div>
           </div>
 
-          <!-- Bottom control buttons -->
-          <div class="remote-grid bottom-controls" style="margin-top: 0.75rem">
-            <button class="control-btn" data-type="toggle_bgv">BGV</button>
-            <button
-              class="control-btn"
-              data-type="toggle_recording"
-              style="color: #ff4444"
-            >
-              REC
+          <!-- Key Controls Row -->
+          <div class="numpad-controls-row" style="grid-column: span 4">
+            <button data-type="key_up" data-value="ArrowUp">KEY &uarr;</button>
+            <button data-type="key_down" data-value="ArrowDown">
+              KEY &darr;
             </button>
           </div>
+          <!-- Volume Controls Row -->
+          <div class="numpad-controls-row" style="grid-column: span 4">
+            <button data-type="vol_up" data-value="=">VOL &uarr;</button>
+            <button data-type="vol_down" data-value="-">VOL &darr;</button>
+          </div>
+
+          <!-- Navigation / Extra -->
+          <button
+            class="btn-secondary span-4 mobile-only"
+            id="open-library-btn"
+          >
+            BROWSE SONGLIST
+          </button>
+          <button
+            data-type="yt_search"
+            class="span-4 mobile-only"
+            style="margin-top: 0.5rem"
+          >
+            YOUTUBE SEARCH
+          </button>
         </div>
+      </div>
 
-        <!-- YouTube Search View -->
-        <div class="search-view">
-          <!-- Content is identical, omitted for brevity -->
+      <!-- Song List / Library View (Right on Tablet, Overlay on Mobile) -->
+      <div id="songlist-view" class="view">
+        <div class="library-header">
+          <button
+            class="mobile-only"
+            id="close-library-btn"
+            style="width: 50px; font-size: 1.5rem"
+          >
+            &larr;
+          </button>
+          <button
+            id="library-back-btn"
+            style="width: 50px; font-size: 1.5rem; display: none"
+          >
+            &larr;
+          </button>
           <input
             type="text"
-            class="search-input-remote"
-            placeholder="Search for songs..."
+            id="library-search"
+            class="search-bar"
+            placeholder="Search artists..."
           />
-          <button class="search-submit-btn">Search</button>
-          <div class="search-controls">
-            <button data-type="nav_up" data-value="ArrowUp">&uarr;</button>
-            <button data-type="nav_down" data-value="ArrowDown">&darr;</button>
-            <button class="search-back-btn">Back</button>
-            <button class="search-ok-btn" data-type="enter" data-value="Enter">
-              OK
-            </button>
-          </div>
         </div>
 
-        <!-- Song List View -->
-        <div class="songlist-view">
-          <!-- Content is identical, omitted for brevity -->
-          <div class="songlist-header">
-            <button class="songlist-back-btn">&larr; Back</button>
-            <input
-              type="text"
-              class="search-input-remote songlist-search"
-              placeholder="Filter list..."
-            />
+        <div class="library-content">
+          <!-- Artist Grid View -->
+          <div id="artist-view-container">
+            <div class="artist-grid" id="artist-grid">
+              <!-- JS Injected Artists -->
+            </div>
           </div>
-          <div class="songlist-container"></div>
+
+          <!-- Specific Songs List View -->
+          <div id="song-view-container" class="song-list-container">
+            <h3
+              id="current-artist-name"
+              style="margin: 0 0 1rem 0; color: var(--primary)"
+            >
+              Artist Name
+            </h3>
+            <div id="artist-songs-list">
+              <!-- JS Injected Songs -->
+            </div>
+          </div>
         </div>
-      </main>
+      </div>
+
+      <!-- YouTube Search View (Mobile/Overlay only) -->
+      <div id="search-view" class="view" style="z-index: 3">
+        <div class="library-header">
+          <button id="close-yt-btn" style="width: 50px">&larr;</button>
+          <input
+            type="text"
+            id="yt-input"
+            class="search-bar"
+            placeholder="Search YouTube..."
+          />
+          <button id="yt-submit-btn" class="btn-primary" style="width: 60px">
+            GO
+          </button>
+        </div>
+        <div
+          style="
+            padding: 2rem;
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: 1fr 1fr;
+          "
+        >
+          <button
+            data-type="nav_up"
+            data-value="ArrowUp"
+            style="height: 100px; font-size: 2rem"
+          >
+            &uarr;
+          </button>
+          <button
+            data-type="nav_down"
+            data-value="ArrowDown"
+            style="height: 100px; font-size: 2rem"
+          >
+            &darr;
+          </button>
+          <button
+            data-type="enter"
+            data-value="Enter"
+            class="span-2 btn-primary"
+            style="height: 80px"
+          >
+            SELECT / PLAY
+          </button>
+        </div>
+      </div>
     </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">Song Reserved!</div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", () => {
         const socket = io({ query: { clientType: "remote" } });
 
-        // --- STATE & HELPERS ---
+        // --- State ---
         let fullSongList = [];
-        const isTabletOrLarger = () =>
-          window.matchMedia("(min-width: 768px)").matches;
+        let artistsMap = {};
+        let currentView = "artists";
 
-        // --- DOM Elements ---
-        const body = document.body;
-        const remoteView = document.querySelector(".remote-view");
-        const searchView = document.querySelector(".search-view");
-        const songlistView = document.querySelector(".songlist-view");
-        const searchInput = document.querySelector(".search-input-remote");
-        const searchSubmitBtn = document.querySelector(".search-submit-btn");
-        const songlistBackBtn = document.querySelector(".songlist-back-btn");
-        const songlistSearchInput = document.querySelector(".songlist-search");
-        const songlistContainer = document.querySelector(".songlist-container");
+        // --- Elements ---
+        const artistGrid = document.getElementById("artist-grid");
+        const artistViewContainer = document.getElementById(
+          "artist-view-container",
+        );
+        const songViewContainer = document.getElementById(
+          "song-view-container",
+        );
+        const artistSongsList = document.getElementById("artist-songs-list");
+        const currentArtistLabel = document.getElementById(
+          "current-artist-name",
+        );
 
-        socket.on("connect", () =>
-          console.log("Connected to Encore Link server."),
-        );
-        socket.on("disconnect", () =>
-          console.log("Disconnected from Encore Link server."),
-        );
+        const librarySearch = document.getElementById("library-search");
+        const libraryBackBtn = document.getElementById("library-back-btn");
+        const songlistView = document.getElementById("songlist-view");
+        const searchView = document.getElementById("search-view");
+
+        // --- Socket Connection & Data Request ---
+        socket.on("connect", () => {
+          console.log("Connected to Encore. Requesting song list...");
+          // CRITICAL FIX: Automatically ask the server for the song list on connection
+          socket.emit("remote-command", { type: "get_song_list", value: "" });
+        });
 
         socket.on("fromRemote", (payload) => {
-          console.log(payload);
+          // Handle incoming song list
           if (payload.type === "songlist" && Array.isArray(payload.contents)) {
+            console.log(`Received ${payload.contents.length} songs.`);
             fullSongList = payload.contents;
-            renderSongList(fullSongList);
-            showSonglistView();
-          }
-          if (payload.type === "now_playing") {
-            console.log("NOW PLAYING", payload.song);
+            processSongList(fullSongList);
           }
         });
 
-        // --- Universal button click handler ---
-        const handleButtonClick = (e) => {
-          const button = e.currentTarget;
-          const type = button.dataset.type;
-          const value = button.dataset.value;
-          if (type) {
-            socket.emit("remote-command", { type, value });
-          }
-        };
+        // --- Data Processing ---
+        function processSongList(songs) {
+          artistsMap = {};
+          songs.forEach((song) => {
+            // Normalize artist name to avoid duplicates like "Abba" vs "ABBA"
+            const rawArtist = song.artist || "Unknown Artist";
+            const artistKey = rawArtist.trim();
 
-        document
-          .querySelectorAll(".remote-grid button, .search-controls button")
-          .forEach((button) => {
-            if (button.disabled) return;
-            button.addEventListener("click", handleButtonClick);
+            if (!artistsMap[artistKey]) {
+              artistsMap[artistKey] = [];
+            }
+            artistsMap[artistKey].push(song);
           });
 
-        // --- REVISED: View Toggling Logic ---
+          // Sort artists alphabetically
+          const sortedArtists = Object.keys(artistsMap).sort((a, b) =>
+            a.localeCompare(b, undefined, { sensitivity: "base" }),
+          );
 
-        const showRemoteView = () => {
-          socket.emit("remote-command", { type: "yt_search_close", value: "" });
-          remoteView.classList.add("active");
-          searchView.classList.remove("active");
+          renderArtistGrid(sortedArtists);
+        }
 
-          // This function is also now the "close song list panel" function
-          songlistView.classList.remove("active");
-          body.classList.remove("songlist-open");
-        };
+        // --- Rendering: Artist Grid ---
+        function renderArtistGrid(artists) {
+          artistGrid.innerHTML = "";
 
-        const showSearchView = () => {
-          remoteView.classList.remove("active");
-          searchView.classList.add("active");
-          songlistView.classList.remove("active"); // Ensure songlist is closed
-          body.classList.remove("songlist-open");
-          socket.emit("remote-command", { type: "yt_search_open" });
-          searchInput.focus();
-        };
-
-        const showSonglistView = () => {
-          searchView.classList.remove("active"); // Always hide search view
-          songlistView.classList.add("active");
-          body.classList.add("songlist-open");
-          songlistSearchInput.focus();
-
-          // CRITICAL CHANGE: Only hide the remote view on mobile devices.
-          if (!isTabletOrLarger()) {
-            remoteView.classList.remove("active");
+          if (artists.length === 0) {
+            artistGrid.innerHTML =
+              '<div style="grid-column: span 2; text-align: center; color: var(--text-dim); padding: 2rem;">Loading artists or list is empty...</div>';
+            return;
           }
+
+          const fragment = document.createDocumentFragment();
+
+          artists.forEach((artist) => {
+            const card = document.createElement("div");
+            card.className = "artist-card";
+
+            // Create a deterministic color based on the name
+            const color1 = stringToColor(artist);
+            const color2 = stringToColor(artist.split("").reverse().join(""));
+            const initial = artist.charAt(0).toUpperCase();
+
+            card.innerHTML = `
+                    <div class="artist-art" style="background: linear-gradient(135deg, ${color1}, ${color2})">
+                        ${initial}
+                    </div>
+                    <div class="artist-name">${artist}</div>
+                `;
+
+            card.onclick = () => openArtistSongs(artist);
+            fragment.appendChild(card);
+          });
+
+          artistGrid.appendChild(fragment);
+        }
+
+        // --- Rendering: Songs ---
+        function openArtistSongs(artistName) {
+          currentView = "songs";
+          currentArtistLabel.textContent = artistName;
+
+          const songs = artistsMap[artistName];
+          artistSongsList.innerHTML = "";
+
+          songs.forEach((song) => {
+            const item = document.createElement("div");
+            item.className = "song-item";
+            item.innerHTML = `
+                    <div class="song-code">${song.code}</div>
+                    <div class="song-info">
+                        <div class="song-title">${song.title}</div>
+                        <!-- We hide the artist name here since we are in that artist's folder -->
+                    </div>
+                `;
+            item.onclick = () => reserveSong(song);
+            artistSongsList.appendChild(item);
+          });
+
+          // Switch UI State
+          artistViewContainer.style.display = "none";
+          songViewContainer.classList.add("active");
+
+          // Update Inputs
+          librarySearch.value = "";
+          librarySearch.placeholder = `Search in ${artistName}...`;
+          libraryBackBtn.style.display = "block";
+        }
+
+        function returnToArtistGrid() {
+          currentView = "artists";
+          artistViewContainer.style.display = "block";
+          songViewContainer.classList.remove("active");
+          libraryBackBtn.style.display = "none";
+          librarySearch.placeholder = "Search artists...";
+          librarySearch.value = "";
+
+          // Reset filter to show all artists
+          renderArtistGrid(
+            Object.keys(artistsMap).sort((a, b) =>
+              a.localeCompare(b, undefined, { sensitivity: "base" }),
+            ),
+          );
+        }
+
+        // --- View Navigation ---
+        document.getElementById("open-library-btn").onclick = () => {
+          songlistView.classList.add("active");
         };
 
-        // Assign new functions to button events
-        document
-          .querySelector('button[data-type="yt_search"]')
-          .addEventListener("click", showSearchView);
-        document
-          .querySelector(".search-back-btn")
-          .addEventListener("click", showRemoteView);
-        songlistBackBtn.addEventListener("click", showRemoteView);
+        document.getElementById("close-library-btn").onclick = () => {
+          songlistView.classList.remove("active");
+          setTimeout(returnToArtistGrid, 300);
+        };
 
-        // --- Search Submission Logic ---
-        const submitSearch = () => {
-          const query = searchInput.value.trim();
-          if (query) {
+        libraryBackBtn.onclick = returnToArtistGrid;
+
+        // YT Search Toggles
+        document.querySelector('button[data-type="yt_search"]').onclick =
+          () => {
+            searchView.classList.add("active");
+            document.getElementById("yt-input").focus();
+            socket.emit("remote-command", { type: "yt_search_open" });
+          };
+        document.getElementById("close-yt-btn").onclick = () => {
+          searchView.classList.remove("active");
+          socket.emit("remote-command", { type: "yt_search_close" });
+        };
+
+        // --- Search Logic ---
+        librarySearch.addEventListener("input", (e) => {
+          const query = e.target.value.toLowerCase();
+
+          if (currentView === "artists") {
+            const allArtists = Object.keys(artistsMap).sort((a, b) =>
+              a.localeCompare(b, undefined, { sensitivity: "base" }),
+            );
+            if (!query) {
+              renderArtistGrid(allArtists);
+            } else {
+              const filtered = allArtists.filter((a) =>
+                a.toLowerCase().includes(query),
+              );
+              renderArtistGrid(filtered);
+            }
+          } else {
+            // Filter songs within current artist view
+            const songItems = artistSongsList.querySelectorAll(".song-item");
+            songItems.forEach((item) => {
+              const text = item.innerText.toLowerCase();
+              item.style.display = text.includes(query) ? "flex" : "none";
+            });
+          }
+        });
+
+        // --- Command Logic ---
+        function reserveSong(song) {
+          socket.emit("remote-command", {
+            type: "reserve_code",
+            value: song.code,
+          });
+          showToast(`Reserved: ${song.title}`);
+        }
+
+        document.querySelectorAll("button[data-type]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const type = btn.dataset.type;
+            const value = btn.dataset.value;
+            if (type === "yt_search" && !btn.classList.contains("mobile-only"))
+              return;
+            socket.emit("remote-command", { type, value });
+          });
+        });
+
+        document.getElementById("yt-submit-btn").onclick = () => {
+          const query = document.getElementById("yt-input").value;
+          if (query)
             socket.emit("remote-command", {
               type: "yt_search_query",
               value: query,
             });
-          }
         };
 
-        searchSubmitBtn.addEventListener("click", submitSearch);
-        searchInput.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") {
-            submitSearch();
+        // --- Helpers ---
+        function stringToColor(str) {
+          let hash = 0;
+          for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
           }
-        });
+          const c = (hash & 0x00ffffff).toString(16).toUpperCase();
+          return "#" + "00000".substring(0, 6 - c.length) + c;
+        }
 
-        // --- Song List Logic (Unchanged) ---
-        const renderSongList = (songs) => {
-          songlistContainer.innerHTML = "";
-          if (songs.length === 0) {
-            songlistContainer.innerHTML =
-              '<p style="text-align: center; opacity: 0.5;">No songs found.</p>';
-            return;
-          }
-          const fragment = document.createDocumentFragment();
-          songs.forEach((song) => {
-            const item = document.createElement("div");
-            item.className = "song-item";
-            item.dataset.code = song.code;
-            item.innerHTML = `
-                    <div class="song-code">${song.code}</div>
-                    <div class="song-details">
-                        <div class="song-title">${song.title}</div>
-                        <div class="song-artist">${song.artist}</div>
-                    </div>
-                `;
-            fragment.appendChild(item);
-          });
-          songlistContainer.appendChild(fragment);
-        };
-
-        songlistSearchInput.addEventListener("input", (e) => {
-          const searchTerm = e.target.value.toLowerCase();
-          if (!searchTerm) {
-            renderSongList(fullSongList);
-            return;
-          }
-          const filteredList = fullSongList.filter(
-            (song) =>
-              song.title.toLowerCase().includes(searchTerm) ||
-              song.artist.toLowerCase().includes(searchTerm) ||
-              song.code.startsWith(searchTerm),
-          );
-          renderSongList(filteredList);
-        });
-
-        songlistContainer.addEventListener("click", (e) => {
-          const songItem = e.target.closest(".song-item");
-          if (songItem) {
-            const code = songItem.dataset.code;
-            const song = fullSongList.find((s) => s.code === code);
-            if (song) {
-              socket.emit("remote-command", {
-                type: "reserve_code",
-                value: code,
-              });
-              showToast(`Reserved: ${song.title}`);
-              // Only hide the panel on tablets after reserving. Mobile is full screen.
-              if (isTabletOrLarger()) {
-                setTimeout(showRemoteView, 800);
-              }
-            }
-          }
-        });
-
-        // --- Helper: Toast Notification (Unchanged) ---
         let toastTimeout;
-        const showToast = (message) => {
+        function showToast(msg) {
+          const toast = document.getElementById("toast");
+          toast.textContent = msg;
+          toast.classList.add("show");
           clearTimeout(toastTimeout);
-          const existingToast = document.querySelector(".toast-notification");
-          if (existingToast) existingToast.remove();
-          const toast = document.createElement("div");
-          toast.className = "toast-notification";
-          toast.textContent = message;
-          document.body.appendChild(toast);
-          setTimeout(() => toast.classList.add("show"), 10);
-          toastTimeout = setTimeout(() => {
-            toast.classList.remove("show");
-            toast.addEventListener("transitionend", () => toast.remove(), {
-              once: true,
-            });
-          }, 3000);
-        };
+          toastTimeout = setTimeout(() => toast.classList.remove("show"), 2500);
+        }
       });
     </script>
   </body>
