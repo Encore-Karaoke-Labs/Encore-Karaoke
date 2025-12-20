@@ -54,6 +54,7 @@ export class InfoBarModule {
   showDefault() {
     if (this.checkRecording && this.checkRecording()) {
       this.show("RECORDING", "REC ●");
+      this.showBar();
       return;
     }
     const { reservationQueue } = this.getState();
@@ -68,7 +69,9 @@ export class InfoBarModule {
         "UP NEXT",
         `${codeSpan} <span class="info-bar-title">${nextSong.title}</span> <span class="info-bar-artist">- ${nextSong.artist}${extra}</span>`,
       );
+      this.showBar();
     } else {
+      this.hideBar();
       this.show("UP NEXT", "—");
     }
   }

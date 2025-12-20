@@ -473,11 +473,13 @@ class EncoreController {
       this.infoBar.hideBar();
       this.updateMenuUI();
     } else if (newMode === "player") {
-      if (this.state.currentSongIsMultiplexed)
+      if (this.state.currentSongIsMultiplexed) {
         this.Forte.togglePianoRollVisibility(true);
+      } else {
+        this.Forte.togglePianoRollVisibility(false);
+      }
       this.dom.playerUi.classOff("hidden");
-      this.infoBar.showDefault();
-      this.infoBar.showBar();
+      this.infoBar.showDefault(); // Will check if bar needs to be shown (REC or Queue)
     } else if (newMode === "yt-search") {
       if (this.state.currentSongIsMultiplexed)
         this.Forte.togglePianoRollVisibility(false);
@@ -683,6 +685,9 @@ class EncoreController {
     this.scoreHud.hide();
     this.dom.introCard.classOff("visible");
 
+    // Fix: Explicitly reset the multiplex flag so setMode doesn't show the piano roll
+    this.state.currentSongIsMultiplexed = false;
+
     this.state.currentSongIsYouTube = song.path.startsWith("yt://");
     this.state.currentSongIsMV = !!song.videoPath;
     this.state.reservationNumber = "";
@@ -705,6 +710,10 @@ class EncoreController {
     });
 
     if (this.state.currentSongIsYouTube) {
+      // Fix: Ensure previous track is stopped and piano roll is hidden
+      this.Forte.stopTrack();
+      this.Forte.togglePianoRollVisibility(false);
+
       this.bgv.stop();
       this.dom.bgvContainer.classOn("hidden");
       this.dom.ytContainer.classOff("hidden");
@@ -1341,6 +1350,7 @@ class EncoreController {
         this.infoBar.bar.classOff("temp-visible");
       }
       this.infoBar.show("RESERVING", content);
+      this.infoBar.showBar(); // Explicitly show bar since we are typing
     }
   }
 
