@@ -1064,9 +1064,17 @@ const pkg = {
               const rawLyrics = state.playback.sequencer.midiData.lyrics;
               if (rawLyrics && rawLyrics.length > 0) {
                 const decoder = new TextDecoder();
-                state.playback.decodedLyrics = rawLyrics.map((lyricBuffer) =>
-                  decoder.decode(lyricBuffer),
-                );
+                // Filter out metadata lyrics (starting with @)
+                // but keep structural ones (like standalone newlines/slashes)
+                // so the UI can detect line breaks.
+                state.playback.decodedLyrics = rawLyrics
+                  .map((lyricBuffer) => decoder.decode(lyricBuffer))
+                  .filter((text) => {
+                    const clean = text.replace(/[\r\n\/\\]/g, "");
+                    // Keep if empty (structural tag) or if not metadata
+                    return !clean.startsWith("@");
+                  });
+                console.log(state.playback.decodedLyrics);
               }
               resolve();
             }, "forte-loader");
@@ -1077,10 +1085,14 @@ const pkg = {
             if (messageType === 5) {
               const text = new TextDecoder().decode(messageData.buffer);
               const cleanText = text.replace(/[\r\n\/\\]/g, "");
-              if (cleanText) {
+              // Only dispatch if it has content AND is not metadata
+              if (cleanText && !cleanText.startsWith("@")) {
                 document.dispatchEvent(
                   new CustomEvent("CherryTree.Forte.Playback.LyricEvent", {
-                    detail: { index: displayableLyricIndex },
+                    detail: {
+                      index: displayableLyricIndex,
+                      text: cleanText,
+                    },
                   }),
                 );
                 displayableLyricIndex++;

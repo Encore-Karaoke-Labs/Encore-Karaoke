@@ -799,8 +799,18 @@ class EncoreController {
       let displayableSyllableIndex = 0;
 
       for (const syllableText of pbState.decodedLyrics) {
-        const isNewLine = /[\r\n\/\\]/.test(syllableText);
+        // NOTE: We check specifically for the New Line characters to handle line breaks,
+        // but we rely on the clean text for rendering.
+        // If cleanText matches exactly what Forte outputs (empty string for just \n),
+        // we stay in sync with the event dispatcher.
+        const startsWithNewLine = /^[\r\n\/\\\\]/.test(syllableText);
         const cleanText = syllableText.replace(/[\r\n\/\\]/g, "");
+
+        if (startsWithNewLine && currentLineSyllables.length > 0) {
+          lines.push(currentLineSyllables);
+          currentLineSyllables = [];
+        }
+
         if (cleanText) {
           const romanized = await Romanizer.romanize(cleanText);
           const syllable = {
@@ -812,10 +822,6 @@ class EncoreController {
           allSyllables.push(syllable);
           currentLineSyllables.push(syllable);
           displayableSyllableIndex++;
-        }
-        if (isNewLine && currentLineSyllables.length > 0) {
-          lines.push(currentLineSyllables);
-          currentLineSyllables = [];
         }
       }
       if (currentLineSyllables.length > 0) lines.push(currentLineSyllables);
@@ -858,9 +864,16 @@ class EncoreController {
 
       // Define Event Handler
       this.boundLyricEvent = (e) => {
-        const { index } = e.detail;
+        const { index, text } = e.detail;
         if (index >= allSyllables.length) return;
         const activeSyllable = allSyllables[index];
+
+        // Safety check: Ensure the text from Forte matches the text in Encore
+        if (text && text !== activeSyllable.text) {
+          console.warn(
+            `[Encore] Lyric Mismatch! Forte: "${text}", Encore: "${activeSyllable.text}" at index ${index}`,
+          );
+        }
 
         if (activeSyllable.lineIndex !== currentSongLineIndex) {
           currentSongLineIndex = activeSyllable.lineIndex;
