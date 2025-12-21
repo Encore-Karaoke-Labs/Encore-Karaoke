@@ -803,9 +803,15 @@ class EncoreController {
         // but we rely on the clean text for rendering.
         // If cleanText matches exactly what Forte outputs (empty string for just \n),
         // we stay in sync with the event dispatcher.
+
+        // Check for Prefix Newline (breaks BEFORE text)
         const startsWithNewLine = /^[\r\n\/\\\\]/.test(syllableText);
+        // Check for Suffix Newline (breaks AFTER text)
+        const endsWithNewLine = /[\r\n\/\\\\]$/.test(syllableText);
+
         const cleanText = syllableText.replace(/[\r\n\/\\]/g, "");
 
+        // 1. Handle Prefix Newline
         if (startsWithNewLine && currentLineSyllables.length > 0) {
           lines.push(currentLineSyllables);
           currentLineSyllables = [];
@@ -822,6 +828,14 @@ class EncoreController {
           allSyllables.push(syllable);
           currentLineSyllables.push(syllable);
           displayableSyllableIndex++;
+        }
+
+        // 2. Handle Suffix Newline
+        // Only trigger if we added text (so cleanText is not empty), otherwise a standalone \r
+        // (which starts and ends with \r) would trigger double line breaks.
+        if (endsWithNewLine && cleanText && currentLineSyllables.length > 0) {
+          lines.push(currentLineSyllables);
+          currentLineSyllables = [];
         }
       }
       if (currentLineSyllables.length > 0) lines.push(currentLineSyllables);
