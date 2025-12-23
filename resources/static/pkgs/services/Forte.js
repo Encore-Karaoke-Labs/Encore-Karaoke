@@ -68,6 +68,7 @@ let micAnalyserBuffer = null;
 const state = {
   scoring: {
     enabled: false,
+    userInputEnabled: true, // Tracks user preference vs system override
     micStream: null,
     micSourceNode: null,
     micAnalyser: null,
@@ -1032,6 +1033,12 @@ const pkg = {
       if (state.playback.isMidi) {
         if (!state.playback.sequencer || state.playback.status === "playing")
           return;
+
+        // Force disable mic for MIDI performance optimization
+        // We preserve user preference in userInputEnabled
+        pkg.data.stopMicInput();
+        state.scoring.enabled = false;
+
         state.playback.sequencer.play();
         state.playback.status = "playing";
       } else {
@@ -1185,6 +1192,8 @@ const pkg = {
         if (scoreReasonTimeout) clearTimeout(scoreReasonTimeout);
       }
 
+      const wasMidi = state.playback.isMidi;
+
       if (state.playback.status === "stopped") return;
 
       // Disconnect Recording
@@ -1216,6 +1225,12 @@ const pkg = {
       state.playback.multiplexPan = -1;
       state.playback.status = "stopped";
       state.playback.pauseTime = 0;
+
+      // Restore Mic Input if it was disabled by MIDI optimization
+      if (wasMidi && state.scoring.userInputEnabled) {
+        pkg.data.startMicInput(state.scoring.currentMicDeviceId);
+      }
+
       dispatchPlaybackUpdate();
 
       if (animationFrameId) {
@@ -1444,15 +1459,49 @@ const pkg = {
       state.scoring.currentMicDeviceId = deviceId;
     },
 
-    startMicInput: async (deviceId = "default") => {
+    setMicInputEnabled: async (enabled) => {
+      state.scoring.userInputEnabled = enabled;
+      if (enabled) {
+        await pkg.data.startMicInput(state.scoring.currentMicDeviceId);
+      } else {
+        pkg.data.stopMicInput();
+      }
+    },
+
+    stopMicInput: () => {
       if (state.scoring.micStream) {
         state.scoring.micStream.getTracks().forEach((track) => track.stop());
         state.scoring.micStream = null;
       }
       if (state.scoring.micSourceNode) {
-        state.scoring.micSourceNode.disconnect();
+        try {
+          state.scoring.micSourceNode.disconnect();
+        } catch (e) {}
         state.scoring.micSourceNode = null;
       }
+      // Also disconnect from effect chain to stop graph processing
+      if (state.scoring.micAnalyser) {
+        try {
+          state.effects.micChainInput.disconnect(state.scoring.micAnalyser);
+        } catch (e) {
+          // Ignore connection errors if already disconnected
+        }
+        state.scoring.micAnalyser = null;
+      }
+      state.scoring.enabled = false;
+      console.log(
+        "[FORTE SVC] Microphone input stopped (Performance/User req).",
+      );
+    },
+
+    startMicInput: async (deviceId = "default") => {
+      // Ensure we clean up previous streams first
+      pkg.data.stopMicInput();
+
+      // If user disabled it, don't start it unless called directly
+      // However, startMicInput implies a direct request or system restore.
+      // We update state.scoring.userInputEnabled only if called via setMicInputEnabled ideally,
+      // but here we assume if this is called, we want it on.
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -1482,6 +1531,8 @@ const pkg = {
             analyser.fftSize,
           );
         }
+        // Restore enabled flag (algorithms active)
+        state.scoring.enabled = true;
         console.log("[FORTE SVC] Microphone input started.");
       } catch (e) {
         console.error("[FORTE SVC] Failed to get microphone input:", e);
@@ -1522,7 +1573,9 @@ const pkg = {
     rebuildVocalChain: () => {
       const { micChainInput, micChainOutput, vocalChain } = state.effects;
       micChainInput.disconnect();
-      micChainInput.connect(state.scoring.micAnalyser); // Maintain scoring tap
+      if (state.scoring.micAnalyser) {
+        micChainInput.connect(state.scoring.micAnalyser); // Maintain scoring tap
+      }
 
       let lastNode = micChainInput;
       if (vocalChain.length > 0) {
