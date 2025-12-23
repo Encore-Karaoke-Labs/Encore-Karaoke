@@ -924,6 +924,7 @@ class EncoreController {
 
   async setupLyrics(song, pbState) {
     this.parsedLrc = []; // Clear old lyrics
+
     if (pbState.isMidi) {
       this.dom.midiContainer.styleJs({ display: "flex" });
       this.dom.lrcContainer.styleJs({ display: "none" });
@@ -933,6 +934,7 @@ class EncoreController {
       let currentLineSyllables = [];
       let displayableSyllableIndex = 0;
 
+      // --- Parsing Logic ---
       for (const syllableText of pbState.decodedLyrics) {
         const startsWithNewLine = /^[\r\n\/\\\\]/.test(syllableText);
         const endsWithNewLine = /[\r\n\/\\\\]$/.test(syllableText);
@@ -963,6 +965,7 @@ class EncoreController {
       }
       if (currentLineSyllables.length > 0) lines.push(currentLineSyllables);
 
+      // --- Rendering Setup ---
       const displayLines = [
         this.dom.midiLineDisplay1,
         this.dom.midiLineDisplay2,
@@ -999,31 +1002,65 @@ class EncoreController {
       displayLines[0].classOn("active");
       displayLines[1].classOn("next");
 
-      // Define Event Handler
+      let currentVisualIndex = 0;
+
       this.boundLyricEvent = (e) => {
-        const { index, text } = e.detail;
-        if (index >= allSyllables.length) return;
-        const activeSyllable = allSyllables[index];
+        const { text } = e.detail;
 
-        if (text && text !== activeSyllable.text) {
-          console.warn(
-            `[Encore] Lyric Mismatch! Forte: "${text}", Encore: "${activeSyllable.text}" at index ${index}`,
+        if (!text) return;
+        const cleanInput = text.replace(/[\r\n\/\\]/g, "");
+        if (!cleanInput) return;
+
+        if (currentVisualIndex >= allSyllables.length) return;
+
+        let targetSyllable = allSyllables[currentVisualIndex];
+        let matchFound = false;
+
+        if (targetSyllable.text === cleanInput) {
+          matchFound = true;
+        } else {
+          const lookAheadLimit = Math.min(
+            currentVisualIndex + 15,
+            allSyllables.length,
           );
+
+          for (let i = currentVisualIndex + 1; i < lookAheadLimit; i++) {
+            if (allSyllables[i].text === cleanInput) {
+              console.log(
+                `[Encore] Lyric Resync: Skipped from ${currentVisualIndex} to ${i} ("${cleanInput}")`,
+              );
+              currentVisualIndex = i;
+              targetSyllable = allSyllables[i];
+              matchFound = true;
+              break;
+            }
+          }
         }
 
-        if (activeSyllable.lineIndex !== currentSongLineIndex) {
-          currentSongLineIndex = activeSyllable.lineIndex;
-          const activeDisplay = displayLines[currentSongLineIndex % 2];
-          const nextDisplay = displayLines[(currentSongLineIndex + 1) % 2];
-          activeDisplay.classOn("active").classOff("next");
-          nextDisplay.classOff("active").classOn("next");
-          renderLine(nextDisplay, lines[currentSongLineIndex + 1]);
+        if (matchFound) {
+          // Handle Line Swapping
+          if (targetSyllable.lineIndex !== currentSongLineIndex) {
+            currentSongLineIndex = targetSyllable.lineIndex;
+            const activeDisplay = displayLines[currentSongLineIndex % 2];
+            const nextDisplay = displayLines[(currentSongLineIndex + 1) % 2];
+            activeDisplay.classOn("active").classOff("next");
+            nextDisplay.classOff("active").classOn("next");
+            renderLine(nextDisplay, lines[currentSongLineIndex + 1]);
+          }
+
+          // Highlight the syllable
+          const newSyllableEl = this.wrapper.qs(
+            `.lyric-syllable-container[data-index="${targetSyllable.globalIndex}"]`,
+          );
+          if (newSyllableEl) newSyllableEl.classOn("active");
+
+          // Advance cursor
+          currentVisualIndex++;
+        } else {
+          console.debug(`[Encore] Ignored metadata event: ${cleanInput}`);
         }
-        const newSyllableEl = this.wrapper.qs(
-          `.lyric-syllable-container[data-index="${index}"]`,
-        );
-        if (newSyllableEl) newSyllableEl.classOn("active");
       };
+
       document.addEventListener(
         "CherryTree.Forte.Playback.LyricEvent",
         this.boundLyricEvent,
@@ -1034,7 +1071,6 @@ class EncoreController {
       const lrcText = await this.FsSvc.readFile(song.lrcPath);
       this.parsedLrc = await this.parseLrc(lrcText);
       if (this.parsedLrc.length > 0) {
-        // Initial Render
         this.renderLrcLine(this.dom.lrcLineDisplay1, this.parsedLrc[0]);
         this.renderLrcLine(this.dom.lrcLineDisplay2, this.parsedLrc[1]);
         this.dom.lrcLineDisplay2.classOn("next");
@@ -1043,7 +1079,6 @@ class EncoreController {
       }
     }
   }
-
   renderLrcLine(displayEl, lineData) {
     displayEl.clear();
     if (!lineData) return;
