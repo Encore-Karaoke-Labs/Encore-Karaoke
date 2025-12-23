@@ -371,13 +371,30 @@ app.whenReady().then(() => {
   });
 
   // --- Electron IPC Handlers ---
-  ipcMain.handle("getConfig", () => Config.get());
+  // Get the entire configuration object, useful for initial state hydration.
+  ipcMain.handle("config-get-all", () => Config.getAll());
 
-  ipcMain.on("updateConfig", (event, newConfig) => {
-    Config.update(newConfig);
-    logger.info("CONFIG", "Configuration updated via IPC");
+  // Get a single value using a key.
+  ipcMain.handle("config-get-item", (event, key) => {
+    if (typeof key !== "string") return null;
+    return Config.getItem(key);
   });
 
+  // Set a single value using a key-value pair.
+  ipcMain.on("config-set-item", (event, { key, value }) => {
+    if (typeof key !== "string") return;
+    Config.setItem(key, value);
+    logger.info("CONFIG", `Set '${key}'`);
+  });
+
+  // Merge an object into the current config. Perfect for setup wizards.
+  ipcMain.on("config-merge", (event, dataObject) => {
+    if (typeof dataObject !== "object" || dataObject === null) return;
+    Config.merge(dataObject);
+    logger.info("CONFIG", "Configuration merged with new data.");
+  });
+
+  // --- Other Electron IPC Handlers ---
   ipcMain.handle("mic-validate-code", (event, code) => {
     if (micSessions.has(code) && micSessions.get(code).status === "pending") {
       micSessions.set(code, { status: "active" });

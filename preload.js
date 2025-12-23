@@ -12,3 +12,10 @@ contextBridge.exposeInMainWorld("desktopIntegration", {
     },
   },
 });
+
+contextBridge.exposeInMainWorld("config", {
+  getAll: () => ipcRenderer.invoke("config-get-all"),
+  getItem: (key) => ipcRenderer.invoke("config-get-item", key),
+  setItem: (key, value) => ipcRenderer.send("config-set-item", { key, value }),
+  merge: (dataObject) => ipcRenderer.send("config-merge", dataObject),
+});
