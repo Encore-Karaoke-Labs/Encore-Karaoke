@@ -713,7 +713,7 @@ const pkg = {
 
     try {
       audioContext = new (window.AudioContext || window.webkitAudioContext)({
-        latencyHint: "playback",
+        latencyHint: 0.25,
         sampleRate: 44100,
       });
       masterGain = audioContext.createGain();
