@@ -1889,6 +1889,7 @@ class EncoreController {
       const d = cmd.data;
       switch (d.type) {
         case "digit":
+          this.showTheSongList();
           this.handleDigitInput(d.value);
           break;
         case "backspace":

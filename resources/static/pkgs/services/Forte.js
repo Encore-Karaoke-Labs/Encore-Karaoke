@@ -713,7 +713,7 @@ const pkg = {
 
     try {
       audioContext = new (window.AudioContext || window.webkitAudioContext)({
-        latencyHint: 0.25,
+        latencyHint: 0.5,
         sampleRate: 44100,
       });
       masterGain = audioContext.createGain();
@@ -958,7 +958,7 @@ const pkg = {
             state.playback.sequencer.addOnSongChangeEvent(() => {
               const rawLyrics = state.playback.sequencer.midiData.lyrics;
               if (rawLyrics && rawLyrics.length > 0) {
-                const decoder = new TextDecoder();
+                const decoder = new TextDecoder("windows-1250");
                 // Filter out metadata lyrics (starting with @)
                 // but keep structural ones (like standalone newlines/slashes)
                 // so the UI can detect line breaks.
@@ -978,7 +978,7 @@ const pkg = {
           let displayableLyricIndex = 0;
           state.playback.sequencer.onTextEvent = (messageData, messageType) => {
             if (messageType === 5) {
-              const text = new TextDecoder().decode(messageData.buffer);
+              const text = new TextDecoder("windows-1250").decode(messageData.buffer);
               const cleanText = text.replace(/[\r\n\/\\]/g, "");
               // Only dispatch if it has content AND is not metadata
               if (cleanText && !cleanText.startsWith("@")) {
