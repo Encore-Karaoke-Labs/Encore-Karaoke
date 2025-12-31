@@ -1637,6 +1637,7 @@ kbd {
     transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   pointer-events: none;
   line-height: 1;
+  margin-bottom: 30px;
 }
 
 .countdown-display.visible {
@@ -1646,10 +1647,13 @@ kbd {
 
 .lyrics-container,
 .midi-lyrics-container {
+  display: inline-block;
   width: 100%;
+  max-width: 100%;
   height: auto;
   position: relative;
   transition: opacity 0.3s ease;
+  bottom: 25px;
 }
 
 .lyrics-container {
@@ -1708,8 +1712,10 @@ kbd {
 
 .midi-lyric-line {
   display: flex;
+  width: 100%;
+  max-width: 100%;
   justify-content: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   white-space: pre;
   color: rgba(255, 255, 255, 0.4);
 }
