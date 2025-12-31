@@ -260,6 +260,69 @@ class EncoreController {
     return { label: "RS", color: colors.RealSound };
   }
 
+  parseDuration(durationStr) {
+    if (!durationStr) return 0;
+    const parts = durationStr.split(":").map(Number);
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]; // HH:MM:SS
+    if (parts.length === 2) return parts[0] * 60 + parts[1]; // MM:SS
+    return 0; // Invalid or empty
+  }
+
+  scheduleYoutubeSkip(seconds) {
+    this.clearYoutubeTimers();
+
+    // Default buffer: 5 seconds for buffering/loading
+    const totalMs = (seconds + 5) * 1000;
+    const warningDuration = 10 * 1000; // Warn 10s before end
+    const warnAt = Math.max(0, totalMs - warningDuration);
+
+    console.log(
+      `[Encore] Scheduling YT Skip in ${totalMs / 1000}s (Warn at ${
+        warnAt / 1000
+      }s)`,
+    );
+
+    this.ytWarningTimer = setTimeout(() => {
+      this.state.isYtSkipWarningActive = true;
+      this.infoBar.showTemp(
+        "AUTO SKIP",
+        "Song ending in 10s. Press <span class='key-badge'>UP</span> to extend (+30s).",
+        10000,
+      );
+    }, warnAt);
+
+    this.ytAutoSkipTimer = setTimeout(() => {
+      console.log("[Encore] Auto-skipping YouTube track.");
+      this.stopPlayer();
+      this.bgv.start();
+      this.transitionAfterSong();
+    }, totalMs);
+  }
+
+  extendYoutubeSkip() {
+    if (!this.state.isYtSkipWarningActive) return;
+
+    this.clearYoutubeTimers();
+    this.state.isYtSkipWarningActive = false;
+
+    // Schedule new skip: 10s (remaining from warning) + 30s extension
+    // We pass 35s because scheduleYoutubeSkip adds 5s buffer, so 35+5 = 40s total
+    // To get exactly +30s relative to *now* (where we had ~10s left):
+    // We want total time from now to be 40s.
+    // scheduleYoutubeSkip adds 5s buffer. So input needs to be 35.
+    this.scheduleYoutubeSkip(35);
+
+    this.infoBar.showTemp("EXTENDED", "Time extended by 30 seconds.", 3000);
+  }
+
+  clearYoutubeTimers() {
+    if (this.ytAutoSkipTimer) clearTimeout(this.ytAutoSkipTimer);
+    if (this.ytWarningTimer) clearTimeout(this.ytWarningTimer);
+    this.ytAutoSkipTimer = null;
+    this.ytWarningTimer = null;
+    this.state.isYtSkipWarningActive = false;
+  }
+
   buildUI() {
     // --- Containers ---
     this.dom = {};
@@ -937,6 +1000,12 @@ class EncoreController {
         allow:
           "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
       });
+      if (!song.isLive && song.durationText) {
+        const seconds = this.parseDuration(song.durationText);
+        if (seconds > 0) {
+          this.scheduleYoutubeSkip(seconds);
+        }
+      }
       this.dom.lrcContainer.classOn("hidden");
       this.dom.midiContainer.classOn("hidden");
 
@@ -1290,6 +1359,7 @@ class EncoreController {
     this.dom.introCard.classOff("visible");
     this.dom.ytContainer.classOn("hidden");
     this.dom.ytIframe.attr({ src: "" });
+    this.clearYoutubeTimers();
     this.dom.bgvContainer.classOff("hidden");
     this.Forte.stopTrack();
     this.cleanupPlayerEvents();
@@ -1526,6 +1596,12 @@ class EncoreController {
       return;
     }
 
+    if (this.state.isYtSkipWarningActive && e.key === "ArrowUp") {
+      e.preventDefault();
+      this.extendYoutubeSkip();
+      return;
+    }
+
     // SCORE SCREEN SKIP LOGIC
     if (this.state.isScoreScreenActive) {
       if (["Enter", " ", "Escape"].includes(e.key)) {
@@ -1687,6 +1763,8 @@ class EncoreController {
                 title: res.title,
                 artist: res.channelTitle,
                 path: `yt://${res.id}`,
+                durationText: res.length?.simpleText,
+                isLive: res.isLive,
               };
         this.state.reservationQueue.push(song);
         const codeSpan = song.code
@@ -1725,6 +1803,8 @@ class EncoreController {
               title: res.title,
               artist: res.channelTitle,
               path: `yt://${res.id}`,
+              durationText: res.length?.simpleText,
+              isLive: res.isLive,
             };
       this.startPlayer(song);
     }
