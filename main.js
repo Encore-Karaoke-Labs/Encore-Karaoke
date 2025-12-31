@@ -15,6 +15,7 @@ const { Server } = require("socket.io");
 const qrcode = require("qrcode");
 
 // --- Media & Karaoke Imports ---
+const { setVolume, getVolume, setMute, getMute } = require("easy-volume");
 const KuromojiAnalyzer = require("kuroshiro-analyzer-kuromoji");
 const Kuroshiro = require("kuroshiro").default;
 const YouTubeCastReceiver = require("yt-cast-receiver");
@@ -405,6 +406,14 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("mic-get-peer-id", () => playerPeerId);
+  ipcMain.handle("get-volume", async () => {
+    let vol = await getVolume();
+    return vol;
+  });
+
+  ipcMain.on("set-volume", async (event, vol) => {
+    await setVolume(vol);
+  });
 
   ipcMain.on("setRPC", (event, arg) => {
     discordClient.user?.setActivity({

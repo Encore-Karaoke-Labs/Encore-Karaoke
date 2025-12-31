@@ -19,3 +19,8 @@ contextBridge.exposeInMainWorld("config", {
   setItem: (key, value) => ipcRenderer.send("config-set-item", { key, value }),
   merge: (dataObject) => ipcRenderer.send("config-merge", dataObject),
 });
+
+contextBridge.exposeInMainWorld("volume", {
+  getVolume: async () => ipcRenderer.invoke("get-volume"),
+  setVolume: async (vol) => ipcRenderer.send("set-volume", vol),
+});

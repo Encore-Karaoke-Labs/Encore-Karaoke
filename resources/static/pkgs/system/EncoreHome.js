@@ -47,6 +47,7 @@ class EncoreController {
       reservationNumber: "",
       reservationQueue: [],
       knownRemotes: {},
+      windowsVolume: 1,
       volume: config.audioConfig?.mix.instrumental.volume ?? 1,
       videoSyncOffset: config.videoConfig?.syncOffset || 0,
       searchResults: [],
@@ -103,6 +104,9 @@ class EncoreController {
     this.wrapper = new Html("div").classOn("full-ui").appendTo("body");
     this.Ui.becomeTopUi(this.Pid, this.wrapper);
     this.wrapper.classOn("loading");
+
+    this.state.windowsVolume = await window.volume.getVolume();
+    console.log("[Encore] Windows volume", this.state.windowsVolume);
 
     // Load resources
     console.log("[Encore] Loading assets...");
@@ -919,6 +923,10 @@ class EncoreController {
       this.Forte.stopTrack();
       this.Forte.togglePianoRollVisibility(false);
 
+      // Feature Parity: YouTube tracks now react to volume
+      this.state.windowsVolume = await window.volume.getVolume();
+      window.volume.setVolume(this.state.volume * 100);
+
       this.bgv.stop();
       this.dom.bgvContainer.classOn("hidden");
       this.dom.ytContainer.classOff("hidden");
@@ -1287,6 +1295,11 @@ class EncoreController {
     this.cleanupPlayerEvents();
     this.dom.countdownDisplay.classOff("visible").text("");
     this.dom.formatIndicator.styleJs({ opacity: "0" });
+
+    if (this.state.currentSongIsYouTube) {
+      window.volume.setVolume(this.state.windowsVolume);
+    }
+
     this.state.currentSongIsMV = false;
     this.state.currentSongIsYouTube = false;
     this.state.currentSongIsMultiplexed = false;
@@ -1822,6 +1835,9 @@ class EncoreController {
       Math.min(1, this.state.volume + (dir === "up" ? 0.05 : -0.05)),
     );
     this.Forte.setTrackVolume(this.state.volume);
+    if (this.state.currentSongIsYouTube) {
+      window.volume.setVolume(this.state.volume * 100);
+    }
     const p = Math.round(this.state.volume * 100);
     this.infoBar.showTemp(
       "VOLUME",

@@ -31,6 +31,7 @@
     "@distube/ytdl-core": "^4.16.12",
     "@xhayper/discord-rpc": "^1.2.0",
     "cors": "^2.8.5",
+    "easy-volume": "^1.2.0",
     "electron-squirrel-startup": "^1.0.1",
     "express": "^4.19.2",
     "fluent-ffmpeg": "^2.1.3",
