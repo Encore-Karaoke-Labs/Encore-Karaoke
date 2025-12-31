@@ -1058,6 +1058,8 @@ class EncoreController {
       this.dom.introTitle.text(song.title);
       this.dom.introArtist.text(song.artist);
       this.dom.introCard.classOn("visible");
+      this.dom.lrcContainer.styleJs({ opacity: "1" });
+      this.dom.midiContainer.styleJs({ opacity: "1" });
 
       await this.setupLyrics(song, pbState);
       this.setupTimeUpdate(mvPlayer);
@@ -1076,8 +1078,6 @@ class EncoreController {
           return;
         }
         this.dom.introCard.classOff("visible");
-        this.dom.lrcContainer.styleJs({ opacity: "1" });
-        this.dom.midiContainer.styleJs({ opacity: "1" });
         if (mvPlayer) mvPlayer.play().catch(console.error);
         this.Forte.playTrack();
         this.state.isTransitioning = false;
