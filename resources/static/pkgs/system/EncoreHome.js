@@ -793,9 +793,14 @@ class EncoreController {
       if (this.state.mode === "player")
         this.wrapper.classOn("in-game-search-active");
 
+      // Clear the highlighted search index when opening overlay
+      this.state.highlightedSearchIndex = -1;
+
       // Restore the has-results class if results are already present
-      if (this.state.searchResults.length > 0)
+      if (this.state.searchResults.length > 0) {
         this.dom.searchWindow.classOn("has-results");
+        this.updateSearchHighlight();
+      }
 
       this.dom.searchInput.elm.focus();
       this.dom.searchInput.elm.select();
