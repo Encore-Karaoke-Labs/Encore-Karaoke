@@ -821,14 +821,43 @@ class EncoreController {
       this.songList.forEach((s) => {
         if (s.code.includes(query)) localResults.push({ ...s, type: "local" });
       });
-    this.songList.forEach((s) => {
+
+    // Search by title, artist, and their romanized versions
+    for (const s of this.songList) {
+      if (localResults.find((x) => x.code === s.code)) continue;
+
+      const titleMatch = s.title.toLowerCase().includes(query);
+      const artistMatch = s.artist.toLowerCase().includes(query);
+
+      let romaTitle = null;
+      let romaArtist = null;
+
+      // Romanize title and artist for comparison
       if (
-        (s.title.toLowerCase().includes(query) ||
-          s.artist.toLowerCase().includes(query)) &&
-        !localResults.find((x) => x.code === s.code)
-      )
+        !titleMatch &&
+        /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/.test(
+          s.title,
+        )
+      ) {
+        romaTitle = await Romanizer.romanize(s.title);
+      }
+      if (
+        !artistMatch &&
+        /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/.test(
+          s.artist,
+        )
+      ) {
+        romaArtist = await Romanizer.romanize(s.artist);
+      }
+
+      const romaMatch =
+        (romaTitle && romaTitle.toLowerCase().includes(query)) ||
+        (romaArtist && romaArtist.toLowerCase().includes(query));
+
+      if (titleMatch || artistMatch || romaMatch) {
         localResults.push({ ...s, type: "local" });
-    });
+      }
+    }
 
     this.state.searchResults = [...localResults];
     this.renderSearchResults();
