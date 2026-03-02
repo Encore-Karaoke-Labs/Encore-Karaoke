@@ -27,8 +27,8 @@ function pathJoin(parts, sep) {
 
 class EncoreController {
   constructor(Root, config) {
-    console.log("CONFIG", config);
-    console.log("test", config.audioConfig.mix.instrumental.volume);
+    // console.log("CONFIG", config);
+    // console.log("test", config.audioConfig.mix.instrumental.volume);
     this.Root = Root;
     this.Pid = Root.Pid;
     this.Ui = Root.Processes.getService("UiLib").data;
@@ -186,29 +186,31 @@ class EncoreController {
 
     // Start BGV
     console.log("MANIFEST", this.libraryInfo);
-    await this.bgv.loadManifestCategories();
-    let libraryBgvCategories =
-      this.libraryInfo.manifest.additionalContents.bgvCategories;
-    libraryBgvCategories.forEach((category) => {
-      let tempPaths = [];
-      category.BGV_LIST.forEach((vidPath) => {
-        tempPaths.push(pathJoin([this.libraryInfo.path, vidPath]));
+    if (this.libraryInfo.additionalContents?.bgvCategories) {
+      await this.bgv.loadManifestCategories();
+      let libraryBgvCategories =
+        this.libraryInfo.manifest.additionalContents.bgvCategories;
+      libraryBgvCategories.forEach((category) => {
+        let tempPaths = [];
+        category.BGV_LIST.forEach((vidPath) => {
+          tempPaths.push(pathJoin([this.libraryInfo.path, vidPath]));
+        });
+        this.bgv.addDynamicCategory({
+          BGV_CATEGORY: category.BGV_CATEGORY,
+          BGV_LIST: tempPaths,
+          isAbsolute: true,
+        });
       });
-      this.bgv.addDynamicCategory({
-        BGV_CATEGORY: category.BGV_CATEGORY,
-        BGV_LIST: tempPaths,
-        isAbsolute: true,
-      });
-    });
-    const mtvPaths = this.songList
-      .filter((s) => s.videoPath)
-      .map((s) => s.videoPath);
-    if (mtvPaths.length)
-      this.bgv.addDynamicCategory({
-        BGV_CATEGORY: "MTV",
-        BGV_LIST: mtvPaths,
-        isAbsolute: true,
-      });
+      const mtvPaths = this.songList
+        .filter((s) => s.videoPath)
+        .map((s) => s.videoPath);
+      if (mtvPaths.length)
+        this.bgv.addDynamicCategory({
+          BGV_CATEGORY: "MTV",
+          BGV_LIST: mtvPaths,
+          isAbsolute: true,
+        });
+    }
 
     const bumperPaths =
       this.libraryInfo.manifest.additionalContents?.bumperImages;

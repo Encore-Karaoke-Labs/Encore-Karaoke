@@ -151,7 +151,7 @@ const pkg = {
       "CherryTree.FsSvc.SongList.Ready",
       async (e) => {
         let msgData = e.detail;
-        if (msgData.manifest.additionalContents.soundFont) {
+        if (msgData.manifest.additionalContents?.soundFont) {
           statusP.text("Loading sounds...");
           const url = new URL(`http://127.0.0.1:9864/getFile`);
           const soundFontPath = pathJoin([
