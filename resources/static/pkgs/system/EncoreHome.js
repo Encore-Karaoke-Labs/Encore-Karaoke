@@ -158,6 +158,7 @@ class EncoreController {
     console.log(
       `Encore ${this.versionInformation.channel} running in version ${this.versionInformation.number}`,
     );
+    document.title = `Encore Karaoke ${this.versionInformation.channel} v${this.versionInformation.number} (${this.versionInformation.codename})`;
 
     // Audio Config
     await this.Forte.setTrackVolume(this.state.volume);
