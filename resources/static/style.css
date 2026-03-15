@@ -1787,8 +1787,13 @@ kbd {
   color: rgba(255, 255, 255, 0.4);
 }
 
+.lyric-fade-in {
+  animation: fade-in 0.5s ease-out;
+  animation-delay: var(--animation-delay, 0s);
+}
+
 .midi-lyric-line.next {
-  opacity: 0.5;
+  opacity: 0.8;
 }
 
 .lyric-syllable-container {
@@ -2789,5 +2794,14 @@ input[type="range"]::-moz-range-thumb {
   }
   50% {
     opacity: 0.7;
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
   }
 }

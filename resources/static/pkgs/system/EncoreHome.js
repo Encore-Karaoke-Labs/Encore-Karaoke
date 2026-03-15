@@ -1269,6 +1269,7 @@ class EncoreController {
         if (!lineData) return;
 
         let currentWord = null;
+        let wordIndex = 0;
 
         lineData.forEach((s) => {
           // Calculate length to normalize the CSS highlight sweep speed
@@ -1278,6 +1279,15 @@ class EncoreController {
             currentWord = new Html("div")
               .classOn("lyric-word")
               .appendTo(displayEl);
+            if (currentSongLineIndex > 0) {
+              currentWord.style({
+                "--animation-delay": `${wordIndex * 0.05}s`,
+                opacity: "0",
+                "animation-fill-mode": "forwards",
+              });
+              currentWord.classOn("lyric-fade-in");
+            }
+            wordIndex++;
           }
 
           const container = new Html("div")
