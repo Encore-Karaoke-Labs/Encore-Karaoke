@@ -409,6 +409,22 @@ ul {
   animation: pop 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);
 }
 
+.tiles {
+  position: absolute;
+  height: 100%;
+  width: 100%;
+
+  display: grid;
+  grid-template-columns: repeat(var(--columns), 1fr);
+  grid-template-rows: repeat(var(--rows), 1ft);
+}
+
+.tile {
+  background-color: rgb(0, 0, 0);
+  opacity: 1;
+  transition: all;
+}
+
 @keyframes logoAnimateIn {
   0% {
     transform: scale(0) translateY(-50%);

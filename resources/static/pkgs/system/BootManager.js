@@ -12,7 +12,10 @@ const pkg = {
     const loadingScreen = document.querySelector("#loading");
     if (loadingScreen) loadingScreen.remove();
 
-    document.body.style.backgroundColor = "black";
+    document.body.style.backgroundColor = "white";
+
+    let columns = Math.floor(document.body.clientWidth / 50);
+    let rows = Math.floor(document.body.clientHeight / 50);
 
     // --- Create Main UI Wrapper ---
     wrapper = new Html("div")
@@ -29,6 +32,24 @@ const pkg = {
         opacity: 1,
       })
       .appendTo("body");
+
+    let tiles = new Html("div").classOn("tiles").appendTo(wrapper);
+
+    const createTile = (index) => {
+      const tile = new Html("div").classOn("tile");
+      return tile;
+    };
+
+    const createTiles = (quantity) => {
+      Array.from(Array(quantity)).map((tile, index) => {
+        createTile(index).appendTo(tiles);
+        console.log("tile", index);
+      });
+    };
+
+    tiles.elm.style.setProperty("--columns", columns);
+    tiles.elm.style.setProperty("--rows", rows);
+    createTiles(columns * rows);
 
     // --- Create Terebi Text Elements for Animation ---
     const terebiText = "テレビ";
@@ -92,7 +113,6 @@ const pkg = {
         },
       });
 
-      // 2. Animate Terebi characters rising up
       tl.add({
         targets: ".terebi-char",
         translateY: ["100%", 0],
@@ -100,12 +120,24 @@ const pkg = {
         delay: anime.stagger(80),
       });
 
-      // 3. Zoom out and fade the text
       tl.add({
         targets: terebiH1.elm,
         scale: [1, 0.75],
         opacity: [1, 0],
         duration: 500,
+      });
+
+      tl.add({
+        targets: ".tile",
+        opacity: [1, 0],
+        delay: anime.stagger(35, {
+          grid: [columns, rows],
+          from: "center",
+          ease: "outExpo",
+          duration: 200,
+        }),
+        duration: 200,
+        ease: "outExpo",
       });
     }
 
