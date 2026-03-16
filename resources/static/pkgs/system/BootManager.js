@@ -12,7 +12,7 @@ const pkg = {
     const loadingScreen = document.querySelector("#loading");
     if (loadingScreen) loadingScreen.remove();
 
-    document.body.style.backgroundColor = "white";
+    document.body.style.backgroundColor = "black";
 
     // --- Create Main UI Wrapper ---
     wrapper = new Html("div")
@@ -41,7 +41,7 @@ const pkg = {
         textAlign: "center",
         margin: 0,
         padding: 0,
-        color: "#333",
+        color: "white",
         display: "flex",
         opacity: 0,
       })
@@ -75,11 +75,16 @@ const pkg = {
     function beginAnimation() {
       console.log("LOADED, beginning animation.");
 
+      document.body.style.transition = "background-color 0.5s ease-in-out";
+
       const tl = anime.timeline({
         easing: "easeInOutExpo",
         complete: () => {
-          wrapper.cleanup();
-          checkServicesLoaded();
+          document.body.style.backgroundColor = "white";
+          setTimeout(() => {
+            wrapper.cleanup();
+            checkServicesLoaded();
+          }, 1000);
         },
         begin: () => {
           startupSound.volume = 1;
