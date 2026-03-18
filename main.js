@@ -6,6 +6,7 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 const dgram = require("dgram");
+const { exec } = require("child_process");
 
 // --- Server & Networking
 const express = require("express");
@@ -54,6 +55,8 @@ const versionInformation = {
   channel: "BETA",
   codename: "Virgo",
 };
+
+const kioskEnabled = process.argv.includes("--kiosk");
 
 const PORT = 9864;
 const server = express();
@@ -344,6 +347,22 @@ const createWindow = () => {
   });
 
   win.loadURL(`http://127.0.0.1:${PORT}/index.html`);
+  if (kioskEnabled) {
+    win.setKiosk(true);
+    win.setAlwaysOnTop(true);
+    if (process.platform === "win32") {
+      exec("taskkill /f /im explorer.exe", (error) => {
+        if (error) {
+          logger.error(
+            "SYSTEM",
+            "Failed to kill explorer.exe: " + error.message,
+          );
+        } else {
+          logger.info("SYSTEM", "Explorer killed for kiosk mode");
+        }
+      });
+    }
+  }
 
   win.webContents.on("devtools-opened", () => {
     // Custom DevTools styling for dark mode consistency
@@ -563,4 +582,19 @@ app.whenReady().then(() => {
     logger.info("SERVER", `Encore Karaoke server running on port ${PORT}`);
     createWindow();
   });
+});
+
+app.on("before-quit", () => {
+  if (kioskEnabled && process.platform === "win32") {
+    exec("explorer.exe", (error) => {
+      if (error) {
+        logger.error(
+          "SYSTEM",
+          "Failed to restart explorer.exe: " + error.message,
+        );
+      } else {
+        logger.info("SYSTEM", "Explorer restarted");
+      }
+    });
+  }
 });
