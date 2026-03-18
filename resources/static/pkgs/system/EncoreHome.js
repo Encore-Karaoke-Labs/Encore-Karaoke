@@ -181,6 +181,17 @@ class EncoreController {
 
     // Initialize Modules into DOM
     this.infoBar.mount(this.wrapper);
+
+    // Check for kiosk mode and show notification
+    const isKioskEnabled = await window.kiosk.isEnabled();
+    if (isKioskEnabled) {
+      this.infoBar.showTemp(
+        "KIOSK MODE",
+        "Fullscreen enabled. Alt+Tab and Start Menu disabled.",
+        5000,
+      );
+    }
+
     this.scoreHud.mount(this.wrapper);
     this.mixer.mount(this.wrapper);
     this.bgv.mount(this.dom.bgvContainer);

@@ -92,8 +92,8 @@ export class InfoBarModule {
     let songInfo = song
       ? `<span class="info-bar-title">${song.title}</span><span class="info-bar-artist">- ${song.artist}</span>`
       : reservationNumber.length === 5
-      ? `<span style="opacity: 0.5;">No song found.</span>`
-      : "";
+        ? `<span style="opacity: 0.5;">No song found.</span>`
+        : "";
     this.showTemp(
       "RESERVING",
       `<span class="info-bar-code">${displayCode}</span> ${songInfo}`,

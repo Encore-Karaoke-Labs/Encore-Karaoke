@@ -412,6 +412,11 @@ app.whenReady().then(() => {
     return versionInformation;
   });
 
+  // Kiosk mode status
+  ipcMain.handle("get-kiosk-enabled", () => {
+    return kioskEnabled;
+  });
+
   // Get the entire configuration object, useful for initial state hydration.
   ipcMain.handle("config-get-all", () => Config.getAll());
 

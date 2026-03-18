@@ -28,3 +28,7 @@ contextBridge.exposeInMainWorld("volume", {
 contextBridge.exposeInMainWorld("version", {
   getVersionInformation: async () => ipcRenderer.invoke("get-version"),
 });
+
+contextBridge.exposeInMainWorld("kiosk", {
+  isEnabled: async () => ipcRenderer.invoke("get-kiosk-enabled"),
+});
