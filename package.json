@@ -42,6 +42,7 @@
     "mime-types": "^2.1.35",
     "qrcode": "^1.5.3",
     "socket.io": "^4.7.5",
+    "socket.io-client": "^4.8.3",
     "spessasynth_lib": "^3.27.8",
     "systeminformation": "^5.31.1",
     "youtube-search-api": "^2.0.1",

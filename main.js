@@ -1,3 +1,6 @@
+// --- START OF FILE main.js ---
+
+// This check is for Windows installers. It should be the very first thing.
 if (require("electron-squirrel-startup")) app.quit();
 
 // --- Core Imports ---
@@ -13,6 +16,7 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
+const { io: ioClient } = require("socket.io-client"); // Added for Cloud Tunnel
 const qrcode = require("qrcode");
 
 // --- Media & Karaoke Imports ---
@@ -22,12 +26,12 @@ const Kuroshiro = require("kuroshiro").default;
 const YouTubeCastReceiver = require("yt-cast-receiver");
 const { Player } = require("yt-cast-receiver");
 const youtubesearchapi = require("youtube-search-api");
-const si = require("systeminformation"); // Replaced node-disk-info
+const si = require("systeminformation");
 const mime = require("mime-types");
 
 // --- Integration Imports ---
 const { Client } = require("@xhayper/discord-rpc");
-const Config = require("./config-manager"); // The new file
+const Config = require("./config-manager");
 const { version } = require("os");
 
 // ==========================================
@@ -49,7 +53,6 @@ const logger = {
 // ==========================================
 // 2. INITIALIZATION
 // ==========================================
-
 const versionInformation = {
   number: "1.0.0",
   channel: "BETA",
@@ -61,7 +64,7 @@ const kioskEnabled = process.argv.includes("--kiosk");
 const PORT = 9864;
 const server = express();
 const serverHttp = http.createServer(server);
-const io = new Server(serverHttp);
+const io = new Server(serverHttp); // Local Network Server
 
 // Initialize Kuroshiro
 const kuroshiro = new Kuroshiro();
@@ -80,8 +83,6 @@ try {
 // ==========================================
 // 3. UTILITY CLASSES
 // ==========================================
-
-// Wrapper for YouTube Cast Receiver
 class SocketPlayer extends Player {
   constructor(socket) {
     super();
@@ -90,14 +91,11 @@ class SocketPlayer extends Player {
     this.position = 0;
     this.duration = 0;
   }
-
-  // Helper to emit and log
   _emit(event, data) {
     logger.debug("PLAYER", `Action: ${event}`);
     this.socket.emit(event, data);
     return Promise.resolve(true);
   }
-
   doPause() {
     return this._emit("pause");
   }
@@ -108,24 +106,20 @@ class SocketPlayer extends Player {
     this.position = 0;
     return this._emit("stop");
   }
-
   doPlay(video, position) {
     this.position = 0;
     logger.info("PLAYER", `Playing: ${video}`);
     this.socket.emit("play", video);
     return Promise.resolve(true);
   }
-
   doSeek(position) {
     this.position = position;
     return this._emit("seek", position);
   }
-
   doSetVolume(volume) {
     this.volume = volume;
     return this._emit("volume", volume);
   }
-
   doGetVolume() {
     return Promise.resolve(this.volume);
   }
@@ -135,8 +129,6 @@ class SocketPlayer extends Player {
   doGetDuration() {
     return Promise.resolve(this.duration);
   }
-
-  // State updates from Client
   setDuration(duration) {
     this.duration = duration;
   }
@@ -169,23 +161,19 @@ function setupDiscordRPC() {
       largeImageText: "Encore Karaoke",
     });
   });
-
   discordClient.on("disconnected", () => {
     if (isRpcReconnecting) return;
     logger.warn("DISCORD", "Disconnected. Reconnecting in 15s...");
     isRpcReconnecting = true;
-
     const interval = setInterval(() => {
       rpcReconnAttempts++;
       logger.info("DISCORD", `Reconnection attempt ${rpcReconnAttempts}/3`);
-
       discordClient.destroy();
       discordClient = new Client({ clientId: "1408795513397973052" });
-      setupDiscordRPC(); // Re-attach listeners
+      setupDiscordRPC();
       discordClient
         .login()
         .catch((e) => logger.error("DISCORD", "Login failed"));
-
       if (rpcReconnAttempts >= 3) {
         logger.error("DISCORD", "Failed to reconnect after 3 attempts.");
         clearInterval(interval);
@@ -199,14 +187,12 @@ function setupDiscordRPC() {
 // ==========================================
 // 5. SERVER ROUTES & LOGIC
 // ==========================================
-
-// Middleware
 server.use(express.static("resources/static"));
 server.use(express.static("public"));
 server.use(express.json());
 server.use(cors());
 
-// --- System Routes ---
+// --- Local IP detection for fallback ---
 let local_ip = null;
 const udpSocket = dgram.createSocket("udp4");
 udpSocket.connect(80, "8.8.8.8", () => {
@@ -217,6 +203,7 @@ udpSocket.connect(80, "8.8.8.8", () => {
 
 server.get("/local_ip", (req, res) => res.send(local_ip));
 
+// --- QR Code generation ---
 server.get("/qr", (req, res) => {
   qrcode.toDataURL(req.query["url"], (err, url) => {
     if (err) return res.status(500).send("QR Error");
@@ -231,7 +218,6 @@ server.get("/drives", async (req, res) => {
   logger.debug("FILE", "Requesting drives");
   try {
     const disks = await si.fsSize();
-    // Use Set to remove any duplicate mount points, map `mount` property (e.g. 'C:', 'D:', '/')
     const mountPoints = [...new Set(disks.map((d) => d.mount))];
     res.json(mountPoints);
   } catch (error) {
@@ -334,7 +320,6 @@ server.post("/auth/verify-hash", (req, res) => {
 // ==========================================
 // 6. MAIN APP STARTUP
 // ==========================================
-
 const createWindow = () => {
   const win = new BrowserWindow({
     width: 1280,
@@ -365,19 +350,10 @@ const createWindow = () => {
   }
 
   win.webContents.on("devtools-opened", () => {
-    // Custom DevTools styling for dark mode consistency
-    const css = `
-    :root { --sys-color-base: var(--ref-palette-neutral100); }
-    .-theme-with-dark-background { --sys-color-base: var(--ref-palette-secondary25); }
-    body { --default-font-family: system-ui,sans-serif; }`;
-
-    win.webContents.devToolsWebContents.executeJavaScript(`
-      const s = document.createElement('style'); s.innerHTML = '${css.replaceAll(
-        "\n",
-        " ",
-      )}';
-      document.body.append(s); document.body.classList.remove('platform-windows');
-    `);
+    const css = `:root { --sys-color-base: var(--ref-palette-neutral100); } .-theme-with-dark-background { --sys-color-base: var(--ref-palette-secondary25); } body { --default-font-family: system-ui,sans-serif; }`;
+    win.webContents.devToolsWebContents.executeJavaScript(
+      `const s = document.createElement('style'); s.innerHTML = '${css.replaceAll("\n", " ")}'; document.body.append(s); document.body.classList.remove('platform-windows');`,
+    );
   });
 };
 
@@ -387,60 +363,75 @@ app.whenReady().then(() => {
     .login()
     .catch((e) => logger.error("DISCORD", "Initial login failed"));
 
+  // -- Encore Link Tunnel --
+  const CLOUD_URL = "https://olive.nxw.pw:8443";
+  const cloudSocket = ioClient(CLOUD_URL, {
+    query: { clientType: "host" },
+    reconnectionAttempts: 5,
+  });
+  let activeRoomCode = null;
+
+  cloudSocket.on("connect", () => {
+    logger.info(
+      "CLOUD",
+      `Successfully connected to Cloud Relay at ${CLOUD_URL}`,
+    );
+  });
+  cloudSocket.on("room-created", (data) => {
+    activeRoomCode = data.roomCode;
+    logger.info("CLOUD", `Cloud Room is ready! PIN: ${activeRoomCode}`);
+  });
+  cloudSocket.on("connect_error", (err) => {
+    logger.error(
+      "CLOUD",
+      `Connection to relay failed: ${err.message}. Will retry.`,
+    );
+    activeRoomCode = null;
+  });
+
+  server.get("/cloud_info", (req, res) => {
+    if (!activeRoomCode) {
+      return res
+        .status(503)
+        .json({ error: "Cloud relay not connected. Please wait." });
+    }
+    res.json({
+      relayUrl: "https://link.encorekaraoke.org",
+      roomCode: activeRoomCode,
+    });
+  });
+
   // --- MIC / PEERJS Logic ---
   const playerPeerId = `encore-player-${crypto.randomBytes(8).toString("hex")}`;
   const micSessions = new Map();
-
-  // Endpoint for remote to get session
   server.get("/mic/initiate", (req, res) => {
     const sessionCode = crypto.randomUUID();
     micSessions.set(sessionCode, { status: "pending", createdAt: Date.now() });
-
-    // Auto-expiry
     setTimeout(() => {
       if (micSessions.has(sessionCode)) micSessions.delete(sessionCode);
     }, 300000);
-
     logger.info("MIC", `Session created: ${sessionCode}`);
     res.json({ playerPeerId, sessionCode });
   });
 
   // --- Electron IPC Handlers ---
-
-  // Versioning info
-  ipcMain.handle("get-version", () => {
-    return versionInformation;
-  });
-
-  // Kiosk mode status
-  ipcMain.handle("get-kiosk-enabled", () => {
-    return kioskEnabled;
-  });
-
-  // Get the entire configuration object, useful for initial state hydration.
+  ipcMain.handle("get-version", () => versionInformation);
+  ipcMain.handle("get-kiosk-enabled", () => kioskEnabled);
   ipcMain.handle("config-get-all", () => Config.getAll());
-
-  // Get a single value using a key.
   ipcMain.handle("config-get-item", (event, key) => {
     if (typeof key !== "string") return null;
     return Config.getItem(key);
   });
-
-  // Set a single value using a key-value pair.
   ipcMain.on("config-set-item", (event, { key, value }) => {
     if (typeof key !== "string") return;
     Config.setItem(key, value);
     logger.info("CONFIG", `Set '${key}'`);
   });
-
-  // Merge an object into the current config. Perfect for setup wizards.
   ipcMain.on("config-merge", (event, dataObject) => {
     if (typeof dataObject !== "object" || dataObject === null) return;
     Config.merge(dataObject);
     logger.info("CONFIG", "Configuration merged with new data.");
   });
-
-  // --- Other Electron IPC Handlers ---
   ipcMain.handle("mic-validate-code", (event, code) => {
     if (micSessions.has(code) && micSessions.get(code).status === "pending") {
       micSessions.set(code, { status: "active" });
@@ -449,17 +440,9 @@ app.whenReady().then(() => {
     }
     return false;
   });
-
   ipcMain.handle("mic-get-peer-id", () => playerPeerId);
-  ipcMain.handle("get-volume", async () => {
-    let vol = await getVolume();
-    return vol;
-  });
-
-  ipcMain.on("set-volume", async (event, vol) => {
-    await setVolume(vol);
-  });
-
+  ipcMain.handle("get-volume", async () => getVolume());
+  ipcMain.on("set-volume", async (event, vol) => setVolume(vol));
   ipcMain.on("setRPC", (event, arg) => {
     discordClient.user?.setActivity({
       state: arg.state,
@@ -473,50 +456,78 @@ app.whenReady().then(() => {
     });
   });
 
-  // --- Socket.IO Handling ---
   const knownRemotes = {};
+
+  cloudSocket.on("remote-connected", ({ identity }) => {
+    logger.info("LINK", `Cloud Remote connected: ${identity}`);
+    knownRemotes[identity] = {
+      connectedAt: new Date().toISOString(),
+      type: "cloud",
+    };
+    io.to("karaoke-app").emit("join", { type: "remote", identity });
+  });
+
+  cloudSocket.on("remote-command", (payload) => {
+    logger.debug(
+      "LINK",
+      `Cloud Command from ${payload.identity}: ${JSON.stringify(payload.data)}`,
+    );
+    io.to("karaoke-app").emit("execute-command", payload);
+  });
+
+  cloudSocket.on("remote-disconnected", ({ identity }) => {
+    logger.info("LINK", `Cloud Remote disconnected: ${identity}`);
+    delete knownRemotes[identity];
+    io.to("karaoke-app").emit("leave", { type: "remote", identity });
+  });
 
   io.on("connection", async (socket) => {
     const clientType = socket.handshake.query.clientType;
 
-    // Case 1: Main Desktop App
     if (clientType === "app") {
       logger.info("LINK", "Main App connected to Socket");
       socket.join("karaoke-app");
       socket.emit("remotes", knownRemotes);
 
-      socket.on("sendData", (msg) =>
-        io.to(msg.identity).emit("fromRemote", msg.data),
-      );
+      socket.on("sendData", (msg) => {
+        if (msg.identity && msg.identity.startsWith("cloud_")) {
+          const actualSocketId = msg.identity.replace("cloud_", "");
+          cloudSocket.emit("host-response", {
+            identity: actualSocketId,
+            data: msg.data,
+          });
+        } else {
+          io.to(msg.identity).emit("fromRemote", msg.data);
+        }
+      });
       socket.on("broadcastData", (msg) =>
         socket.broadcast.emit("fromRemote", msg),
       );
       return;
     }
 
-    // Case 2: Remote Controller (Mobile)
     if (clientType === "remote") {
-      logger.info("LINK", `Remote connected: ${socket.id}`);
+      logger.info("LINK", `Local Remote connected: ${socket.id}`);
       io.to("karaoke-app").emit("join", {
         type: clientType,
         identity: socket.id,
       });
-
-      knownRemotes[socket.id] = { connectedAt: new Date().toISOString() };
-
+      knownRemotes[socket.id] = {
+        connectedAt: new Date().toISOString(),
+        type: "local",
+      };
       socket.on("remote-command", (data) => {
         logger.debug(
           "LINK",
-          `Command from ${socket.id}: ${JSON.stringify(data)}`,
+          `Local Command from ${socket.id}: ${JSON.stringify(data)}`,
         );
         io.to("karaoke-app").emit("execute-command", {
           identity: socket.id,
           data,
         });
       });
-
       socket.on("disconnect", () => {
-        logger.info("LINK", `Remote disconnected: ${socket.id}`);
+        logger.info("LINK", `Local Remote disconnected: ${socket.id}`);
         io.to("karaoke-app").emit("leave", {
           type: clientType,
           identity: socket.id,
@@ -526,14 +537,6 @@ app.whenReady().then(() => {
       return;
     }
 
-    // Case 3: Enterprise/POS
-    if (clientType === "enterprise") {
-      logger.info("LINK", "POS System attempting auth");
-      // Enterprise logic here
-      return;
-    }
-
-    // Case 4: YouTube Cast Receiver (Default Fallback)
     const details = socket.handshake.auth;
     if (details && details.name) {
       logger.info("CAST", `YT Cast Connection from ${details.name}`);
@@ -546,22 +549,18 @@ app.whenReady().then(() => {
           model: details.model,
         },
       });
-
       receiver.on("senderConnect", (sender) =>
         socket.emit("clientConnected", sender),
       );
       receiver.on("senderDisconnect", (sender) =>
         socket.emit("clientDisconnect", sender),
       );
-
       try {
         await receiver.start();
         socket.emit("success");
       } catch (error) {
         socket.emit("error", error);
       }
-
-      // Relay events from App logic to Socket logic
       socket.on("volume", (v) => player.setVolume({ level: v, muted: false }));
       socket.on("duration", (d) => player.setDuration(d));
       socket.on("position", (p) => player.setPosition(p));
@@ -570,7 +569,6 @@ app.whenReady().then(() => {
         await player.pause();
         await player.next();
       });
-
       socket.on("disconnect", async () => {
         logger.info("CAST", "App disconnected, stopping receiver");
         try {
@@ -582,7 +580,6 @@ app.whenReady().then(() => {
     }
   });
 
-  // Start Server
   serverHttp.listen(PORT, () => {
     logger.info("SERVER", `Encore Karaoke server running on port ${PORT}`);
     createWindow();

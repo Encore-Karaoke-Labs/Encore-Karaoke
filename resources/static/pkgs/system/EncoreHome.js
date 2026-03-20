@@ -708,10 +708,26 @@ class EncoreController {
       .appendTo(this.dom.qrContainer);
     const img = new Html("img").appendTo(imgWrapper);
 
-    fetch("http://127.0.0.1:9864/local_ip")
-      .then((r) => r.text())
-      .then((ip) => {
-        const remoteUrl = `http://${ip}:9864/remote`;
+    let remoteUrl = ``;
+
+    fetch("http://127.0.0.1:9864/cloud_info")
+      .then((r) => r.json())
+      .then((info) => {
+        if (!info.roomCode) {
+          // Use Local server instead
+          fetch("http://127.0.0.1:9864/local_ip")
+            .then((r) => r.text())
+            .then((ip) => {
+              const remoteUrl = `http://${ip}:9864/remote`;
+              img.attr({
+                src: `http://127.0.0.1:9864/qr?url=${encodeURIComponent(remoteUrl)}`,
+              });
+            })
+            .catch((e) => this.dom.qrContainer.classOn("hidden"));
+          return;
+        }
+
+        const remoteUrl = `${info.relayUrl}/?room=${info.roomCode}`;
         img.attr({
           src: `http://127.0.0.1:9864/qr?url=${encodeURIComponent(remoteUrl)}`,
         });
