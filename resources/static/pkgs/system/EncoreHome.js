@@ -64,6 +64,12 @@ class EncoreController {
       isScoreScreenActive: false,
       scoreSkipResolver: null,
       showSongList: false,
+      chatHistory: [],
+      deviceRegistry: {}, // deviceId -> { nickname }
+      activeSockets: {}, // socketId -> deviceId
+      typingUsers: new Set(),
+      cheerQueue: [],
+      isCheering: false,
     };
 
     this.bumperImages = [];
@@ -586,6 +592,44 @@ class EncoreController {
     this.dom.midiLineDisplay2 = new Html("div")
       .classOn("lyric-line", "midi-lyric-line", "next")
       .appendTo(this.dom.midiContainer);
+
+    // --- Cheer Overlay ---
+    this.dom.cheerOverlayContainer = new Html("div")
+      .classOn("cheer-overlay-container")
+      .styleJs({
+        position: "absolute",
+        top: "20px",
+        right: "-500px", // Hidden by default
+        zIndex: "9000",
+        transition: "all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+        backgroundColor: "rgba(20, 20, 30, 0.9)",
+        border: "2px solid #ffd700",
+        borderRadius: "15px",
+        padding: "15px 25px",
+        display: "flex",
+        flexDirection: "column",
+        boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+        maxWidth: "400px",
+      })
+      .appendTo(this.wrapper);
+
+    this.dom.cheerHeader = new Html("div")
+      .styleJs({
+        color: "#ffd700",
+        fontWeight: "700",
+        fontSize: "1.2rem",
+        marginBottom: "5px",
+      })
+      .appendTo(this.dom.cheerOverlayContainer);
+
+    this.dom.cheerMessage = new Html("div")
+      .styleJs({
+        color: "#fff",
+        fontSize: "1.5rem",
+        fontWeight: "600",
+        wordWrap: "break-word",
+      })
+      .appendTo(this.dom.cheerOverlayContainer);
   }
 
   buildPostSongScreen() {
@@ -735,6 +779,70 @@ class EncoreController {
       .catch((e) => this.dom.qrContainer.classOn("hidden"));
 
     this.updateRemoteCount();
+  }
+
+  // --- Social Logic ---
+
+  processCheerQueue() {
+    if (this.state.isCheering || this.state.cheerQueue.length === 0) return;
+
+    this.state.isCheering = true;
+    const cheer = this.state.cheerQueue.shift();
+
+    this.Forte.playSfx("/assets/audio/fanfare-2.mp3"); // Optional: playful sound
+
+    this.dom.cheerHeader.html(`🎉 <span>${cheer.nickname}</span> cheers:`);
+    this.dom.cheerMessage.text(cheer.message);
+
+    // Slide In
+    this.dom.cheerOverlayContainer.styleJs({ right: "20px" });
+
+    // Hold for 5 seconds, then slide out
+    setTimeout(() => {
+      this.dom.cheerOverlayContainer.styleJs({ right: "-500px" });
+
+      // Wait for animation to finish, then process next
+      setTimeout(() => {
+        this.state.isCheering = false;
+        this.processCheerQueue();
+      }, 600);
+    }, 5000);
+  }
+
+  generateUniqueNickname(desiredName, deviceId) {
+    let baseName = desiredName.trim().substring(0, 15) || "Singer";
+    let finalName = baseName;
+    let counter = 1;
+
+    // Check against names owned by OTHER devices
+    const otherNames = Object.entries(this.state.deviceRegistry)
+      .filter(([id, _]) => id !== deviceId)
+      .map(([_, data]) => data.nickname.toLowerCase());
+
+    while (otherNames.includes(finalName.toLowerCase())) {
+      finalName = `${baseName} ${counter}`;
+      counter++;
+    }
+    return finalName;
+  }
+
+  broadcastSocialState() {
+    const activeUsersCount = Object.keys(this.state.activeSockets).length;
+
+    const typingNicks = Array.from(this.state.typingUsers)
+      .map((socketId) => {
+        const devId = this.state.activeSockets[socketId];
+        return devId && this.state.deviceRegistry[devId]
+          ? this.state.deviceRegistry[devId].nickname
+          : null;
+      })
+      .filter(Boolean);
+
+    this.socket.emit("broadcastData", {
+      type: "social_update",
+      typing: typingNicks,
+      usersCount: activeUsersCount,
+    });
   }
 
   // --- Core Logic Methods ---
@@ -2380,11 +2488,87 @@ class EncoreController {
     });
     this.socket.on("leave", (leaveInformation) => {
       delete this.state.knownRemotes[leaveInformation.identity];
+
+      // Remove from active sockets, but KEEP in deviceRegistry so they keep their name on reconnect
+      delete this.state.activeSockets[leaveInformation.identity];
+      this.state.typingUsers.delete(leaveInformation.identity);
+
       this.updateRemoteCount();
-      console.log("[LINK] Remote disconnected.", this.state.knownRemotes);
+      this.broadcastSocialState();
     });
     this.socket.on("execute-command", (cmd) => {
       const d = cmd.data;
+
+      // --- Social Commands ---
+      if (d.type === "set_nickname") {
+        const deviceId = d.deviceId || cmd.identity; // Fallback to socket ID if no device ID
+        const uniqueName = this.generateUniqueNickname(d.value, deviceId);
+
+        // Register the device and link the current socket
+        this.state.deviceRegistry[deviceId] = { nickname: uniqueName };
+        this.state.activeSockets[cmd.identity] = deviceId;
+
+        this.socket.emit("sendData", {
+          identity: cmd.identity,
+          data: {
+            type: "social_init",
+            nickname: uniqueName,
+            history: this.state.chatHistory,
+          },
+        });
+        this.broadcastSocialState();
+        return;
+      }
+
+      if (d.type === "chat_message") {
+        const deviceId = this.state.activeSockets[cmd.identity];
+        const sender =
+          deviceId && this.state.deviceRegistry[deviceId]
+            ? this.state.deviceRegistry[deviceId].nickname
+            : "Guest";
+
+        const msgObj = {
+          id: Date.now(),
+          sender,
+          text: d.value.substring(0, 200),
+          time: Date.now(),
+        };
+
+        this.state.chatHistory.push(msgObj);
+        if (this.state.chatHistory.length > 100) this.state.chatHistory.shift();
+
+        this.state.typingUsers.delete(cmd.identity);
+
+        this.socket.emit("broadcastData", {
+          type: "new_chat",
+          message: msgObj,
+        });
+        this.broadcastSocialState();
+        return;
+      }
+
+      if (d.type === "send_cheer") {
+        const deviceId = this.state.activeSockets[cmd.identity];
+        const sender =
+          deviceId && this.state.deviceRegistry[deviceId]
+            ? this.state.deviceRegistry[deviceId].nickname
+            : "Guest";
+
+        this.state.cheerQueue.push({
+          nickname: sender,
+          message: d.value.substring(0, 50),
+        });
+        this.processCheerQueue();
+        return;
+      }
+
+      if (d.type === "typing_state") {
+        if (d.value) this.state.typingUsers.add(cmd.identity);
+        else this.state.typingUsers.delete(cmd.identity);
+        this.broadcastSocialState();
+        return;
+      }
+
       switch (d.type) {
         case "digit":
           this.showTheSongList();

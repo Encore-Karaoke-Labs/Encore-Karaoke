@@ -1,10 +1,11 @@
-<!DOCTYPE html>
+<!-- index.html (Local Link Client) -->
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content"
     />
     <title>Encore Link</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -24,17 +25,13 @@
         --border: rgba(255, 255, 255, 0.15);
         --btn-bg: rgba(255, 255, 255, 0.05);
         --btn-active: rgba(137, 207, 240, 0.2);
-
         --radius: 12px;
         --header-height: 60px;
       }
-
       * {
         box-sizing: border-box;
         -webkit-tap-highlight-color: transparent;
       }
-
-      /* --- Scrollbar Styling --- */
       ::-webkit-scrollbar {
         width: 6px;
         height: 6px;
@@ -59,14 +56,12 @@
         background-color: var(--bg-color);
         color: var(--text);
         margin: 0;
-        height: 100vh;
+        height: 100dvh; /* Dynamic viewport height fixes mobile keyboard cutoff */
         width: 100vw;
         display: flex;
         flex-direction: column;
         overflow: hidden;
       }
-
-      /* --- Main Layout --- */
       .app-container {
         display: flex;
         flex-direction: column;
@@ -75,8 +70,6 @@
         overflow: hidden;
         position: relative;
       }
-
-      /* --- Header --- */
       .app-header {
         height: var(--header-height);
         display: flex;
@@ -87,7 +80,6 @@
         z-index: 10;
         flex-shrink: 0;
       }
-
       .app-header h1 {
         font-size: 1.5rem;
         font-weight: 700;
@@ -96,15 +88,12 @@
         margin: 0;
         text-shadow: 0 0 10px rgba(137, 207, 240, 0.5);
       }
-
-      /* --- View Handling --- */
       .view-container {
         flex: 1;
         position: relative;
         overflow: hidden;
         width: 100%;
       }
-
       .view {
         position: absolute;
         inset: 0;
@@ -115,23 +104,19 @@
         height: 100%;
         overflow: hidden;
       }
-
       #remote-view {
         z-index: 1;
       }
-
       #songlist-view {
         z-index: 2;
         transform: translateX(100%);
         transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
         visibility: hidden;
       }
-
       #songlist-view.active {
         transform: translateX(0);
         visibility: visible;
       }
-
       #search-view {
         z-index: 50;
         position: fixed;
@@ -144,13 +129,70 @@
         background: var(--bg-color);
         visibility: hidden;
       }
-
       #search-view.active {
         transform: translateY(0);
         visibility: visible;
       }
 
-      /* --- Remote Controls --- */
+      /* --- Chat & Social UI --- */
+      #chat-view {
+        z-index: 40;
+        transform: translateY(100%);
+        transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        visibility: hidden;
+      }
+      #chat-view.active {
+        transform: translateY(0);
+        visibility: visible;
+      }
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .chat-msg {
+        background: var(--bg-secondary);
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        word-wrap: break-word;
+        max-width: 90%;
+        align-self: flex-start;
+      }
+      .chat-msg .sender {
+        font-weight: 700;
+        color: var(--primary);
+        font-size: 0.95rem;
+        margin-bottom: 0.25rem;
+      }
+      .chat-msg.self {
+        background: rgba(137, 207, 240, 0.1);
+        border-color: rgba(137, 207, 240, 0.3);
+        align-self: flex-end;
+      }
+      .chat-input-area {
+        padding: 1rem;
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border);
+        display: flex;
+        gap: 0.5rem;
+        flex-direction: column;
+        flex-shrink: 0;
+      }
+      .chat-controls {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .typing-indicator {
+        font-size: 0.85rem;
+        color: var(--secondary);
+        height: 20px;
+        font-style: italic;
+      }
+
       #remote-view-content {
         flex: 1;
         overflow-y: auto;
@@ -159,7 +201,6 @@
         flex-direction: column;
         align-items: center;
       }
-
       .remote-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -168,29 +209,23 @@
         max-width: 400px;
         padding-bottom: 2rem;
       }
-
       .numpad-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 0.75rem;
         margin-bottom: 0.75rem;
       }
-
-      /* Wrapper for 2-column control groups (Key/Vol) */
       .controls-wrapper {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 0.75rem;
         margin-bottom: 0.75rem;
       }
-
       .control-column {
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
       }
-
-      /* --- Buttons --- */
       button {
         font-family: "Rajdhani", sans-serif;
         background: var(--btn-bg);
@@ -210,13 +245,11 @@
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
         -webkit-tap-highlight-color: transparent;
       }
-
       button:active {
         transform: scale(0.96);
         background: var(--btn-active);
         border-color: var(--primary);
       }
-
       .btn-primary {
         background: var(--primary);
         color: var(--bg-color);
@@ -231,21 +264,17 @@
         color: #ff5555;
         border-color: rgba(255, 85, 85, 0.3);
       }
-
       .span-2 {
         grid-column: span 2;
       }
       .span-4 {
         grid-column: span 4;
       }
-
       .numpad-btn {
         font-size: 1.8rem;
         height: 70px;
         background: rgba(255, 255, 255, 0.02);
       }
-
-      /* --- Library Styles --- */
       .library-header {
         padding: 0.75rem;
         border-bottom: 1px solid var(--border);
@@ -254,7 +283,6 @@
         background: var(--bg-secondary);
         flex-shrink: 0;
       }
-
       .search-bar {
         flex: 1;
         background: rgba(0, 0, 0, 0.3);
@@ -269,35 +297,46 @@
       .search-bar:focus {
         border-color: var(--primary);
       }
-
       .library-content {
         flex: 1;
-        overflow-y: auto;
-        padding: 1rem;
-        -webkit-overflow-scrolling: touch;
-      }
-
-      /* Artist List */
-      .artist-list {
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
+        overflow: hidden;
       }
 
+      /* --- Virtual Scroller Classes --- */
+      .virtual-scroller {
+        position: relative;
+        overflow-y: auto;
+        width: 100%;
+        height: 100%;
+        -webkit-overflow-scrolling: touch;
+      }
+      .virtual-scroller-content {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+      }
+
+      #artist-view-container {
+        flex: 1;
+        display: block;
+      }
       .artist-row {
         display: flex;
         align-items: center;
         background: var(--bg-secondary);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
+        border-bottom: 1px solid var(--border);
         padding: 0.8rem;
         cursor: pointer;
         transition: background 0.2s;
+        height: 75px;
+        box-sizing: border-box;
       }
       .artist-row:active {
         background: var(--btn-active);
       }
-
       .artist-avatar {
         width: 40px;
         height: 40px;
@@ -311,7 +350,6 @@
         margin-right: 1rem;
         flex-shrink: 0;
       }
-
       .artist-name-list {
         font-size: 1.1rem;
         font-weight: 600;
@@ -321,32 +359,30 @@
         overflow: hidden;
         text-overflow: ellipsis;
       }
-
       .artist-count {
         font-size: 0.9rem;
         color: var(--text-dim);
       }
-
-      /* Song List */
       #song-view-container {
         display: none;
         flex-direction: column;
+        height: 100%;
       }
       #song-view-container.active {
         display: flex;
       }
-
       .song-item {
         display: flex;
         align-items: center;
         padding: 1rem 0.5rem;
         border-bottom: 1px solid var(--border);
         cursor: pointer;
+        height: 75px;
+        box-sizing: border-box;
       }
       .song-item:active {
         background: var(--btn-active);
       }
-
       .song-code {
         font-size: 1.2rem;
         font-weight: 700;
@@ -364,8 +400,6 @@
         font-weight: 700;
         margin-bottom: 2px;
       }
-
-      /* --- Toast --- */
       .toast {
         position: fixed;
         bottom: 2rem;
@@ -386,9 +420,36 @@
         opacity: 1;
       }
 
-      /* =========================================
-         TABLET & DESKTOP LAYOUT (Split Screen)
-         ========================================= */
+      /* Custom Modal */
+      #nickname-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 10, 20, 0.95);
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 2rem;
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      #nickname-overlay.active {
+        visibility: visible;
+        opacity: 1;
+      }
+      .nickname-box {
+        background: var(--bg-secondary);
+        border: 1px solid var(--primary);
+        padding: 2rem;
+        border-radius: var(--radius);
+        width: 100%;
+        max-width: 400px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
       @media (min-width: 768px) {
         .view-container {
           display: flex;
@@ -396,11 +457,9 @@
           width: 100%;
           height: 100%;
         }
-
         .app-header {
           display: none;
         }
-
         #remote-view {
           position: relative;
           width: 380px;
@@ -410,7 +469,6 @@
           display: flex;
           z-index: 10;
         }
-
         .remote-title-desktop {
           display: block;
           text-align: center;
@@ -421,7 +479,6 @@
           letter-spacing: 0.3rem;
           width: 100%;
         }
-
         #songlist-view {
           position: relative;
           flex: 1;
@@ -431,18 +488,15 @@
           z-index: 5;
           border-left: none;
         }
-
         .mobile-only {
           display: none !important;
         }
-
         #unified-back-btn {
           display: none;
         }
         #unified-back-btn.desktop-visible {
           display: block;
         }
-
         button {
           font-size: 1.3rem;
           height: 70px;
@@ -452,7 +506,6 @@
           font-size: 2.2rem;
         }
       }
-
       @media (max-width: 767px) {
         .remote-title-desktop {
           display: none;
@@ -461,6 +514,45 @@
     </style>
   </head>
   <body>
+    <!-- Nickname Input Modal -->
+    <div id="nickname-overlay">
+      <div class="nickname-box">
+        <h2 style="margin-top: 0; color: var(--primary); letter-spacing: 2px">
+          PARTY CHAT
+        </h2>
+        <p
+          style="
+            color: var(--text-dim);
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+          "
+        >
+          Enter a nickname to join the chat and send cheers!
+        </p>
+        <input
+          type="text"
+          id="nickname-input"
+          class="search-bar"
+          placeholder="Your Nickname..."
+          maxlength="15"
+          style="
+            width: 100%;
+            margin-bottom: 1rem;
+            text-align: center;
+            font-size: 1.3rem;
+            padding: 1rem;
+          "
+        />
+        <button
+          id="nickname-submit"
+          class="btn-primary"
+          style="width: 100%; height: 60px; font-size: 1.2rem"
+        >
+          JOIN SESSION
+        </button>
+      </div>
+    </div>
+
     <div class="app-container">
       <header class="app-header">
         <h1>ENCORE LINK</h1>
@@ -473,7 +565,6 @@
             <div class="remote-title-desktop">ENCORE</div>
 
             <div class="remote-grid">
-              <!-- Transport -->
               <button data-type="stop" data-value="Escape" class="btn-danger">
                 STOP
               </button>
@@ -486,7 +577,6 @@
               </button>
               <button data-type="toggle_bgv">BGV</button>
 
-              <!-- Numpad -->
               <div class="numpad-grid" style="grid-column: span 4">
                 <button class="numpad-btn" data-type="digit" data-value="1">
                   1
@@ -528,9 +618,7 @@
                 <div></div>
               </div>
 
-              <!-- Control Rows (Key on Left, Vol on Right) -->
               <div class="controls-wrapper span-4">
-                <!-- Left Column: Key -->
                 <div class="control-column">
                   <button data-type="key_up" data-value="ArrowUp">
                     KEY &uarr;
@@ -539,7 +627,6 @@
                     KEY &darr;
                   </button>
                 </div>
-                <!-- Right Column: Vol -->
                 <div class="control-column">
                   <button data-type="vol_up" data-value="=">VOL &uarr;</button>
                   <button data-type="vol_down" data-value="-">
@@ -548,21 +635,78 @@
                 </div>
               </div>
 
-              <!-- Mobile Navigation -->
               <button
                 class="btn-secondary span-4 mobile-only"
                 id="open-library-btn"
               >
                 BROWSE SONGLIST
               </button>
-
-              <!-- YouTube Search -->
+              <button class="btn-primary span-4" id="open-chat-btn">
+                PARTY CHAT & CHEER
+              </button>
               <button
                 data-type="yt_search"
                 class="span-4"
                 style="margin-top: 0.5rem"
               >
                 YOUTUBE SEARCH
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat & Social Panel -->
+        <div id="chat-view" class="view">
+          <div class="library-header">
+            <button id="close-chat-btn" style="width: 50px; font-size: 1.5rem">
+              &larr;
+            </button>
+            <div
+              style="
+                flex: 1;
+                display: flex;
+                align-items: center;
+                padding-left: 1rem;
+                font-weight: 700;
+                font-size: 1.2rem;
+              "
+            >
+              PARTY CHAT
+              <span
+                id="user-count"
+                style="
+                  margin-left: auto;
+                  font-size: 1rem;
+                  color: var(--primary);
+                "
+                >1 User</span
+              >
+            </div>
+          </div>
+          <div class="chat-messages" id="chat-messages-container"></div>
+          <div class="chat-input-area">
+            <div class="typing-indicator" id="typing-indicator"></div>
+            <div class="chat-controls">
+              <input
+                type="text"
+                id="chat-input"
+                class="search-bar"
+                placeholder="Message or Cheer..."
+                maxlength="150"
+              />
+              <button
+                id="chat-send-btn"
+                style="width: 60px"
+                class="btn-primary"
+              >
+                SEND
+              </button>
+              <button
+                id="chat-cheer-btn"
+                style="width: 80px"
+                class="btn-secondary"
+              >
+                CHEER
               </button>
             </div>
           </div>
@@ -586,21 +730,30 @@
           </div>
 
           <div class="library-content">
-            <div id="artist-view-container">
-              <div class="artist-list" id="artist-list">
-                <!-- JS Injected Artists -->
-              </div>
+            <div id="artist-view-container" class="virtual-scroller">
+              <div class="virtual-scroller-content" id="artist-list"></div>
             </div>
 
             <div id="song-view-container">
               <h3
                 id="current-artist-name"
-                style="margin: 0 0 1rem 0; color: var(--primary)"
+                style="
+                  margin: 1rem 1rem 0 1rem;
+                  color: var(--primary);
+                  flex-shrink: 0;
+                "
               >
                 Artist Name
               </h3>
-              <div id="artist-songs-list">
-                <!-- JS Injected Songs -->
+              <div
+                id="song-scroller-container"
+                class="virtual-scroller"
+                style="flex: 1; margin-top: 1rem"
+              >
+                <div
+                  class="virtual-scroller-content"
+                  id="artist-songs-list"
+                ></div>
               </div>
             </div>
           </div>
@@ -633,7 +786,6 @@
               justify-content: center;
             "
           >
-            <!-- Navigation Group (Stacked Top) -->
             <div style="display: flex; flex-direction: column; gap: 1rem">
               <button
                 data-type="nav_up"
@@ -650,8 +802,6 @@
                 &darr;
               </button>
             </div>
-
-            <!-- Action Group (Bottom, Distinct) -->
             <button
               data-type="enter"
               data-value="Enter"
@@ -674,41 +824,159 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
+      // --- Virtual Scroller Utility ---
+      class VirtualScroller {
+        constructor(containerId, contentId, itemHeight, renderCallback) {
+          this.container = document.getElementById(containerId);
+          this.content = document.getElementById(contentId);
+          this.itemHeight = itemHeight;
+          this.renderCallback = renderCallback;
+          this.items = [];
+          this.container.addEventListener("scroll", () => this.render());
+        }
+        setItems(items) {
+          this.items = items;
+          this.content.style.height = `${this.items.length * this.itemHeight}px`;
+          this.container.scrollTop = 0;
+          this.render();
+        }
+        render() {
+          const scrollTop = this.container.scrollTop;
+          const containerHeight = this.container.clientHeight;
+          let startIndex = Math.floor(scrollTop / this.itemHeight) - 5;
+          let endIndex =
+            Math.ceil((scrollTop + containerHeight) / this.itemHeight) + 5;
+          startIndex = Math.max(0, startIndex);
+          endIndex = Math.min(this.items.length, endIndex);
+          this.content.innerHTML = "";
+          const fragment = document.createDocumentFragment();
+          for (let i = startIndex; i < endIndex; i++) {
+            const node = this.renderCallback(this.items[i], i);
+            node.style.position = "absolute";
+            node.style.top = `${i * this.itemHeight}px`;
+            node.style.width = "100%";
+            node.style.height = `${this.itemHeight}px`;
+            fragment.appendChild(node);
+          }
+          this.content.appendChild(fragment);
+        }
+      }
+
       document.addEventListener("DOMContentLoaded", () => {
         const socket = io({ query: { clientType: "remote" } });
 
         // --- State ---
         let fullSongList = [];
         let artistsMap = {};
+        let currentArtistSongs = [];
+        let navState = { view: "artists", mobileLibraryOpen: false };
 
-        let navState = {
-          view: "artists",
-          mobileLibraryOpen: false,
-        };
+        // --- Social State & Device ID ---
+        function getOrCreateDeviceId() {
+          let id = localStorage.getItem("encore_device_id");
+          if (!id) {
+            id =
+              (crypto.randomUUID && crypto.randomUUID()) ||
+              "dev_" + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem("encore_device_id", id);
+          }
+          return id;
+        }
+
+        const deviceId = getOrCreateDeviceId();
+        let myNickname = localStorage.getItem("encore_nickname") || "";
+        let chatMessages = [];
+        let typingTimeout = null;
 
         // --- Elements ---
-        const artistListContainer = document.getElementById("artist-list");
         const artistViewContainer = document.getElementById(
           "artist-view-container",
         );
         const songViewContainer = document.getElementById(
           "song-view-container",
         );
-        const artistSongsList = document.getElementById("artist-songs-list");
         const currentArtistLabel = document.getElementById(
           "current-artist-name",
         );
-
         const librarySearch = document.getElementById("library-search");
         const unifiedBackBtn = document.getElementById("unified-back-btn");
         const songlistView = document.getElementById("songlist-view");
-
         const searchView = document.getElementById("search-view");
 
-        // --- Socket Connection ---
+        const chatView = document.getElementById("chat-view");
+        const chatInput = document.getElementById("chat-input");
+        const typingIndicator = document.getElementById("typing-indicator");
+        const chatContainer = document.getElementById(
+          "chat-messages-container",
+        );
+
+        const nickOverlay = document.getElementById("nickname-overlay");
+        const nickInput = document.getElementById("nickname-input");
+        const nickSubmit = document.getElementById("nickname-submit");
+
+        // --- Virtual Scroller Setups ---
+        const artistScroller = new VirtualScroller(
+          "artist-view-container",
+          "artist-list",
+          75,
+          (artist) => {
+            const row = document.createElement("div");
+            row.className = "artist-row";
+            const color1 = stringToColor(artist);
+            const color2 = stringToColor(artist.split("").reverse().join(""));
+            const count = artistsMap[artist] ? artistsMap[artist].length : 0;
+            row.innerHTML = `<div class="artist-avatar" style="background: linear-gradient(135deg, ${color1}, ${color2})">${artist.charAt(0).toUpperCase()}</div><div class="artist-name-list">${artist}</div><div class="artist-count">${count}</div>`;
+            row.onclick = () => openArtistSongs(artist);
+            return row;
+          },
+        );
+
+        const songScroller = new VirtualScroller(
+          "song-scroller-container",
+          "artist-songs-list",
+          75,
+          (song) => {
+            const item = document.createElement("div");
+            item.className = "song-item";
+            item.innerHTML = `<div class="song-code">${song.code}</div><div class="song-info"><div class="song-title">${song.title}</div></div>`;
+            item.onclick = () => reserveSong(song);
+            return item;
+          },
+        );
+
+        // --- Socket Events ---
         socket.on("connect", () => {
           console.log("Connected to Encore. Requesting song list...");
           socket.emit("remote-command", { type: "get_song_list", value: "" });
+
+          if (!myNickname) {
+            nickOverlay.classList.add("active");
+            nickInput.focus();
+          } else {
+            socket.emit("remote-command", {
+              type: "set_nickname",
+              value: myNickname,
+              deviceId,
+            });
+          }
+        });
+
+        nickSubmit.onclick = () => {
+          const val = nickInput.value.trim();
+          if (val) {
+            myNickname = val;
+            localStorage.setItem("encore_nickname", myNickname);
+            nickOverlay.classList.remove("active");
+            socket.emit("remote-command", {
+              type: "set_nickname",
+              value: myNickname,
+              deviceId,
+            });
+          }
+        };
+
+        nickInput.addEventListener("keyup", (e) => {
+          if (e.key === "Enter") nickSubmit.onclick();
         });
 
         socket.on("fromRemote", (payload) => {
@@ -716,9 +984,94 @@
             fullSongList = payload.contents;
             processSongList(fullSongList);
           }
+          if (payload.type === "reserve_response") {
+            if (payload.success) showToast(`Reserved: ${payload.song.title}`);
+            else showToast(`Song not found.`);
+          }
+
+          // Social Events
+          if (payload.type === "social_init") {
+            myNickname = payload.nickname;
+            localStorage.setItem("encore_nickname", myNickname);
+            chatMessages = payload.history || [];
+            renderChat();
+          }
+          if (payload.type === "social_update") {
+            document.getElementById("user-count").textContent =
+              `${payload.usersCount} User(s)`;
+            const typers = payload.typing.filter((n) => n !== myNickname);
+            if (typers.length === 0) typingIndicator.textContent = "";
+            else if (typers.length === 1)
+              typingIndicator.textContent = `${typers[0]} is typing...`;
+            else typingIndicator.textContent = `Several people are typing...`;
+          }
+          if (payload.type === "new_chat") {
+            chatMessages.push(payload.message);
+            if (chatMessages.length > 100) chatMessages.shift();
+            renderChat();
+          }
         });
 
-        // --- Data Processing ---
+        // --- Chat Logic ---
+        function renderChat() {
+          const isNearBottom =
+            chatContainer.scrollHeight -
+              chatContainer.scrollTop -
+              chatContainer.clientHeight <
+            100;
+          chatContainer.innerHTML = "";
+          chatMessages.forEach((msg) => {
+            const isSelf = msg.sender === myNickname;
+            const div = document.createElement("div");
+            div.className = `chat-msg ${isSelf ? "self" : ""}`;
+            div.innerHTML = `<div class="sender">${isSelf ? "You" : msg.sender}</div><div class="text">${msg.text}</div>`;
+            chatContainer.appendChild(div);
+          });
+          if (isNearBottom || chatMessages.length === 1)
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        document.getElementById("open-chat-btn").onclick = () => {
+          chatView.classList.add("active");
+          setTimeout(
+            () => (chatContainer.scrollTop = chatContainer.scrollHeight),
+            50,
+          );
+        };
+        document.getElementById("close-chat-btn").onclick = () =>
+          chatView.classList.remove("active");
+
+        const sendChatMessage = () => {
+          const val = chatInput.value.trim();
+          if (!val) return;
+          socket.emit("remote-command", { type: "chat_message", value: val });
+          chatInput.value = "";
+          socket.emit("remote-command", { type: "typing_state", value: false });
+        };
+        const sendCheer = () => {
+          const val = chatInput.value.trim();
+          if (!val) return showToast("Type a message to Cheer!");
+          socket.emit("remote-command", { type: "send_cheer", value: val });
+          chatInput.value = "";
+          showToast("Cheer Sent!");
+        };
+
+        document.getElementById("chat-send-btn").onclick = sendChatMessage;
+        document.getElementById("chat-cheer-btn").onclick = sendCheer;
+
+        chatInput.addEventListener("keyup", (e) => {
+          if (e.key === "Enter") return sendChatMessage();
+          socket.emit("remote-command", { type: "typing_state", value: true });
+          clearTimeout(typingTimeout);
+          typingTimeout = setTimeout(() => {
+            socket.emit("remote-command", {
+              type: "typing_state",
+              value: false,
+            });
+          }, 2000);
+        });
+
+        // --- Library Logic ---
         function processSongList(songs) {
           artistsMap = {};
           songs.forEach((song) => {
@@ -733,92 +1086,40 @@
           renderArtistList(sortedArtists);
         }
 
-        // --- Rendering ---
         function renderArtistList(artists) {
-          artistListContainer.innerHTML = "";
-          if (artists.length === 0) {
-            artistListContainer.innerHTML =
+          if (artists.length === 0)
+            document.getElementById("artist-list").innerHTML =
               '<div style="text-align: center; color: var(--text-dim); padding: 2rem;">No matches found.</div>';
-            return;
-          }
-          const fragment = document.createDocumentFragment();
-          artists.forEach((artist) => {
-            const row = document.createElement("div");
-            row.className = "artist-row";
-            const color1 = stringToColor(artist);
-            const color2 = stringToColor(artist.split("").reverse().join(""));
-            const count = artistsMap[artist] ? artistsMap[artist].length : 0;
-
-            row.innerHTML = `
-                <div class="artist-avatar" style="background: linear-gradient(135deg, ${color1}, ${color2})">
-                    ${artist.charAt(0).toUpperCase()}
-                </div>
-                <div class="artist-name-list">${artist}</div>
-                <div class="artist-count">${count}</div>
-            `;
-            row.onclick = () => openArtistSongs(artist);
-            fragment.appendChild(row);
-          });
-          artistListContainer.appendChild(fragment);
+          else artistScroller.setItems(artists);
         }
 
         function openArtistSongs(artistName) {
           navState.view = "songs";
           currentArtistLabel.textContent = artistName;
-
-          const songs = artistsMap[artistName] || [];
-          artistSongsList.innerHTML = "";
-
-          songs.forEach((song) => {
-            const item = document.createElement("div");
-            item.className = "song-item";
-            item.innerHTML = `
-                    <div class="song-code">${song.code}</div>
-                    <div class="song-info"><div class="song-title">${song.title}</div></div>
-                `;
-            item.onclick = () => reserveSong(song);
-            artistSongsList.appendChild(item);
-          });
-
-          // Switch DOM
+          currentArtistSongs = artistsMap[artistName] || [];
           artistViewContainer.style.display = "none";
           songViewContainer.classList.add("active");
-
-          // Update Inputs & Buttons
+          songScroller.setItems(currentArtistSongs);
           librarySearch.value = "";
           librarySearch.placeholder = `Search in ${artistName}...`;
-
-          // Update Back Button Visibility for Desktop
           unifiedBackBtn.classList.add("desktop-visible");
         }
 
-        // --- Navigation Logic ---
-
         function handleBackNavigation() {
-          // Case 1: We are looking at specific songs. Go back to Artist List.
           if (navState.view === "songs") {
             navState.view = "artists";
             artistViewContainer.style.display = "block";
             songViewContainer.classList.remove("active");
-
             librarySearch.placeholder = "Search songs or artists...";
             librarySearch.value = "";
-
-            // Reset search results to full list
             const sortedArtists = Object.keys(artistsMap).sort((a, b) =>
               a.localeCompare(b, undefined, { sensitivity: "base" }),
             );
             renderArtistList(sortedArtists);
-
-            // Hide back button on desktop (since we are at root)
             unifiedBackBtn.classList.remove("desktop-visible");
-          }
-          // Case 2: We are at Artist List. If mobile, close the library.
-          else if (navState.view === "artists") {
-            if (window.innerWidth < 768) {
-              closeLibrary();
-            } else {
-              // Desktop: Do nothing or clear search
+          } else if (navState.view === "artists") {
+            if (window.innerWidth < 768) closeLibrary();
+            else {
               librarySearch.value = "";
               const sorted = Object.keys(artistsMap).sort((a, b) =>
                 a.localeCompare(b, undefined, { sensitivity: "base" }),
@@ -832,7 +1133,6 @@
           navState.mobileLibraryOpen = true;
           songlistView.classList.add("active");
         }
-
         function closeLibrary() {
           navState.mobileLibraryOpen = false;
           songlistView.classList.remove("active");
@@ -842,7 +1142,6 @@
         unifiedBackBtn.onclick = handleBackNavigation;
         document.getElementById("open-library-btn").onclick = openLibrary;
 
-        // YT Search Logic
         document.querySelector('button[data-type="yt_search"]').onclick =
           () => {
             searchView.classList.add("active");
@@ -854,10 +1153,8 @@
           socket.emit("remote-command", { type: "yt_search_close" });
         };
 
-        // --- Search Logic ---
         librarySearch.addEventListener("input", (e) => {
           const query = e.target.value.toLowerCase();
-
           if (navState.view === "artists") {
             const allArtists = Object.keys(artistsMap);
             if (!query) {
@@ -868,34 +1165,31 @@
               );
             } else {
               const matchedArtists = new Set();
-
               allArtists.forEach((artist) => {
                 if (artist.toLowerCase().includes(query))
                   matchedArtists.add(artist);
               });
-
               fullSongList.forEach((song) => {
                 if (song.title && song.title.toLowerCase().includes(query)) {
                   const artistKey = song.artist.trim();
                   if (artistsMap[artistKey]) matchedArtists.add(artistKey);
                 }
               });
-
               const results = Array.from(matchedArtists).sort((a, b) =>
                 a.localeCompare(b, undefined, { sensitivity: "base" }),
               );
               renderArtistList(results);
             }
           } else {
-            const songItems = artistSongsList.querySelectorAll(".song-item");
-            songItems.forEach((item) => {
-              const text = item.innerText.toLowerCase();
-              item.style.display = text.includes(query) ? "flex" : "none";
-            });
+            const filtered = currentArtistSongs.filter(
+              (song) =>
+                song.title.toLowerCase().includes(query) ||
+                song.code.includes(query),
+            );
+            songScroller.setItems(filtered);
           }
         });
 
-        // --- Command Logic ---
         function reserveSong(song) {
           socket.emit("remote-command", {
             type: "reserve_code",
@@ -923,7 +1217,6 @@
             });
         };
 
-        // --- Helpers ---
         function stringToColor(str) {
           let hash = 0;
           for (let i = 0; i < str.length; i++)

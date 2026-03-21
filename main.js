@@ -500,9 +500,10 @@ app.whenReady().then(() => {
           io.to(msg.identity).emit("fromRemote", msg.data);
         }
       });
-      socket.on("broadcastData", (msg) =>
-        socket.broadcast.emit("fromRemote", msg),
-      );
+      socket.on("broadcastData", (msg) => {
+        socket.broadcast.emit("fromRemote", msg);
+        cloudSocket.emit("host-broadcast", msg);
+      });
       return;
     }
 
