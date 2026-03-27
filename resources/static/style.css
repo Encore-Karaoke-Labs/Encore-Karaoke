@@ -3166,6 +3166,45 @@ input[type="range"]::-moz-range-thumb {
   z-index: 9999;
   pointer-events: none;
 }
+/* --- Retail Credits Overlay Badge --- */
+.credits-overlay-badge {
+  position: fixed;
+  bottom: 2rem;
+  left: 3rem;
+  background: rgba(10, 10, 20, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+  padding: 0.6rem 1.5rem;
+  border-radius: 0.5rem;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 700;
+  font-size: 1.5rem;
+  backdrop-filter: blur(5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  letter-spacing: 0.15em;
+  transition:
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* Lights up blue when user has inserted coins */
+.credits-overlay-badge.has-credits {
+  border-color: #89cff0;
+  color: #89cff0;
+  box-shadow: 0 0 15px rgba(137, 207, 240, 0.25);
+}
+
+/* Lights up gold/yellow when set to Free Play */
+.credits-overlay-badge.free-play {
+  border-color: #ffd700;
+  color: #ffd700;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.25);
+}
 
 /* Adjust title containers to align text with badges */
 .song-item-title,

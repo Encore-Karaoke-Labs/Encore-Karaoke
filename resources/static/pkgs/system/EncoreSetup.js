@@ -62,8 +62,6 @@ class EncoreSetupController {
       opacity: 0,
     });
 
-    this.Ui.becomeTopUi(this.Pid, this.wrapper);
-
     this.container = new Html("div")
       .classOn("setup-container")
       .appendTo(this.wrapper);
@@ -201,7 +199,7 @@ class EncoreSetupController {
             label: "Test Audio Output",
             type: "action",
             action: () => {
-              this.Forte.playSfx("/assets/audio/fanfare.mp3");
+              this.Forte.playSfx("/assets/audio/fanfare.wav");
               this.showToast("PLAYING TEST SOUND...", "info");
             },
           },

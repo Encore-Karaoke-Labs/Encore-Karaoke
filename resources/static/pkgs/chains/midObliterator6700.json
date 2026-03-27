@@ -1,0 +1,15 @@
+[
+  {
+    "path": "/pkgs/plugins/ParametricEQ.js",
+    "params": {
+      "bands": [
+        {
+          "type": "peaking",
+          "freq": 676,
+          "gain": -2.5,
+          "q": 1.5
+        }
+      ]
+    }
+  }
+]

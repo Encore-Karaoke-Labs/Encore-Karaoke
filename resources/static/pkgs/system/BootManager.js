@@ -1,5 +1,4 @@
 import Html from "/libs/html.js";
-import langManager from "../../libs/l10n/manager.js";
 
 let wrapper;
 
@@ -160,7 +159,6 @@ const pkg = {
       });
     }
 
-    await Root.Core.pkg.run("services:SfxLib", [], true);
     await Root.Core.pkg.run("services:UiLib", [], true);
     await Root.Core.pkg.run("services:Forte", [], true);
     await Root.Core.pkg.run("services:FsSvc", [], true);
@@ -168,7 +166,6 @@ const pkg = {
     async function checkServicesLoaded() {
       let curInterval = setInterval(() => {
         try {
-          Root.Processes.getService("SfxLib").data;
           Root.Processes.getService("UiLib").data;
           Root.Processes.getService("FsSvc").data;
           Root.Processes.getService("ForteSvc").data;

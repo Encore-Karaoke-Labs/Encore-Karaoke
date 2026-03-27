@@ -262,7 +262,6 @@ const pkg = {
 
     Pid = Root.Pid;
     Ui = Root.Processes.getService("UiLib").data;
-    Sfx = Root.Processes.getService("SfxLib").data;
 
     wrapper = new Html("div").class("full-ui").appendTo("body").styleJs({
       color: "black",
@@ -376,8 +375,6 @@ const pkg = {
       fontSize: "2rem",
       whiteSpace: "pre-wrap",
     });
-
-    Ui.becomeTopUi(Pid, wrapper);
 
     const tl = anime.timeline({
       easing: "easeInOutExpo",

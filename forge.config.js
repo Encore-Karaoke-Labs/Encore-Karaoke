@@ -29,7 +29,7 @@ module.exports = {
     {
       name: "@electron-forge/maker-squirrel",
       config: {
-        "authors": 'Heartling Records',
+        "authors": 'Encore Karaoke Labs',
         "description": 'Encore Karaoke app',
       },
     },
@@ -40,7 +40,7 @@ module.exports = {
     {
       name: "@electron-forge/maker-deb",
       config: {
-        "authors": 'Heartling Records',
+        "authors": 'Encore Karaoke Labs',
         "description": 'Encore Karaoke for Linux',
         "name": "Encore",
         "category": "Games"

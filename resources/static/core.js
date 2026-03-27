@@ -4,27 +4,9 @@
 ////////////////////////
 
 import Html from "./libs/html.js";
-import Ws from "./libs/windowSystem.js";
-import Modal from "./libs/modal.js";
-import Keyboard from "./libs/keyboard.js";
 import vfs from "./libs/vfs.js";
-import notify from "./libs/notify.js";
-import controllerMapping from "./libs/controllerMapping.js";
-import "./libs/gamecontroller.js";
 
 (async () => {
-  if (typeof window["gameControl"] !== "undefined") {
-    console.log("gc found!!");
-    gameControl.on("connect", (gamepad) => {
-      console.log("gp found!!");
-      controllerMapping.setup(gamepad);
-    });
-
-    gameControl.on("disconnect", (gamepad) => {
-      console.log("Gp disconnected!");
-      window.gps.splice(gamepad, 1);
-    });
-  }
   let Security = {
     vars: new Map(),
     getSecureVariable(key) {
@@ -47,9 +29,6 @@ import "./libs/gamecontroller.js";
     startPkg(pkgName, args) {
       return Core.pkg.run(pkgName, args, false);
     },
-    Modal,
-    Window: Ws.data.win,
-    ControllerSupported: () => !(typeof window["gameControl"] === "undefined"),
   };
   let Processes = {
     list: [],
@@ -168,7 +147,6 @@ import "./libs/gamecontroller.js";
           Arguments,
           Libs,
           Security,
-          Input,
           Core: privs === true ? Core : undefined,
           Pid: pid,
           end: Processes.list[pid].end,
@@ -204,145 +182,9 @@ import "./libs/gamecontroller.js";
     },
   };
 
-  const Input = {
-    listen: function (what, listener, pid) {
-      if (this.listeners[what] !== undefined)
-        this.listeners[what][pid] = listener;
-    },
-    unListen: function (what, pid) {
-      this.listeners[what][pid] = undefined;
-    },
-    /*
-    +--------+--------+-------------+
-    | Input  | Button | Key         |
-    | ------ | ------ | ----------- |
-    | left   | <-     | ArrowLeft   |
-    | right  | ->     | ArrowRight  |
-    | up     | ^      | ArrowUp     |
-    | down   | v      | ArrowDown   |
-    | confirm| A      | Space/Enter |
-    | back   | B      | Backspace   |
-    | act    | X      | Ctrl        |
-    | alt    | Y      | Backslash   |
-    | menu   | Select | Escape      |
-    +--------+--------+-------------+
-    */
-    listeners: {
-      left: {},
-      right: {},
-      up: {},
-      down: {},
-      confirm: {},
-      back: {},
-      act: {},
-      alt: {},
-      menu: {},
-    },
-    /**
-     * Pop the input
-     * @param {InputType} type Input type
-     */
-    pop: function (type, playerId = 0) {
-      // console.log("Input:", type);
-      this.listeners[type][this.focusedApp] &&
-        this.listeners[type][this.focusedApp](playerId);
-      window.currentPlayerId = playerId;
-      window.gpListeners[type].forEach((l) => l());
-      // this.listeners[type].forEach((l) => l(this.focusedApp));
-    },
-    // Focused app determines which menu is on top and should be controllable
-    // (PID-based)
-    focusedApp: null,
-  };
-
-  window.gpListeners = {
-    left: [],
-    right: [],
-    up: [],
-    down: [],
-    confirm: [],
-    back: [],
-    act: [],
-    alt: [],
-    menu: [],
-  };
-
-  window.onkeydown = function (e) {
-    switch (e.code) {
-      // Left
-      case "ArrowLeft":
-        Libs.Input.pop("left", 4);
-        break;
-      // Right
-      case "ArrowRight":
-        Libs.Input.pop("right", 4);
-        break;
-      // Up
-      case "ArrowUp":
-        Libs.Input.pop("up", 4);
-        break;
-      // Down
-      case "ArrowDown":
-        Libs.Input.pop("down", 4);
-        break;
-      // Confirm
-      case "Enter":
-      case "Space":
-        Libs.Input.pop("confirm", 4);
-        break;
-      // Back
-      case "Backspace":
-        if (e.target.tagName.toLowerCase() === "input") return;
-        Libs.Input.pop("back", 4);
-        break;
-      // Action
-      case "ControlLeft":
-      case "ControlRight":
-        Libs.Input.pop("act", 4);
-        break;
-      // Menu
-      case "Escape":
-        Libs.Input.pop("menu", 4);
-        break;
-      // Alternate
-      case "Backslash":
-        Libs.Input.pop("alt", 4);
-        break;
-    }
-  };
-
-  window.gps = [];
-
-  Libs.Input = Input;
-  Libs.Notify = notify;
-
-  // For debugging purposes
-  window.Core = Core;
-  window.Processes = Processes;
-  window.Security = Security;
-  window.Libs = Libs;
-  window.vfs = vfs;
-
-  Ws.init(Core);
-  Modal.init(Processes);
-  Keyboard.init(Processes);
   await Core.pkg.run("system:BootManager", {
     time: performance.now(),
   });
-  notify.init(Processes);
-  controllerMapping.init(notify.show);
-  if (typeof window["gameControl"] === "undefined") {
-    setTimeout(() => {
-      Modal.Show({
-        title: "Gamepad support is not available",
-        description:
-          "Gamepad support will be unavailable in this session. Use keyboard, mouse or touch instead.",
-        parent: document.body,
-        pid: -1,
-        buttons: [{ type: "primary", text: "OK" }],
-      });
-    }, 5000);
-  }
 
   document.body.style.opacity = 1;
   setTimeout((_) => {

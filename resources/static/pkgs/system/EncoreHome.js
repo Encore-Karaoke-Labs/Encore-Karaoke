@@ -27,8 +27,6 @@ function pathJoin(parts, sep) {
 
 class EncoreController {
   constructor(Root, config) {
-    // console.log("CONFIG", config);
-    // console.log("test", config.audioConfig.mix.instrumental.volume);
     this.Root = Root;
     this.Pid = Root.Pid;
     this.Ui = Root.Processes.getService("UiLib").data;
@@ -75,9 +73,6 @@ class EncoreController {
     this.bumperImages = [];
     this.currentBumperIndex = 0;
     this.bumperInterval = null;
-    // versionInformation is obtained asynchronously via the preload API. We'll
-    // populate it during init so we can await the promise and avoid holding a
-    // bare Promise object.
     this.versionInformation = null;
 
     console.log(this.state);
@@ -92,7 +87,7 @@ class EncoreController {
         songMap: this.songMap,
       }),
       () => (this.recorder ? this.recorder.isRecording : false),
-      (s) => this.getFormatInfo(s), // Pass format helper to InfoBar
+      (s) => this.getFormatInfo(s),
     );
     this.recorder = new RecorderModule(
       this.Forte,
@@ -118,7 +113,6 @@ class EncoreController {
 
   async init() {
     this.wrapper = new Html("div").classOn("full-ui").appendTo("body");
-    this.Ui.becomeTopUi(this.Pid, this.wrapper);
     this.wrapper.classOn("loading");
 
     this.state.windowsVolume = await window.volume.getVolume();
@@ -127,12 +121,20 @@ class EncoreController {
     // Load resources
     console.log("[Encore] Loading assets...");
     const sfx = [
-      "fanfare.mp3",
-      "fanfare-2.mp3",
-      "67-kid.mp3",
+      "fanfare.wav",
       ...Array.from({ length: 10 }, (_, i) => `numbers/${i}.wav`),
     ];
     await Promise.all(sfx.map((s) => this.Forte.loadSfx(`/assets/audio/${s}`)));
+
+    try {
+      this.Forte.loadVocalChain(
+        await (await fetch("/pkgs/chains/midObliterator6700.json")).json(),
+      );
+    } catch (e) {
+      console.warn(
+        "[Encore] midObliterator6700 vocal chain not found, skipping.",
+      );
+    }
 
     this.socket = io({ query: { clientType: "app" } });
     this.socket.on("connect", () => {
@@ -158,9 +160,6 @@ class EncoreController {
     });
 
     // Version Info
-    // we need to fetch the version information before doing any logging that
-    // references it.  getVersionInformation() returns a Promise, so await it and
-    // stash the result in the instance.
     this.versionInformation = await window.version.getVersionInformation();
     console.log(
       `Encore ${this.versionInformation.channel} running in version ${this.versionInformation.number}`,
@@ -169,12 +168,10 @@ class EncoreController {
 
     // Audio Config
     await this.Forte.setTrackVolume(this.state.volume);
-    // Use optional chaining for safer access to nested properties
     if (this.config.audioConfig?.micLatency) {
       await this.Forte.setLatency(this.config.audioConfig.micLatency);
     }
 
-    // Check for a specific mic device, otherwise use the system default.
     const micDevice = this.config.audioConfig?.mix?.scoring?.inputDevice;
     if (micDevice) {
       await this.Forte.setMicDevice(micDevice);
@@ -318,9 +315,8 @@ class EncoreController {
   scheduleYoutubeSkip(seconds) {
     this.clearYoutubeTimers();
 
-    // Default buffer: 5 seconds for buffering/loading
     const totalMs = (seconds + 5) * 1000;
-    const warningDuration = 10 * 1000; // Warn 10s before end
+    const warningDuration = 10 * 1000;
     const warnAt = Math.max(0, totalMs - warningDuration);
 
     console.log(
@@ -352,11 +348,6 @@ class EncoreController {
     this.clearYoutubeTimers();
     this.state.isYtSkipWarningActive = false;
 
-    // Schedule new skip: 10s (remaining from warning) + 30s extension
-    // We pass 35s because scheduleYoutubeSkip adds 5s buffer, so 35+5 = 40s total
-    // To get exactly +30s relative to *now* (where we had ~10s left):
-    // We want total time from now to be 40s.
-    // scheduleYoutubeSkip adds 5s buffer. So input needs to be 35.
     this.scheduleYoutubeSkip(35);
 
     this.infoBar.showTemp("EXTENDED", "Time extended by 30 seconds.", 3000);
@@ -656,60 +647,6 @@ class EncoreController {
       .text("")
       .appendTo(mainGroup);
 
-    // Gauges Row
-    const gaugeRow = new Html("div")
-      .classOn("score-details-grid")
-      .appendTo(this.dom.postSongScreen);
-
-    this.dom.gauges = {};
-    const createSvgGauge = (label, color) => {
-      const wrap = new Html("div").classOn("gauge-wrapper").appendTo(gaugeRow);
-
-      const svgContainer = new Html("div")
-        .classOn("gauge-svg-container")
-        .appendTo(wrap);
-      // SVG Implementation
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("viewBox", "0 0 100 100");
-      svg.setAttribute("class", "gauge-svg");
-
-      const bgCircle = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "circle",
-      );
-      bgCircle.setAttribute("cx", "50");
-      bgCircle.setAttribute("cy", "50");
-      bgCircle.setAttribute("r", "45");
-      bgCircle.setAttribute("class", "gauge-bg-circle");
-
-      const fillCircle = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "circle",
-      );
-      fillCircle.setAttribute("cx", "50");
-      fillCircle.setAttribute("cy", "50");
-      fillCircle.setAttribute("r", "45");
-      fillCircle.setAttribute("class", "gauge-fill-circle");
-      fillCircle.style.setProperty("--g-color", color);
-
-      svg.appendChild(bgCircle);
-      svg.appendChild(fillCircle);
-      svgContainer.elm.appendChild(svg);
-
-      const valText = new Html("div")
-        .classOn("gauge-value-text")
-        .text("0")
-        .appendTo(svgContainer);
-      new Html("div").classOn("gauge-label").text(label).appendTo(wrap);
-
-      return { circle: fillCircle, text: valText };
-    };
-
-    this.dom.gauges.keyRhythm = createSvgGauge("Pitch", "#4fc3f7");
-    this.dom.gauges.vibrato = createSvgGauge("Vibrato", "#ba68c8");
-    this.dom.gauges.upband = createSvgGauge("Up-Band", "#ffb74d");
-    this.dom.gauges.downband = createSvgGauge("Down-Band", "#81c784");
-
     // Footer
     new Html("div")
       .classOn("score-skip-hint")
@@ -835,6 +772,7 @@ class EncoreController {
       type: "social_update",
       typing: typingNicks,
       usersCount: activeUsersCount,
+      users: this.state.deviceRegistry, // Push Map Payload to remote app
     });
   }
 
@@ -1310,9 +1248,12 @@ class EncoreController {
         opacity: "1",
       });
 
-      if (this.state.currentSongIsMultiplexed) {
+      // KEY-AWARE: Show scoring HUD for ALL local songs, but ONLY show Piano Roll for Multiplexed
+      if (!this.state.currentSongIsYouTube) {
         this.scoreHud.show(0);
-        this.Forte.togglePianoRollVisibility(true);
+        this.Forte.togglePianoRollVisibility(
+          this.state.currentSongIsMultiplexed,
+        );
       }
 
       this.dom.introTitle.text(song.title);
@@ -1324,7 +1265,8 @@ class EncoreController {
       await this.setupLyrics(song, pbState);
       this.setupTimeUpdate(mvPlayer);
 
-      if (this.state.currentSongIsMultiplexed) {
+      // KEY-AWARE: Bind update events for ALL local songs to allow post-song scoring overlays
+      if (!this.state.currentSongIsYouTube) {
         this.boundScoreUpdate = (e) => this.scoreHud.show(e.detail.finalScore);
         document.addEventListener(
           "CherryTree.Forte.Scoring.Update",
@@ -1779,14 +1721,14 @@ class EncoreController {
       this.Forte.togglePianoRollVisibility(false);
       if (this.recorder.isRecording) this.recorder.stop();
 
-      const wasMultiplexed = this.state.currentSongIsMultiplexed;
+      const wasLocalAudio = !this.state.currentSongIsYouTube;
       const wasMV = this.state.currentSongIsMV;
       this.scoreHud.hide();
 
       if (wasMV) await this.bgv.resumePlaylist();
       this.stopPlayer();
 
-      if (wasMultiplexed) {
+      if (wasLocalAudio) {
         const finalScore = this.Forte.getPlaybackState().score;
         await this.showPostSongScreen(finalScore);
       }
@@ -1822,14 +1764,7 @@ class EncoreController {
       .styleJs({ transform: "scale(0.8)", opacity: "0", color: "#fff" });
     this.dom.finalScoreDisplay.text("0");
 
-    // Reset SVG Gauges: Dashoffset = 283 (full circle hidden)
-    Object.values(this.dom.gauges).forEach((g) => {
-      g.circle.style.strokeDashoffset = "283";
-      g.text.text("0");
-    });
-
     this.dom.postSongScreen.styleJs({ opacity: "1", pointerEvents: "all" });
-    // this.Forte.playSfx("/assets/audio/fanfare.mp3");
 
     // Calculate Grade
     const s = scoreData.finalScore;
@@ -1839,10 +1774,10 @@ class EncoreController {
       this.Forte.playSfx("/assets/audio/67-kid.mp3");
     }
     if (s == 100) {
-      rank = "WHAT THE FUCK HOW";
+      rank = "HOW DID YOU PULL THAT OFF";
       rankColor = "#00e676";
     } else if (s >= 98) {
-      rank = "HOLY SHIT";
+      rank = "WHAT";
       rankColor = "#00e676";
     } else if (s >= 90) {
       rank = "EXCELLENT";
@@ -1860,13 +1795,16 @@ class EncoreController {
       rank = "NICE TRY";
       rankColor = "#ffca28";
     } else {
-      rank = "YIKES";
+      rank = "yikes";
       rankColor = "#ef5350";
     }
 
     // Animation Promise
     const animate = async () => {
-      const dur = 2000;
+      setTimeout(() => {
+        this.Forte.playSfx("/assets/audio/fanfare.wav");
+      }, 1000);
+      const dur = 3800;
       const start = performance.now();
       await new Promise((r) => {
         const tick = () => {
@@ -1879,21 +1817,18 @@ class EncoreController {
           const curScore = s * ease;
           this.dom.finalScoreDisplay.text(Math.floor(curScore));
 
-          // Gauges (SVG Dashoffset calculation)
-          // Circumference ~ 283. Offset = 283 - (283 * percentage)
-          Object.keys(this.dom.gauges).forEach((k) => {
-            let key = k === "keyRhythm" ? "pitchAndRhythm" : k;
-            const val = (scoreData.details[key] || 0) * ease;
-            const offset = 283 - 283 * (val / 100);
-            this.dom.gauges[k].circle.style.strokeDashoffset = offset;
-            this.dom.gauges[k].text.text(Math.round(val));
-          });
-
           if (p < 1) requestAnimationFrame(tick);
           else r();
         };
         requestAnimationFrame(tick);
       });
+
+      if (
+        typeof window !== "undefined" &&
+        typeof window.confetti === "function"
+      ) {
+        window.confetti();
+      }
 
       // Show Rank
       this.dom.rankDisplay.text(rank).styleJs({
@@ -1908,7 +1843,7 @@ class EncoreController {
     await Promise.race([
       (async () => {
         await animate();
-        await new Promise((r) => setTimeout(r, 5000));
+        await new Promise((r) => setTimeout(r, 8000));
       })(),
       new Promise((resolve) => {
         this.state.scoreSkipResolver = resolve;
@@ -2658,9 +2593,70 @@ class EncoreController {
           } else {
             this.socket.emit("sendData", {
               identity: cmd.identity,
-              data: { type: "reserve_response", success: false },
+              data: {
+                type: "reserve_response",
+                success: false,
+                reason: "Not found",
+              },
             });
           }
+          break;
+
+        case "client_yt_search":
+          (async () => {
+            try {
+              const query = d.value;
+              const res = await fetch(
+                `http://127.0.0.1:9864/yt-search?q=${encodeURIComponent(query)}`,
+              );
+              const data = await res.json();
+
+              // Map the items strictly to include thumbnails for the client remote
+              const ytItems = (data.items || [])
+                .filter((i) => i.type === "video")
+                .map((item) => ({
+                  id: item.id,
+                  title: item.title,
+                  channelTitle: item.channelTitle,
+                  length: item.length,
+                  isLive: item.isLive,
+                  // Default to mqdefault (Medium Quality) to balance load size and clarity
+                  thumbnail:
+                    item.thumbnail?.thumbnails?.[0]?.url ||
+                    `https://img.youtube.com/vi/${item.id}/mqdefault.jpg`,
+                }));
+
+              this.socket.emit("sendData", {
+                identity: cmd.identity,
+                data: { type: "yt_search_results", results: ytItems },
+              });
+            } catch (e) {
+              console.error("Client YT Search failed", e);
+            }
+          })();
+          break;
+
+        case "reserve_yt":
+          const ytSong = {
+            title: d.value.title,
+            artist: d.value.artist || d.value.channelTitle,
+            path: d.value.path || `yt://${d.value.id}`,
+            durationText: d.value.durationText,
+            isLive: d.value.isLive,
+            code: "YT", // Map cleanly into typical rendering queue
+          };
+
+          if (this.state.mode === "menu") {
+            this.startPlayer(ytSong);
+          } else {
+            this.state.reservationQueue.push(ytSong);
+            this.infoBar.showDefault();
+          }
+
+          this.socket.emit("sendData", {
+            identity: cmd.identity,
+            data: { type: "reserve_response", success: true, song: ytSong },
+          });
           break;
       }
     });
