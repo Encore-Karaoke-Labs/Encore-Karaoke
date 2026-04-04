@@ -1,6 +1,3 @@
-// --- START OF FILE Forte.js ---
-
-// Forte Sound Engine for Encore Karaoke
 import {
   Synthetizer,
   Sequencer,
@@ -8,16 +5,24 @@ import {
 import Html from "/libs/html.js";
 import { PitchDetector } from "https://cdn.jsdelivr.net/npm/pitchy@4.1.0/+esm";
 
-// --- Helper Functions ---
-
+/**
+ * Dispatches an event notifying the frontend of a change in playback status.
+ */
 function dispatchPlaybackUpdate() {
   document.dispatchEvent(
     new CustomEvent("CherryTree.Forte.Playback.Update", {
       detail: pkg.data.getPlaybackState(),
     }),
   );
+  logVerbose("Dispatching playback update", pkg.data.getPlaybackState());
 }
 
+/**
+ * Attempts to detect the correct text encoding for MIDI lyrics data to prevent mojibake.
+ *
+ * @param {Uint8Array} uint8Array - The raw byte data of the lyrics.
+ * @returns {string} The identified encoding standard (e.g., "shift-jis", "utf-8").
+ */
 function detectEncoding(uint8Array) {
   const encodings = [
     "utf-8",
@@ -25,6 +30,8 @@ function detectEncoding(uint8Array) {
     "euc-kr",
     "windows-1250",
     "windows-1252",
+    "utf-16le",
+    ,
   ];
 
   for (const encoding of encodings) {
@@ -47,7 +54,6 @@ function detectEncoding(uint8Array) {
   return "utf-8";
 }
 
-// --- Music Theory / Key Detection Constants ---
 const PITCH_CLASSES = [
   "C",
   "C#",
@@ -63,7 +69,6 @@ const PITCH_CLASSES = [
   "B",
 ];
 
-// Temperley Profiles: Significantly better at resolving dominant (Fifth) confusion than K-S
 const MAJOR_PROFILE = [
   5.0, 2.0, 3.5, 2.0, 4.5, 4.0, 2.0, 4.5, 2.0, 3.5, 1.5, 4.0,
 ];
@@ -71,6 +76,13 @@ const MINOR_PROFILE = [
   5.0, 2.0, 3.5, 4.5, 2.0, 4.0, 2.0, 4.5, 3.5, 2.0, 1.5, 4.0,
 ];
 
+/**
+ * Calculates the Pearson correlation coefficient between an audio chroma profile and a reference profile.
+ *
+ * @param {number[]} chroma - The current 12-bin chroma vector.
+ * @param {number[]} profile - The reference key profile (Major/Minor).
+ * @returns {number} The correlation score (-1.0 to 1.0).
+ */
 function getPearsonCorrelation(chroma, profile) {
   let sumC = 0,
     sumP = 0,
@@ -91,6 +103,12 @@ function getPearsonCorrelation(chroma, profile) {
   return (12 * sumCP - sumC * sumP) / denom;
 }
 
+/**
+ * Analyzes a chroma distribution array to determine the most likely active musical key.
+ *
+ * @param {number[]} chromaArray - The aggregated chroma bins.
+ * @returns {{root: number, mode: string, name: string, correlation: number}} The estimated key data.
+ */
 function detectMusicalKey(chromaArray) {
   let bestCorrelation = -1;
   let bestKeyIndex = 0;
@@ -124,20 +142,25 @@ function detectMusicalKey(chromaArray) {
   };
 }
 
-// --- Global Variables & Constants ---
+function logVerbose(message, ...args) {
+  if (!state.verbose) return;
+  console.log(`[FORTE SVC] ${message}`, ...args);
+}
+
+function logVerboseWarn(message, ...args) {
+  if (!state.verbose) return;
+  console.warn(`[FORTE SVC] ${message}`, ...args);
+}
 
 let root;
 let audioContext;
 let masterGain;
 let masterCompressor;
 let sourceNode = null;
+let sfxSourceNode = null;
 let animationFrameId = null;
 let sfxGain;
 const sfxCache = new Map();
-
-let toastElement = null;
-let toastStyleElement = null;
-let toastTimeout = null;
 
 let pianoRollContainer = null;
 let pianoRollTrack = null;
@@ -148,20 +171,16 @@ let scoreReasonDisplay = null;
 let scoreReasonTimeout = null;
 const PIXELS_PER_SECOND = 150;
 
-// --- Scoring Thresholds ---
 const GUIDE_CLARITY_THRESHOLD = 0.5;
 const MIC_CLARITY_THRESHOLD = 0.7;
 const RMS_NOISE_GATE = 0.005;
 
-// Strict thresholds for Key-Aware scoring to combat Speaker Bleed
-const KEY_AWARE_RMS_GATE = 0.035;
+const KEY_AWARE_RMS_GATE = 0.005;
 const KEY_AWARE_CLARITY = 0.85;
 const MIN_FRAMES_FOR_FULL_SCORE = 900;
 
 let guideAnalyserBuffer = null;
 let micAnalyserBuffer = null;
-
-// --- State Management ---
 
 const state = {
   scoring: {
@@ -184,8 +203,6 @@ const state = {
     hasHitCurrentNote: false,
     micDevices: [],
     currentMicDeviceId: "default",
-
-    // Key-Aware Additions
     musicAnalyser: null,
     meydaAnalyzer: null,
     totalFramesSinging: 0,
@@ -236,10 +253,15 @@ const state = {
   ui: {
     pianoRollVisible: true,
   },
+  verbose: true,
 };
 
-// --- Scoring Logic ---
-
+/**
+ * Pops up a brief on-screen indicator describing scoring evaluations.
+ *
+ * @param {string} text - The content of the notification.
+ * @param {string} [type="pitch"] - Sub-type for styling.
+ */
 function showScoreReason(text, type = "pitch") {
   if (scoreReasonTimeout) clearTimeout(scoreReasonTimeout);
   if (!state.ui.pianoRollVisible) return;
@@ -254,6 +276,11 @@ function showScoreReason(text, type = "pitch") {
   }, 1200);
 }
 
+/**
+ * Analyzes audio input and updates scoring/pitch metrics continuously.
+ *
+ * @param {number} currentTime - Current track playback time in seconds.
+ */
 function updateScore(currentTime) {
   if (
     !state.scoring.enabled ||
@@ -290,7 +317,6 @@ function updateScore(currentTime) {
     : 0;
 
   if (state.playback.isMultiplexed && state.scoring.vocalGuideAnalyser) {
-    // MULTIPLEX SCORING
     if (!guideAnalyserBuffer)
       guideAnalyserBuffer = new Float32Array(
         state.scoring.vocalGuideAnalyser.fftSize,
@@ -365,7 +391,6 @@ function updateScore(currentTime) {
     }
     state.scoring.finalScore = state.scoring.details.accuracy;
   } else {
-    // KEY-AWARE SCORING
     if (state.scoring.meydaAnalyzer && typeof Meyda !== "undefined") {
       state.scoring.frameCount++;
 
@@ -373,7 +398,6 @@ function updateScore(currentTime) {
         const features = state.scoring.meydaAnalyzer.get("chroma");
         if (features) {
           for (let i = 0; i < 12; i++) {
-            // Increased smoothing weight (0.95 vs 0.90) to create a deeper memory of the tonal center
             state.scoring.rollingChroma[i] =
               state.scoring.rollingChroma[i] * 0.95 + features[i] * 0.05;
           }
@@ -398,7 +422,6 @@ function updateScore(currentTime) {
               } else if (detected.name !== state.scoring.currentKeyName) {
                 if (detected.name === state.scoring.candidateKeyName) {
                   state.scoring.candidateKeyCount++;
-                  // Increased to 5 seconds (5 checks) to absolutely guarantee it's a real modulation
                   if (state.scoring.candidateKeyCount >= 5) {
                     state.scoring.currentKeyName = detected.name;
                     const root = detected.root;
@@ -453,7 +476,6 @@ function updateScore(currentTime) {
     }
   }
 
-  // 4. Update Piano Roll User Pitch Visual
   if (
     pianoRollContainer &&
     pianoRollContainer.elm.classList.contains("visible")
@@ -478,8 +500,9 @@ function updateScore(currentTime) {
   }
 }
 
-// --- Animation Loop ---
-
+/**
+ * Primary synchronization loop processing active playback progression and UI updates.
+ */
 function timingLoop() {
   if (state.playback.status !== "playing") {
     animationFrameId = null;
@@ -549,8 +572,11 @@ function timingLoop() {
   animationFrameId = requestAnimationFrame(timingLoop);
 }
 
-// --- Piano Roll Helpers ---
-
+/**
+ * Builds physical DOM elements representing pre-analyzed track notes on a visual piano roll.
+ *
+ * @param {Array<{id: number, pitch: number, startTime: number, duration: number}>} notes - The collection of notes.
+ */
 function renderPianoRollNotes(notes) {
   if (!pianoRollTrack) return;
   const fragment = document.createDocumentFragment();
@@ -577,6 +603,11 @@ function renderPianoRollNotes(notes) {
   pianoRollTrack.elm.appendChild(fragment);
 }
 
+/**
+ * Starts a background asynchronous chunked processing routine measuring Multiplex pitch lines.
+ *
+ * @param {AudioBuffer} audioBuffer - Full track decoded buffer containing isolated guide track on right channel.
+ */
 function startIncrementalGuideAnalysis(audioBuffer) {
   console.log("[FORTE SVC] Starting incremental analysis for piano roll...");
   state.playback.isAnalyzing = true;
@@ -702,25 +733,27 @@ function startIncrementalGuideAnalysis(audioBuffer) {
         }
       }
       state.playback.isAnalyzing = false;
-      console.log("[FORTE SVC] Incremental analysis complete.");
+      logVerbose("Incremental guide analysis complete.");
     }
   }
 
   setTimeout(processChunk, 16);
 }
 
-// --- Service Definition ---
-
 const pkg = {
   name: "Forte Sound Engine Service",
   svcName: "ForteSvc",
   type: "svc",
   privs: 0,
+  /**
+   * Instantiates global audio contexts and pipeline nodes.
+   *
+   * @param {Object} Root - Global Application object.
+   */
   start: async function (Root) {
-    console.log("Starting Forte Sound Engine Service for Encore.");
+    logVerbose("Starting Forte Sound Engine Service for Encore.");
     root = Root;
 
-    toastElement = new Html("div").classOn("forte-toast").appendTo("body");
     pianoRollContainer = new Html("div")
       .classOn("forte-piano-roll-container")
       .appendTo("body");
@@ -739,7 +772,7 @@ const pkg = {
 
     try {
       audioContext = new (window.AudioContext || window.webkitAudioContext)({
-        latencyHint: 0.1,
+        latencyHint: 0.5,
         sampleRate: 44100,
       });
 
@@ -770,12 +803,12 @@ const pkg = {
       state.playback.midiGain = audioContext.createGain();
       state.playback.midiGain.connect(masterGain);
 
-      // Key-Aware Analyzers Setup
       state.scoring.musicAnalyser = audioContext.createAnalyser();
       state.scoring.musicAnalyser.fftSize = 2048;
       state.playback.midiGain.connect(state.scoring.musicAnalyser);
 
-      console.log("[FORTE SVC] Audio pipelines initialized.");
+      logVerbose("Audio pipelines initialized.");
+      logVerbose("AudioContext sinkId", audioContext.sinkId || "default");
 
       state.playback.currentDeviceId = audioContext.sinkId || "default";
       pkg.data.getPlaybackDevices();
@@ -807,10 +840,21 @@ const pkg = {
   },
 
   data: {
+    /**
+     * Retrieves the continuous stream containing both mixed mic and music lines.
+     *
+     * @returns {MediaStream} Real-time audio stream output.
+     */
     getRecordingAudioStream: () => {
       return state.recording.audioStream;
     },
 
+    /**
+     * Loads a short sound effect into the global buffer cache.
+     *
+     * @param {string} url - Audio endpoint.
+     * @returns {Promise<boolean>} True if loaded.
+     */
     loadSfx: async (url) => {
       if (!audioContext) return false;
       if (sfxCache.has(url)) return true;
@@ -826,6 +870,11 @@ const pkg = {
       }
     },
 
+    /**
+     * Fires a previously cached sound effect immediately.
+     *
+     * @param {string} url - Target URL matching the cache dictionary.
+     */
     playSfx: async (url) => {
       if (!audioContext) return;
       if (audioContext.state === "suspended") await audioContext.resume();
@@ -838,13 +887,29 @@ const pkg = {
       }
 
       if (audioBuffer) {
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(sfxGain);
-        source.start(0);
+        sfxSourceNode = audioContext.createBufferSource();
+        sfxSourceNode.buffer = audioBuffer;
+        sfxSourceNode.connect(sfxGain);
+        sfxSourceNode.start(0);
       }
     },
 
+    /**
+     * Stops sound effect
+     */
+    stopSfx: async () => {
+      if (sfxSourceNode) {
+        sfxSourceNode.onended = null;
+        sfxSourceNode.stop();
+        sfxSourceNode = null;
+      }
+    },
+
+    /**
+     * Retrieves available hardware output devices mapping them to system identifiers.
+     *
+     * @returns {Promise<Array<{deviceId: string, label: string}>>} List of detected output pairs.
+     */
     getPlaybackDevices: async () => {
       if (!navigator.mediaDevices?.enumerateDevices) return [];
       try {
@@ -864,12 +929,19 @@ const pkg = {
       }
     },
 
+    /**
+     * Points audio graph out towards a specific hardware boundary via API.
+     *
+     * @param {string} deviceId - Local device token.
+     * @returns {Promise<boolean>} Indication of success mapping out.
+     */
     setPlaybackDevice: async (deviceId) => {
       if (!audioContext || typeof audioContext.setSinkId !== "function")
         return false;
       try {
         await audioContext.setSinkId(deviceId);
         state.playback.currentDeviceId = deviceId;
+        logVerbose("Playback device set", deviceId);
         dispatchPlaybackUpdate();
         return true;
       } catch (e) {
@@ -877,6 +949,11 @@ const pkg = {
       }
     },
 
+    /**
+     * Determines CSS layout presentation showing the pitch mapping visualization layer.
+     *
+     * @param {boolean} bool - True enforcing visible traits.
+     */
     togglePianoRollVisibility: async (bool) => {
       state.ui.pianoRollVisible = bool;
       if (bool) {
@@ -888,6 +965,12 @@ const pkg = {
       }
     },
 
+    /**
+     * Replaces the running default soundfont buffer used in SpessaSynth.
+     *
+     * @param {string} url - Target SF2 endpoint structure URL.
+     * @returns {Promise<boolean>} True indicating the buffer rebuilt completely.
+     */
     loadSoundFont: async (url) => {
       if (!audioContext) return false;
 
@@ -895,7 +978,7 @@ const pkg = {
         pkg.data.stopTrack();
       }
 
-      console.log(`[FORTE SVC] Swapping SoundFont with: ${url}`);
+      logVerbose(`Swapping SoundFont with: ${url}`);
 
       try {
         const response = await fetch(url);
@@ -914,9 +997,7 @@ const pkg = {
           state.playback.synthesizer.transpose(state.playback.transpose);
         }
 
-        console.log(
-          "[FORTE SVC] New SoundFont loaded and Synthesizer recreated.",
-        );
+        logVerbose("New SoundFont loaded and Synthesizer recreated.");
         return true;
       } catch (e) {
         console.error(`[FORTE SVC] Failed to load custom SoundFont: ${url}`, e);
@@ -924,6 +1005,12 @@ const pkg = {
       }
     },
 
+    /**
+     * Primary load sequencer formatting tracks and establishing variables specific to decoding contexts.
+     *
+     * @param {string} url - The targeted local media.
+     * @returns {Promise<boolean>} True if all media segments parsed cleanly.
+     */
     loadTrack: async (url) => {
       if (!audioContext) return false;
       if (state.playback.status !== "stopped") pkg.data.stopTrack();
@@ -956,10 +1043,11 @@ const pkg = {
       if (!isMidi && url.toLowerCase().includes(".multiplexed.")) {
         state.playback.isMultiplexed = true;
       }
-
-      if (toastElement) {
-        toastElement.text(isMidi ? "Classic Karaoke" : "Real Sound");
-      }
+      logVerbose("Preparing to load track", {
+        url,
+        isMidi,
+        isMultiplexed: state.playback.isMultiplexed,
+      });
 
       try {
         const response = await fetch(url);
@@ -979,9 +1067,36 @@ const pkg = {
             if (state.playback.status !== "stopped") pkg.data.stopTrack();
           }, "forte-song-end");
 
+          state.playback.sequencer.addOnTempoChangeEvent((bpm) => {
+            logVerbose("Tempo change", bpm);
+            document.dispatchEvent(
+              new CustomEvent("CherryTree.Forte.Playback.TempoEvent", {
+                detail: { bpm },
+              }),
+            );
+          }, "forte-tempo-change");
+
+          logVerbose("Sequencer loaded", state.playback.sequencer);
+
           await new Promise((resolve) => {
             state.playback.sequencer.addOnSongChangeEvent(() => {
-              const rawLyrics = state.playback.sequencer.midiData.lyrics;
+              const midiData = state.playback.sequencer.midiData;
+              const rawLyrics = midiData.lyrics;
+
+              state.playback.midiInfo = {
+                ticks: midiData.lyricsTicks || [],
+                timeDivision: midiData.timeDivision || 480,
+                tempoChanges: midiData.tempoChanges || [],
+                initialBpm: 120,
+                keyRange: midiData.keyRange || { min: 0, max: 127 },
+              };
+
+              if (midiData.tempoChanges && midiData.tempoChanges.length > 0) {
+                state.playback.midiInfo.initialBpm = Math.round(
+                  midiData.tempoChanges[0].tempo,
+                );
+              }
+
               if (rawLyrics && rawLyrics.length > 0) {
                 const totalLength = rawLyrics.reduce(
                   (acc, val) => acc + val.byteLength,
@@ -995,17 +1110,13 @@ const pkg = {
                 }
 
                 state.playback.lyricsEncoding = detectEncoding(combinedBuffer);
-                console.log(
-                  `[FORTE SVC] Detected MIDI lyric encoding: ${state.playback.lyricsEncoding}`,
-                );
-
                 const decoder = new TextDecoder(state.playback.lyricsEncoding);
 
                 state.playback.decodedLyrics = rawLyrics
                   .map((lyricBuffer) => decoder.decode(lyricBuffer))
                   .filter((text) => {
                     const clean = text.replace(/[\r\n\/\\]/g, "");
-                    return !clean.startsWith("@");
+                    return !clean.startsWith("@") && !clean.startsWith("#");
                   });
               } else {
                 state.playback.lyricsEncoding = "utf-8";
@@ -1021,13 +1132,14 @@ const pkg = {
                 state.playback.lyricsEncoding,
               ).decode(messageData.buffer);
               const cleanText = text.replace(/[\r\n\/\\]/g, "");
-              if (cleanText && !cleanText.startsWith("@")) {
+              if (
+                cleanText &&
+                !cleanText.startsWith("@") &&
+                !cleanText.startsWith("#")
+              ) {
                 document.dispatchEvent(
                   new CustomEvent("CherryTree.Forte.Playback.LyricEvent", {
-                    detail: {
-                      index: displayableLyricIndex,
-                      text: cleanText,
-                    },
+                    detail: { index: displayableLyricIndex, text: cleanText },
                   }),
                 );
                 displayableLyricIndex++;
@@ -1045,7 +1157,7 @@ const pkg = {
 
         state.playback.status = "stopped";
         state.playback.pauseTime = 0;
-        console.log(`[FORTE SVC] Track loaded: ${url}`);
+        logVerbose(`Track loaded: ${url}`);
         dispatchPlaybackUpdate();
         return true;
       } catch (e) {
@@ -1054,6 +1166,9 @@ const pkg = {
       }
     },
 
+    /**
+     * Executes loaded node timelines beginning progression logic and sound routing.
+     */
     playTrack: () => {
       if (audioContext.state === "suspended") audioContext.resume();
 
@@ -1070,6 +1185,11 @@ const pkg = {
       }
 
       state.scoring.enabled = true;
+      logVerbose("Track playback starting", {
+        isMidi: state.playback.isMidi,
+        isMultiplexed: state.playback.isMultiplexed,
+        bufferDuration: state.playback.buffer?.duration,
+      });
       Object.assign(state.scoring, {
         finalScore: 0,
         totalScorableNotes: 0,
@@ -1194,6 +1314,9 @@ const pkg = {
       if (animationFrameId === null) timingLoop();
     },
 
+    /**
+     * Briefly pauses track play preserving position counters and visual graphs.
+     */
     pauseTrack: () => {
       if (state.playback.status !== "playing") return;
 
@@ -1227,6 +1350,7 @@ const pkg = {
         sourceNode = null;
       }
 
+      logVerbose("Playback paused", pkg.data.getPlaybackState());
       dispatchPlaybackUpdate();
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
@@ -1234,12 +1358,10 @@ const pkg = {
       }
     },
 
+    /**
+     * Ends track and resets active properties, wiping buffers and hiding tools.
+     */
     stopTrack: () => {
-      if (toastElement) {
-        if (toastTimeout) clearTimeout(toastTimeout);
-        toastElement.classOff("visible");
-      }
-
       if (pianoRollContainer) pianoRollContainer.classOff("visible");
       if (scoreReasonDisplay) {
         scoreReasonDisplay.classOff("visible");
@@ -1275,6 +1397,7 @@ const pkg = {
       state.playback.multiplexPan = -1;
       state.playback.status = "stopped";
       state.playback.pauseTime = 0;
+      logVerbose("Playback stopped", pkg.data.getPlaybackState());
 
       dispatchPlaybackUpdate();
 
@@ -1284,14 +1407,39 @@ const pkg = {
       }
     },
 
+    /**
+     * Adjusts the overall music tracking output level via compressor thresholding.
+     *
+     * @param {number} level - Gain volume factor from 0.0 to 1.0.
+     */
     setTrackVolume: (level) => {
       if (!masterGain) return;
       const clampedLevel = Math.max(0, Math.min(1, level));
       masterGain.gain.setValueAtTime(clampedLevel, audioContext.currentTime);
       sfxGain.gain.setValueAtTime(clampedLevel, audioContext.currentTime);
       state.playback.volume = clampedLevel;
+      logVerbose("Track volume set", clampedLevel);
     },
 
+    /**
+     * Enables or disables verbose engine logging.
+     *
+     * @param {boolean} enabled - Whether verbose logs should be active.
+     */
+    setVerbose: (enabled) => {
+      state.verbose = Boolean(enabled);
+      if (state.verbose) {
+        logVerbose("Verbose logging enabled");
+      } else {
+        console.log("[FORTE SVC] Verbose logging disabled.");
+      }
+    },
+
+    /**
+     * Controls individual gain levels filtering split multiplex nodes pushing output toward specific sides.
+     *
+     * @param {number} panValue - Number mapped from -1 (Left/Inst) to 1 (Right/Vocal).
+     */
     setMultiplexPan: (panValue) => {
       const pan = Math.max(-1, Math.min(1, panValue));
       state.playback.multiplexPan = pan;
@@ -1309,6 +1457,11 @@ const pkg = {
       dispatchPlaybackUpdate();
     },
 
+    /**
+     * Alters structural playback properties scaling raw audio streams up and down or stepping SpessaSynth MIDI pitch.
+     *
+     * @param {number} semitones - Increment specifying half-step directionations.
+     */
     setTranspose: (semitones) => {
       const clamped = Math.max(-24, Math.min(24, Math.round(semitones)));
       if (
@@ -1333,6 +1486,11 @@ const pkg = {
       dispatchPlaybackUpdate();
     },
 
+    /**
+     * Gets the active scoring metrics.
+     *
+     * @returns {Object} Accuracy mapping metrics.
+     */
     getScoringState: () => {
       return {
         finalScore: state.scoring.finalScore,
@@ -1340,6 +1498,11 @@ const pkg = {
       };
     },
 
+    /**
+     * Assembles all metadata properties currently framing active media tracks output.
+     *
+     * @returns {Object} Representation of engine time properties and statuses.
+     */
     getPlaybackState: () => {
       let duration = 0;
       let currentTime = 0;
@@ -1368,19 +1531,28 @@ const pkg = {
         isMidi: state.playback.isMidi,
         isMultiplexed: state.playback.isMultiplexed,
         decodedLyrics: state.playback.decodedLyrics,
+        midiInfo: state.playback.midiInfo,
         transpose: state.playback.transpose,
         multiplexPan: state.playback.multiplexPan,
         score: pkg.data.getScoringState(),
       };
     },
 
+    /**
+     * Warms up backend components initializing mic arrays logic scopes.
+     */
     initializeScoringEngine: async () => {
       if (!audioContext) return;
-      console.log("[FORTE SVC] Initializing Scoring Engine...");
+      logVerbose("Initializing Scoring Engine...");
       await pkg.data.getMicDevices();
       await pkg.data.startMicInput(state.scoring.currentMicDeviceId);
     },
 
+    /**
+     * Operates automatic testing routines determining signal round trips between system nodes calibrating offsets.
+     *
+     * @returns {Promise<number>} Averaged latency delay in seconds.
+     */
     runLatencyTest: async () => {
       if (
         !audioContext ||
@@ -1389,7 +1561,7 @@ const pkg = {
       ) {
         throw new Error("Audio context or mic not ready.");
       }
-      console.log("[FORTE SVC] Starting latency calibration...");
+      logVerbose("Starting latency calibration...");
 
       const NTESTS = 8;
       const TEST_INTERVAL_S = 0.5;
@@ -1482,11 +1654,21 @@ const pkg = {
       return await testPromise;
     },
 
+    /**
+     * Force overwrites the mic delay.
+     *
+     * @param {number} latencySeconds - Decimal value fixing input buffers.
+     */
     setLatency: (latencySeconds) => {
       if (typeof latencySeconds !== "number" || isNaN(latencySeconds)) return;
       state.scoring.measuredLatencyS = Math.max(0, Math.min(1, latencySeconds));
     },
 
+    /**
+     * Enumerates local peripheral input targets listing hardware.
+     *
+     * @returns {Promise<Array<{label: string, deviceId: string}>>} List representing mic devices.
+     */
     getMicDevices: async () => {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -1499,11 +1681,21 @@ const pkg = {
       }
     },
 
+    /**
+     * Shifts engine input recording mapping to the chosen microphone device hardware.
+     *
+     * @param {string} deviceId - Local device token.
+     */
     setMicDevice: async (deviceId) => {
       await pkg.data.startMicInput(deviceId);
       state.scoring.currentMicDeviceId = deviceId;
     },
 
+    /**
+     * Switches capturing capability enabling system parsing.
+     *
+     * @param {boolean} enabled - Flag mapping function.
+     */
     setMicInputEnabled: async (enabled) => {
       state.scoring.userInputEnabled = enabled;
       if (enabled) {
@@ -1513,7 +1705,11 @@ const pkg = {
       }
     },
 
+    /**
+     * Disconnects nodes cutting streams directly from microphones terminating buffers.
+     */
     stopMicInput: () => {
+      logVerbose("Stopping microphone input");
       if (state.scoring.micStream) {
         state.scoring.micStream.getTracks().forEach((track) => track.stop());
         state.scoring.micStream = null;
@@ -1536,6 +1732,11 @@ const pkg = {
       );
     },
 
+    /**
+     * Resolves promises establishing physical microphone feeds creating analyzer pipelines.
+     *
+     * @param {string} [deviceId="default"] - Selection criteria.
+     */
     startMicInput: async (deviceId = "default") => {
       pkg.data.stopMicInput();
 
@@ -1566,20 +1767,24 @@ const pkg = {
           );
         }
         state.scoring.enabled = true;
-        console.log("[FORTE SVC] Microphone input started.");
+        logVerbose("Microphone input started", { deviceId: deviceId });
       } catch (e) {
         console.error("[FORTE SVC] Failed to get microphone input:", e);
       }
     },
 
+    /**
+     * Assembles audio worklets applying effects dynamically generating chains.
+     *
+     * @param {Array<Object>} chainConfig - Mapped representations configuring instances.
+     */
     loadVocalChain: async (chainConfig) => {
       state.effects.vocalChain.forEach((plugin) => plugin.disconnect());
       state.effects.vocalChain = [];
 
       for (const pluginConfig of chainConfig) {
         try {
-          console.log(pluginConfig);
-          console.log("[FORTE SVC] Loading plugin", pluginConfig.path);
+          logVerbose("Loading plugin configuration", pluginConfig);
           const pluginModule = await import(pluginConfig.path);
           const PluginClass = pluginModule.default;
           let pluginInstance;
@@ -1603,11 +1808,17 @@ const pkg = {
       pkg.data.rebuildVocalChain();
     },
 
+    /**
+     * Bridges disparate nodes constructing one coherent graph modifying stream components.
+     */
     rebuildVocalChain: () => {
+      logVerbose("Rebuilding vocal chain", {
+        chainLength: state.effects.vocalChain.length,
+      });
       const { micChainInput, micChainOutput, vocalChain } = state.effects;
       micChainInput.disconnect();
       if (state.scoring.micAnalyser) {
-        micChainInput.connect(state.scoring.micAnalyser); // Maintain scoring tap
+        micChainInput.connect(state.scoring.micAnalyser);
       }
 
       let lastNode = micChainInput;
@@ -1620,11 +1831,23 @@ const pkg = {
       lastNode.connect(micChainOutput);
     },
 
+    /**
+     * Shifts state modifying loaded node specific internal parameter objects.
+     *
+     * @param {number} pluginIndex - Array location index.
+     * @param {string} paramName - Field property designation string.
+     * @param {number} value - Floating target logic adjusting module specific traits.
+     */
     setPluginParameter: (pluginIndex, paramName, value) => {
       const plugin = state.effects.vocalChain[pluginIndex];
       if (plugin) plugin.setParameter(paramName, value);
     },
 
+    /**
+     * Target shifting level affecting final recorded volume outputs of microphones.
+     *
+     * @param {number} level - Target mapping gain values from 0 to 2.
+     */
     setMicRecordingVolume: (level) => {
       const clamped = Math.max(0, Math.min(2, level));
       if (state.effects.micChainOutput) {
@@ -1636,6 +1859,11 @@ const pkg = {
       }
     },
 
+    /**
+     * Target shifting level affecting final recorded volume outputs of background tracks.
+     *
+     * @param {number} level - Target mapping gain values from 0 to 1.
+     */
     setMusicRecordingVolume: (level) => {
       const clamped = Math.max(0, Math.min(1, level));
       state.effects.musicGainInRecording = clamped;
@@ -1648,6 +1876,11 @@ const pkg = {
       }
     },
 
+    /**
+     * Compiles properties describing effect logic status across chains currently operating.
+     *
+     * @returns {Object} Data schema reflecting internal values across loaded objects.
+     */
     getVocalChainState: () => {
       const chainState = state.effects.vocalChain.map((plugin) => ({
         name: plugin.name,
@@ -1661,11 +1894,12 @@ const pkg = {
     },
   },
 
+  /**
+   * Disconnects nodes ensuring all resources map closed exiting contexts appropriately.
+   */
   end: async function () {
     console.log("[FORTE SVC] Shutting down.");
 
-    if (toastElement) toastElement.cleanup();
-    if (toastStyleElement) toastStyleElement.cleanup();
     if (pianoRollContainer) pianoRollContainer.cleanup();
     if (scoreReasonDisplay) scoreReasonDisplay.cleanup();
 

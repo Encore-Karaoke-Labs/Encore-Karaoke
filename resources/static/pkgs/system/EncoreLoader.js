@@ -4,10 +4,17 @@ let wrapper, Ui, Pid, Sfx;
 let root;
 let statusP;
 
-// Source - https://stackoverflow.com/a
-// Posted by anneb, modified by community. See post 'Timeline' for change history
-// Retrieved 2025-12-22, License - CC BY-SA 4.0
-
+/**
+ * Joins path parts with a given separator, normalizing leading and trailing slashes.
+ *
+ * @author anneb (Modified by community)
+ * @license CC BY-SA 4.0
+ * @see https://stackoverflow.com/a
+ *
+ * @param {string[]} parts - The path segments to join.
+ * @param {string} [sep="/"] - The separator to use.
+ * @returns {string} The normalized joined path.
+ */
 function pathJoin(parts, sep) {
   const separator = sep || "/";
   parts = parts.map((part, index) => {
@@ -28,15 +35,15 @@ const pkg = {
   privs: 0,
 
   /**
-   * Creates a modal to allow the user to select from multiple libraries.
-   * @param {Array<object>} libraries - The list of found library objects.
-   * @returns {Promise<string>} A promise that resolves with the selected library path.
+   * Creates a modal to allow the user to select from multiple detected libraries.
+   *
+   * @param {Array<Object>} libraries - The list of found library objects.
+   * @returns {Promise<string>} A promise resolving to the selected library path.
    */
   async promptUserToSelectLibrary(libraries) {
     return new Promise((resolve) => {
       let selectedIndex = 0;
 
-      // --- CORRECTED: Added style to ensure text is visible ---
       const modal = new Html("div")
         .class("modal-container")
         .appendTo(wrapper)
@@ -107,7 +114,8 @@ const pkg = {
   },
 
   /**
-   * --- NEW: Enters a polling state, waiting for a library to be connected. ---
+   * Enters a polling state, waiting for a valid library drive to be connected.
+   *
    * @returns {Promise<string>} A promise that resolves with the path of the first library found.
    */
   async waitForLibrary() {
@@ -121,15 +129,18 @@ const pkg = {
         const foundLibraries = await fsSvc.findEncoreLibraries();
         if (foundLibraries.length > 0) {
           clearInterval(intervalId);
-          resolve(foundLibraries[0].path); // Resolve with the first one found
+          resolve(foundLibraries[0].path);
         }
-      }, 3000); // Check every 3 seconds
+      }, 3000);
     });
   },
 
   /**
-   * The core loading logic after a library path has been determined.
-   * @param {string} libraryPath - The full path to the selected library.
+   * The core loading logic executing after a library path has been determined.
+   * Parses the song list, loads sound fonts, and transitions to the main application.
+   *
+   * @param {string} libraryPath - The full absolute path to the selected library.
+   * @returns {Promise<void>}
    */
   async proceedWithLoading(libraryPath) {
     let fsSvc = root.Processes.getService("FsSvc").data;
@@ -180,6 +191,11 @@ const pkg = {
     );
   },
 
+  /**
+   * Orchestrates the initial boot logic, handling library detection, setup redirects, and loading sequences.
+   *
+   * @returns {Promise<void>}
+   */
   async startLoadingSequence() {
     let fsSvc = root.Processes.getService("FsSvc").data;
 
@@ -254,6 +270,11 @@ const pkg = {
     }
   },
 
+  /**
+   * Initializes the loader application, setting up the UI and boot animations.
+   *
+   * @param {Object} Root - The root CherryTree system context.
+   */
   start: async function (Root) {
     root = Root;
     window.desktopIntegration?.ipc.send("setRPC", {

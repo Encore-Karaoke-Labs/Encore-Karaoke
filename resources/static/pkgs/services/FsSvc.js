@@ -1,10 +1,9 @@
-// Ensure jsmediatags is loaded, assuming it's available globally.
 const jsmediatags = window.jsmediatags;
 
 // Internal state for the service to hold the cached song list and manifest
 const state = {
   currentLibraryPath: null,
-  currentManifest: null, // Added to store the active library's info
+  currentManifest: null,
   songList: [],
   isBuilding: false,
 };
@@ -166,7 +165,6 @@ const pkg = {
       state.isBuilding = true;
       console.log(`[FsSvc] Checking song list for: ${libraryPath}`);
 
-      // --- NEW: Load Manifest immediately when building/loading list ---
       let loadedManifest = null;
       try {
         const manifestContent = await pkg.data.readFile(
@@ -178,7 +176,6 @@ const pkg = {
       } catch (e) {
         console.warn("[FsSvc] Failed to load manifest for current library", e);
       }
-      // ----------------------------------------------------------------
 
       const files = await pkg.data.getFolder(libraryPath);
       if (!files) {
@@ -202,7 +199,7 @@ const pkg = {
           );
           state.songList = cachedList;
           state.currentLibraryPath = libraryPath;
-          state.currentManifest = loadedManifest; // Set manifest in state
+          state.currentManifest = loadedManifest;
           state.isBuilding = false;
           dispatchSongListReady();
           return true;
@@ -213,7 +210,7 @@ const pkg = {
         "[FsSvc] Cache is stale or missing. Starting full library build...",
       );
       state.currentLibraryPath = libraryPath;
-      state.currentManifest = loadedManifest; // Set manifest in state
+      state.currentManifest = loadedManifest;
       state.songList = [];
 
       const newSongList = [];

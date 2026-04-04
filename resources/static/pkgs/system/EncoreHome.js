@@ -7,10 +7,29 @@ import { RecorderModule } from "/modules/Recorder.js";
 import { InfoBarModule } from "/modules/InfoBar.js";
 import { ScoreHUDModule } from "/modules/ScoreHUD.js";
 
-// Source - https://stackoverflow.com/a
-// Posted by anneb, modified by community. See post 'Timeline' for change history
-// Retrieved 2025-12-22, License - CC BY-SA 4.0
+const INTERLUDE_TIPS = [
+  "TIP: You can use your phone to queue songs by scanning the QR code!",
+  "Take a deep breath and get ready for the next verse.",
+  "”Maybe there's only a dark road up ahead. But you still have to believe and keep going. Believe that the stars will light your path, even a little bit.” - Kaori Miyazono",
+  "”Music speaks louder than words” - Kousei Arima",
+  "Grab a drink and rest your vocal cords.",
+  "TIP: Press F2 to enter the setup menu when playback is stopped.",
+  "Adjust the instrumental volume using the - and = keys.",
+  "”Rock resonates as the music of the perpetual underdog. Is it really rock if it's sung by life's winners?” - Hitori Gotoh",
+  "TIP: You can search for songs by title, artist, or song number by pressing Y.",
+];
 
+/**
+ * Joins path parts with a given separator, normalizing leading and trailing slashes.
+ *
+ * @author anneb (Modified by community)
+ * @license CC BY-SA 4.0
+ * @see https://stackoverflow.com/a
+ *
+ * @param {string[]} parts - The path segments to join.
+ * @param {string} [sep="/"] - The separator to use.
+ * @returns {string} The normalized joined path.
+ */
 function pathJoin(parts, sep) {
   const separator = sep || "/";
   parts = parts.map((part, index) => {
@@ -25,7 +44,17 @@ function pathJoin(parts, sep) {
   return parts.join(separator);
 }
 
+/**
+ * Main Controller for the Encore Karaoke Home interface.
+ * Manages playback, UI state, song selection, searches, and socket communication.
+ */
 class EncoreController {
+  /**
+   * Initializes a new EncoreController.
+   *
+   * @param {Object} Root - The root application object containing system services.
+   * @param {Object} config - Configuration settings for audio, video, and general app behavior.
+   */
   constructor(Root, config) {
     this.Root = Root;
     this.Pid = Root.Pid;
@@ -34,7 +63,6 @@ class EncoreController {
     this.Forte = Root.Processes.getService("ForteSvc").data;
     this.config = config;
 
-    // --- State Management ---
     this.songList = [];
     this.songMap = new Map();
     this.libraryInfo = this.FsSvc.getLibraryInfo();
@@ -61,10 +89,11 @@ class EncoreController {
       lastPlaybackStatus: null,
       isScoreScreenActive: false,
       scoreSkipResolver: null,
+      scoreSkipped: false,
       showSongList: false,
       chatHistory: [],
-      deviceRegistry: {}, // deviceId -> { nickname }
-      activeSockets: {}, // socketId -> deviceId
+      deviceRegistry: {},
+      activeSockets: {},
       typingUsers: new Set(),
       cheerQueue: [],
       isCheering: false,
@@ -77,7 +106,6 @@ class EncoreController {
 
     console.log(this.state);
 
-    // --- Instantiate Modules ---
     this.mixer = new MixerModule(this.Forte);
     this.bgv = new BGVModule();
     this.scoreHud = new ScoreHUDModule();
@@ -96,14 +124,12 @@ class EncoreController {
       generateDialog,
     );
 
-    // --- Event Handlers (Bound) ---
     this.boundKeydown = this.handleKeyDown.bind(this);
     this.boundPlaybackUpdate = this.handlePlaybackUpdate.bind(this);
     this.boundTimeUpdate = null;
     this.boundLyricEvent = null;
     this.boundScoreUpdate = null;
 
-    // Timers & Playback Variables
     this.countdownTimers = [];
     this.nextLineUpdateTimeout = null;
     this.countdownTargetTime = null;
@@ -111,6 +137,11 @@ class EncoreController {
     this.parsedLrc = [];
   }
 
+  /**
+   * Bootstraps the application, loads assets, builds the UI, and initializes playback mechanisms.
+   *
+   * @returns {Promise<void>}
+   */
   async init() {
     this.wrapper = new Html("div").classOn("full-ui").appendTo("body");
     this.wrapper.classOn("loading");
@@ -118,23 +149,12 @@ class EncoreController {
     this.state.windowsVolume = await window.volume.getVolume();
     console.log("[Encore] Windows volume", this.state.windowsVolume);
 
-    // Load resources
     console.log("[Encore] Loading assets...");
     const sfx = [
       "fanfare.wav",
       ...Array.from({ length: 10 }, (_, i) => `numbers/${i}.wav`),
     ];
     await Promise.all(sfx.map((s) => this.Forte.loadSfx(`/assets/audio/${s}`)));
-
-    try {
-      this.Forte.loadVocalChain(
-        await (await fetch("/pkgs/chains/midObliterator6700.json")).json(),
-      );
-    } catch (e) {
-      console.warn(
-        "[Encore] midObliterator6700 vocal chain not found, skipping.",
-      );
-    }
 
     this.socket = io({ query: { clientType: "app" } });
     this.socket.on("connect", () => {
@@ -147,7 +167,6 @@ class EncoreController {
     });
     this.setupSocketListeners();
 
-    // Load Songs
     this.songList = this.FsSvc.getSongList();
     this.songMap = new Map(this.songList.map((s) => [s.code, s]));
     this.socket.emit("broadcastData", {
@@ -159,14 +178,12 @@ class EncoreController {
       state: `Main Menu`,
     });
 
-    // Version Info
     this.versionInformation = await window.version.getVersionInformation();
     console.log(
       `Encore ${this.versionInformation.channel} running in version ${this.versionInformation.number}`,
     );
     document.title = `Encore Karaoke ${this.versionInformation.channel} v${this.versionInformation.number} (${this.versionInformation.codename})`;
 
-    // Audio Config
     await this.Forte.setTrackVolume(this.state.volume);
     if (this.config.audioConfig?.micLatency) {
       await this.Forte.setLatency(this.config.audioConfig.micLatency);
@@ -179,13 +196,10 @@ class EncoreController {
       await this.Forte.setMicDevice("default");
     }
 
-    // Build UI
     this.buildUI();
 
-    // Initialize Modules into DOM
     this.infoBar.mount(this.wrapper);
 
-    // Check for kiosk mode and show notification
     const isKioskEnabled = await window.kiosk.isEnabled();
     if (isKioskEnabled) {
       this.infoBar.showTemp(
@@ -210,14 +224,12 @@ class EncoreController {
       scoreDisplay: this.scoreHud.scoreDisplay,
     });
 
-    // Event Listeners
     window.addEventListener("keydown", this.boundKeydown);
     document.addEventListener(
       "CherryTree.Forte.Playback.Update",
       this.boundPlaybackUpdate,
     );
 
-    // Start BGV
     console.log("MANIFEST", this.libraryInfo);
     if (this.libraryInfo.manifest?.additionalContents?.bgvCategories) {
       await this.bgv.loadManifestCategories();
@@ -266,6 +278,12 @@ class EncoreController {
     }, 100);
   }
 
+  /**
+   * Determines format display details (label and color) based on a song's type/path.
+   *
+   * @param {Object} song - The song metadata object.
+   * @returns {{label: string, color: string}} Style information for the given format.
+   */
   getFormatInfo(song) {
     const colors = {
       MTV: "#2F6CD1",
@@ -304,14 +322,25 @@ class EncoreController {
     return { label: "RS", color: colors.RealSound };
   }
 
+  /**
+   * Parses a formatted duration string into total seconds.
+   *
+   * @param {string} durationStr - The duration format (e.g., "HH:MM:SS" or "MM:SS").
+   * @returns {number} The time represented in seconds.
+   */
   parseDuration(durationStr) {
     if (!durationStr) return 0;
     const parts = durationStr.split(":").map(Number);
-    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]; // HH:MM:SS
-    if (parts.length === 2) return parts[0] * 60 + parts[1]; // MM:SS
-    return 0; // Invalid or empty
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return 0;
   }
 
+  /**
+   * Schedules an automatic skip/transition for a YouTube track after its duration elapses.
+   *
+   * @param {number} seconds - The duration in seconds.
+   */
   scheduleYoutubeSkip(seconds) {
     this.clearYoutubeTimers();
 
@@ -342,6 +371,9 @@ class EncoreController {
     }, totalMs);
   }
 
+  /**
+   * Extends the YouTube auto-skip timer by an additional 30 seconds.
+   */
   extendYoutubeSkip() {
     if (!this.state.isYtSkipWarningActive) return;
 
@@ -353,6 +385,9 @@ class EncoreController {
     this.infoBar.showTemp("EXTENDED", "Time extended by 30 seconds.", 3000);
   }
 
+  /**
+   * Clears currently running YouTube skip timers.
+   */
   clearYoutubeTimers() {
     if (this.ytAutoSkipTimer) clearTimeout(this.ytAutoSkipTimer);
     if (this.ytWarningTimer) clearTimeout(this.ytWarningTimer);
@@ -361,8 +396,10 @@ class EncoreController {
     this.state.isYtSkipWarningActive = false;
   }
 
+  /**
+   * Generates and mounts all core UI components.
+   */
   buildUI() {
-    // --- Containers ---
     this.dom = {};
     this.dom.bgvContainer = new Html("div")
       .classOn("bgv-container")
@@ -375,7 +412,6 @@ class EncoreController {
       .classOn("overlay-ui")
       .appendTo(this.wrapper);
 
-    // --- Standby Screen UI (Banner) ---
     this.dom.standbyScreen = new Html("div")
       .classOn("standby-screen")
       .appendTo(this.dom.overlay);
@@ -394,7 +430,6 @@ class EncoreController {
       .classOn("player-ui", "hidden")
       .appendTo(this.wrapper);
 
-    // --- Format Indicator ---
     this.dom.formatIndicator = new Html("div")
       .classOn("format-indicator")
       .styleJs({
@@ -413,17 +448,14 @@ class EncoreController {
       })
       .appendTo(this.wrapper);
 
-    // --- Post Song Screen ---
     this.buildPostSongScreen();
 
-    // --- Calibration Screen ---
     this.dom.calibrationScreen = new Html("div")
       .classOn("calibration-screen")
       .appendTo(this.wrapper);
     this.dom.calibTitle = new Html("h1").appendTo(this.dom.calibrationScreen);
     this.dom.calibText = new Html("p").appendTo(this.dom.calibrationScreen);
 
-    // --- Main Menu Content ---
     this.dom.mainContent = new Html("div")
       .classOn("main-content")
       .appendTo(this.dom.overlay);
@@ -442,7 +474,6 @@ class EncoreController {
       .classOn("song-artist")
       .appendTo(songInfo);
 
-    // --- Song List ---
     this.dom.songListContainer = new Html("div")
       .classOn("song-list-container")
       .appendTo(this.dom.overlay);
@@ -495,7 +526,6 @@ class EncoreController {
 
     this.dom.songListContainer.elm.appendChild(listFragment);
 
-    // --- Bottom Actions ---
     this.dom.bottomActions = new Html("div")
       .classOn("bottom-actions")
       .appendTo(this.dom.overlay);
@@ -515,10 +545,8 @@ class EncoreController {
       .on("click", () => this.mixer.toggle())
       .appendTo(this.dom.bottomActions);
 
-    // --- QR Code ---
     this.buildQR();
 
-    // --- Version Badge ---
     const vi = this.versionInformation || {
       channel: "",
       number: "",
@@ -530,7 +558,6 @@ class EncoreController {
       .text(`${vi.channel} v${vi.number} (${vi.codename})`.trim())
       .appendTo(this.wrapper);
 
-    // --- Search Window ---
     this.dom.searchWindow = new Html("div")
       .classOn("search-window")
       .appendTo(this.dom.searchUi);
@@ -548,14 +575,33 @@ class EncoreController {
       }
     });
 
-    // --- Player UI ---
     this.dom.introCard = new Html("div").classOn("intro-card").appendTo("body");
+
+    const introContent = new Html("div")
+      .classOn("intro-card-content")
+      .appendTo(this.dom.introCard);
     this.dom.introTitle = new Html("div")
       .classOn("intro-card-title")
-      .appendTo(this.dom.introCard);
+      .appendTo(introContent);
     this.dom.introArtist = new Html("div")
       .classOn("intro-card-artist")
-      .appendTo(this.dom.introCard);
+      .appendTo(introContent);
+    this.dom.introMeta = new Html("div")
+      .classOn("intro-card-meta")
+      .appendTo(introContent);
+
+    this.dom.interludeOverlay = new Html("div")
+      .classOn("interlude-overlay")
+      .appendTo("body");
+
+    new Html("div")
+      .classOn("interlude-text")
+      .text("INTERLUDE")
+      .appendTo(this.dom.interludeOverlay);
+
+    this.dom.interludeTipBox = new Html("div")
+      .classOn("interlude-tip-box")
+      .appendTo(this.dom.interludeOverlay);
 
     const bottom = new Html("div")
       .classOn("player-bottom-section")
@@ -584,13 +630,12 @@ class EncoreController {
       .classOn("lyric-line", "midi-lyric-line", "next")
       .appendTo(this.dom.midiContainer);
 
-    // --- Cheer Overlay ---
     this.dom.cheerOverlayContainer = new Html("div")
       .classOn("cheer-overlay-container")
       .styleJs({
         position: "absolute",
         top: "20px",
-        left: "-500px", // Hidden by default
+        left: "-500px",
         zIndex: "9000",
         transition: "all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
         backgroundColor: "rgba(20, 20, 30, 0.9)",
@@ -623,18 +668,19 @@ class EncoreController {
       .appendTo(this.dom.cheerOverlayContainer);
   }
 
+  /**
+   * Constructs the score results overlay shown after performance completion.
+   */
   buildPostSongScreen() {
     this.dom.postSongScreen = new Html("div")
       .classOn("post-song-screen-overlay")
       .appendTo(this.wrapper);
 
-    // Title
     new Html("div")
       .classOn("score-title-text")
       .text("YOUR SCORE")
       .appendTo(this.dom.postSongScreen);
 
-    // Main Group: Score on top, Rank below
     const mainGroup = new Html("div")
       .classOn("score-main-group")
       .appendTo(this.dom.postSongScreen);
@@ -647,13 +693,15 @@ class EncoreController {
       .text("")
       .appendTo(mainGroup);
 
-    // Footer
     new Html("div")
       .classOn("score-skip-hint")
       .text("PRESS ENTER TO CONTINUE")
       .appendTo(this.dom.postSongScreen);
   }
 
+  /**
+   * Updates the UI badge displaying the number of connected remote devices.
+   */
   updateRemoteCount() {
     if (this.dom.qrConnectedCount) {
       const count = Object.keys(this.state.knownRemotes || {}).length;
@@ -667,6 +715,9 @@ class EncoreController {
     }
   }
 
+  /**
+   * Generates and mounts the connection QR Code.
+   */
   buildQR() {
     this.dom.qrContainer = new Html("div")
       .classOn("qr-code-container")
@@ -695,7 +746,6 @@ class EncoreController {
       .then((r) => r.json())
       .then((info) => {
         if (!info.roomCode) {
-          // Use Local server instead
           fetch("http://127.0.0.1:9864/local_ip")
             .then((r) => r.text())
             .then((ip) => {
@@ -718,8 +768,9 @@ class EncoreController {
     this.updateRemoteCount();
   }
 
-  // --- Social Logic ---
-
+  /**
+   * Processes the queue of incoming cheers and sequentially shows their overlay animations.
+   */
   processCheerQueue() {
     if (this.state.isCheering || this.state.cheerQueue.length === 0) return;
 
@@ -739,12 +790,18 @@ class EncoreController {
     }, 5000);
   }
 
+  /**
+   * Determines an available unique nickname by appending a numerical counter if necessary.
+   *
+   * @param {string} desiredName - The requested username.
+   * @param {string} deviceId - The requesting device's persistent identifier.
+   * @returns {string} An active session-unique username.
+   */
   generateUniqueNickname(desiredName, deviceId) {
     let baseName = desiredName.trim().substring(0, 15) || "Singer";
     let finalName = baseName;
     let counter = 1;
 
-    // Check against names owned by OTHER devices
     const otherNames = Object.entries(this.state.deviceRegistry)
       .filter(([id, _]) => id !== deviceId)
       .map(([_, data]) => data.nickname.toLowerCase());
@@ -756,6 +813,9 @@ class EncoreController {
     return finalName;
   }
 
+  /**
+   * Dispatches active chat and presence status out to connected remote devices.
+   */
   broadcastSocialState() {
     const activeUsersCount = Object.keys(this.state.activeSockets).length;
 
@@ -772,12 +832,13 @@ class EncoreController {
       type: "social_update",
       typing: typingNicks,
       usersCount: activeUsersCount,
-      users: this.state.deviceRegistry, // Push Map Payload to remote app
+      users: this.state.deviceRegistry,
     });
   }
 
-  // --- Core Logic Methods ---
-
+  /**
+   * Starts rotation of designated standby bumper images on the main screen.
+   */
   startBumperCycle() {
     if (this.bumperInterval) clearInterval(this.bumperInterval);
     if (this.bumperImages.length === 0) {
@@ -801,24 +862,31 @@ class EncoreController {
         imageUrl.searchParams.append("path", nextImage);
         this.dom.standbyBumper.attr({ src: imageUrl.href });
         this.dom.standbyBumper.styleJs({ opacity: 1 });
-      }, 500); // Wait for fade out
+      }, 500);
     };
 
-    // Load initial image
     const initialImage = this.bumperImages[0];
     const imageUrl = new URL("http://127.0.0.1:9864/getFile");
     imageUrl.searchParams.append("path", initialImage);
     this.dom.standbyBumper.attr({ src: imageUrl.href });
 
-    this.bumperInterval = setInterval(cycle, 8000); // 8-second interval
+    this.bumperInterval = setInterval(cycle, 8000);
   }
 
+  /**
+   * Expands the standby screen to reveal the local song collection index.
+   */
   showTheSongList() {
     if (this.state.mode !== "menu" || this.state.showSongList) return;
     this.state.showSongList = true;
     this.updateMenuUI();
   }
 
+  /**
+   * Modifies application state, coordinating required UI toggles and visibility changes.
+   *
+   * @param {string} newMode - Target state ("menu", "player", "yt-search").
+   */
   setMode(newMode) {
     this.state.mode = newMode;
     this.wrapper.classOff(
@@ -840,6 +908,11 @@ class EncoreController {
       this.dom.searchInput.elm.blur();
       this.infoBar.hideBar();
       this.updateMenuUI();
+      setTimeout(() => {
+        if (this.state.scoreSkipped) {
+          this.state.scoreSkipped = false;
+        }
+      }, 5000);
     } else if (newMode === "player") {
       if (this.state.currentSongIsMultiplexed) {
         this.Forte.togglePianoRollVisibility(true);
@@ -847,7 +920,7 @@ class EncoreController {
         this.Forte.togglePianoRollVisibility(false);
       }
       this.dom.playerUi.classOff("hidden");
-      this.infoBar.showDefault(); // Will check if bar needs to be shown (REC or Queue)
+      this.infoBar.showDefault();
     } else if (newMode === "yt-search") {
       if (this.state.currentSongIsMultiplexed)
         this.Forte.togglePianoRollVisibility(false);
@@ -856,19 +929,20 @@ class EncoreController {
     }
   }
 
+  /**
+   * Updates standard menu interfaces including list selection highlighting and the active title.
+   */
   updateMenuUI() {
     if (!this.state.showSongList && this.state.mode === "menu") {
       this.dom.standbyScreen.classOff("hidden");
       this.dom.mainContent.classOn("hidden");
       this.dom.songListContainer.classOn("hidden");
       this.dom.bottomActions.classOn("hidden");
-      // Hide the number display text content when not showing the list
       this.dom.numberDisplay.text("");
       this.dom.songTitle.text("");
       this.dom.songArtist.text("");
       return;
     }
-    // If we're here, we want to show the list/input UI
     this.dom.standbyScreen.classOn("hidden");
     this.dom.mainContent.classOff("hidden");
     this.dom.songListContainer.classOff("hidden");
@@ -911,6 +985,11 @@ class EncoreController {
     });
   }
 
+  /**
+   * Presents or dismisses the in-game search layout.
+   *
+   * @param {boolean} visible - Truthy to show the overlay.
+   */
   toggleSearchOverlay(visible) {
     if (this.state.currentSongIsMultiplexed)
       this.Forte.togglePianoRollVisibility(!visible);
@@ -920,10 +999,8 @@ class EncoreController {
       if (this.state.mode === "player")
         this.wrapper.classOn("in-game-search-active");
 
-      // Clear the highlighted search index when opening overlay
       this.state.highlightedSearchIndex = -1;
 
-      // Restore the has-results class if results are already present
       if (this.state.searchResults.length > 0) {
         this.dom.searchWindow.classOn("has-results");
         this.updateSearchHighlight();
@@ -940,6 +1017,11 @@ class EncoreController {
     }
   }
 
+  /**
+   * Queries both local indexing and YouTube APIs to render a blended set of results.
+   *
+   * @returns {Promise<void>}
+   */
   async performSearch() {
     const query = this.dom.searchInput.getValue().trim().toLowerCase();
     if (!query) {
@@ -955,7 +1037,6 @@ class EncoreController {
         if (s.code.includes(query)) localResults.push({ ...s, type: "local" });
       });
 
-    // Search by title, artist, and their romanized versions
     for (const s of this.songList) {
       if (localResults.find((x) => x.code === s.code)) continue;
 
@@ -965,7 +1046,6 @@ class EncoreController {
       let romaTitle = null;
       let romaArtist = null;
 
-      // Romanize title and artist for comparison
       if (
         !titleMatch &&
         /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/.test(
@@ -1012,6 +1092,9 @@ class EncoreController {
     }
   }
 
+  /**
+   * Projects search hits onto the UI window block.
+   */
   renderSearchResults() {
     const prevHighlight = this.state.highlightedSearchIndex;
 
@@ -1042,7 +1125,7 @@ class EncoreController {
       });
 
       const info = new Html("div").classOn("search-info").appendTo(item);
-      const fmt = this.getFormatInfo(res); // Use the helper
+      const fmt = this.getFormatInfo(res);
 
       if (res.type === "local") {
         new Html("div")
@@ -1065,7 +1148,6 @@ class EncoreController {
           .text(res.artist)
           .appendTo(info);
       } else {
-        // YouTube Result
         const thumb = new Html("div")
           .classOn("search-thumbnail-wrapper")
           .appendTo(item);
@@ -1115,6 +1197,9 @@ class EncoreController {
     this.updateSearchHighlight();
   }
 
+  /**
+   * Refreshes the actively selected search entry item based on index state.
+   */
   updateSearchHighlight() {
     this.dom.searchResultsContainer
       .qsa(".search-result-item")
@@ -1127,14 +1212,17 @@ class EncoreController {
       });
   }
 
-  // --- Player Logic ---
-
+  /**
+   * Begins loading and processing of a track object, transitioning into playback mode.
+   *
+   * @param {Object} song - The target metadata object describing the media track.
+   * @returns {Promise<void>}
+   */
   async startPlayer(song) {
     this.state.isTransitioning = true;
     this.recorder.setSongInfo(song);
     this.cleanupPlayerEvents();
 
-    // Reset Visuals
     this.dom.countdownDisplay.classOff("visible").text("");
     this.countdownTargetTime = null;
     this.lastCountdownTick = null;
@@ -1145,9 +1233,11 @@ class EncoreController {
     this.dom.midiLineDisplay2.clear().classOff("active", "next");
     this.scoreHud.hide();
     this.dom.introCard.classOff("visible");
+    this.dom.introMeta.clear();
+    this.dom.interludeOverlay.classOff("visible");
+    this.state.isInterludeActive = false;
     this.dom.formatIndicator.styleJs({ opacity: "0" });
 
-    // Fix: Explicitly reset the multiplex flag so setMode doesn't show the piano roll
     this.state.currentSongIsMultiplexed = false;
 
     this.state.currentSongIsYouTube = song.path.startsWith("yt://");
@@ -1162,6 +1252,7 @@ class EncoreController {
       details: song.title,
       state: song.artist,
     });
+
     this.socket.emit("broadcastData", {
       type: "now_playing",
       song: {
@@ -1179,11 +1270,9 @@ class EncoreController {
     }
 
     if (this.state.currentSongIsYouTube) {
-      // Fix: Ensure previous track is stopped and piano roll is hidden
       this.Forte.stopTrack();
       this.Forte.togglePianoRollVisibility(false);
 
-      // Feature Parity: YouTube tracks now react to volume
       this.state.windowsVolume = await window.volume.getVolume();
       let maxVolume = this.state.windowsVolume;
       window.volume.setVolume(this.state.volume * maxVolume);
@@ -1237,8 +1326,7 @@ class EncoreController {
       const pbState = this.Forte.getPlaybackState();
       this.state.currentSongIsMultiplexed = pbState.isMultiplexed;
 
-      // Determine Format Icon
-      let icon = "rs.png"; // Default RealSound
+      let icon = "rs.png";
       if (this.state.currentSongIsMV) icon = "mtv.png";
       else if (this.state.currentSongIsMultiplexed) icon = "mp.png";
       else if (pbState.isMidi) icon = "midi.png";
@@ -1248,7 +1336,6 @@ class EncoreController {
         opacity: "1",
       });
 
-      // KEY-AWARE: Show scoring HUD for ALL local songs, but ONLY show Piano Roll for Multiplexed
       if (!this.state.currentSongIsYouTube) {
         this.scoreHud.show(0);
         this.Forte.togglePianoRollVisibility(
@@ -1262,10 +1349,20 @@ class EncoreController {
       this.dom.lrcContainer.styleJs({ opacity: "1" });
       this.dom.midiContainer.styleJs({ opacity: "1" });
 
+      this.currentBpm = pbState.midiInfo
+        ? pbState.midiInfo.initialBpm || 120
+        : 120;
+      this.boundTempoUpdate = (e) => {
+        this.currentBpm = e.detail.bpm;
+      };
+      document.addEventListener(
+        "CherryTree.Forte.Playback.TempoEvent",
+        this.boundTempoUpdate,
+      );
+
       await this.setupLyrics(song, pbState);
       this.setupTimeUpdate(mvPlayer);
 
-      // KEY-AWARE: Bind update events for ALL local songs to allow post-song scoring overlays
       if (!this.state.currentSongIsYouTube) {
         this.boundScoreUpdate = (e) => this.scoreHud.show(e.detail.finalScore);
         document.addEventListener(
@@ -1283,19 +1380,93 @@ class EncoreController {
         if (mvPlayer) mvPlayer.play().catch(console.error);
         this.Forte.playTrack();
         this.state.isTransitioning = false;
+        setTimeout(() => {
+          if (this.state.scoreSkipped) {
+            this.state.scoreSkipped = false;
+          }
+        }, 5000);
       }, 2500);
     }
   }
 
+  /**
+   * Synchronously digests lyrics payload, whether encoded as absolute time in LRC
+   * or tick-based within a sequenced MIDI file.
+   *
+   * @param {Object} song - The playing track context.
+   * @param {Object} pbState - State payload derived from the SpessaSynth library describing formatting internals.
+   * @returns {Promise<void>}
+   */
   async setupLyrics(song, pbState) {
-    this.parsedLrc = []; // Clear old lyrics
+    this.parsedLrc = [];
+    this.interludes = [];
+    this.countdowns = [];
+    this.allMidiSyllables = [];
+
+    const getSecondsForTick = (targetTick, tempoChanges, ppqm) => {
+      if (targetTick <= 0) return 0;
+      let time = 0;
+      let currentTick = 0;
+      let currentBpm = 120;
+
+      if (tempoChanges && tempoChanges.length > 0) {
+        // Sort ascending by tick, resolving simultaneous events correctly by evaluating initial dummy tempos first.
+        let chronologicalChanges = tempoChanges
+          .map((tc, index) => {
+            let tick = tc.ticks !== undefined ? tc.ticks : tc.tick;
+            let val = tc.tempo || tc.bpm || 120;
+            let bpm = val > 1000 ? Math.round(60000000 / val) : val;
+            if (bpm <= 0) bpm = 120;
+            return { tick, bpm, _originalIndex: index };
+          })
+          .sort((a, b) => {
+            if (a.tick !== b.tick) return a.tick - b.tick;
+            return b._originalIndex - a._originalIndex;
+          });
+
+        for (let tc of chronologicalChanges) {
+          if (tc.tick >= targetTick) break;
+
+          if (tc.tick > currentTick) {
+            let deltaTicks = tc.tick - currentTick;
+            time += (deltaTicks / ppqm) * (60 / currentBpm);
+            currentTick = tc.tick;
+          }
+
+          currentBpm = tc.bpm;
+        }
+      }
+
+      let remainingTicks = targetTick - currentTick;
+      if (remainingTicks > 0) {
+        time += (remainingTicks / ppqm) * (60 / currentBpm);
+      }
+
+      return time;
+    };
 
     if (pbState.isMidi) {
       this.dom.midiContainer.styleJs({ display: "flex" });
       this.dom.lrcContainer.styleJs({ display: "none" });
 
-      // --- Metadata parsing ---
+      const midiInfo = pbState.midiInfo;
+      let ppqm = midiInfo.timeDivision || 480;
       let lyricsToParse = [...pbState.decodedLyrics];
+
+      let displayBpm = 120;
+      if (midiInfo.tempoChanges && midiInfo.tempoChanges.length > 0) {
+        let initialChanges = midiInfo.tempoChanges.filter(
+          (t) => (t.ticks !== undefined ? t.ticks : t.tick) === 0,
+        );
+        let firstTc =
+          initialChanges.length > 0
+            ? initialChanges[0]
+            : midiInfo.tempoChanges[0];
+        let val = firstTc.tempo || firstTc.bpm || 120;
+        displayBpm = val > 1000 ? Math.round(60000000 / val) : Math.round(val);
+      }
+      this.dom.introMeta.text(`BPM: ${displayBpm}`);
+
       let fullMetadataString = "";
       while (
         lyricsToParse.length > 0 &&
@@ -1304,6 +1475,7 @@ class EncoreController {
       ) {
         fullMetadataString += lyricsToParse.shift();
       }
+
       if (fullMetadataString) {
         const metadata = {};
         const regex = /{#([^=]+)=([^}]+)}/g;
@@ -1311,24 +1483,34 @@ class EncoreController {
         while ((match = regex.exec(fullMetadataString)) !== null) {
           metadata[match[1].toUpperCase()] = match[2];
         }
-        console.log("[Encore] Parsed MIDI Metadata:", metadata);
         if (metadata.TITLE) this.dom.introTitle.text(metadata.TITLE);
         if (metadata.ARTIST) this.dom.introArtist.text(metadata.ARTIST);
       }
 
-      // --- Synchronous syllable parsing ---
       const allSyllables = [];
       const lines = [];
       let currentLineSyllables = [];
       let displayableSyllableIndex = 0;
-      for (const syllableText of lyricsToParse) {
+      let offsetIndex = pbState.decodedLyrics.length - lyricsToParse.length;
+
+      for (let i = 0; i < lyricsToParse.length; i++) {
+        const syllableText = lyricsToParse[i];
+        const tick = midiInfo.ticks[i + offsetIndex];
+        const absoluteTime = getSecondsForTick(
+          tick,
+          midiInfo.tempoChanges,
+          ppqm,
+        );
+
         const startsWithNewLine = /^[\r\n\/\\\\]/.test(syllableText);
         const endsWithNewLine = /[\r\n\/\\\\]$/.test(syllableText);
         let cleanText = syllableText.replace(/[\r\n\/\\]/g, "");
+
         if (startsWithNewLine && currentLineSyllables.length > 0) {
           lines.push(currentLineSyllables);
           currentLineSyllables = [];
         }
+
         if (cleanText) {
           let mainText = cleanText;
           let furiganaText = null;
@@ -1337,6 +1519,7 @@ class EncoreController {
             mainText = furiMatch[1];
             furiganaText = furiMatch[2];
           }
+
           const syllable = {
             text: mainText,
             furigana: furiganaText,
@@ -1345,6 +1528,9 @@ class EncoreController {
             rawText: cleanText,
             globalIndex: displayableSyllableIndex,
             lineIndex: lines.length,
+            tick: tick,
+            absoluteTime: absoluteTime,
+            durationTicks: 0,
           };
           allSyllables.push(syllable);
           currentLineSyllables.push(syllable);
@@ -1357,6 +1543,56 @@ class EncoreController {
       }
       if (currentLineSyllables.length > 0) lines.push(currentLineSyllables);
 
+      if (allSyllables.length > 0 && allSyllables[0].tick >= 8 * ppqm) {
+        let nTick = allSyllables[0].tick;
+        this.countdowns.push({
+          t3: getSecondsForTick(nTick - 3 * ppqm, midiInfo.tempoChanges, ppqm),
+          t2: getSecondsForTick(nTick - 2 * ppqm, midiInfo.tempoChanges, ppqm),
+          t1: getSecondsForTick(nTick - 1 * ppqm, midiInfo.tempoChanges, ppqm),
+          t0: getSecondsForTick(nTick, midiInfo.tempoChanges, ppqm),
+        });
+      }
+
+      for (let i = 0; i < allSyllables.length - 1; i++) {
+        let cur = allSyllables[i];
+        let next = allSyllables[i + 1];
+
+        cur.durationTicks = Math.max(0, next.tick - cur.tick);
+        let gapTicks = next.tick - cur.tick;
+
+        if (gapTicks >= 8 * ppqm) {
+          let intStart = cur.tick + 2 * ppqm;
+          let intEnd = next.tick - 4 * ppqm;
+
+          this.interludes.push({
+            start: getSecondsForTick(intStart, midiInfo.tempoChanges, ppqm),
+            end: getSecondsForTick(intEnd, midiInfo.tempoChanges, ppqm),
+          });
+
+          this.countdowns.push({
+            t3: getSecondsForTick(
+              next.tick - 3 * ppqm,
+              midiInfo.tempoChanges,
+              ppqm,
+            ),
+            t2: getSecondsForTick(
+              next.tick - 2 * ppqm,
+              midiInfo.tempoChanges,
+              ppqm,
+            ),
+            t1: getSecondsForTick(
+              next.tick - 1 * ppqm,
+              midiInfo.tempoChanges,
+              ppqm,
+            ),
+            t0: getSecondsForTick(next.tick, midiInfo.tempoChanges, ppqm),
+          });
+        }
+      }
+      if (allSyllables.length > 0)
+        allSyllables[allSyllables.length - 1].durationTicks = ppqm;
+
+      this.allMidiSyllables = allSyllables;
       const displayLines = [
         this.dom.midiLineDisplay1,
         this.dom.midiLineDisplay2,
@@ -1365,11 +1601,10 @@ class EncoreController {
 
       const getRomanizationPromise = (syllable) => {
         if (!syllable.romanizationPromise) {
-          const textToRomanize = syllable.furigana || syllable.text;
           syllable.romanizationPromise = Romanizer.romanize(
-            textToRomanize,
-          ).then((romanizedText) => {
-            syllable.romanized = romanizedText || "";
+            syllable.furigana || syllable.text,
+          ).then((rt) => {
+            syllable.romanized = rt || "";
             return syllable.romanized;
           });
         }
@@ -1379,14 +1614,10 @@ class EncoreController {
       const renderLine = (displayEl, lineData) => {
         displayEl.clear();
         if (!lineData) return;
-
         let currentWord = null;
         let wordIndex = 0;
 
         lineData.forEach((s) => {
-          // Calculate length to normalize the CSS highlight sweep speed
-          const charCount = s.text.length > 0 ? s.text.length : 1;
-
           if (!currentWord || s.rawText.startsWith(" ")) {
             currentWord = new Html("div")
               .classOn("lyric-word")
@@ -1405,18 +1636,15 @@ class EncoreController {
           const container = new Html("div")
             .classOn("lyric-syllable-container")
             .attr({ "data-index": s.globalIndex })
-            .style({ "--char-count": charCount })
             .appendTo(currentWord);
 
-          // Render Furigana and Original text immediately
           const furiSpan = new Html("span")
             .classOn("lyric-syllable-furigana")
             .appendTo(container);
-          if (s.furigana) {
+          if (s.furigana)
             furiSpan.attr({ "data-text": s.furigana }).text(s.furigana);
-          } else {
-            furiSpan.html("&nbsp;").styleJs({ visibility: "hidden" });
-          }
+          else furiSpan.html("&nbsp;").styleJs({ visibility: "hidden" });
+
           new Html("span")
             .classOn("lyric-syllable-original")
             .attr({ "data-text": s.text })
@@ -1426,56 +1654,41 @@ class EncoreController {
           const romSpan = new Html("span")
             .classOn("lyric-syllable-romanized")
             .appendTo(container);
-          if (s.romanized) {
+          if (s.romanized)
             romSpan.attr({ "data-text": s.romanized }).text(s.romanized);
-          } else {
+          else {
             romSpan.html("&nbsp;").styleJs({ visibility: "hidden" });
-            getRomanizationPromise(s).then((romanizedText) => {
-              if (romanizedText) {
+            getRomanizationPromise(s).then((rt) => {
+              if (rt)
                 romSpan
-                  .attr({ "data-text": romanizedText })
-                  .text(romanizedText)
+                  .attr({ "data-text": rt })
+                  .text(rt)
                   .styleJs({ visibility: "visible" });
-              }
             });
           }
-
-          if (s.rawText.endsWith(" ")) {
-            currentWord = null;
-          }
+          if (s.rawText.endsWith(" ")) currentWord = null;
         });
       };
 
-      // --- Initial Rendering ---
-      // Render the first two lines, which will automatically start their romanization process.
-      renderLine(displayLines[0], lines[0]);
-      renderLine(displayLines[1], lines[1]);
+      if (lines[0]) renderLine(displayLines[0], lines[0]);
+      if (lines[1]) renderLine(displayLines[1], lines[1]);
       displayLines[0].classOn("active");
       displayLines[1].classOn("next");
-
-      // --- Pre-fetch the third line to prevent pop-in on the first line change ---
-      if (lines[2]) {
-        lines[2].forEach(getRomanizationPromise);
-      }
 
       let currentVisualIndex = 0;
       this.boundLyricEvent = (e) => {
         const { text } = e.detail;
         if (!text) return;
-        const cleanInput = text.replace(/[\r\n\/\\]/g, "");
-        if (!cleanInput) return;
-        if (currentVisualIndex >= allSyllables.length) return;
+
         let targetSyllable = allSyllables[currentVisualIndex];
         let matchFound = false;
-        if (targetSyllable.rawText === cleanInput) {
+
+        if (targetSyllable && targetSyllable.rawText === text)
           matchFound = true;
-        } else {
-          const lookAheadLimit = Math.min(
-            currentVisualIndex + 15,
-            allSyllables.length,
-          );
-          for (let i = currentVisualIndex + 1; i < lookAheadLimit; i++) {
-            if (allSyllables[i].rawText === cleanInput) {
+        else {
+          const limit = Math.min(currentVisualIndex + 15, allSyllables.length);
+          for (let i = currentVisualIndex + 1; i < limit; i++) {
+            if (allSyllables[i].rawText === text) {
               currentVisualIndex = i;
               targetSyllable = allSyllables[i];
               matchFound = true;
@@ -1492,39 +1705,41 @@ class EncoreController {
             activeDisplay.classOn("active").classOff("next");
             nextDisplay.classOff("active").classOn("next");
 
-            // Render the new "next" line
             renderLine(nextDisplay, lines[currentSongLineIndex + 1]);
-
-            // Pre-fetch the romanization for the line after that
-            const nextNextLine = lines[currentSongLineIndex + 2];
-            if (nextNextLine) {
-              nextNextLine.forEach(getRomanizationPromise);
-            }
+            if (lines[currentSongLineIndex + 2])
+              lines[currentSongLineIndex + 2].forEach(getRomanizationPromise);
           }
 
-          // --- SMOOTH CATCH-UP LOGIC ---
-          // Find all syllables rendered on the screen. If their global index is behind the
-          // syllable that was just triggered, force them to complete catching up.
           const allScreenSyllables = this.wrapper.qsa(
             ".lyric-syllable-container",
           );
           if (allScreenSyllables) {
             allScreenSyllables.forEach((el) => {
               const idx = parseInt(el.elm.getAttribute("data-index"), 10);
-              if (idx < targetSyllable.globalIndex) {
+              if (idx < targetSyllable.globalIndex)
                 el.classOff("active").classOn("completed");
-              }
             });
           }
-          // -----------------------------
+
+          let sweepEndTick =
+            targetSyllable.tick +
+            Math.min(targetSyllable.durationTicks, 2 * ppqm);
+          if (targetSyllable.rawText.match(/[\r\n\/\\]$/))
+            sweepEndTick = targetSyllable.tick + ppqm;
+
+          let durationS =
+            getSecondsForTick(sweepEndTick, midiInfo.tempoChanges, ppqm) -
+            targetSyllable.absoluteTime;
+          durationS = Math.max(0.1, Math.min(durationS, 1.5));
 
           const newSyllableEl = this.wrapper.qs(
             `.lyric-syllable-container[data-index="${targetSyllable.globalIndex}"]`,
           );
-          if (newSyllableEl) newSyllableEl.classOn("active");
+          if (newSyllableEl) {
+            newSyllableEl.style({ "--syllable-duration": `${durationS}s` });
+            newSyllableEl.classOn("active");
+          }
           currentVisualIndex++;
-        } else {
-          console.debug(`[Encore] Ignored metadata event: ${cleanInput}`);
         }
       };
 
@@ -1537,15 +1752,33 @@ class EncoreController {
       this.dom.lrcContainer.styleJs({ display: "flex" });
       const lrcText = await this.FsSvc.readFile(song.lrcPath);
       this.parsedLrc = await this.parseLrc(lrcText);
+
       if (this.parsedLrc.length > 0) {
         this.renderLrcLine(this.dom.lrcLineDisplay1, this.parsedLrc[0]);
         this.renderLrcLine(this.dom.lrcLineDisplay2, this.parsedLrc[1]);
         this.dom.lrcLineDisplay2.classOn("next");
-        if (this.parsedLrc[0].time > 8.0)
-          this.scheduleCountdown(this.parsedLrc[0].time);
+
+        if (this.parsedLrc[0].time > 4.0) {
+          this.countdowns.push(this.parsedLrc[0].time);
+        }
+
+        for (let i = 0; i < this.parsedLrc.length - 1; i++) {
+          let cur = this.parsedLrc[i];
+          let next = this.parsedLrc[i + 1];
+          if (next.time - cur.time > 8.0) {
+            this.countdowns.push(next.time);
+          }
+        }
       }
     }
   }
+
+  /**
+   * Translates an active string block into DOM visual lyrics content.
+   *
+   * @param {Object} displayEl - Target display element wrapper.
+   * @param {Object} lineData - Dictionary representing the raw text segment and matching romanization properties.
+   */
   renderLrcLine(displayEl, lineData) {
     displayEl.clear();
     if (!lineData) return;
@@ -1560,6 +1793,12 @@ class EncoreController {
         .appendTo(displayEl);
   }
 
+  /**
+   * Destructures an LRC syntax text stream into a synchronized objects timeline.
+   *
+   * @param {string} text - Payload raw content.
+   * @returns {Promise<Array<{time: number, text: string, romanized: string}>>} Ordered event segments matching playback markers.
+   */
   async parseLrc(text) {
     const regex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
     if (!text) return [];
@@ -1578,12 +1817,18 @@ class EncoreController {
     return (await Promise.all(promises)).filter(Boolean);
   }
 
+  /**
+   * Manages sync updates pushing data toward DOM endpoints during continuous media streams.
+   *
+   * @param {Object|null} mvPlayer - HTMLVideoElement if syncing to an absolute local Music Video.
+   */
   setupTimeUpdate(mvPlayer) {
     let currentLrcIndex = -1;
+    this.lastCountdownTick = null;
+
     this.boundTimeUpdate = (e) => {
       const { currentTime } = e.detail;
 
-      // MV Sync logic
       if (mvPlayer) {
         const target = currentTime + this.state.videoSyncOffset / 1000;
         const drift = (target - mvPlayer.currentTime) * 1000;
@@ -1595,24 +1840,68 @@ class EncoreController {
         else mvPlayer.playbackRate = 1;
       }
 
-      // Countdown Logic
-      if (this.countdownTargetTime !== null) {
-        const rem = this.countdownTargetTime - currentTime;
-        let tick =
-          rem > 3 ? null : rem > 2 ? "3" : rem > 1 ? "2" : rem > 0 ? "1" : null;
-        if (!tick && rem <= 0) this.countdownTargetTime = null;
-        if (tick !== this.lastCountdownTick) {
-          this.lastCountdownTick = tick;
-          this.dom.countdownDisplay.text(tick || "");
-          if (tick) this.dom.countdownDisplay.classOn("visible");
-          else this.dom.countdownDisplay.classOff("visible");
+      if (this.interludes && this.interludes.length > 0) {
+        let inInterlude = this.interludes.find(
+          (ind) => currentTime >= ind.start && currentTime < ind.end,
+        );
+        if (inInterlude) {
+          if (!this.state.isInterludeActive) {
+            this.state.isInterludeActive = true;
+
+            const tip =
+              INTERLUDE_TIPS[Math.floor(Math.random() * INTERLUDE_TIPS.length)];
+            this.dom.interludeTipBox.text(tip);
+
+            this.dom.interludeOverlay.classOn("visible");
+            this.dom.midiContainer.styleJs({
+              opacity: "0",
+              pointerEvents: "none",
+            });
+          }
+        } else {
+          if (this.state.isInterludeActive) {
+            this.state.isInterludeActive = false;
+            this.dom.interludeOverlay.classOff("visible");
+            this.dom.midiContainer.styleJs({
+              opacity: "1",
+              pointerEvents: "all",
+            });
+          }
         }
       }
 
-      // LRC Logic
+      if (this.countdowns && this.countdowns.length > 0) {
+        let activeCd = this.countdowns.find((c) => {
+          if (typeof c === "number")
+            return c - currentTime > 0.2 && c - currentTime <= 3.2;
+          return currentTime >= c.t3 && currentTime < c.t0;
+        });
+
+        if (activeCd) {
+          let tick = null;
+          if (typeof activeCd === "number") {
+            let rem = activeCd - currentTime;
+            tick = Math.ceil(rem).toString();
+            if (parseInt(tick) > 3) tick = null;
+          } else {
+            if (currentTime >= activeCd.t1) tick = "1";
+            else if (currentTime >= activeCd.t2) tick = "2";
+            else if (currentTime >= activeCd.t3) tick = "3";
+          }
+
+          if (tick && tick !== this.lastCountdownTick) {
+            this.lastCountdownTick = tick;
+            this.dom.countdownDisplay.text(tick);
+            this.dom.countdownDisplay.classOn("visible");
+          }
+        } else if (this.lastCountdownTick !== null) {
+          this.lastCountdownTick = null;
+          this.dom.countdownDisplay.classOff("visible");
+        }
+      }
+
       if (this.parsedLrc && this.parsedLrc.length) {
         let newIdx = -1;
-        // Optimization: For large LRCs, backward search is okay, but ensure no DOM trashing
         for (let i = this.parsedLrc.length - 1; i >= 0; i--) {
           if (currentTime >= this.parsedLrc[i].time) {
             newIdx = i;
@@ -1636,8 +1925,6 @@ class EncoreController {
             const curLine = this.parsedLrc[currentLrcIndex];
             const nextLine = this.parsedLrc[currentLrcIndex + 1];
             if (nextLine) {
-              if (nextLine.time - curLine.time > 8.0)
-                this.scheduleCountdown(nextLine.time);
               this.nextLineUpdateTimeout = setTimeout(
                 () => {
                   this.renderLrcLine(next, nextLine);
@@ -1655,12 +1942,20 @@ class EncoreController {
     );
   }
 
+  /**
+   * Enqueues an on-screen timer sequence toward the next specified event anchor.
+   *
+   * @param {number} targetTime - Time location marker setting an implicit offset.
+   */
   scheduleCountdown(targetTime) {
     this.countdownTargetTime = targetTime;
     this.lastCountdownTick = null;
     this.dom.countdownDisplay.classOff("visible");
   }
 
+  /**
+   * Forces a total stop on active play sequences, clearing dependent systems.
+   */
   stopPlayer() {
     this.recorder.clearSongInfo();
     this.dom.introCard.classOff("visible");
@@ -1686,6 +1981,9 @@ class EncoreController {
     }
   }
 
+  /**
+   * Destroys active event watchers explicitly mapped exclusively to the currently playing song instance.
+   */
   cleanupPlayerEvents() {
     if (this.nextLineUpdateTimeout) clearTimeout(this.nextLineUpdateTimeout);
     this.nextLineUpdateTimeout = null;
@@ -1704,11 +2002,24 @@ class EncoreController {
         "CherryTree.Forte.Scoring.Update",
         this.boundScoreUpdate,
       );
+    if (this.boundTempoUpdate)
+      document.removeEventListener(
+        "CherryTree.Forte.Playback.TempoEvent",
+        this.boundTempoUpdate,
+      );
+
     this.boundTimeUpdate = null;
     this.boundLyricEvent = null;
     this.boundScoreUpdate = null;
+    this.boundTempoUpdate = null;
   }
 
+  /**
+   * Triggers downstream progression steps in response to system audio signals.
+   *
+   * @param {Event} e - Payload encapsulating system stream statuses.
+   * @returns {Promise<void>}
+   */
   async handlePlaybackUpdate(e) {
     const { status } = e.detail || {};
     if (
@@ -1737,6 +2048,9 @@ class EncoreController {
     this.state.lastPlaybackStatus = status;
   }
 
+  /**
+   * Proceeds to queue the next song sequentially or return completely to idle.
+   */
   transitionAfterSong() {
     if (this.state.reservationQueue.length > 0) {
       const next = this.state.reservationQueue.shift();
@@ -1755,10 +2069,15 @@ class EncoreController {
     }
   }
 
+  /**
+   * Manages the visual rendering and skip-blocking of the final performance ranking display.
+   *
+   * @param {Object} scoreData - Analytics mapped from internal pitch measuring libraries.
+   * @returns {Promise<void>} Resolves when screen transitions are finalized.
+   */
   async showPostSongScreen(scoreData) {
     this.state.isScoreScreenActive = true;
 
-    // Reset visuals
     this.dom.rankDisplay
       .text("")
       .styleJs({ transform: "scale(0.8)", opacity: "0", color: "#fff" });
@@ -1766,7 +2085,6 @@ class EncoreController {
 
     this.dom.postSongScreen.styleJs({ opacity: "1", pointerEvents: "all" });
 
-    // Calculate Grade
     const s = scoreData.finalScore;
     let rank = "Good";
     let rankColor = "#aed581";
@@ -1799,21 +2117,20 @@ class EncoreController {
       rankColor = "#ef5350";
     }
 
-    // Animation Promise
     const animate = async () => {
       setTimeout(() => {
+        if (this.state.scoreSkipped) return;
         this.Forte.playSfx("/assets/audio/fanfare.wav");
       }, 1000);
       const dur = 3800;
       const start = performance.now();
       await new Promise((r) => {
+        if (this.state.scoreSkipped) return;
         const tick = () => {
           const now = performance.now();
           const p = Math.min((now - start) / dur, 1);
-          // Ease out cubic
           const ease = 1 - Math.pow(1 - p, 3);
 
-          // Score
           const curScore = s * ease;
           this.dom.finalScoreDisplay.text(Math.floor(curScore));
 
@@ -1827,10 +2144,17 @@ class EncoreController {
         typeof window !== "undefined" &&
         typeof window.confetti === "function"
       ) {
-        window.confetti();
+        if (!this.state.scoreSkipped) {
+          window.confetti({
+            position: {
+              x: window.innerWidth / 2,
+              y: window.innerHeight / 2,
+            },
+          });
+        }
       }
 
-      // Show Rank
+      if (this.state.scoreSkipped) return;
       this.dom.rankDisplay.text(rank).styleJs({
         transform: "scale(1)",
         opacity: "1",
@@ -1839,7 +2163,6 @@ class EncoreController {
       });
     };
 
-    // Wait for either the animation + delay OR the user to skip
     await Promise.race([
       (async () => {
         await animate();
@@ -1850,13 +2173,17 @@ class EncoreController {
       }),
     ]);
 
-    // Cleanup
     this.dom.postSongScreen.styleJs({ opacity: "0", pointerEvents: "none" });
     this.state.isScoreScreenActive = false;
     this.state.scoreSkipResolver = null;
     await new Promise((r) => setTimeout(r, 400));
   }
 
+  /**
+   * Presents UI sequences triggering the backend microphone calibration logic routines.
+   *
+   * @returns {Promise<void>}
+   */
   async runCalibrationSequence() {
     if (this.state.isTransitioning) return;
     this.state.isTransitioning = true;
@@ -1892,8 +2219,11 @@ class EncoreController {
     this.state.isTransitioning = false;
   }
 
-  // --- Input Handling ---
-
+  /**
+   * Global catch mechanism translating keyboard presses into mapped command functions.
+   *
+   * @param {KeyboardEvent} e - A raw DOM keydown occurrence.
+   */
   handleKeyDown(e) {
     if (this.mixer.isVisible) {
       this.mixer.handleKeyDown(e);
@@ -1909,6 +2239,8 @@ class EncoreController {
     if (this.state.isScoreScreenActive) {
       if (["Enter", " ", "Escape"].includes(e.key)) {
         if (this.state.scoreSkipResolver) {
+          this.Forte.stopSfx();
+          this.state.scoreSkipped = true;
           this.state.scoreSkipResolver();
         }
         e.preventDefault();
@@ -1956,7 +2288,6 @@ class EncoreController {
     }
 
     if (this.state.mode === "menu" && !this.state.showSongList) {
-      // Any interaction key will show the song list
       if (
         (e.key >= "0" && e.key <= "9") ||
         e.key.startsWith("Arrow") ||
@@ -1992,12 +2323,18 @@ class EncoreController {
       this.runCalibrationSequence();
   }
 
+  /**
+   * Processes numerical keypresses against the active code input buffer strings.
+   *
+   * @param {string} digit - An individual character ranging "0"-"9".
+   */
   handleDigitInput(digit) {
     const target =
       this.state.mode === "player" ? "reservationNumber" : "songNumber";
     this.state[target] =
       this.state[target].length >= 5 ? digit : this.state[target] + digit;
     if (this.state.mode !== "player") {
+      this.Forte.stopSfx();
       this.Forte.playSfx(`/assets/audio/numbers/${digit}.wav`);
       this.state.isTypingNumber = true;
       this.updateMenuUI();
@@ -2006,6 +2343,9 @@ class EncoreController {
     }
   }
 
+  /**
+   * Responds to the delete backspace key deleting elements on various modes inputs buffers.
+   */
   handleBackspace() {
     if (this.state.isSearchOverlayVisible && !this.dom.searchInput.getValue())
       this.toggleSearchOverlay(false);
@@ -2028,11 +2368,15 @@ class EncoreController {
       this.setMode("menu");
   }
 
+  /**
+   * Renders the bottom screen informational banner regarding live queued reservations while typing.
+   *
+   * @param {boolean} isTemp - Flag indicating fading temporariness of visibility.
+   */
   _updateReservationUI(isTemp) {
     const displayCode = this.state.reservationNumber.padStart(5, "0");
     const song = this.songMap.get(displayCode);
 
-    // Generate Badge
     let fmtBadge = "";
     if (song) {
       const fmt = this.getFormatInfo(song);
@@ -2058,10 +2402,13 @@ class EncoreController {
         this.infoBar.bar.classOff("temp-visible");
       }
       this.infoBar.show("RESERVING", content);
-      this.infoBar.showBar(); // Explicitly show bar since we are typing
+      this.infoBar.showBar();
     }
   }
 
+  /**
+   * Action executing commits to text blocks or selections, transitioning to play.
+   */
   handleEnter() {
     if (this.state.isPromptingSetup) {
       this.state.isPromptingSetup = false;
@@ -2112,7 +2459,7 @@ class EncoreController {
 
           this.startPlayer(song);
         }
-        return; // Prevent fallthrough to playing the normal background selection!
+        return;
       }
 
       if (this.state.reservationQueue.length)
@@ -2202,12 +2549,15 @@ class EncoreController {
     }
   }
 
+  /**
+   * Action reversing states or dropping contexts.
+   */
   handleEscape() {
     if (this.state.isTransitioning) return;
 
     if (this.state.isPromptingSetup) {
       this.state.isPromptingSetup = false;
-      this.dom.standbyText.text("SELECT SONG"); // Revert text
+      this.dom.standbyText.text("SELECT SONG");
       this.updateMenuUI();
       return;
     }
@@ -2226,7 +2576,7 @@ class EncoreController {
       this.state.highlightedSearchIndex = -1;
       this.state.searchResults = [];
       this.dom.searchInput.elm.value = "";
-      this.renderSearchResults(); // Safely clears the visual results
+      this.renderSearchResults();
       if (this.state.mode === "yt-search") {
         this.setMode("menu");
       }
@@ -2239,7 +2589,6 @@ class EncoreController {
         this.state.isTypingNumber = false;
         this.updateMenuUI();
       } else if (this.state.showSongList) {
-        // If list is shown, hide it and go back to standby
         this.state.showSongList = false;
         this.state.highlightedIndex = -1;
         this.updateMenuUI();
@@ -2258,6 +2607,11 @@ class EncoreController {
     }
   }
 
+  /**
+   * Action traversing lists vertically.
+   *
+   * @param {string} dir - Literal string "up" or "down".
+   */
   handleNav(dir) {
     const isInputFocused = document.activeElement === this.dom.searchInput.elm;
     const isSearchActive =
@@ -2271,18 +2625,14 @@ class EncoreController {
 
       if (isInputFocused) {
         if (change > 0 && this.state.searchResults.length > 0) {
-          // DOWN: blur input, select first item
           this.dom.searchInput.elm.blur();
           this.state.highlightedSearchIndex = 0;
         }
-        // UP: do nothing if already focused on input
       } else {
         if (change < 0 && this.state.highlightedSearchIndex <= 0) {
-          // UP from first item: focus back to input
           this.state.highlightedSearchIndex = -1;
           this.dom.searchInput.elm.focus();
         } else {
-          // Move up/down within the results
           this.state.highlightedSearchIndex = Math.max(
             0,
             Math.min(
@@ -2304,7 +2654,6 @@ class EncoreController {
       );
       this.updateMenuUI();
     } else if (this.state.mode === "player") {
-      // Transpose
       if (this.state.currentSongIsYouTube) return;
       const change = dir === "up" ? 1 : -1;
       const cur = this.Forte.getPlaybackState().transpose || 0;
@@ -2314,6 +2663,11 @@ class EncoreController {
     }
   }
 
+  /**
+   * Action balancing channel splits in capable Multiplex tracks.
+   *
+   * @param {string} dir - Literal string "left" or "right".
+   */
   handlePan(dir) {
     if (this.state.mode !== "player") return;
     const pb = this.Forte.getPlaybackState();
@@ -2344,6 +2698,11 @@ class EncoreController {
     this.infoBar.showTemp("VOCAL BALANCE", txt, 3000);
   }
 
+  /**
+   * Translates volume commands into absolute level shifts.
+   *
+   * @param {string} dir - Literal string "up" or "down".
+   */
   handleVolume(dir) {
     this.state.volume = Math.max(
       0,
@@ -2366,6 +2725,11 @@ class EncoreController {
     );
   }
 
+  /**
+   * Action triggering BGV sequence cyclings or MV sync drifting.
+   *
+   * @param {string} key - A "[" or "]" literal character indicating direction.
+   */
   handleBracket(key) {
     if (this.state.currentSongIsMV) {
       this.state.videoSyncOffset += key === "]" ? 10 : -10;
@@ -2395,6 +2759,9 @@ class EncoreController {
     }
   }
 
+  /**
+   * Handler bridging the user shortcut jumping into a search flow layout.
+   */
   handleYKey() {
     if (this.state.isTransitioning) return;
     if (this.state.mode === "menu") this.setMode("yt-search");
@@ -2402,6 +2769,9 @@ class EncoreController {
       this.toggleSearchOverlay(!this.state.isSearchOverlayVisible);
   }
 
+  /**
+   * Binds socket events mapping the remote controller app commands into actions here.
+   */
   setupSocketListeners() {
     this.socket.on("join", (joinInformation) => {
       if (joinInformation.type == "remote") {
@@ -2417,7 +2787,6 @@ class EncoreController {
     this.socket.on("leave", (leaveInformation) => {
       delete this.state.knownRemotes[leaveInformation.identity];
 
-      // Remove from active sockets, but KEEP in deviceRegistry so they keep their name on reconnect
       delete this.state.activeSockets[leaveInformation.identity];
       this.state.typingUsers.delete(leaveInformation.identity);
 
@@ -2427,12 +2796,10 @@ class EncoreController {
     this.socket.on("execute-command", (cmd) => {
       const d = cmd.data;
 
-      // --- Social Commands ---
       if (d.type === "set_nickname") {
-        const deviceId = d.deviceId || cmd.identity; // Fallback to socket ID if no device ID
+        const deviceId = d.deviceId || cmd.identity;
         const uniqueName = this.generateUniqueNickname(d.value, deviceId);
 
-        // Register the device and link the current socket
         this.state.deviceRegistry[deviceId] = { nickname: uniqueName };
         this.state.activeSockets[cmd.identity] = deviceId;
 
@@ -2611,7 +2978,6 @@ class EncoreController {
               );
               const data = await res.json();
 
-              // Map the items strictly to include thumbnails for the client remote
               const ytItems = (data.items || [])
                 .filter((i) => i.type === "video")
                 .map((item) => ({
@@ -2620,7 +2986,6 @@ class EncoreController {
                   channelTitle: item.channelTitle,
                   length: item.length,
                   isLive: item.isLive,
-                  // Default to mqdefault (Medium Quality) to balance load size and clarity
                   thumbnail:
                     item.thumbnail?.thumbnails?.[0]?.url ||
                     `https://img.youtube.com/vi/${item.id}/mqdefault.jpg`,
@@ -2643,7 +3008,7 @@ class EncoreController {
             path: d.value.path || `yt://${d.value.id}`,
             durationText: d.value.durationText,
             isLive: d.value.isLive,
-            code: "YT", // Map cleanly into typical rendering queue
+            code: "YT",
           };
 
           if (this.state.mode === "menu") {
@@ -2662,6 +3027,9 @@ class EncoreController {
     });
   }
 
+  /**
+   * Finalizes class, unmounting event listeners to prevent leakage.
+   */
   destroy() {
     if (this.boundKeydown)
       window.removeEventListener("keydown", this.boundKeydown);

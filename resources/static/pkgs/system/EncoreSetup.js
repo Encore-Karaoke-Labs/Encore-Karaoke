@@ -1,10 +1,19 @@
 import Html from "/libs/html.js";
 
+/**
+ * Controller for the Encore Setup environment.
+ * Handles system configuration, including audio/video settings, library selection, and security.
+ */
 class EncoreSetupController {
+  /**
+   * Initializes a new EncoreSetupController.
+   *
+   * @param {Object} Root - The CherryTree system context.
+   */
   constructor(Root) {
     this.Root = Root;
     this.Pid = Root.Pid;
-    this.Ui = Root.Processes.getService("UiLib").data; // Added UiLib
+    this.Ui = Root.Processes.getService("UiLib").data;
     this.Forte = Root.Processes.getService("ForteSvc").data;
     this.FsSvc = Root.Processes.getService("FsSvc").data;
 
@@ -22,11 +31,10 @@ class EncoreSetupController {
       pinChangeStep: 0,
       newPinTemp: "",
       isVerifying: false,
-      dialog: null, // { title, content }
-      previewingVideo: false, // Active when in Video Sync Preview mode
+      dialog: null,
+      previewingVideo: false,
     };
 
-    // Video Sync state refs
     this.previewVideoEl = null;
     this.offsetDisplay = null;
     this.previewSyncFrame = null;
@@ -34,6 +42,11 @@ class EncoreSetupController {
     this.boundKeydown = this.handleKeyDown.bind(this);
   }
 
+  /**
+   * Bootstraps the setup interface, fetching configurations, device lists, and libraries.
+   *
+   * @returns {Promise<void>}
+   */
   async init() {
     this.config = await window.config.getAll();
     this.micDevices = await this.Forte.getMicDevices();
@@ -78,6 +91,12 @@ class EncoreSetupController {
     }, 100);
   }
 
+  /**
+   * Verifies the provided PIN against the securely stored hash.
+   *
+   * @param {string} input - The 4-digit PIN to check.
+   * @returns {Promise<boolean>} True if the PIN is valid or no PIN is set, otherwise false.
+   */
   async verifyPin(input) {
     const pinData = this.config.security?.pinData;
     if (!pinData) return input === "0000";
@@ -99,6 +118,12 @@ class EncoreSetupController {
     }
   }
 
+  /**
+   * Generates a new salt and hash combination for a new PIN.
+   *
+   * @param {string} input - The new 4-digit PIN.
+   * @returns {Promise<Object|null>} An object containing the generated salt and hash.
+   */
   async createPinHash(input) {
     try {
       const res = await fetch("http://127.0.0.1:9864/auth/create-hash", {
@@ -113,6 +138,9 @@ class EncoreSetupController {
     }
   }
 
+  /**
+   * Constructs the data maps for the dashboard tiles and submenus based on the current configuration.
+   */
   buildSettingsMap() {
     this.DASHBOARD_TILES = [
       { id: "library", label: "Library & Storage", icon: "📁" },
@@ -292,6 +320,11 @@ class EncoreSetupController {
     };
   }
 
+  /**
+   * Catches and dispatches keyboard events for system setup navigation.
+   *
+   * @param {KeyboardEvent} e - The active keydown event.
+   */
   handleKeyDown(e) {
     if (this.state.previewingVideo) {
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
@@ -427,6 +460,11 @@ class EncoreSetupController {
     }
   }
 
+  /**
+   * Processes the completed PIN entry for login or PIN changes.
+   *
+   * @returns {Promise<void>}
+   */
   async processAuth() {
     if (this.state.view === "auth") {
       const isValid = await this.verifyPin(this.state.authInput);
@@ -473,9 +511,13 @@ class EncoreSetupController {
     this.renderView();
   }
 
+  /**
+   * Triggers a specific action requested from the dashboard tile menu.
+   *
+   * @param {string} id - The ID representing the selected dashboard tile.
+   */
   executeAction(id) {
     if (id === "reboot") {
-      // Create a massive black overlay over everything for a seamless fade to black
       const fadeOverlay = new Html("div")
         .styleJs({
           position: "fixed",
@@ -512,6 +554,11 @@ class EncoreSetupController {
     }
   }
 
+  /**
+   * Initiates a scan for Encore Libraries across local drives.
+   *
+   * @returns {Promise<void>}
+   */
   async handleLibraryScan() {
     this.showToast("SCANNING DRIVES...", "info");
     const foundLibs = await this.FsSvc.findEncoreLibraries();
@@ -525,7 +572,6 @@ class EncoreSetupController {
     this.currentManifest = newLib.manifest;
     window.config.setItem("libraryPath", newLib.path);
 
-    // Refresh the song list based on the new library
     await this.FsSvc.buildSongList(newLib.path);
     this.songList = this.FsSvc.getSongList();
 
@@ -533,13 +579,17 @@ class EncoreSetupController {
     this.renderView();
   }
 
+  /**
+   * Initializes the overlay video preview layer to assist syncing delays.
+   *
+   * @returns {Promise<void>}
+   */
   async startVideoPreview() {
     if (!this.songList || this.songList.length === 0) {
       this.showToast("LIBRARY EMPTY OR NOT LOADED", "error");
       return;
     }
 
-    // Find a track that specifically has an MTV
     const mtvSong = this.songList.find((s) => s.videoPath);
     if (!mtvSong) {
       this.showToast("NO MTV SONGS FOUND IN LIBRARY", "error");
@@ -565,6 +615,9 @@ class EncoreSetupController {
     this.previewSyncFrame = requestAnimationFrame(() => this.syncVideoLoop());
   }
 
+  /**
+   * Processes alignment synchronization adjustments during the active preview cycle.
+   */
   syncVideoLoop() {
     if (!this.state.previewingVideo) return;
     const pbState = this.Forte.getPlaybackState();
@@ -592,6 +645,9 @@ class EncoreSetupController {
     this.previewSyncFrame = requestAnimationFrame(() => this.syncVideoLoop());
   }
 
+  /**
+   * Halts the active video preview cycle and tears down associated DOM layers.
+   */
   stopVideoPreview() {
     this.state.previewingVideo = false;
     if (this.previewSyncFrame) cancelAnimationFrame(this.previewSyncFrame);
@@ -604,6 +660,12 @@ class EncoreSetupController {
     this.renderView();
   }
 
+  /**
+   * Triggers a fast UI toast notification message.
+   *
+   * @param {string} msg - The notification message text.
+   * @param {string} type - Status level formatting ("success", "error", "info").
+   */
   showToast(msg, type) {
     const toast = new Html("div")
       .classOn("setup-toast", type)
@@ -616,6 +678,9 @@ class EncoreSetupController {
     }, 3000);
   }
 
+  /**
+   * Main rendering routine, delegating the visual layout logic based on system state.
+   */
   renderView() {
     this.container.clear();
 
@@ -654,6 +719,11 @@ class EncoreSetupController {
     }
   }
 
+  /**
+   * Overlays the current menu view displaying track video syncing parameters.
+   *
+   * @param {Object} container - Top level parent rendering DOM context.
+   */
   renderVideoPreviewOverlay(container) {
     const overlay = new Html("div")
       .classOn("setup-video-preview-overlay")
@@ -675,6 +745,11 @@ class EncoreSetupController {
     new Html("p").text("◀ / ▶ to adjust | ENTER / ESC to save").appendTo(hud);
   }
 
+  /**
+   * Renders the modal prompt dialog inside the provided parent container.
+   *
+   * @param {Object} container - The DOM wrapper representing the active UI space.
+   */
   renderDialog(container) {
     const overlay = new Html("div")
       .classOn("setup-dialog-overlay")
@@ -692,6 +767,11 @@ class EncoreSetupController {
       .appendTo(box);
   }
 
+  /**
+   * Displays the PIN authorization interface logic elements.
+   *
+   * @param {Object} container - Top level active screen layer container.
+   */
   renderAuthScreen(container) {
     const authBox = new Html("div").classOn("auth-box").appendTo(container);
 
@@ -719,6 +799,11 @@ class EncoreSetupController {
     }
   }
 
+  /**
+   * Projects root-level dashboard item options rendering a grid menu layout.
+   *
+   * @param {Object} container - Setup menu frame wrapper.
+   */
   renderDashboard(container) {
     const grid = new Html("div").classOn("setup-grid").appendTo(container);
     this.DASHBOARD_TILES.forEach((tile, idx) => {
@@ -736,6 +821,11 @@ class EncoreSetupController {
     });
   }
 
+  /**
+   * Triggers visual update to present specific section values or controls inside the setup.
+   *
+   * @param {Object} container - Targeted element injection wrapper representing the system view area.
+   */
   renderSubmenu(container) {
     const menuData = this.SUBMENUS[this.state.activeMenuId];
 
@@ -778,6 +868,9 @@ class EncoreSetupController {
     });
   }
 
+  /**
+   * Finalizes interface operations removing bindings and cleaning state logic hooks.
+   */
   destroy() {
     window.removeEventListener("keydown", this.boundKeydown);
     if (this.previewSyncFrame) cancelAnimationFrame(this.previewSyncFrame);
