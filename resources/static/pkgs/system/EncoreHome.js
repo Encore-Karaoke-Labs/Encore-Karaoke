@@ -2088,9 +2088,6 @@ class EncoreController {
     const s = scoreData.finalScore;
     let rank = "Good";
     let rankColor = "#aed581";
-    if (s == 67) {
-      this.Forte.playSfx("/assets/audio/67-kid.mp3");
-    }
     if (s == 100) {
       rank = "HOW DID YOU PULL THAT OFF";
       rankColor = "#00e676";
