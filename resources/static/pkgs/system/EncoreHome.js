@@ -10,14 +10,17 @@ import { ScoreHUDModule } from "/modules/ScoreHUD.js";
 const INTERLUDE_TIPS = [
   "TIP: You can use your phone to queue songs by scanning the QR code!",
   "Take a deep breath and get ready for the next verse.",
-  "”Maybe there's only a dark road up ahead. But you still have to believe and keep going. Believe that the stars will light your path, even a little bit.” - Kaori Miyazono",
-  "”Music speaks louder than words” - Kousei Arima",
+  "”Maybe there's only a dark road up ahead. But you still have to believe and keep going. Believe that the stars will light your path, even a little bit.” - Kaori Miyazono, Your Lie in April",
+  "”Music speaks louder than words” - Kousei Arima, Your Lie in April",
   "Grab a drink and rest your vocal cords.",
   "TIP: Press F2 to enter the setup menu when playback is stopped.",
   "Adjust the instrumental volume using the - and = keys.",
-  "”Rock resonates as the music of the perpetual underdog. Is it really rock if it's sung by life's winners?” - Hitori Gotoh",
+  "”Rock resonates as the music of the perpetual underdog. Is it really rock if it's sung by life's winners?” - Hitori Gotoh, Bocchi The Rock!",
   "TIP: You can search for songs by title, artist, or song number by pressing Y.",
+  "”Get freaky 🤑🤑” - Stariix, Encore Karaoke Labs",
 ];
+
+let TEMP_TIPS = [...INTERLUDE_TIPS];
 
 /**
  * Joins path parts with a given separator, normalizing leading and trailing slashes.
@@ -151,7 +154,7 @@ class EncoreController {
 
     console.log("[Encore] Loading assets...");
     const sfx = [
-      "fanfare.wav",
+      "fanfare.mid",
       ...Array.from({ length: 10 }, (_, i) => `numbers/${i}.wav`),
     ];
     await Promise.all(sfx.map((s) => this.Forte.loadSfx(`/assets/audio/${s}`)));
@@ -1848,10 +1851,12 @@ class EncoreController {
           if (!this.state.isInterludeActive) {
             this.state.isInterludeActive = true;
 
-            const tip =
-              INTERLUDE_TIPS[Math.floor(Math.random() * INTERLUDE_TIPS.length)];
+            const tip = TEMP_TIPS[Math.floor(Math.random() * TEMP_TIPS.length)];
             this.dom.interludeTipBox.text(tip);
-
+            TEMP_TIPS.splice(TEMP_TIPS.indexOf(tip), 1);
+            if (TEMP_TIPS === 0) {
+              TEMP_TIPS = [...INTERLUDE_TIPS];
+            }
             this.dom.interludeOverlay.classOn("visible");
             this.dom.midiContainer.styleJs({
               opacity: "0",
@@ -2089,36 +2094,65 @@ class EncoreController {
     let rank = "Good";
     let rankColor = "#aed581";
     if (s == 100) {
+      // Wow! You're THE Star of the show!
       rank = "HOW DID YOU PULL THAT OFF";
       rankColor = "#00e676";
     } else if (s >= 98) {
+      // Bravo! Keep singing!
       rank = "WHAT";
       rankColor = "#00e676";
     } else if (s >= 90) {
+      // Wow, you're an awesome singer!
       rank = "EXCELLENT";
       rankColor = "#29b6f6";
     } else if (s >= 80) {
+      // Great singing!
       rank = "GREAT";
       rankColor = "#ffee58";
     } else if (s >= 60) {
+      // Nice job!
       rank = "GOOD";
       rankColor = "#ffca28";
     } else if (s >= 50) {
+      // You're getting there!
       rank = "DECENT";
       rankColor = "#ffca28";
     } else if (s >= 20) {
+      // Not bad!
       rank = "NICE TRY";
       rankColor = "#ffca28";
     } else {
+      // Practice makes perfect!
       rank = "yikes";
       rankColor = "#ef5350";
     }
 
+    const playAudioSequence = async () => {
+      await new Promise((r) => setTimeout(r, 1000));
+      if (this.state.scoreSkipped) return;
+
+      const fanfareFinished = await this.Forte.playSfx(
+        "/assets/audio/fanfare.mid",
+      );
+      if (!fanfareFinished || this.state.scoreSkipped) return;
+
+      const narrations =
+        this.libraryInfo?.manifest?.additionalContents?.scoreNarrations;
+      if (narrations && Array.isArray(narrations)) {
+        const match = narrations.find((n) => s >= n.min && s <= n.max);
+        if (match && match.file) {
+          const narrationUrl = new URL("http://127.0.0.1:9864/getFile");
+          narrationUrl.searchParams.append(
+            "path",
+            pathJoin([this.libraryInfo.path, match.file]),
+          );
+          await this.Forte.playSfx(narrationUrl.href);
+        }
+      }
+    };
+    playAudioSequence();
+
     const animate = async () => {
-      setTimeout(() => {
-        if (this.state.scoreSkipped) return;
-        this.Forte.playSfx("/assets/audio/fanfare.wav");
-      }, 1000);
       const dur = 3800;
       const start = performance.now();
       await new Promise((r) => {
@@ -2163,7 +2197,7 @@ class EncoreController {
     await Promise.race([
       (async () => {
         await animate();
-        await new Promise((r) => setTimeout(r, 8000));
+        await new Promise((r) => setTimeout(r, 12000));
       })(),
       new Promise((resolve) => {
         this.state.scoreSkipResolver = resolve;

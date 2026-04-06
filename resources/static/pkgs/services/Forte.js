@@ -158,6 +158,8 @@ let masterGain;
 let masterCompressor;
 let sourceNode = null;
 let sfxSourceNode = null;
+let sfxSequencer = null;
+let sfxResolve = null;
 let animationFrameId = null;
 let sfxGain;
 const sfxCache = new Map();
@@ -861,8 +863,19 @@ const pkg = {
       try {
         const response = await fetch(url);
         const arrayBuffer = await response.arrayBuffer();
+
+        const isMidi =
+          url.toLowerCase().endsWith(".mid") ||
+          url.toLowerCase().endsWith(".midi") ||
+          url.toLowerCase().endsWith(".kar");
+
+        if (isMidi) {
+          sfxCache.set(url, { isMidi: true, buffer: arrayBuffer });
+          return true;
+        }
+
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        sfxCache.set(url, audioBuffer);
+        sfxCache.set(url, { isMidi: false, buffer: audioBuffer });
         return true;
       } catch (e) {
         console.error(`[FORTE SVC] Failed to load SFX: ${url}`, e);
@@ -872,26 +885,57 @@ const pkg = {
 
     /**
      * Fires a previously cached sound effect immediately.
+     * Resolves when the effect has fully completed playing.
      *
      * @param {string} url - Target URL matching the cache dictionary.
+     * @returns {Promise<boolean>} Resolves to true when completed naturally, false if interrupted.
      */
     playSfx: async (url) => {
-      if (!audioContext) return;
-      if (audioContext.state === "suspended") await audioContext.resume();
+      await pkg.data.stopSfx();
 
-      let audioBuffer = sfxCache.get(url);
-      if (!audioBuffer) {
-        const success = await pkg.data.loadSfx(url);
-        if (!success) return;
-        audioBuffer = sfxCache.get(url);
-      }
+      return new Promise(async (resolve) => {
+        if (!audioContext) return resolve(false);
+        if (audioContext.state === "suspended") await audioContext.resume();
 
-      if (audioBuffer) {
-        sfxSourceNode = audioContext.createBufferSource();
-        sfxSourceNode.buffer = audioBuffer;
-        sfxSourceNode.connect(sfxGain);
-        sfxSourceNode.start(0);
-      }
+        let cached = sfxCache.get(url);
+        if (!cached) {
+          const success = await pkg.data.loadSfx(url);
+          if (!success) return resolve(false);
+          cached = sfxCache.get(url);
+        }
+
+        if (cached) {
+          sfxResolve = resolve;
+
+          if (cached.isMidi) {
+            if (!state.playback.synthesizer) return resolve(false);
+            sfxSequencer = new Sequencer(
+              [{ binary: cached.buffer }],
+              state.playback.synthesizer,
+            );
+            sfxSequencer.loop = false;
+            sfxSequencer.addOnSongEndedEvent(() => {
+              if (sfxResolve) {
+                sfxResolve(true);
+                sfxResolve = null;
+              }
+            }, "forte-sfx-end");
+          } else {
+            sfxSourceNode = audioContext.createBufferSource();
+            sfxSourceNode.buffer = cached.buffer;
+            sfxSourceNode.connect(sfxGain);
+            sfxSourceNode.onended = () => {
+              if (sfxResolve) {
+                sfxResolve(true);
+                sfxResolve = null;
+              }
+            };
+            sfxSourceNode.start(0);
+          }
+        } else {
+          resolve(false);
+        }
+      });
     },
 
     /**
@@ -902,6 +946,14 @@ const pkg = {
         sfxSourceNode.onended = null;
         sfxSourceNode.stop();
         sfxSourceNode = null;
+      }
+      if (sfxSequencer) {
+        sfxSequencer.stop();
+        sfxSequencer = null;
+      }
+      if (sfxResolve) {
+        sfxResolve(false);
+        sfxResolve = null;
       }
     },
 
