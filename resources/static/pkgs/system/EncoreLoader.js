@@ -140,55 +140,68 @@ const pkg = {
    * Parses the song list, loads sound fonts, and transitions to the main application.
    *
    * @param {string} libraryPath - The full absolute path to the selected library.
-   * @returns {Promise<void>}
+   * @returns {Promise<boolean>} True if successful, False if the library failed to load.
    */
   async proceedWithLoading(libraryPath) {
     let fsSvc = root.Processes.getService("FsSvc").data;
     let forteSvc = root.Processes.getService("ForteSvc").data;
 
     statusP.text("Loading Library...");
-    document.addEventListener("CherryTree.FsSvc.SongList.Progress", (e) => {
+
+    const progressHandler = (e) => {
       if (this.aborted) return;
       statusP.text(
         `Loading library...\n${e.detail.current}/${e.detail.total} (${e.detail.percentage}%)`,
       );
-    });
-
-    fsSvc.buildSongList(libraryPath);
+    };
 
     document.addEventListener(
-      "CherryTree.FsSvc.SongList.Ready",
-      async (e) => {
-        if (this.aborted) return;
+      "CherryTree.FsSvc.SongList.Progress",
+      progressHandler,
+    );
 
-        if (this.f2Handler) {
-          document.removeEventListener("keydown", this.f2Handler);
-          this.f2Handler = null;
-        }
+    const success = await fsSvc.buildSongList(libraryPath);
 
-        let msgData = e.detail;
-        if (msgData.manifest.additionalContents?.soundFont) {
-          statusP.text("Loading sounds...");
-          const url = new URL(`http://127.0.0.1:9864/getFile`);
-          const soundFontPath = pathJoin([
-            msgData.libraryPath,
-            msgData.manifest.additionalContents.soundFont,
-          ]);
-          url.searchParams.append("path", soundFontPath);
-          await forteSvc.loadSoundFont(url.href);
-        }
+    document.removeEventListener(
+      "CherryTree.FsSvc.SongList.Progress",
+      progressHandler,
+    );
 
-        await root.Libs.startPkg("system:EncoreHome", []);
-        document.addEventListener(
-          "CherryTree.UI.Ready",
-          () => {
-            root.end();
-          },
-          { once: true },
-        );
+    if (this.aborted) return false;
+
+    if (!success) {
+      return false;
+    }
+
+    if (this.f2Handler) {
+      document.removeEventListener("keydown", this.f2Handler);
+      this.f2Handler = null;
+    }
+
+    const libInfo = fsSvc.getLibraryInfo();
+
+    if (libInfo?.manifest?.additionalContents?.soundFont) {
+      statusP.text("Loading sounds...");
+      const url = new URL(`http://127.0.0.1:9864/getFile`);
+      const soundFontPath = pathJoin([
+        libInfo.path,
+        libInfo.manifest.additionalContents.soundFont,
+      ]);
+      url.searchParams.append("path", soundFontPath);
+      await forteSvc.loadSoundFont(url.href);
+    }
+
+    await root.Libs.startPkg("system:EncoreHome", []);
+
+    document.addEventListener(
+      "CherryTree.UI.Ready",
+      () => {
+        root.end();
       },
       { once: true },
     );
+
+    return true;
   },
 
   /**
@@ -223,10 +236,25 @@ const pkg = {
 
     try {
       const config = await window.config.getAll();
+      let currentLibraryPath = config.libraryPath;
 
-      if (config.libraryPath) {
-        if (!this.aborted) await this.proceedWithLoading(config.libraryPath);
-      } else {
+      if (currentLibraryPath) {
+        if (!this.aborted) {
+          const loaded = await this.proceedWithLoading(currentLibraryPath);
+          if (!loaded) {
+            console.warn(
+              "Configured library not found. Falling back to search.",
+            );
+            await window.config.merge({ libraryPath: null });
+            currentLibraryPath = null;
+            statusP.text("Library missing. Re-evaluating...");
+          } else {
+            return;
+          }
+        }
+      }
+
+      if (!currentLibraryPath) {
         statusP.text("Searching for libraries...");
         const foundLibraries = await fsSvc.findEncoreLibraries();
 

@@ -105,9 +105,11 @@ const pkg = {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ dir: path }),
         });
-        return await res.json();
+        const data = await res.json();
+        if (data.error) return null;
+        return data;
       } catch (err) {
-        return [];
+        return null;
       }
     },
 
