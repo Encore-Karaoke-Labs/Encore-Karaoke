@@ -20,7 +20,7 @@ const INTERLUDE_TIPS = [
   "”Get freaky 🤑🤑” - Stariix, Encore Karaoke Labs",
 ];
 
-let TEMP_TIPS = [...INTERLUDE_TIPS];
+let TEMP_TIPS = structuredClone(INTERLUDE_TIPS);
 
 /**
  * Joins path parts with a given separator, normalizing leading and trailing slashes.
@@ -1855,7 +1855,7 @@ class EncoreController {
             this.dom.interludeTipBox.text(tip);
             TEMP_TIPS.splice(TEMP_TIPS.indexOf(tip), 1);
             if (TEMP_TIPS === 0) {
-              TEMP_TIPS = [...INTERLUDE_TIPS];
+              TEMP_TIPS = structuredClone(...INTERLUDE_TIPS);
             }
             this.dom.interludeOverlay.classOn("visible");
             this.dom.midiContainer.styleJs({
