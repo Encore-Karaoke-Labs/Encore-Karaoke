@@ -595,7 +595,7 @@ class EncoreController {
 
     this.dom.interludeOverlay = new Html("div")
       .classOn("interlude-overlay")
-      .appendTo("body");
+      .appendTo(this.wrapper);
 
     new Html("div")
       .classOn("interlude-text")
@@ -1854,8 +1854,8 @@ class EncoreController {
             const tip = TEMP_TIPS[Math.floor(Math.random() * TEMP_TIPS.length)];
             this.dom.interludeTipBox.text(tip);
             TEMP_TIPS.splice(TEMP_TIPS.indexOf(tip), 1);
-            if (TEMP_TIPS === 0) {
-              TEMP_TIPS = structuredClone(...INTERLUDE_TIPS);
+            if (TEMP_TIPS.length === 0) {
+              TEMP_TIPS = structuredClone(INTERLUDE_TIPS);
             }
             this.dom.interludeOverlay.classOn("visible");
             this.dom.midiContainer.styleJs({
@@ -1972,6 +1972,14 @@ class EncoreController {
     this.cleanupPlayerEvents();
     this.dom.countdownDisplay.classOff("visible").text("");
     this.dom.formatIndicator.styleJs({ opacity: "0" });
+
+    this.state.isInterludeActive = false;
+    if (this.dom.interludeOverlay) {
+      this.dom.interludeOverlay.classOff("visible");
+    }
+    if (this.dom.midiContainer) {
+      this.dom.midiContainer.styleJs({ opacity: "1", pointerEvents: "all" });
+    }
 
     if (this.state.currentSongIsYouTube) {
       window.volume.setVolume(this.state.windowsVolume);
