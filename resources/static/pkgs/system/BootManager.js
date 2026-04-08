@@ -8,10 +8,10 @@ const pkg = {
   privs: 1,
   start: async function (Root) {
     console.log("[BootManager] Started", Root);
-    const loadingScreen = document.querySelector("#loading");
-    if (loadingScreen) loadingScreen.remove();
 
-    document.body.style.backgroundColor = "white";
+    // 1. Instantly set the body to our dark color to prevent early flashes
+    document.body.style.backgroundColor = "#080810";
+    document.body.style.margin = "0";
 
     let shouldBootSetup =
       sessionStorage.getItem("encore_boot_setup") === "true";
@@ -32,6 +32,7 @@ const pkg = {
         top: 0,
         left: 0,
         opacity: 1,
+        backgroundColor: "#080810",
       })
       .appendTo("body");
 
@@ -98,28 +99,95 @@ const pkg = {
       .text("Press F2 to go into Setup")
       .appendTo(wrapper);
 
-    anime({
-      targets: setupText.elm,
-      opacity: 1,
-      duration: 500,
-      easing: "linear",
-    });
+    const warningScreen = new Html("div")
+      .styleJs({
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        backgroundColor: "#080810",
+        color: "#ffffff",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 676767,
+        fontFamily: "Rajdhani, sans-serif",
+        textAlign: "center",
+        padding: "2rem",
+      })
+      .appendTo(wrapper);
+
+    new Html("h1")
+      .text("PHOTOSENSITIVITY WARNING")
+      .styleJs({
+        color: "#ff5555",
+        fontSize: "4rem",
+        margin: "0 0 1rem 0",
+        letterSpacing: "0.1em",
+      })
+      .appendTo(warningScreen);
+
+    new Html("p")
+      .html(
+        "This application contains rapid color changes, flashing lights, and visual patterns<br>that may trigger seizures for people with photosensitive epilepsy.<br><br>Viewer discretion is advised.",
+      )
+      .styleJs({
+        margin: "0",
+        fontSize: "1.8rem",
+        opacity: 0.8,
+        lineHeight: "1.5",
+      })
+      .appendTo(warningScreen);
+
+    const loadingScreen = document.querySelector("#loading");
+    if (loadingScreen) loadingScreen.remove();
+
+    let audioLoaded = false;
+    let warningDone = false;
+    let hasStarted = false;
 
     let startupSound = new Audio("/assets/audio/startup.wav");
-    let hasLoaded = false;
     startupSound.addEventListener("loadeddata", () => {
-      if (hasLoaded === true) return;
-      hasLoaded = true;
-      beginAnimation();
+      audioLoaded = true;
+      checkReadyToAnimate();
     });
     setTimeout(() => startupSound.load(), 16);
 
+    setTimeout(() => {
+      anime({
+        targets: warningScreen.elm,
+        opacity: 0,
+        duration: 1000,
+        easing: "linear",
+        complete: () => {
+          warningScreen.cleanup();
+          warningDone = true;
+          checkReadyToAnimate();
+        },
+      });
+    }, 4000);
+
+    function checkReadyToAnimate() {
+      if (audioLoaded && warningDone && !hasStarted) {
+        hasStarted = true;
+
+        anime({
+          targets: setupText.elm,
+          opacity: 1,
+          duration: 500,
+          easing: "linear",
+        });
+
+        beginAnimation();
+      }
+    }
+
     function beginAnimation() {
-      document.body.style.transition = "background-color 0.5s ease-in-out";
       const tl = anime.timeline({
         easing: "easeInOutExpo",
         complete: () => {
-          document.body.style.backgroundColor = "white";
           setTimeout(() => {
             wrapper.cleanup();
             checkServicesLoaded();
@@ -156,6 +224,12 @@ const pkg = {
         }),
         duration: 100,
         ease: "outExpo",
+        begin: () => {
+          // Switch the background to white ONLY precisely when the tiles start fading!
+          // This prevents the white background from bleeding through sub-pixel grid gaps.
+          wrapper.styleJs({ backgroundColor: "white" });
+          document.body.style.backgroundColor = "white";
+        },
       });
     }
 

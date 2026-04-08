@@ -11,7 +11,7 @@ const crypto = require("crypto");
 const dgram = require("dgram");
 const { exec } = require("child_process");
 
-// --- Server & Networking
+// --- Server & Networking ---
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
@@ -335,6 +335,7 @@ const createWindow = () => {
     },
   });
 
+  win.setBackgroundColor("#000");
   win.loadURL(`http://127.0.0.1:${PORT}/index.html`);
   if (kioskEnabled) {
     win.setKiosk(true);
