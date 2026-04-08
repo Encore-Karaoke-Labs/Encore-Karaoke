@@ -155,6 +155,9 @@ class EncoreController {
     console.log("[Encore] Loading assets...");
     const sfx = [
       "fanfare.mid",
+      "fanfare-2.mid",
+      "fanfare-3.mid",
+      "fanfare-4.mid",
       ...Array.from({ length: 10 }, (_, i) => `numbers/${i}.wav`),
     ];
     await Promise.all(sfx.map((s) => this.Forte.loadSfx(`/assets/audio/${s}`)));
@@ -2139,14 +2142,23 @@ class EncoreController {
       await new Promise((r) => setTimeout(r, 1000));
       if (this.state.scoreSkipped) return;
 
-      const fanfareFinished = await this.Forte.playSfx(
-        "/assets/audio/fanfare.mid",
-        0.5,
-      );
+      let fanfareUrl = "/assets/audio/fanfare-2.mid";
+
+      if (s == 100) {
+        fanfareUrl = "/assets/audio/fanfare-4.mid";
+      } else if (s >= 70) {
+        fanfareUrl = "/assets/audio/fanfare-3.mid";
+      } else if (s >= 20) {
+        fanfareUrl = "/assets/audio/fanfare.mid";
+      }
+
+      const fanfareFinished = await this.Forte.playSfx(fanfareUrl, 0.5);
       if (!fanfareFinished || this.state.scoreSkipped) return;
 
+      let playedNarration = false;
       const narrations =
         this.libraryInfo?.manifest?.additionalContents?.scoreNarrations;
+
       if (narrations && Array.isArray(narrations)) {
         const match = narrations.find((n) => s >= n.min && s <= n.max);
         if (match && match.file) {
@@ -2156,10 +2168,14 @@ class EncoreController {
             pathJoin([this.libraryInfo.path, match.file]),
           );
           await this.Forte.playSfx(narrationUrl.href);
+          playedNarration = true;
         }
       }
+
+      if (!playedNarration) {
+        await new Promise((r) => setTimeout(r, 4000));
+      }
     };
-    playAudioSequence();
 
     const animate = async () => {
       const dur = 3800;
@@ -2204,11 +2220,10 @@ class EncoreController {
       });
     };
 
+    // Wait for BOTH the visuals to finish their 3.8s intro, AND the audio
+    // sequence (fanfare + narration) to completely finish
     await Promise.race([
-      (async () => {
-        await animate();
-        await new Promise((r) => setTimeout(r, 5000));
-      })(),
+      Promise.all([animate(), playAudioSequence()]),
       new Promise((resolve) => {
         this.state.scoreSkipResolver = resolve;
       }),
