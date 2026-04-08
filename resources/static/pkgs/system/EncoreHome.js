@@ -343,6 +343,21 @@ class EncoreController {
   }
 
   /**
+   * Truncates a title to 8 words with ellipsis if it exceeds that length.
+   *
+   * @param {string} title - The title to truncate.
+   * @returns {string} The truncated title with ellipsis if needed.
+   */
+  truncateTitleIfNeeded(title) {
+    if (!title) return title;
+    const words = title.trim().split(/\s+/);
+    if (words.length > 8) {
+      return words.slice(0, 8).join(" ") + "...";
+    }
+    return title;
+  }
+
+  /**
    * Schedules an automatic skip/transition for a YouTube track after its duration elapses.
    *
    * @param {number} seconds - The duration in seconds.
@@ -1349,7 +1364,7 @@ class EncoreController {
         );
       }
 
-      this.dom.introTitle.text(song.title);
+      this.dom.introTitle.text(this.truncateTitleIfNeeded(song.title));
       this.dom.introArtist.text(song.artist);
       this.dom.introCard.classOn("visible");
       this.dom.lrcContainer.styleJs({ opacity: "1" });
@@ -1489,7 +1504,8 @@ class EncoreController {
         while ((match = regex.exec(fullMetadataString)) !== null) {
           metadata[match[1].toUpperCase()] = match[2];
         }
-        if (metadata.TITLE) this.dom.introTitle.text(metadata.TITLE);
+        if (metadata.TITLE)
+          this.dom.introTitle.text(this.truncateTitleIfNeeded(metadata.TITLE));
         if (metadata.ARTIST) this.dom.introArtist.text(metadata.ARTIST);
       }
 
