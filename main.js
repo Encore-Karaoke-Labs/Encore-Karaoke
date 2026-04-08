@@ -331,6 +331,7 @@ const createWindow = () => {
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
+      nodeIntegration: true,
     },
   });
 
@@ -445,6 +446,13 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("mic-get-peer-id", () => playerPeerId);
   ipcMain.handle("get-volume", async () => getVolume());
+  ipcMain.handle("romanize", async (event, rawJapanese) => {
+    const romaji = await kuroshiro.convert(rawJapanese, {
+      to: "romaji",
+      mode: "spaced",
+    });
+    return romaji;
+  });
   ipcMain.on("set-volume", async (event, vol) => setVolume(vol));
   ipcMain.on("setRPC", (event, arg) => {
     discordClient.user?.setActivity({

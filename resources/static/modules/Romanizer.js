@@ -7,11 +7,7 @@ const Romanizer = {
     // Japanese
     if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(text)) {
       try {
-        const params = new URLSearchParams({ t: text });
-        const url = `http://127.0.0.1:9864/romanize?${params.toString()}`;
-        const res = await fetch(url);
-        if (!res.ok) return null;
-        return await res.text();
+        return await window.romanization.romanize(text);
       } catch (err) {
         console.error(`[Romanizer] Network error:`, err);
         return null;
