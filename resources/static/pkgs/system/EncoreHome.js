@@ -2098,7 +2098,7 @@ class EncoreController {
 
     this.dom.postSongScreen.styleJs({ opacity: "1", pointerEvents: "all" });
 
-    const s = scoreData.finalScore;
+    const s = Math.floor(scoreData.finalScore);
     let rank = "Good";
     let rankColor = "#aed581";
     if (s == 100) {
