@@ -809,10 +809,22 @@ const pkg = {
       state.recording.destinationNode =
         audioContext.createMediaStreamDestination();
       state.recording.audioStream = state.recording.destinationNode.stream;
+
+      state.recording.micDestinationNode =
+        audioContext.createMediaStreamDestination();
+      state.recording.musicDestinationNode =
+        audioContext.createMediaStreamDestination();
+      state.recording.micAudioStream =
+        state.recording.micDestinationNode.stream;
+      state.recording.musicAudioStream =
+        state.recording.musicDestinationNode.stream;
+
       state.effects.micChainInput = audioContext.createGain();
       state.effects.micChainOutput = audioContext.createGain();
       state.effects.micChainInput.connect(state.effects.micChainOutput);
+
       state.effects.micChainOutput.connect(state.recording.destinationNode);
+      state.effects.micChainOutput.connect(state.recording.micDestinationNode);
 
       state.playback.midiGain = audioContext.createGain();
       state.playback.midiGain.connect(masterGain);
@@ -861,6 +873,24 @@ const pkg = {
      */
     getRecordingAudioStream: () => {
       return state.recording.audioStream;
+    },
+
+    /**
+     * Retrieves the continuous stream containing the mic stream.
+     *
+     * @returns {MediaStream} Real-time audio stream output.
+     */
+    getMicAudioStream: () => {
+      return state.recording.micAudioStream;
+    },
+
+    /**
+     * Retrieves the continuous stream containing the music stream.
+     *
+     * @returns {MediaStream} Real-time audio stream output.
+     */
+    getMusicAudioStream: () => {
+      return state.recording.musicAudioStream;
     },
 
     /**
@@ -1282,9 +1312,11 @@ const pkg = {
         state.recording.musicRecordingGainNode = recordingGain;
         state.recording.trackDelayNode.delayTime.value =
           state.scoring.measuredLatencyS;
-        state.recording.trackDelayNode
-          .connect(recordingGain)
-          .connect(state.recording.destinationNode);
+
+        state.recording.trackDelayNode.connect(recordingGain);
+        recordingGain.connect(state.recording.destinationNode);
+
+        recordingGain.connect(state.recording.musicDestinationNode);
       }
 
       state.scoring.enabled = true;

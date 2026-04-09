@@ -33,6 +33,7 @@ class EncoreSetupController {
       isVerifying: false,
       dialog: null,
       previewingVideo: false,
+      manualCalib: null,
     };
 
     this.previewVideoEl = null;
@@ -51,6 +52,13 @@ class EncoreSetupController {
     this.config = await window.config.getAll();
     this.micDevices = await this.Forte.getMicDevices();
     this.playbackDevices = await this.Forte.getPlaybackDevices();
+
+    const micDevice = this.config.audioConfig?.mix?.scoring?.inputDevice;
+    if (micDevice) {
+      await this.Forte.setMicDevice(micDevice);
+    } else {
+      await this.Forte.setMicDevice("default");
+    }
 
     if (this.config.libraryPath) {
       await this.FsSvc.buildSongList(this.config.libraryPath);
@@ -141,6 +149,10 @@ class EncoreSetupController {
   /**
    * Constructs the data maps for the dashboard tiles and submenus based on the current configuration.
    */
+  /**
+   * Builds the settings configuration maps for dashboard tiles and submenus.
+   * Initializes device lists and configuration options for the UI.
+   */
   buildSettingsMap() {
     this.DASHBOARD_TILES = [
       { id: "library", label: "Library & Storage", icon: "📁" },
@@ -227,7 +239,7 @@ class EncoreSetupController {
             label: "Test Audio Output",
             type: "action",
             action: () => {
-              this.Forte.playSfx("/assets/audio/fanfare.wav");
+              this.Forte.playSfx("/assets/audio/fanfare.mid");
               this.showToast("PLAYING TEST SOUND...", "info");
             },
           },
@@ -290,6 +302,12 @@ class EncoreSetupController {
               this.Forte.setLatency(val);
             },
           },
+          {
+            id: "manual_calib",
+            label: "Manual Calibration (Sing & Sync)",
+            type: "action",
+            action: () => this.startManualCalibration(),
+          },
         ],
       },
       video: {
@@ -326,6 +344,52 @@ class EncoreSetupController {
    * @param {KeyboardEvent} e - The active keydown event.
    */
   handleKeyDown(e) {
+    if (this.state.manualCalib && this.state.manualCalib.active) {
+      e.preventDefault();
+
+      if (this.state.manualCalib.phase === "input") {
+        if (e.key >= "0" && e.key <= "9") {
+          if (this.state.manualCalib.songInput.length < 5) {
+            this.state.manualCalib.songInput += e.key;
+            this.renderView();
+          }
+        } else if (e.key === "Backspace") {
+          this.state.manualCalib.songInput =
+            this.state.manualCalib.songInput.slice(0, -1);
+          this.renderView();
+        } else if (e.key === "Enter") {
+          const displayCode = this.state.manualCalib.songInput.padStart(5, "0");
+          const song = this.songList.find((s) => s.code === displayCode);
+          if (song) {
+            this.startCalibrationRecording(song);
+          }
+        } else if (e.key === "Escape") {
+          this.exitManualCalibration();
+        }
+      } else if (this.state.manualCalib.phase === "recording") {
+        if (e.key === "Enter") this.stopCalibrationRecording();
+        else if (e.key === "Escape") {
+          this.exitManualCalibration();
+        }
+      } else if (this.state.manualCalib.phase === "playing") {
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          const dir = e.key === "ArrowRight" ? 1 : -1;
+
+          this.state.manualCalib.offset = Math.max(
+            0,
+            Math.min(1000, this.state.manualCalib.offset + 10 * dir),
+          );
+
+          if (this.calibOffsetDisplay) {
+            this.calibOffsetDisplay.text(`${this.state.manualCalib.offset} ms`);
+          }
+          this.updateCalibrationDelay();
+        } else if (e.key === "Enter") this.saveManualCalibration();
+        else if (e.key === "Escape") this.exitManualCalibration();
+      }
+      return;
+    }
+
     if (this.state.previewingVideo) {
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         const dir = e.key === "ArrowRight" ? 1 : -1;
@@ -461,7 +525,488 @@ class EncoreSetupController {
   }
 
   /**
-   * Processes the completed PIN entry for login or PIN changes.
+   * Parses LRC (lyrics) file format for the calibration screen.
+   * Extracts timestamps and lyric text from LRC format strings.
+   *
+   * @param {string} text - The LRC file content to parse
+   * @returns {Array<{time: number, text: string}>} Array of lyric entries with timestamps
+   */
+  parseLrc(text) {
+    const regex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
+    if (!text) return [];
+    const lines = text.split("\n");
+    return lines
+      .map((line) => {
+        const match = line.match(regex);
+        if (!match) return null;
+        const time =
+          parseInt(match[1]) * 60 +
+          parseInt(match[2]) +
+          parseInt(match[3].padEnd(3, "0")) / 1000;
+        const txt = line.replace(regex, "").trim();
+        return txt ? { time, text: txt } : null;
+      })
+      .filter(Boolean);
+  }
+
+  /**
+   * Initializes manual microphone latency calibration mode.
+   * Sets up the state object for capturing and synchronizing audio streams.
+   */
+  startManualCalibration() {
+    this.state.manualCalib = {
+      active: true,
+      phase: "input",
+      songInput: "",
+      offset: Math.round((this.config.audioConfig?.micLatency ?? 0) * 1000),
+      audioContext: new (window.AudioContext || window.webkitAudioContext)(),
+      micRecorder: null,
+      musicRecorder: null,
+      micChunks: [],
+      musicChunks: [],
+      micBuffer: null,
+      trackBuffer: null,
+      micSource: null,
+      trackSource: null,
+      trackDelayNode: null,
+      lrcData: [],
+      midiLines: [],
+    };
+    this.renderView();
+  }
+
+  /**
+   * Begins recording calibration audio for the selected song.
+   * Captures both microphone and music streams, parses lyrics for display.
+   *
+   * @param {Object} song - The song object containing path and metadata
+   * @returns {Promise<void>}
+   */
+  async startCalibrationRecording(song) {
+    this.state.manualCalib.phase = "recording";
+    this.renderView();
+
+    this.Forte.setLatency(0);
+
+    const fileUrl = new URL("http://127.0.0.1:9864/getFile");
+    fileUrl.searchParams.append("path", song.path);
+    await this.Forte.loadTrack(fileUrl.href);
+
+    const pbState = this.Forte.getPlaybackState();
+    this.state.manualCalib.isMidi = pbState.isMidi;
+    this.state.manualCalib.lrcData = [];
+    this.state.manualCalib.midiLines = [];
+    if (pbState.isMidi) {
+      let currentLineText = "";
+      let startIndex = 0;
+      let displayIndex = 0;
+
+      let lyricsToParse = [...pbState.decodedLyrics];
+      while (
+        lyricsToParse.length > 0 &&
+        (lyricsToParse[0].trim().startsWith("{@") ||
+          lyricsToParse[0].trim().startsWith("{#"))
+      ) {
+        lyricsToParse.shift();
+      }
+
+      for (let i = 0; i < lyricsToParse.length; i++) {
+        const syllable = lyricsToParse[i];
+        const clean = syllable.replace(/[\r\n\/\\]/g, "");
+        const startsWithNewLine = /^[\r\n\/\\\\]/.test(syllable);
+        const endsWithNewLine = /[\r\n\/\\\\]$/.test(syllable);
+
+        if (startsWithNewLine && currentLineText.trim() !== "") {
+          this.state.manualCalib.midiLines.push({
+            text: currentLineText.trim(),
+            startIndex,
+            endIndex: displayIndex - 1,
+          });
+          currentLineText = "";
+          startIndex = displayIndex;
+        }
+
+        if (clean) {
+          currentLineText += clean.replace(/\[.*?\]/g, "");
+          displayIndex++;
+        }
+
+        if (endsWithNewLine && currentLineText.trim() !== "") {
+          this.state.manualCalib.midiLines.push({
+            text: currentLineText.trim(),
+            startIndex,
+            endIndex: displayIndex - 1,
+          });
+          currentLineText = "";
+          startIndex = displayIndex;
+        }
+      }
+      if (currentLineText.trim() !== "") {
+        this.state.manualCalib.midiLines.push({
+          text: currentLineText.trim(),
+          startIndex,
+          endIndex: displayIndex - 1,
+        });
+      }
+    } else if (song.lrcPath) {
+      const lrcText = await this.FsSvc.readFile(song.lrcPath);
+      this.state.manualCalib.lrcData = this.parseLrc(lrcText);
+    }
+
+    let currentLineIdx = -1;
+
+    this.boundCalibTimeUpdate = (e) => {
+      if (this.state.manualCalib.isMidi) return;
+      const currentTime = e.detail.currentTime;
+
+      if (this.state.manualCalib.lrcData.length > 0) {
+        let activeIdx = -1;
+        for (let i = this.state.manualCalib.lrcData.length - 1; i >= 0; i--) {
+          if (currentTime >= this.state.manualCalib.lrcData[i].time) {
+            activeIdx = i;
+            break;
+          }
+        }
+
+        if (activeIdx !== currentLineIdx) {
+          currentLineIdx = activeIdx;
+          const activeLine =
+            activeIdx >= 0
+              ? this.state.manualCalib.lrcData[activeIdx].text
+              : "Start singing!";
+          const nextLine =
+            activeIdx >= 0 &&
+            activeIdx + 1 < this.state.manualCalib.lrcData.length
+              ? this.state.manualCalib.lrcData[activeIdx + 1].text
+              : "";
+
+          if (this.calibLyricLine1) this.calibLyricLine1.text(activeLine);
+          if (this.calibLyricLine2) this.calibLyricLine2.text(nextLine);
+        }
+      }
+    };
+
+    this.boundCalibLyricEvent = (e) => {
+      if (!this.state.manualCalib.isMidi) return;
+      const idx = e.detail.index;
+
+      const lines = this.state.manualCalib.midiLines;
+      const activeIdx = lines.findIndex(
+        (l) => idx >= l.startIndex && idx <= l.endIndex,
+      );
+
+      if (activeIdx !== -1 && activeIdx !== currentLineIdx) {
+        currentLineIdx = activeIdx;
+        const activeLine = lines[activeIdx].text;
+        const nextLine =
+          activeIdx + 1 < lines.length ? lines[activeIdx + 1].text : "";
+
+        if (this.calibLyricLine1) this.calibLyricLine1.text(activeLine);
+        if (this.calibLyricLine2) this.calibLyricLine2.text(nextLine);
+      }
+    };
+
+    document.addEventListener(
+      "CherryTree.Forte.Playback.TimeUpdate",
+      this.boundCalibTimeUpdate,
+    );
+    document.addEventListener(
+      "CherryTree.Forte.Playback.LyricEvent",
+      this.boundCalibLyricEvent,
+    );
+
+    if (this.calibLyricLine1) this.calibLyricLine1.text("Start singing!");
+    if (this.calibLyricLine2) {
+      if (
+        this.state.manualCalib.isMidi &&
+        this.state.manualCalib.midiLines.length > 0
+      ) {
+        this.calibLyricLine2.text(this.state.manualCalib.midiLines[0].text);
+      } else if (
+        !this.state.manualCalib.isMidi &&
+        this.state.manualCalib.lrcData.length > 0
+      ) {
+        this.calibLyricLine2.text(this.state.manualCalib.lrcData[0].text);
+      }
+    }
+
+    const micStream = this.Forte.getMicAudioStream();
+    const musicStream = this.Forte.getMusicAudioStream();
+
+    this.state.manualCalib.micChunks = [];
+    this.state.manualCalib.musicChunks = [];
+    this.state.manualCalib.micRecorder = new MediaRecorder(micStream);
+    this.state.manualCalib.musicRecorder = new MediaRecorder(musicStream);
+
+    this.state.manualCalib.micRecorder.ondataavailable = (e) => {
+      if (e.data.size) this.state.manualCalib.micChunks.push(e.data);
+    };
+    this.state.manualCalib.musicRecorder.ondataavailable = (e) => {
+      if (e.data.size) this.state.manualCalib.musicChunks.push(e.data);
+    };
+
+    this.state.manualCalib.musicRecorder.start();
+    this.state.manualCalib.micRecorder.start();
+    this.Forte.playTrack();
+  }
+
+  /**
+   * Stops the active calibration recording and processes the captured audio.
+   */
+  stopCalibrationRecording() {
+    this.state.manualCalib.phase = "processing";
+    this.renderView();
+
+    this.Forte.stopTrack();
+    if (this.boundCalibTimeUpdate)
+      document.removeEventListener(
+        "CherryTree.Forte.Playback.TimeUpdate",
+        this.boundCalibTimeUpdate,
+      );
+    if (this.boundCalibLyricEvent)
+      document.removeEventListener(
+        "CherryTree.Forte.Playback.LyricEvent",
+        this.boundCalibLyricEvent,
+      );
+
+    const p1 = new Promise((resolve) => {
+      this.state.manualCalib.micRecorder.onstop = async () => {
+        const blob = new Blob(this.state.manualCalib.micChunks, {
+          type: "audio/webm",
+        });
+        resolve(await blob.arrayBuffer());
+      };
+      this.state.manualCalib.micRecorder.stop();
+    });
+
+    const p2 = new Promise((resolve) => {
+      this.state.manualCalib.musicRecorder.onstop = async () => {
+        const blob = new Blob(this.state.manualCalib.musicChunks, {
+          type: "audio/webm",
+        });
+        resolve(await blob.arrayBuffer());
+      };
+      this.state.manualCalib.musicRecorder.stop();
+    });
+
+    Promise.all([p1, p2])
+      .then(async ([micArray, musicArray]) => {
+        const ctx = this.state.manualCalib.audioContext;
+        this.state.manualCalib.micBuffer = await ctx.decodeAudioData(micArray);
+        this.state.manualCalib.trackBuffer =
+          await ctx.decodeAudioData(musicArray);
+        this.startCalibrationPlayback();
+      })
+      .catch((e) => {
+        console.error(e);
+        this.showToast("FAILED TO PROCESS RECORDING", "error");
+        this.exitManualCalibration();
+      });
+  }
+
+  /**
+   * Begins playback of recorded audio streams for synchronization comparison.
+   * Sets up audio nodes with delay for offset adjustment.
+   */
+  startCalibrationPlayback() {
+    this.state.manualCalib.phase = "playing";
+    this.renderView();
+
+    const ctx = this.state.manualCalib.audioContext;
+    if (ctx.state === "suspended") ctx.resume();
+
+    this.stopCalibrationNodes();
+
+    this.state.manualCalib.trackSource = ctx.createBufferSource();
+    this.state.manualCalib.trackSource.buffer =
+      this.state.manualCalib.trackBuffer;
+    this.state.manualCalib.trackSource.loop = true;
+
+    this.state.manualCalib.micSource = ctx.createBufferSource();
+    this.state.manualCalib.micSource.buffer = this.state.manualCalib.micBuffer;
+    this.state.manualCalib.micSource.loop = true;
+
+    this.state.manualCalib.trackDelayNode = ctx.createDelay(2.0);
+    this.updateCalibrationDelay();
+
+    this.state.manualCalib.trackSource
+      .connect(this.state.manualCalib.trackDelayNode)
+      .connect(ctx.destination);
+    this.state.manualCalib.micSource.connect(ctx.destination);
+
+    this.state.manualCalib.trackSource.start(0);
+    this.state.manualCalib.micSource.start(0);
+
+    this.renderWaveforms();
+  }
+
+  /**
+   * Updates the delay node with current offset value (0-1000ms).
+   * Re-renders waveforms to reflect the new delay.
+   */
+  updateCalibrationDelay() {
+    if (!this.state.manualCalib.trackDelayNode) return;
+
+    const offsetSeconds = Math.max(0, this.state.manualCalib.offset / 1000);
+    this.state.manualCalib.trackDelayNode.delayTime.value = offsetSeconds;
+    this.renderWaveforms();
+  }
+
+  /**
+   * Safely disconnects and stops all audio nodes used in calibration playback.
+   */
+  stopCalibrationNodes() {
+    if (this.state.manualCalib.trackSource) {
+      try {
+        this.state.manualCalib.trackSource.stop();
+        this.state.manualCalib.trackSource.disconnect();
+      } catch (e) {}
+    }
+    if (this.state.manualCalib.micSource) {
+      try {
+        this.state.manualCalib.micSource.stop();
+        this.state.manualCalib.micSource.disconnect();
+      } catch (e) {}
+    }
+    if (this.state.manualCalib.trackDelayNode) {
+      try {
+        this.state.manualCalib.trackDelayNode.disconnect();
+      } catch (e) {}
+    }
+  }
+
+  /**
+   * Renders waveform visualization of microphone and music audio streams.
+   * Uses canvas to display audio amplitudes for visual sync alignment.
+   */
+  renderWaveforms() {
+    if (!this.calibCanvas) return;
+    const canvas = this.calibCanvas.elm;
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+    ctx.clearRect(0, 0, width, height);
+
+    const trackBuffer = this.state.manualCalib.trackBuffer;
+    const micBuffer = this.state.manualCalib.micBuffer;
+    if (!trackBuffer || !micBuffer) return;
+
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+    ctx.moveTo(width / 2, 0);
+    ctx.lineTo(width / 2, height);
+    ctx.stroke();
+
+    const totalVisibleSeconds = Math.min(trackBuffer.duration, 6);
+
+    const drawBuffer = (
+      buffer,
+      color,
+      yOffset,
+      heightScale,
+      timeOffsetMs = 0,
+    ) => {
+      const data = buffer.getChannelData(0);
+      const sampleRate = buffer.sampleRate;
+      const offsetSeconds = timeOffsetMs / 1000;
+
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+
+      for (let x = 0; x < width; x++) {
+        const timeAtPixel = (x / width) * totalVisibleSeconds;
+        const bufferTime = timeAtPixel - offsetSeconds;
+        const sampleIndex = Math.floor(bufferTime * sampleRate);
+
+        let min = 1.0;
+        let max = -1.0;
+
+        if (sampleIndex >= 0 && sampleIndex < data.length) {
+          const samplesPerPixel = Math.floor(
+            (totalVisibleSeconds / width) * sampleRate,
+          );
+          for (let j = 0; j < samplesPerPixel; j++) {
+            const val = data[sampleIndex + j];
+            if (val < min) min = val;
+            if (val > max) max = val;
+          }
+        } else {
+          min = 0;
+          max = 0;
+        }
+
+        const yMin = yOffset + (1 - min * 1.5) * heightScale;
+        const yMax = yOffset + (1 - max * 1.5) * heightScale;
+
+        if (x === 0) ctx.moveTo(x, yMin);
+        else {
+          ctx.lineTo(x, yMin);
+          ctx.lineTo(x, yMax);
+        }
+      }
+      ctx.stroke();
+    };
+
+    drawBuffer(
+      trackBuffer,
+      "#89cff0",
+      0,
+      height / 4,
+      this.state.manualCalib.offset,
+    );
+
+    drawBuffer(micBuffer, "#ffd700", height / 2, height / 4, 0);
+  }
+
+  /**
+   * Exits calibration mode, cleans up audio nodes and event listeners.
+   * Restores the previous latency setting from configuration.
+   */
+  exitManualCalibration() {
+    if (this.state.manualCalib) {
+      this.stopCalibrationNodes();
+      if (this.state.manualCalib.audioContext)
+        this.state.manualCalib.audioContext.close();
+      if (this.boundCalibTimeUpdate)
+        document.removeEventListener(
+          "CherryTree.Forte.Playback.TimeUpdate",
+          this.boundCalibTimeUpdate,
+        );
+      if (this.boundCalibLyricEvent)
+        document.removeEventListener(
+          "CherryTree.Forte.Playback.LyricEvent",
+          this.boundCalibLyricEvent,
+        );
+
+      this.Forte.stopTrack();
+      const currentConfigLatency = this.config.audioConfig?.micLatency ?? 0;
+      this.Forte.setLatency(currentConfigLatency);
+
+      this.state.manualCalib.active = false;
+    }
+    this.renderView();
+  }
+
+  /**
+   * Persists the calibrated microphone latency offset to configuration.
+   * Applies the new latency setting to the audio engine.
+   */
+  saveManualCalibration() {
+    const val = this.state.manualCalib.offset / 1000;
+    this.config.audioConfig ??= {};
+    this.config.audioConfig.micLatency = val;
+    window.config.setItem("audioConfig.micLatency", val);
+    this.Forte.setLatency(val);
+    this.showToast("CALIBRATION SAVED", "success");
+
+    this.state.manualCalib.active = false;
+    this.exitManualCalibration();
+  }
+
+  /**
+   * Processes PIN verification and entry flow.
+   * Handles both initial authentication and PIN changes based on the current state.
    *
    * @returns {Promise<void>}
    */
@@ -512,9 +1057,10 @@ class EncoreSetupController {
   }
 
   /**
-   * Triggers a specific action requested from the dashboard tile menu.
+   * Executes a dashboard action.
+   * Handles reboot, security PIN change, and navigation to configuration submenus.
    *
-   * @param {string} id - The ID representing the selected dashboard tile.
+   * @param {string} id - The action ID corresponding to a dashboard tile
    */
   executeAction(id) {
     if (id === "reboot") {
@@ -555,7 +1101,8 @@ class EncoreSetupController {
   }
 
   /**
-   * Initiates a scan for Encore Libraries across local drives.
+   * Scans storage for Encore libraries and sets the active library.
+   * Updates song list and configuration based on the discovered library.
    *
    * @returns {Promise<void>}
    */
@@ -580,7 +1127,8 @@ class EncoreSetupController {
   }
 
   /**
-   * Initializes the overlay video preview layer to assist syncing delays.
+   * Initializes video preview playback for sync calibration.
+   * Loads the first MTV song with playback synchronization.
    *
    * @returns {Promise<void>}
    */
@@ -616,7 +1164,9 @@ class EncoreSetupController {
   }
 
   /**
-   * Processes alignment synchronization adjustments during the active preview cycle.
+   * Synchronizes video playback with audio track during preview.
+   * Adjusts video time and playback rate based on configured sync offset.
+   * Runs as a continuous animation frame loop.
    */
   syncVideoLoop() {
     if (!this.state.previewingVideo) return;
@@ -646,7 +1196,8 @@ class EncoreSetupController {
   }
 
   /**
-   * Halts the active video preview cycle and tears down associated DOM layers.
+   * Stops video preview and cleans up playback resources.
+   * Cancels animation frames and removes event listeners.
    */
   stopVideoPreview() {
     this.state.previewingVideo = false;
@@ -661,10 +1212,10 @@ class EncoreSetupController {
   }
 
   /**
-   * Triggers a fast UI toast notification message.
+   * Displays a temporary toast notification.
    *
-   * @param {string} msg - The notification message text.
-   * @param {string} type - Status level formatting ("success", "error", "info").
+   * @param {string} msg - The notification text
+   * @param {string} type - Notification type: "success", "error", or "info"
    */
   showToast(msg, type) {
     const toast = new Html("div")
@@ -679,10 +1230,16 @@ class EncoreSetupController {
   }
 
   /**
-   * Main rendering routine, delegating the visual layout logic based on system state.
+   * Main rendering function that delegates to view-specific renderers.
+   * Handles state-based UI updates for auth, dashboard, calibration, and video preview.
    */
   renderView() {
     this.container.clear();
+
+    if (this.state.manualCalib?.active) {
+      this.renderManualCalibrationOverlay(this.container);
+      return;
+    }
 
     if (this.state.previewingVideo) {
       this.renderVideoPreviewOverlay(this.container);
@@ -720,9 +1277,131 @@ class EncoreSetupController {
   }
 
   /**
-   * Overlays the current menu view displaying track video syncing parameters.
+   * Renders the manual calibration overlay with phase-specific UI.
+   * Displays input, recording, processing, or playback screens.
    *
-   * @param {Object} container - Top level parent rendering DOM context.
+   * @param {Object} container - Parent DOM element
+   */
+  renderManualCalibrationOverlay(container) {
+    const overlay = new Html("div")
+      .classOn("setup-manual-calib-overlay")
+      .appendTo(container);
+
+    new Html("h2").text("MANUAL SYNC CALIBRATION").appendTo(overlay);
+
+    if (this.state.manualCalib.phase === "input") {
+      new Html("p")
+        .text(
+          "Enter a 5-digit song number from your library to use for testing.",
+        )
+        .appendTo(overlay);
+      new Html("br").appendTo(overlay);
+
+      const displayCode = this.state.manualCalib.songInput.padStart(5, "0");
+      new Html("div")
+        .classOn("calib-value-display")
+        .text(displayCode)
+        .appendTo(overlay);
+
+      const song = this.songList.find((s) => s.code === displayCode);
+      if (song) {
+        new Html("p")
+          .styleJs({ color: "#89cff0", fontWeight: "bold", fontSize: "1.5rem" })
+          .text(`${song.title} - ${song.artist}`)
+          .appendTo(overlay);
+      } else if (this.state.manualCalib.songInput.length > 0) {
+        new Html("p")
+          .styleJs({ color: "#ff5555", fontWeight: "bold", fontSize: "1.5rem" })
+          .text("Song not found in library.")
+          .appendTo(overlay);
+      }
+
+      new Html("p")
+        .styleJs({ marginTop: "2rem", opacity: "0.6" })
+        .text("Use Number Keys to type | ENTER to Start | ESC to Cancel")
+        .appendTo(overlay);
+    } else if (this.state.manualCalib.phase === "recording") {
+      new Html("div")
+        .classOn("calib-status-badge")
+        .text("RECORDING... SING ALONG!")
+        .appendTo(overlay);
+
+      const lrcCont = new Html("div")
+        .classOn("calib-lyrics-container")
+        .appendTo(overlay);
+      this.calibLyricLine1 = new Html("div")
+        .classOn("calib-lyric-line", "active")
+        .text("Loading track...")
+        .appendTo(lrcCont);
+      this.calibLyricLine2 = new Html("div")
+        .classOn("calib-lyric-line", "next")
+        .text("")
+        .appendTo(lrcCont);
+
+      new Html("p")
+        .styleJs({ marginTop: "1rem" })
+        .text("Press ENTER when you are finished singing to begin adjusting.")
+        .appendTo(overlay);
+    } else if (this.state.manualCalib.phase === "processing") {
+      new Html("h2").text("PROCESSING AUDIO...").appendTo(overlay);
+    } else if (this.state.manualCalib.phase === "playing") {
+      new Html("p")
+        .text(
+          "Use the Left or Right arrows until your voice lines up with the music.",
+        )
+        .appendTo(overlay);
+      new Html("br").appendTo(overlay);
+
+      const controls = new Html("div")
+        .classOn("calib-controls")
+        .appendTo(overlay);
+
+      const layout = new Html("div")
+        .classOn("calib-waveform-layout")
+        .appendTo(controls);
+
+      const labels = new Html("div")
+        .classOn("calib-waveform-labels-side")
+        .appendTo(layout);
+      new Html("span")
+        .classOn("calib-label-music")
+        .text("MUSIC")
+        .appendTo(labels);
+      new Html("span").classOn("calib-label-mic").text("MIC").appendTo(labels);
+
+      this.calibCanvas = new Html("canvas")
+        .classOn("calib-waveform-canvas")
+        .attr({ width: 800, height: 200 })
+        .appendTo(layout);
+
+      const sliderBox = new Html("div")
+        .classOn("calib-slider-container")
+        .appendTo(controls);
+
+      const offset = this.state.manualCalib.offset;
+      this.calibOffsetDisplay = new Html("div")
+        .classOn("calib-value-display")
+        .text(`${offset > 0 ? "+" : ""}${offset} ms`)
+        .appendTo(sliderBox);
+
+      const btns = new Html("div").classOn("calib-buttons").appendTo(controls);
+      new Html("button")
+        .classOn("box", "positive")
+        .text("Save & Exit (ENTER)")
+        .on("click", () => this.saveManualCalibration())
+        .appendTo(btns);
+      new Html("button")
+        .classOn("box", "negative")
+        .text("Discard (ESC)")
+        .on("click", () => this.exitManualCalibration())
+        .appendTo(btns);
+    }
+  }
+
+  /**
+   * Renders the video preview overlay with sync offset display.
+   *
+   * @param {Object} container - Parent DOM element
    */
   renderVideoPreviewOverlay(container) {
     const overlay = new Html("div")
@@ -746,9 +1425,9 @@ class EncoreSetupController {
   }
 
   /**
-   * Renders the modal prompt dialog inside the provided parent container.
+   * Renders a modal dialog box.
    *
-   * @param {Object} container - The DOM wrapper representing the active UI space.
+   * @param {Object} container - Parent DOM element
    */
   renderDialog(container) {
     const overlay = new Html("div")
@@ -768,9 +1447,10 @@ class EncoreSetupController {
   }
 
   /**
-   * Displays the PIN authorization interface logic elements.
+   * Renders the PIN authentication screen.
+   * Displays input dots based on entered PIN length.
    *
-   * @param {Object} container - Top level active screen layer container.
+   * @param {Object} container - Parent DOM element
    */
   renderAuthScreen(container) {
     const authBox = new Html("div").classOn("auth-box").appendTo(container);
@@ -800,9 +1480,10 @@ class EncoreSetupController {
   }
 
   /**
-   * Projects root-level dashboard item options rendering a grid menu layout.
+   * Renders the dashboard grid with configuration tiles.
+   * Highlights the currently selected tile.
    *
-   * @param {Object} container - Setup menu frame wrapper.
+   * @param {Object} container - Parent DOM element
    */
   renderDashboard(container) {
     const grid = new Html("div").classOn("setup-grid").appendTo(container);
@@ -822,9 +1503,10 @@ class EncoreSetupController {
   }
 
   /**
-   * Triggers visual update to present specific section values or controls inside the setup.
+   * Renders a configuration submenu with items and controls.
+   * Handles range sliders, select dropdowns, and action buttons.
    *
-   * @param {Object} container - Targeted element injection wrapper representing the system view area.
+   * @param {Object} container - Parent DOM element
    */
   renderSubmenu(container) {
     const menuData = this.SUBMENUS[this.state.activeMenuId];
@@ -869,11 +1551,13 @@ class EncoreSetupController {
   }
 
   /**
-   * Finalizes interface operations removing bindings and cleaning state logic hooks.
+   * Cleans up the setup interface.
+   * Removes event listeners and destroys the UI.
    */
   destroy() {
     window.removeEventListener("keydown", this.boundKeydown);
     if (this.previewSyncFrame) cancelAnimationFrame(this.previewSyncFrame);
+    if (this.state.manualCalib?.active) this.exitManualCalibration();
     this.Ui.giveUpUi(this.Pid);
     this.wrapper.cleanup();
   }
