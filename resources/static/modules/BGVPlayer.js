@@ -1,8 +1,15 @@
 import Html from "/libs/html.js";
 
+/**
+ * BGVModule - Encore's BGV playback module
+ * Features single-buffered video element with smooth transitions and manual override capability
+ */
 export class BGVModule {
+  /**
+   * Initialize the BGV player with default settings
+   */
   constructor() {
-    this.videoElement = null; // Single video element
+    this.videoElement = null;
     this.playlist = [];
     this.currentIndex = 0;
     this.container = null;
@@ -11,24 +18,23 @@ export class BGVModule {
     this.isManualMode = false;
     this.activeManualPlayer = null;
     this.PORT = 9864;
-
-    // Performance settings
     this.transitionTimeout = null;
     console.log(
       "[BGV] BGV Player initialized (Single Buffer / Performance Mode).",
     );
   }
 
+  /**
+   * Mount the video player to a container element
+   * @param {HTMLElement} container - The DOM container for video playback
+   */
   mount(container) {
     this.container = container;
-
-    // Set container background to black to hide loading glitches
     this.container.styleJs({
       backgroundColor: "#000",
       overflow: "hidden",
     });
 
-    // Create ONLY ONE video element
     this.videoElement = new Html("video")
       .attr({
         muted: true,
@@ -44,30 +50,30 @@ export class BGVModule {
         width: "100%",
         height: "100%",
         objectFit: "cover",
-        opacity: "0", // Start hidden until ready
-        transition: "opacity 0.5s ease-in-out", // Smooth entry
-        willChange: "opacity", // Optimize compositing
-        transform: "translateZ(0)", // Force GPU layer
+        opacity: "0",
+        transition: "opacity 0.5s ease-in-out",
+        willChange: "opacity",
+        transform: "translateZ(0)",
       })
       .appendTo(this.container).elm;
 
-    // Ensure volume is always 0
     this.videoElement.volume = 0;
     this.videoElement.addEventListener(
       "volumechange",
       () => (this.videoElement.volume = 0),
     );
 
-    // Handle Video End -> Next
     this.videoElement.onended = () => this.playNext();
 
-    // Handle Errors (skip corrupt files)
     this.videoElement.onerror = (e) => {
       console.warn("[BGV] Video error, skipping:", e);
       this.playNext();
     };
   }
 
+  /**
+   * Load background video categories from manifest
+   */
   async loadManifestCategories() {
     try {
       const response = await fetch(
@@ -81,12 +87,19 @@ export class BGVModule {
     }
   }
 
+  /**
+   * Add a dynamic category to the available categories
+   * @param {Object} category - Category object with BGV_LIST and BGV_CATEGORY properties
+   */
   addDynamicCategory(category) {
     if (category && category.BGV_LIST && category.BGV_LIST.length > 0) {
       this.categories.push(category);
     }
   }
 
+  /**
+   * Update playlist based on selected category
+   */
   async updatePlaylistForCategory() {
     const assetBaseUrl = `http://127.0.0.1:${this.PORT}/assets/video/bgv/`;
     this.playlist = [];
@@ -112,7 +125,7 @@ export class BGVModule {
     }
 
     this.playlist = allVideos;
-    // Fisher-Yates Shuffle
+    // Shuffle playlist using Fisher-Yates algorithm
     for (let i = this.playlist.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [this.playlist[i], this.playlist[j]] = [
@@ -126,6 +139,10 @@ export class BGVModule {
     this.start();
   }
 
+  /**
+   * Cycle through available categories
+   * @param {number} direction - Direction to cycle (-1 for previous, 1 for next)
+   */
   cycleCategory(direction) {
     if (this.isManualMode) return;
     const allCategoryNames = [
@@ -140,32 +157,39 @@ export class BGVModule {
     this.updatePlaylistForCategory();
   }
 
+  /**
+   * Start playback of the current playlist
+   */
   start() {
     if (this.isManualMode || this.playlist.length === 0) return;
     this._playUrl(this.playlist[this.currentIndex]);
   }
 
+  /**
+   * Advance to the next video in playlist with fade transition
+   */
   playNext() {
     if (this.isManualMode || this.playlist.length === 0) return;
 
-    // Move index
     this.currentIndex = (this.currentIndex + 1) % this.playlist.length;
 
-    // Simple fade out - switch - fade in logic
-    // This allows the decoder to fully stop the previous file before starting the next
     this.videoElement.style.opacity = "0";
 
     if (this.transitionTimeout) clearTimeout(this.transitionTimeout);
 
     this.transitionTimeout = setTimeout(() => {
       this._playUrl(this.playlist[this.currentIndex]);
-    }, 500); // 500ms black gap to ensure buffer flush
+    }, 500);
   }
 
+  /**
+   * Internal method to load and play a video URL
+   * @private
+   * @param {string} url - The video URL to play
+   */
   _playUrl(url) {
     const v = this.videoElement;
 
-    // One-time listener for when data is ready
     const onCanPlay = () => {
       v.play()
         .then(() => {
@@ -180,12 +204,16 @@ export class BGVModule {
     v.load();
   }
 
+  /**
+   * Play a single video without interrupting the auto-playlist
+   * @param {string} url - The video URL to play
+   * @returns {Promise<HTMLVideoElement>} The video element
+   */
   async playSingleVideo(url) {
     this.isManualMode = true;
     this.activeManualPlayer = this.videoElement;
-    this.videoElement.onended = null; // Stop looping playlist
+    this.videoElement.onended = null;
 
-    // For manual mode (MTV), we want immediate playback
     this.videoElement.style.opacity = "0";
     this.videoElement.src = url;
     this.videoElement.load();
@@ -202,21 +230,26 @@ export class BGVModule {
     return this.videoElement;
   }
 
+  /**
+   * Resume playlist playback after manual video playback
+   */
   async resumePlaylist() {
     if (!this.isManualMode) return;
     this.isManualMode = false;
     this.activeManualPlayer = null;
     this.videoElement.onended = () => this.playNext();
 
-    // Resume current index
     this.start();
   }
 
+  /**
+   * Stop video playback and clear the video source
+   */
   stop() {
     if (this.videoElement) {
       this.videoElement.pause();
       this.videoElement.removeAttribute("src");
-      this.videoElement.load(); // Force buffer flush
+      this.videoElement.load();
       this.videoElement.style.opacity = "0";
     }
     if (this.transitionTimeout) clearTimeout(this.transitionTimeout);

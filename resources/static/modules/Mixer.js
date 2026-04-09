@@ -1,6 +1,14 @@
 import Html from "/libs/html.js";
 
+/**
+ * MixerModule - Manages the microphone and music recording mixer interface
+ * Provides UI controls for adjusting gain levels and plugin parameters
+ */
 export class MixerModule {
+  /**
+   * Creates a new MixerModule instance
+   * @param {Object} forteSvc - Forte service instance for managing audio chain
+   */
   constructor(forteSvc) {
     this.Forte = forteSvc;
     this.isVisible = false;
@@ -11,9 +19,11 @@ export class MixerModule {
     this.activePanel = "list";
     this.selectedIndex = 0;
     this.selectedParamIndex = 0;
-    console.log("[MIXER] Mixer interface initialized.");
   }
-
+  /**
+   * Mounts the mixer modal to a container element
+   * @param {HTMLElement} container - Parent container to append mixer modal to
+   */
   mount(container) {
     this.modal = new Html("div").classOn("mixer-modal").appendTo(container);
     const content = new Html("div")
@@ -39,6 +49,9 @@ export class MixerModule {
     });
   }
 
+  /**
+   * Toggles the visibility of the mixer modal
+   */
   toggle() {
     this.isVisible = !this.isVisible;
     if (this.isVisible) {
@@ -54,6 +67,9 @@ export class MixerModule {
     }
   }
 
+  /**
+   * Builds the mixer interface from current vocal chain state
+   */
   build() {
     this.state = this.Forte.getVocalChainState();
     this.listPanel.clear();
@@ -77,6 +93,10 @@ export class MixerModule {
     });
   }
 
+  /**
+   * Renders the control panel for the selected item
+   * @private
+   */
   _renderControls() {
     this.controlsPanel.clear();
     const items = this.listPanel.qsa(".mixer-item");
@@ -92,7 +112,6 @@ export class MixerModule {
       .appendTo(this.controlsPanel);
 
     if (this.selectedIndex === 0) {
-      // Mic Record
       this._createSlider(
         controlsContainer,
         "Gain",
@@ -111,7 +130,6 @@ export class MixerModule {
         0,
       );
     } else if (this.selectedIndex === 1) {
-      // Music Record
       this._createSlider(
         controlsContainer,
         "Level",
@@ -130,7 +148,6 @@ export class MixerModule {
         0,
       );
     } else {
-      // Plugins
       const pluginIndex = this.selectedIndex - 2;
       const plugin = this.state.chain[pluginIndex];
       if (plugin && plugin.parameters) {
@@ -153,6 +170,15 @@ export class MixerModule {
     this._updateControlsHighlight();
   }
 
+  /**
+   * Creates a slider control for parameter adjustment
+   * @private
+   * @param {Html} container - Container to append slider to
+   * @param {string} name - Label name for the slider
+   * @param {Object} paramDef - Parameter definition with min, max, step, unit, value
+   * @param {Function} callback - Callback fired on slider change
+   * @param {number} paramIndex - Index of the parameter
+   */
   _createSlider(container, name, paramDef, callback, paramIndex) {
     const controlEl = new Html("div")
       .classOn("mixer-control")
@@ -202,6 +228,10 @@ export class MixerModule {
     updateDisplay(paramDef.value);
   }
 
+  /**
+   * Updates the visual highlight on the list panel items
+   * @private
+   */
   _updateListHighlight() {
     this.listPanel.qsa(".mixer-item").forEach((item, index) => {
       if (this.activePanel === "list" && index === this.selectedIndex) {
@@ -213,6 +243,10 @@ export class MixerModule {
     });
   }
 
+  /**
+   * Updates the visual highlight on the control panel items
+   * @private
+   */
   _updateControlsHighlight() {
     this.controlsPanel.qsa(".mixer-control").forEach((control, index) => {
       if (
@@ -227,6 +261,10 @@ export class MixerModule {
     });
   }
 
+  /**
+   * Handles keyboard navigation and control events
+   * @param {KeyboardEvent} e - The keyboard event
+   */
   handleKeyDown(e) {
     e.preventDefault();
     const numListItems = this.listPanel.qsa(".mixer-item").length;
