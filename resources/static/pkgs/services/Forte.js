@@ -785,8 +785,10 @@ const pkg = {
       .appendTo("body");
 
     try {
+      const config = await window.config.getAll();
+      const bufferSize = config.audioConfig?.bufferSize ?? 0.1;
       audioContext = new (window.AudioContext || window.webkitAudioContext)({
-        latencyHint: 0.1,
+        latencyHint: bufferSize,
         sampleRate: 44100,
       });
 
@@ -835,6 +837,12 @@ const pkg = {
 
       logVerbose("Audio pipelines initialized.");
       logVerbose("AudioContext sinkId", audioContext.sinkId || "default");
+      logVerbose("AudioContext baseLatency", audioContext.baseLatency);
+      logVerbose("AudioContext outputLatency", audioContext.outputLatency);
+      logVerbose(
+        "AudioContext total latency",
+        audioContext.baseLatency + audioContext.outputLatency,
+      );
 
       state.playback.currentDeviceId = audioContext.sinkId || "default";
       pkg.data.getPlaybackDevices();

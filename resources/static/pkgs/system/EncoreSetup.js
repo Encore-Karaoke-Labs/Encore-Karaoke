@@ -235,6 +235,22 @@ class EncoreSetupController {
             },
           },
           {
+            id: "buffer_size",
+            label: "Buffer Size (ms) (restart required)",
+            type: "range",
+            min: 10,
+            max: 1000,
+            step: 10,
+            get: () =>
+              Math.round((this.config.audioConfig?.bufferSize ?? 0.1) * 1000),
+            set: (v) => {
+              const val = v / 1000;
+              this.config.audioConfig ??= {};
+              this.config.audioConfig.bufferSize = val;
+              window.config.setItem("audioConfig.bufferSize", val);
+            },
+          },
+          {
             id: "test",
             label: "Test Audio Output",
             type: "action",
