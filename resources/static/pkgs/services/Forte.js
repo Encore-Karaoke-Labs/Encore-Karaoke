@@ -194,7 +194,9 @@ const MIN_FRAMES_FOR_FULL_SCORE = 900;
 const MIN_VOCAL_HZ = 75;
 const MAX_VOCAL_HZ = 1200;
 
+let saveVocalChainTimeout = null;
 let guideAnalyserBuffer = null;
+let saveVolumesTimeout = null;
 let micAnalyserBuffer = null;
 
 const state = {
@@ -266,7 +268,9 @@ const state = {
     micChainInput: null,
     micChainOutput: null,
     vocalChain: [],
+    vocalChainConfig: [],
     musicGainInRecording: 0.2,
+    micGainInRecording: 1.0,
   },
   ui: {
     pianoRollVisible: true,
@@ -2030,10 +2034,12 @@ const pkg = {
      * @param {Array<Object>} chainConfig - Mapped representations configuring instances.
      */
     loadVocalChain: async (chainConfig) => {
+      state.effects.vocalChainConfig = JSON.parse(JSON.stringify(chainConfig));
       state.effects.vocalChain.forEach((plugin) => plugin.disconnect());
       state.effects.vocalChain = [];
 
-      for (const pluginConfig of chainConfig) {
+      for (let i = 0; i < chainConfig.length; i++) {
+        const pluginConfig = chainConfig[i];
         try {
           logVerbose("Loading plugin configuration", pluginConfig);
           const pluginModule = await import(pluginConfig.path);
@@ -2051,6 +2057,35 @@ const pkg = {
               pluginInstance.setParameter(key, value);
             }
           }
+
+          const originalSetParameter = pluginInstance.setParameter;
+          if (typeof originalSetParameter === "function") {
+            pluginInstance.setParameter = function (paramName, value) {
+              originalSetParameter.call(this, paramName, value);
+
+              if (state.effects.vocalChainConfig[i]) {
+                if (!state.effects.vocalChainConfig[i].params) {
+                  state.effects.vocalChainConfig[i].params = {};
+                }
+                state.effects.vocalChainConfig[i].params[paramName] = value;
+
+                if (saveVocalChainTimeout) clearTimeout(saveVocalChainTimeout);
+                saveVocalChainTimeout = setTimeout(() => {
+                  if (
+                    window.config &&
+                    typeof window.config.setItem === "function"
+                  ) {
+                    window.config.setItem(
+                      "audioConfig.vocalChain",
+                      state.effects.vocalChainConfig,
+                    );
+                    logVerbose("Saved updated vocal chain config to disk.");
+                  }
+                }, 300);
+              }
+            };
+          }
+
           state.effects.vocalChain.push(pluginInstance);
         } catch (e) {
           console.error(`[FORTE SVC] Failed to load plugin.`, e);
@@ -2086,6 +2121,7 @@ const pkg = {
      * @param {string} paramName - Field property designation string.
      * @param {number} value - Floating target logic adjusting module specific traits.
      */
+
     setPluginParameter: (pluginIndex, paramName, value) => {
       const plugin = state.effects.vocalChain[pluginIndex];
       if (plugin) plugin.setParameter(paramName, value);
@@ -2098,6 +2134,7 @@ const pkg = {
      */
     setMicRecordingVolume: (level) => {
       const clamped = Math.max(0, Math.min(2, level));
+      state.effects.micGainInRecording = clamped;
       if (state.effects.micChainOutput) {
         state.effects.micChainOutput.gain.setTargetAtTime(
           clamped,
@@ -2105,6 +2142,14 @@ const pkg = {
           0.01,
         );
       }
+
+      if (saveVolumesTimeout) clearTimeout(saveVolumesTimeout);
+      saveVolumesTimeout = setTimeout(() => {
+        if (window.config && typeof window.config.setItem === "function") {
+          window.config.setItem("audioConfig.micRecordingVolume", clamped);
+          logVerbose("Saved mic recording volume to disk.");
+        }
+      }, 300);
     },
 
     /**
@@ -2122,6 +2167,14 @@ const pkg = {
           0.01,
         );
       }
+
+      if (saveVolumesTimeout) clearTimeout(saveVolumesTimeout);
+      saveVolumesTimeout = setTimeout(() => {
+        if (window.config && typeof window.config.setItem === "function") {
+          window.config.setItem("audioConfig.musicRecordingVolume", clamped);
+          logVerbose("Saved music recording volume to disk.");
+        }
+      }, 300);
     },
 
     /**
@@ -2130,15 +2183,17 @@ const pkg = {
      * @returns {Object} Data schema reflecting internal values across loaded objects.
      */
     getVocalChainState: () => {
-      const chainState = state.effects.vocalChain.map((plugin) => ({
+      const chainState = state.effects.vocalChain.map((plugin, i) => ({
         name: plugin.name,
+        path: state.effects.vocalChainConfig[i]?.path,
         parameters: plugin.parameters,
         instance: plugin,
       }));
       return {
-        micGain: state.effects.micChainOutput?.gain.value || 1.0,
+        micGain: state.effects.micGainInRecording,
         musicGain: state.effects.musicGainInRecording,
         chain: chainState,
+        rawConfig: state.effects.vocalChainConfig || [],
       };
     },
   },

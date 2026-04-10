@@ -195,6 +195,16 @@ class EncoreController {
     document.title = `Encore Karaoke ${this.versionInformation.channel} v${this.versionInformation.number} (${this.versionInformation.codename})`;
 
     await this.Forte.setTrackVolume(this.state.volume);
+    if (this.config.audioConfig?.micRecordingVolume !== undefined) {
+      this.Forte.setMicRecordingVolume(
+        this.config.audioConfig.micRecordingVolume,
+      );
+    }
+    if (this.config.audioConfig?.musicRecordingVolume !== undefined) {
+      this.Forte.setMusicRecordingVolume(
+        this.config.audioConfig.musicRecordingVolume,
+      );
+    }
     if (this.config.audioConfig?.micLatency) {
       await this.Forte.setLatency(this.config.audioConfig.micLatency);
     }
@@ -205,6 +215,9 @@ class EncoreController {
     } else {
       await this.Forte.setMicDevice("default");
     }
+
+    const savedChain = this.config.audioConfig?.vocalChain || [];
+    await this.Forte.loadVocalChain(savedChain);
 
     this.buildUI();
 

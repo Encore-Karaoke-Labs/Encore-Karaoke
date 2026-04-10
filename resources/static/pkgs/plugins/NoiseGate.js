@@ -20,13 +20,16 @@ function dbToLinear(db) {
  * [input] -> [workletNode] -> [output]
  */
 export default class NoiseGatePlugin extends BasePlugin {
-  // Private constructor. Use the static `create` method instead.
+  /**
+   * Private constructor. Use the static `create` method instead.
+   * @param {AudioContext} audioContext - The audio context.
+   * @param {AudioWorkletNode} workletNode - The noise gate processing node.
+   */
   constructor(audioContext, workletNode) {
     super(audioContext);
     this.name = "Noise Gate";
     this.workletNode = workletNode;
 
-    // Define the parameters for the UI. Note these are in user-friendly units (dB, ms).
     this.parameters = {
       threshold: {
         type: "slider",
@@ -54,7 +57,6 @@ export default class NoiseGatePlugin extends BasePlugin {
       },
     };
 
-    // Connect the graph
     this.input.connect(this.workletNode).connect(this.output);
   }
 
@@ -75,7 +77,6 @@ export default class NoiseGatePlugin extends BasePlugin {
           `[FORTE SVC] Failed to load NoiseGateProcessor worklet from ${WORKLET_PATH}`,
           e,
         );
-        // Return a dummy object or throw an error to prevent the app from breaking
         throw e;
       }
     }
@@ -97,20 +98,21 @@ export default class NoiseGatePlugin extends BasePlugin {
     const param = this.workletNode.parameters.get(key);
     if (!param) return;
 
-    // Store the UI value
     this.parameters[key].value = value;
 
     let processedValue = value;
-    // Convert values to the format the processor expects
     if (key === "threshold") {
       processedValue = dbToLinear(value);
     } else if (key === "attack" || key === "release") {
-      processedValue = value / 1000; // ms to seconds
+      processedValue = value / 1000;
     }
 
     param.setTargetAtTime(processedValue, this.audioContext.currentTime, 0.01);
   }
 
+  /**
+   * Disconnects the plugin from the audio graph and cleans up resources.
+   */
   disconnect() {
     super.disconnect();
     if (this.workletNode) {

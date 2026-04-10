@@ -7,7 +7,6 @@ import BasePlugin from "/libs/BasePlugin.js";
  * @returns {BiquadFilterType}
  */
 const getFilterType = (typeString) => {
-  // --- MODIFIED: Added 'highpass' and 'lowpass' to the list of valid types. ---
   const validTypes = [
     "lowshelf",
     "highshelf",
@@ -43,7 +42,6 @@ export default class ParametricEQPlugin extends BasePlugin {
    * @param {Array<object>} bandConfigs - Array of band configuration objects.
    */
   buildChain(bandConfigs) {
-    // --- 1. Cleanup old chain ---
     this.input.disconnect();
     this.filters.forEach((f) => f.disconnect());
     this.filters = [];
@@ -54,13 +52,11 @@ export default class ParametricEQPlugin extends BasePlugin {
       return;
     }
 
-    // --- 2. Create new filters and parameters ---
     bandConfigs.forEach((bandConfig, index) => {
       const filter = this.audioContext.createBiquadFilter();
       const type = getFilterType(bandConfig.type);
       filter.type = type;
 
-      // --- MODIFIED: More robust default frequency handling ---
       let defaultFreq = 1000;
       if (type === "lowshelf" || type === "highpass") defaultFreq = 100;
       if (type === "highshelf" || type === "lowpass") defaultFreq = 10000;
@@ -68,26 +64,21 @@ export default class ParametricEQPlugin extends BasePlugin {
       const freq =
         bandConfig.freq !== undefined ? bandConfig.freq : defaultFreq;
       const gain = bandConfig.gain !== undefined ? bandConfig.gain : 0;
-      const q = bandConfig.q !== undefined ? bandConfig.q : 1.0; // Q is used for resonance on HP/LP filters
+      const q = bandConfig.q !== undefined ? bandConfig.q : 1.0;
 
       filter.frequency.value = freq;
 
-      // --- MODIFIED: Apply Gain or Q based on filter type ---
-      // Gain only applies to shelf and peaking filters.
       if (type === "peaking" || type === "lowshelf" || type === "highshelf") {
         filter.gain.value = gain;
       }
-      // Q applies to peaking, highpass, and lowpass filters.
       if (type === "peaking" || type === "highpass" || type === "lowpass") {
         filter.Q.value = q;
       }
 
       this.filters.push(filter);
 
-      // --- 3. Dynamically define the parameters for the UI ---
       const paramPrefix = `band${index}`;
 
-      // Frequency is universal to all our filter types.
       this.parameters[`${paramPrefix}_freq`] = {
         type: "slider",
         min: 20,
@@ -98,7 +89,6 @@ export default class ParametricEQPlugin extends BasePlugin {
         affectsChain: false,
       };
 
-      // Conditionally add Gain parameter if the filter uses it.
       if (type === "peaking" || type === "lowshelf" || type === "highshelf") {
         this.parameters[`${paramPrefix}_gain`] = {
           type: "slider",
@@ -111,7 +101,6 @@ export default class ParametricEQPlugin extends BasePlugin {
         };
       }
 
-      // Conditionally add Q parameter if the filter uses it.
       if (type === "peaking" || type === "highpass" || type === "lowpass") {
         this.parameters[`${paramPrefix}_q`] = {
           type: "slider",
@@ -125,7 +114,6 @@ export default class ParametricEQPlugin extends BasePlugin {
       }
     });
 
-    // --- 4. Connect the new filter chain ---
     let lastNode = this.input;
     this.filters.forEach((filter) => {
       lastNode.connect(filter);
@@ -135,7 +123,9 @@ export default class ParametricEQPlugin extends BasePlugin {
   }
 
   /**
-   * Sets a parameter value.
+   * Sets a parameter value and applies it to the corresponding filter.
+   * @param {string} key - The parameter key (e.g., 'band0_freq', 'band1_gain', or 'bands').
+   * @param {*} value - The new value to set.
    */
   setParameter(key, value) {
     const now = this.audioContext.currentTime;
@@ -164,13 +154,11 @@ export default class ParametricEQPlugin extends BasePlugin {
         filter.frequency.setTargetAtTime(value, now, smoothTime);
         break;
       case "gain":
-        // Check if the gain property exists before setting it.
         if (filter.gain) {
           filter.gain.setTargetAtTime(value, now, smoothTime);
         }
         break;
       case "q":
-        // Check if the Q property exists before setting it.
         if (filter.Q) {
           filter.Q.setTargetAtTime(value, now, smoothTime);
         }
@@ -178,6 +166,9 @@ export default class ParametricEQPlugin extends BasePlugin {
     }
   }
 
+  /**
+   * Disconnects all filters and cleans up resources.
+   */
   disconnect() {
     super.disconnect();
     this.filters.forEach((f) => f.disconnect());

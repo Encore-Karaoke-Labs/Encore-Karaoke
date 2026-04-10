@@ -3352,6 +3352,166 @@ p + .flex-list button {
   width: 100%;
 }
 
+.mixer-content {
+  transition: width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+  width: 700px;
+  height: 80vh;
+  max-height: 800px;
+}
+
+.mixer-content.expanded {
+  width: 95vw;
+  max-width: 1600px;
+}
+.mixer-layout {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden;
+}
+.mixer-faders-section {
+  display: flex;
+  gap: 3rem;
+  padding: 2rem 4rem;
+  background: rgba(0, 0, 0, 0.6);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0; /* --- FIX: Prevent faders from squishing --- */
+}
+.mixer-chain-section {
+  flex: 1;
+  min-width: 300px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 10, 20, 0.4);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.mixer-plugin-section {
+  flex: 4;
+  padding: 2rem;
+  display: none;
+  background: rgba(5, 5, 10, 0.6);
+  overflow-y: auto;
+  overflow-x: auto;
+  position: relative;
+}
+.mixer-content.expanded .mixer-plugin-section {
+  display: block;
+  animation: fadeIn 0.4s ease forwards;
+}
+
+.mixer-controls-container {
+  width: 100%;
+  min-width: max-content;
+  padding-bottom: 1rem;
+}
+
+/* --- Faders & VU Meters --- */
+.channel-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 100px;
+  padding: 1.5rem 0;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.2s ease;
+}
+.channel-strip.focused {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.1);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+}
+.fader-area {
+  display: flex;
+  gap: 1rem;
+  height: 350px;
+  position: relative;
+}
+.vu-meter {
+  width: 14px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+.vu-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 0%;
+  background: linear-gradient(
+    to top,
+    #39ff14 0%,
+    #39ff14 60%,
+    #f7b733 80%,
+    #ff5555 100%
+  );
+}
+.fader-track {
+  width: 12px;
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 6px;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.8);
+}
+.fader-thumb {
+  position: absolute;
+  left: -18px;
+  width: 48px;
+  height: 20px;
+  background: #89cff0;
+  border-radius: 4px;
+  box-shadow:
+    0 5px 15px rgba(0, 0, 0, 0.8),
+    inset 0 2px 2px rgba(255, 255, 255, 0.5);
+  transition: background-color 0.2s;
+}
+.channel-strip.focused .fader-thumb {
+  background: #ffd700;
+}
+
+/* --- Chain List --- */
+.chain-header {
+  color: #89cff0;
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+  margin: 0 0 1rem 0;
+  border-bottom: 1px solid rgba(137, 207, 240, 0.3);
+  padding-bottom: 0.5rem;
+}
+.chain-item {
+  padding: 0.8rem 1.2rem;
+  margin-bottom: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.chain-item.focused {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.15);
+  color: #ffd700;
+  transform: translateX(5px);
+}
+.chain-item.active-plugin {
+  border-color: #89cff0;
+  background: rgba(137, 207, 240, 0.2);
+  box-shadow: 0 0 15px rgba(137, 207, 240, 0.3);
+}
+.add-header {
+  color: #ffd700;
+  margin-top: 1.5rem;
+}
+
 /* ==========================================================================
    15. Forte Piano Roll
    ========================================================================== */
