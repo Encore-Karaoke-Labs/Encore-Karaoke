@@ -2220,18 +2220,18 @@ class EncoreController {
 
       if (
         typeof window !== "undefined" &&
-        typeof window.confetti === "function"
+        typeof window.confetti === "function" &&
+        !this.state.scoreSkipped &&
+        s >= 70
       ) {
-        if (!this.state.scoreSkipped) {
-          window.confetti({
-            position: {
-              x: window.innerWidth / 2,
-              y: window.innerHeight / 2,
-            },
-            count: 67,
-            fade: true,
-          });
-        }
+        window.confetti({
+          position: {
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2,
+          },
+          count: 67,
+          fade: true,
+        });
       }
 
       if (this.state.scoreSkipped) return;
