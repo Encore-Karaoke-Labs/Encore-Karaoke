@@ -2333,7 +2333,7 @@ p + .flex-list button {
   text-align: center;
   font-size: 4.5rem;
   font-weight: bold;
-  text-shadow: 2px 2px 6px #000;
+  text-shadow: 2px 5px 6px #000;
   transition:
     color 0.3s ease,
     opacity 0.3s ease;
@@ -2353,6 +2353,7 @@ p + .flex-list button {
   text-shadow: none;
   -webkit-text-stroke: 6px #010141;
   paint-order: stroke fill;
+  text-shadow: 2px 5px 6px #000;
 }
 
 .lyric-line-original {
@@ -2379,10 +2380,12 @@ p + .flex-list button {
   flex-wrap: wrap;
   white-space: pre;
   color: rgba(255, 255, 255, 0.4);
+  text-shadow: 2px 5px 6px #000;
 }
 
 .midi-lyric-line.next {
   opacity: 0.8;
+  text-shadow: 2px 5px 6px #000;
 }
 
 .lyric-syllable-container {
