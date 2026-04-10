@@ -149,9 +149,13 @@ export class MixerModule {
       );
     } else {
       const pluginIndex = this.selectedIndex - 2;
-      const plugin = this.state.chain[pluginIndex];
-      if (plugin && plugin.parameters) {
-        Object.entries(plugin.parameters).forEach(
+      const pluginState = this.state.chain[pluginIndex];
+      const plugin = pluginState?.instance;
+
+      if (plugin && typeof plugin.renderGUI === "function") {
+        plugin.renderGUI(controlsContainer, Html);
+      } else if (pluginState && pluginState.parameters) {
+        Object.entries(pluginState.parameters).forEach(
           ([paramName, paramDef], pIndex) => {
             if (paramName === "bands") return;
             this._createSlider(
@@ -248,7 +252,8 @@ export class MixerModule {
    * @private
    */
   _updateControlsHighlight() {
-    this.controlsPanel.qsa(".mixer-control").forEach((control, index) => {
+    const controls = this.controlsPanel.qsa(".mixer-control") || [];
+    controls.forEach((control, index) => {
       if (
         this.activePanel === "controls" &&
         index === this.selectedParamIndex
@@ -266,9 +271,31 @@ export class MixerModule {
    * @param {KeyboardEvent} e - The keyboard event
    */
   handleKeyDown(e) {
+    const listItems = this.listPanel.qsa(".mixer-item") || [];
+    const numListItems = listItems.length;
+
+    const paramItems = this.controlsPanel.qsa(".mixer-control") || [];
+    const numParamItems = paramItems.length;
+
+    let isCustomGUI = false;
+    let plugin = null;
+    if (this.selectedIndex >= 2) {
+      const pluginIndex = this.selectedIndex - 2;
+      const pluginState = this.state.chain[pluginIndex];
+      plugin = pluginState?.instance;
+      if (plugin && typeof plugin.renderGUI === "function") {
+        isCustomGUI = true;
+      }
+    }
+
+    if (this.activePanel === "controls" && isCustomGUI) {
+      if (typeof plugin.handleKeyDown === "function") {
+        const handled = plugin.handleKeyDown(e);
+        if (handled) return;
+      }
+    }
+
     e.preventDefault();
-    const numListItems = this.listPanel.qsa(".mixer-item").length;
-    const numParamItems = this.controlsPanel.qsa(".mixer-control").length;
 
     switch (e.key) {
       case "ArrowUp":
@@ -277,11 +304,12 @@ export class MixerModule {
           this.selectedParamIndex = 0;
           this._updateListHighlight();
           this._renderControls();
-        } else {
+        } else if (!isCustomGUI) {
           this.selectedParamIndex = Math.max(0, this.selectedParamIndex - 1);
           this._updateControlsHighlight();
         }
         break;
+
       case "ArrowDown":
         if (this.activePanel === "list") {
           this.selectedIndex = Math.min(
@@ -291,7 +319,7 @@ export class MixerModule {
           this.selectedParamIndex = 0;
           this._updateListHighlight();
           this._renderControls();
-        } else {
+        } else if (!isCustomGUI) {
           this.selectedParamIndex = Math.min(
             numParamItems - 1,
             this.selectedParamIndex + 1,
@@ -299,12 +327,13 @@ export class MixerModule {
           this._updateControlsHighlight();
         }
         break;
+
       case "ArrowRight":
-        if (this.activePanel === "list" && numParamItems > 0) {
+        if (this.activePanel === "list" && (numParamItems > 0 || isCustomGUI)) {
           this.activePanel = "controls";
           this._updateListHighlight();
           this._updateControlsHighlight();
-        } else if (this.activePanel === "controls") {
+        } else if (this.activePanel === "controls" && !isCustomGUI) {
           const activeControl = this.controlsPanel.qs(
             `.mixer-control[data-param-index="${this.selectedParamIndex}"]`,
           );
@@ -315,26 +344,34 @@ export class MixerModule {
           }
         }
         break;
+
       case "ArrowLeft":
         if (this.activePanel === "controls") {
-          const activeControl = this.controlsPanel.qs(
-            `.mixer-control[data-param-index="${this.selectedParamIndex}"]`,
-          );
-          const slider = activeControl?.qs('input[type="range"]');
-          if (slider) {
-            slider.elm.stepDown();
-            slider.elm.dispatchEvent(new Event("input", { bubbles: true }));
+          if (isCustomGUI) {
+            this.activePanel = "list";
+            this._updateListHighlight();
+            this._updateControlsHighlight();
+          } else {
+            const activeControl = this.controlsPanel.qs(
+              `.mixer-control[data-param-index="${this.selectedParamIndex}"]`,
+            );
+            const slider = activeControl?.qs('input[type="range"]');
+            if (slider) {
+              slider.elm.stepDown();
+              slider.elm.dispatchEvent(new Event("input", { bubbles: true }));
+            }
           }
         }
         break;
+
       case "Tab":
-        this.activePanel =
-          this.activePanel === "list" && numParamItems > 0
-            ? "controls"
-            : "list";
-        this._updateListHighlight();
-        this._updateControlsHighlight();
+        if (numParamItems > 0 || isCustomGUI) {
+          this.activePanel = this.activePanel === "list" ? "controls" : "list";
+          this._updateListHighlight();
+          this._updateControlsHighlight();
+        }
         break;
+
       case "Escape":
         this.toggle();
         break;

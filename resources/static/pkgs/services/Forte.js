@@ -2133,6 +2133,7 @@ const pkg = {
       const chainState = state.effects.vocalChain.map((plugin) => ({
         name: plugin.name,
         parameters: plugin.parameters,
+        instance: plugin,
       }));
       return {
         micGain: state.effects.micChainOutput?.gain.value || 1.0,
