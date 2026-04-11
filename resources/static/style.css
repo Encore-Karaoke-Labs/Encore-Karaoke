@@ -3354,7 +3354,7 @@ p + .flex-list button {
 
 .mixer-content {
   transition: width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
-  width: 700px;
+  width: 715px;
   height: 80vh;
   max-height: 800px;
 }
@@ -3412,13 +3412,14 @@ p + .flex-list button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  width: 100px;
-  padding: 1.5rem 0;
+  gap: 1.5rem;
+  width: 120px;
+  padding: 2rem 0;
   border-radius: 12px;
   border: 2px solid transparent;
   background: rgba(255, 255, 255, 0.02);
   transition: all 0.2s ease;
+  height: 100%;
 }
 .channel-strip.focused {
   border-color: #ffd700;
@@ -3427,23 +3428,29 @@ p + .flex-list button {
 }
 .fader-area {
   display: flex;
-  gap: 1rem;
-  height: 350px;
+  justify-content: center;
+  flex-grow: 1;
+  min-height: 250px;
+  width: 100%;
   position: relative;
 }
-.vu-meter {
-  width: 14px;
-  background: rgba(0, 0, 0, 0.8);
-  border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+
+.fader-track {
+  width: 24px;
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 6px;
   position: relative;
-  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.8);
+  height: 100%;
 }
 .vu-fill {
   position: absolute;
   bottom: 0;
-  width: 100%;
-  height: 0%;
+  left: 0;
+  right: 0;
+  top: 0;
+  border-radius: 5px;
   background: linear-gradient(
     to top,
     #39ff14 0%,
@@ -3451,29 +3458,29 @@ p + .flex-list button {
     #f7b733 80%,
     #ff5555 100%
   );
-}
-.fader-track {
-  width: 12px;
-  background: rgba(0, 0, 0, 0.9);
-  border-radius: 6px;
-  position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.8);
+  clip-path: inset(100% 0 0 0);
+  pointer-events: none;
 }
 .fader-thumb {
   position: absolute;
-  left: -18px;
+  left: -12px;
   width: 48px;
-  height: 20px;
-  background: #89cff0;
+  height: 16px;
+  background: rgba(137, 207, 240, 0.85);
   border-radius: 4px;
   box-shadow:
-    0 5px 15px rgba(0, 0, 0, 0.8),
-    inset 0 2px 2px rgba(255, 255, 255, 0.5);
+    0 4px 10px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(2px);
   transition: background-color 0.2s;
+  z-index: 2;
+  pointer-events: none;
 }
 .channel-strip.focused .fader-thumb {
-  background: #ffd700;
+  background: rgba(255, 215, 0, 0.85);
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
 /* --- Chain List --- */

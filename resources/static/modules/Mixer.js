@@ -137,10 +137,11 @@ export class MixerModule {
         .text(label)
         .appendTo(strip);
       const faderArea = new Html("div").classOn("fader-area").appendTo(strip);
-      const vu = new Html("div").classOn("vu-meter").appendTo(faderArea);
-      const vuFill = new Html("div").classOn("vu-fill").appendTo(vu);
+
       const track = new Html("div").classOn("fader-track").appendTo(faderArea);
+      const vuFill = new Html("div").classOn("vu-fill").appendTo(track);
       const thumb = new Html("div").classOn("fader-thumb").appendTo(track);
+
       const valDisplay = new Html("div")
         .styleJs({
           fontWeight: "bold",
@@ -182,11 +183,12 @@ export class MixerModule {
     if (!this.micFader || !this.musicFader) return;
     const micVal = this.state.micGain;
     const micPercent = (micVal / 2.0) * 100;
-    this.micFader.thumb.styleJs({ bottom: `calc(${micPercent}% - 10px)` });
+    this.micFader.thumb.styleJs({ bottom: `calc(${micPercent}% - 8px)` });
     this.micFader.valDisplay.text(`${(micVal * 100).toFixed(0)} %`);
+
     const musVal = this.state.musicGain;
     const musPercent = (musVal / 1.0) * 100;
-    this.musicFader.thumb.styleJs({ bottom: `calc(${musPercent}% - 10px)` });
+    this.musicFader.thumb.styleJs({ bottom: `calc(${musPercent}% - 8px)` });
     this.musicFader.valDisplay.text(`${(musVal * 100).toFixed(0)} %`);
   }
 
@@ -523,14 +525,22 @@ export class MixerModule {
           ? newMicLevel
           : Math.max(newMicLevel, this.micMeterLevel * DECAY_RATE);
       if (this.micFader && this.micFader.vuFill)
-        this.micFader.vuFill.styleJs({ height: `${this.micMeterLevel}%` });
+        // Replaced `height:` with a dynamic `clipPath:`
+        this.micFader.vuFill.styleJs({
+          clipPath: `inset(${100 - this.micMeterLevel}% 0 0 0)`,
+        });
+
       let newMusicLevel = calcLevel(this.musicAnalyser, this.state.musicGain);
       this.musicMeterLevel =
         newMusicLevel >= this.musicMeterLevel
           ? newMusicLevel
           : Math.max(newMusicLevel, this.musicMeterLevel * DECAY_RATE);
       if (this.musicFader && this.musicFader.vuFill)
-        this.musicFader.vuFill.styleJs({ height: `${this.musicMeterLevel}%` });
+        // Replaced `height:` with a dynamic `clipPath:`
+        this.musicFader.vuFill.styleJs({
+          clipPath: `inset(${100 - this.musicMeterLevel}% 0 0 0)`,
+        });
+
       this.meterFrame = requestAnimationFrame(updateMeters);
     };
     updateMeters();
