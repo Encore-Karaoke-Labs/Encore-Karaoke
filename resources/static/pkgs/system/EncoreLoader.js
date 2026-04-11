@@ -179,8 +179,12 @@ const pkg = {
     }
 
     const libInfo = fsSvc.getLibraryInfo();
+    const config = await window.config.getAll();
 
-    if (libInfo?.manifest?.additionalContents?.soundFont) {
+    if (
+      libInfo?.manifest?.additionalContents?.soundFont &&
+      config.audioConfig?.useLibraryFont
+    ) {
       statusP.text("Loading sounds...");
       const url = new URL(`http://127.0.0.1:9864/getFile`);
       const soundFontPath = pathJoin([
