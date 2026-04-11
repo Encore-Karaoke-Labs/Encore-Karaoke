@@ -1393,8 +1393,6 @@ const pkg = {
 
               const dataArray = e.event.data;
 
-              logVerbose("SpessaSynth event", e);
-              logVerbose("Lyric / text event", dataArray);
               if (!dataArray || !(dataArray instanceof Uint8Array)) return;
               const text = new TextDecoder(
                 state.playback.lyricsEncoding,
