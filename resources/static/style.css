@@ -3585,7 +3585,6 @@ p + .flex-list button {
   transition:
     top 0.05s linear,
     opacity 0.1s linear;
-  transform: translateY(-50%);
   will-change: top, opacity;
 }
 

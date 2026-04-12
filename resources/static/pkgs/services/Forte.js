@@ -575,7 +575,7 @@ function updateScore(currentTime) {
     };
 
     if (isSinging && midiMicPitch > 0) {
-      pianoRollUserPitch.elm.style.top = `${pitchToY(midiMicPitch) - 2}px`;
+      pianoRollUserPitch.elm.style.transform = `translateY(${pitchToY(midiMicPitch) - 2}px)`;
       pianoRollUserPitch.elm.style.opacity = "1";
     } else {
       pianoRollUserPitch.elm.style.opacity = "0";

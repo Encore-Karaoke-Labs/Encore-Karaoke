@@ -1689,62 +1689,74 @@ class EncoreController {
       const renderLine = (displayEl, lineData) => {
         displayEl.clear();
         if (!lineData) return;
+
+        const fragment = document.createDocumentFragment();
         let currentWord = null;
         let wordIndex = 0;
 
         lineData.forEach((s) => {
           if (!currentWord || s.rawText.startsWith(" ")) {
-            currentWord = new Html("div")
-              .classOn("lyric-word")
-              .appendTo(displayEl);
+            currentWord = document.createElement("div");
+            currentWord.className = "lyric-word";
             if (currentSongLineIndex > 0) {
-              currentWord.style({
-                "--animation-delay": `${wordIndex * 0.05}s`,
-                opacity: "0",
-                "animation-fill-mode": "forwards",
-              });
-              currentWord.classOn("lyric-fade-in");
+              currentWord.style.setProperty(
+                "--animation-delay",
+                `${wordIndex * 0.05}s`,
+              );
+              currentWord.style.opacity = "0";
+              currentWord.style.animationFillMode = "forwards";
+              currentWord.classList.add("lyric-fade-in");
             }
             wordIndex++;
+            fragment.appendChild(currentWord);
           }
 
-          const container = new Html("div")
-            .classOn("lyric-syllable-container")
-            .attr({ "data-index": s.globalIndex })
-            .appendTo(currentWord);
+          const container = document.createElement("div");
+          container.className = "lyric-syllable-container";
+          container.setAttribute("data-index", s.globalIndex);
 
-          s.domElement = container;
+          s.domElement = new Html(container);
 
-          const furiSpan = new Html("span")
-            .classOn("lyric-syllable-furigana")
-            .appendTo(container);
-          if (s.furigana)
-            furiSpan.attr({ "data-text": s.furigana }).text(s.furigana);
-          else furiSpan.html("&nbsp;").styleJs({ visibility: "hidden" });
+          const furiSpan = document.createElement("span");
+          furiSpan.className = "lyric-syllable-furigana";
+          if (s.furigana) {
+            furiSpan.setAttribute("data-text", s.furigana);
+            furiSpan.innerText = s.furigana;
+          } else {
+            furiSpan.innerHTML = "&nbsp;";
+            furiSpan.style.visibility = "hidden";
+          }
+          container.appendChild(furiSpan);
 
-          new Html("span")
-            .classOn("lyric-syllable-original")
-            .attr({ "data-text": s.text })
-            .text(s.text)
-            .appendTo(container);
+          const origSpan = document.createElement("span");
+          origSpan.className = "lyric-syllable-original";
+          origSpan.setAttribute("data-text", s.text);
+          origSpan.innerText = s.text;
+          container.appendChild(origSpan);
 
-          const romSpan = new Html("span")
-            .classOn("lyric-syllable-romanized")
-            .appendTo(container);
-          if (s.romanized)
-            romSpan.attr({ "data-text": s.romanized }).text(s.romanized);
-          else {
-            romSpan.html("&nbsp;").styleJs({ visibility: "hidden" });
+          const romSpan = document.createElement("span");
+          romSpan.className = "lyric-syllable-romanized";
+          if (s.romanized) {
+            romSpan.setAttribute("data-text", s.romanized);
+            romSpan.innerText = s.romanized;
+          } else {
+            romSpan.innerHTML = "&nbsp;";
+            romSpan.style.visibility = "hidden";
             getRomanizationPromise(s).then((rt) => {
-              if (rt)
-                romSpan
-                  .attr({ "data-text": rt })
-                  .text(rt)
-                  .styleJs({ visibility: "visible" });
+              if (rt) {
+                romSpan.setAttribute("data-text", rt);
+                romSpan.innerText = rt;
+                romSpan.style.visibility = "visible";
+              }
             });
           }
+          container.appendChild(romSpan);
+
+          currentWord.appendChild(container);
           if (s.rawText.endsWith(" ")) currentWord = null;
         });
+
+        displayEl.elm.appendChild(fragment);
       };
 
       if (lines[0]) renderLine(displayLines[0], lines[0]);
@@ -1994,37 +2006,48 @@ class EncoreController {
       }
 
       if (this.parsedLrc && this.parsedLrc.length) {
-        let newIdx = -1;
-        for (let i = this.parsedLrc.length - 1; i >= 0; i--) {
-          if (currentTime >= this.parsedLrc[i].time) {
-            newIdx = i;
-            break;
+        let newIdx = currentLrcIndex;
+
+        while (
+          newIdx + 1 < this.parsedLrc.length &&
+          currentTime >= this.parsedLrc[newIdx + 1].time
+        ) {
+          newIdx++;
+        }
+
+        if (newIdx > 0 && currentTime < this.parsedLrc[newIdx].time) {
+          newIdx = -1;
+          while (
+            newIdx + 1 < this.parsedLrc.length &&
+            currentTime >= this.parsedLrc[newIdx + 1].time
+          ) {
+            newIdx++;
           }
         }
-        if (newIdx !== currentLrcIndex) {
+
+        if (newIdx !== currentLrcIndex && newIdx >= 0) {
           if (this.nextLineUpdateTimeout)
             clearTimeout(this.nextLineUpdateTimeout);
           currentLrcIndex = newIdx;
-          if (newIdx >= 0) {
-            const active = [this.dom.lrcLineDisplay1, this.dom.lrcLineDisplay2][
-              currentLrcIndex % 2
-            ];
-            const next = [this.dom.lrcLineDisplay1, this.dom.lrcLineDisplay2][
-              (currentLrcIndex + 1) % 2
-            ];
-            active.classOn("active").classOff("next");
-            next.classOff("active").classOn("next");
 
-            const curLine = this.parsedLrc[currentLrcIndex];
-            const nextLine = this.parsedLrc[currentLrcIndex + 1];
-            if (nextLine) {
-              this.nextLineUpdateTimeout = setTimeout(
-                () => {
-                  this.renderLrcLine(next, nextLine);
-                },
-                (nextLine.time - curLine.time) * 500,
-              );
-            }
+          const active = [this.dom.lrcLineDisplay1, this.dom.lrcLineDisplay2][
+            currentLrcIndex % 2
+          ];
+          const next = [this.dom.lrcLineDisplay1, this.dom.lrcLineDisplay2][
+            (currentLrcIndex + 1) % 2
+          ];
+
+          active.classOn("active").classOff("next");
+          next.classOff("active").classOn("next");
+
+          const curLine = this.parsedLrc[currentLrcIndex];
+          const nextLine = this.parsedLrc[currentLrcIndex + 1];
+
+          if (nextLine) {
+            this.nextLineUpdateTimeout = setTimeout(
+              () => this.renderLrcLine(next, nextLine),
+              (nextLine.time - curLine.time) * 500,
+            );
           }
         }
       }
@@ -2316,8 +2339,6 @@ class EncoreController {
       });
     };
 
-    // Wait for BOTH the visuals to finish their 3.8s intro, AND the audio
-    // sequence (fanfare + narration) to completely finish
     await Promise.race([
       Promise.all([animate(), playAudioSequence()]),
       new Promise((resolve) => {
