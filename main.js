@@ -236,7 +236,8 @@ server.post("/auth/verify-hash", (req, res) => {
   res.json({ valid: computedHash === hash });
 });
 
-const TITLE_BAR_HEIGHT = 55;
+const titleBarHeight = 55;
+let zoomFactor = Config.getItem("zoomLevel") || 1;
 
 // Main App Startup
 const createWindow = () => {
@@ -249,6 +250,7 @@ const createWindow = () => {
     backgroundColor: "#000",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
+      spellcheck: false,
     },
   });
 
@@ -276,9 +278,9 @@ const createWindow = () => {
     } else {
       appView.setBounds({
         x: 0,
-        y: TITLE_BAR_HEIGHT,
+        y: titleBarHeight,
         width: bounds.width,
-        height: bounds.height - TITLE_BAR_HEIGHT,
+        height: bounds.height - titleBarHeight,
       });
     }
   };
@@ -292,26 +294,40 @@ const createWindow = () => {
   updateBounds();
 
   win.loadURL(
-    `http://127.0.0.1:${PORT}/titlebar.html?platform=${process.platform}`,
+    `file://${__dirname}/resources/static/titlebar.html?platform=${process.platform}`,
   );
   appView.webContents.loadURL(`http://127.0.0.1:${PORT}/index.html`);
+  appView.webContents.setZoomFactor(zoomFactor);
+
+  const resetZoom = () => {
+    zoomFactor = 1;
+    Config.setItem("zoomFactor", zoomFactor);
+    appView.webContents.setZoomFactor(zoomFactor);
+    return;
+  };
+
+  const addZoom = () => {
+    zoomFactor = zoomFactor + 0.15;
+    Config.setItem("zoomFactor", zoomFactor);
+    appView.webContents.setZoomFactor(zoomFactor);
+    return;
+  };
+
+  const reduceZoom = () => {
+    if (zoomFactor > 0.26) {
+      zoomFactor = zoomFactor - 0.15;
+      Config.setItem("zoomFactor", zoomFactor);
+      appView.webContents.setZoomFactor(zoomFactor);
+    }
+    return;
+  };
 
   win.on("focus", () => {
-    globalShortcut.register("CommandOrControl+0", () => {
-      return;
-    });
-    globalShortcut.register("CommandOrControl+plus", () => {
-      return;
-    });
-    globalShortcut.register("CommandOrControl+=", () => {
-      return;
-    });
-    globalShortcut.register("CommandOrControl+-", () => {
-      return;
-    });
-    globalShortcut.register("CommandOrControl+_", () => {
-      return;
-    });
+    globalShortcut.register("CommandOrControl+0", resetZoom);
+    globalShortcut.register("CommandOrControl+plus", addZoom);
+    globalShortcut.register("CommandOrControl+=", addZoom);
+    globalShortcut.register("CommandOrControl+-", reduceZoom);
+    globalShortcut.register("CommandOrControl+_", reduceZoom);
   });
 
   win.on("blur", () => {
