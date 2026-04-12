@@ -322,12 +322,17 @@ const createWindow = () => {
     return;
   };
 
+  const reloadPage = () => {
+    appView.webContents.reload();
+  };
+
   win.on("focus", () => {
     globalShortcut.register("CommandOrControl+0", resetZoom);
     globalShortcut.register("CommandOrControl+plus", addZoom);
     globalShortcut.register("CommandOrControl+=", addZoom);
     globalShortcut.register("CommandOrControl+-", reduceZoom);
     globalShortcut.register("CommandOrControl+_", reduceZoom);
+    globalShortcut.register("CommandOrControl+r", reloadPage);
   });
 
   win.on("blur", () => {
@@ -336,6 +341,7 @@ const createWindow = () => {
     globalShortcut.unregister("CommandOrControl+=");
     globalShortcut.unregister("CommandOrControl+-");
     globalShortcut.unregister("CommandOrControl+_");
+    globalShortcut.unregister("CommandOrControl+r");
   });
 
   if (kioskEnabled) {
