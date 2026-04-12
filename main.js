@@ -1,6 +1,12 @@
 if (require("electron-squirrel-startup")) app.quit();
 
-const { app, BrowserWindow, WebContentsView, ipcMain } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  WebContentsView,
+  ipcMain,
+  globalShortcut,
+} = require("electron");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -289,6 +295,32 @@ const createWindow = () => {
   );
   appView.webContents.loadURL(`http://127.0.0.1:${PORT}/index.html`);
 
+  win.on("focus", () => {
+    globalShortcut.register("CommandOrControl+0", () => {
+      return;
+    });
+    globalShortcut.register("CommandOrControl+plus", () => {
+      return;
+    });
+    globalShortcut.register("CommandOrControl+=", () => {
+      return;
+    });
+    globalShortcut.register("CommandOrControl+-", () => {
+      return;
+    });
+    globalShortcut.register("CommandOrControl+_", () => {
+      return;
+    });
+  });
+
+  win.on("blur", () => {
+    globalShortcut.unregister("CommandOrControl+0");
+    globalShortcut.unregister("CommandOrControl+plus");
+    globalShortcut.unregister("CommandOrControl+=");
+    globalShortcut.unregister("CommandOrControl+-");
+    globalShortcut.unregister("CommandOrControl+_");
+  });
+
   if (kioskEnabled) {
     win.setKiosk(true);
     win.setAlwaysOnTop(true);
@@ -323,7 +355,9 @@ const createWindow = () => {
         event.preventDefault();
       }
       if (input.key === "F11") {
-        win.setFullScreen(!win.isFullScreen());
+        if (!kioskEnabled) {
+          win.setFullScreen(!win.isFullScreen());
+        }
         event.preventDefault();
       }
     }
