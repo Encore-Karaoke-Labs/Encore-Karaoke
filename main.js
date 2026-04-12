@@ -323,7 +323,7 @@ const createWindow = () => {
   };
 
   const reloadPage = () => {
-    appView.webContents.reload();
+    if (!kioskEnabled) appView.webContents.reload();
   };
 
   win.on("focus", () => {
