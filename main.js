@@ -53,6 +53,7 @@ const versionInformation = {
 };
 
 const kioskEnabled = process.argv.includes("--kiosk");
+const isDev = process.argv.includes("--dev");
 
 const PORT = 9864;
 const server = express();
@@ -349,6 +350,10 @@ const createWindow = () => {
         input.key === "F12" ||
         (input.control && input.shift && input.key.toLowerCase() === "i")
       ) {
+        if (!isDev) {
+          event.preventDefault();
+          return;
+        }
         if (appView.webContents.isDevToolsOpened())
           appView.webContents.closeDevTools();
         else appView.webContents.openDevTools({ mode: "detach" });
