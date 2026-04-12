@@ -2393,6 +2393,7 @@ p + .flex-list button {
   flex-direction: column;
   align-items: center;
   margin: 0;
+  contain: layout style;
 }
 
 .lyric-word {
@@ -2402,48 +2403,37 @@ p + .flex-list button {
   justify-content: center;
 }
 
-/* Add styles for the Furigana (top text) */
+.lyric-syllable-original,
+.lyric-syllable-romanized,
 .lyric-syllable-furigana {
   position: relative;
-  font-size: 1.25rem; /* Smaller than main text */
-  margin-bottom: 0.1rem;
-  color: rgba(255, 255, 255, 0.5); /* Slightly dim by default */
-  line-height: 1;
-  font-weight: 500;
-}
-
-/* Ensure Furigana gets the wipe effect too */
-.lyric-syllable-furigana::after {
-  content: attr(data-text);
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0;
-  color: #ffb74d;
-  text-shadow: none;
-  -webkit-text-stroke: 3px #010141;
   paint-order: stroke fill;
-  overflow: hidden;
-  transition: width 0s;
 }
 
-/* Update original syllable to be main focus */
 .lyric-syllable-original {
-  position: relative;
   font-size: inherit;
   color: rgba(255, 255, 255, 0.4);
+  -webkit-text-stroke: 5px #010141;
 }
 
 .lyric-syllable-romanized {
-  position: relative;
   font-size: 1.5rem;
   margin-top: 0.25rem;
   line-height: 1;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.4);
+  -webkit-text-stroke: 5px #010141;
 }
 
-/* GPU-accelerated highlighting */
+.lyric-syllable-furigana {
+  font-size: 1.25rem;
+  margin-bottom: 0.1rem;
+  line-height: 1;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  -webkit-text-stroke: 3px #010141;
+}
+
 .lyric-syllable-original::after,
 .lyric-syllable-romanized::after,
 .lyric-syllable-furigana::after {
@@ -2452,15 +2442,17 @@ p + .flex-list button {
   top: 0;
   left: 0;
   width: 100%;
-  color: #ffffff;
-  text-shadow: none;
-  -webkit-text-stroke: 5px #010141;
-  paint-order: stroke fill;
+  height: 100%;
   overflow: hidden;
 
   clip-path: inset(0 100% 0 0);
-  transition: clip-path 0s;
   will-change: clip-path;
+}
+
+.lyric-syllable-original::after,
+.lyric-syllable-romanized::after {
+  color: #ffffff;
+  -webkit-text-stroke: 5px #010141;
 }
 
 .lyric-syllable-furigana::after {
@@ -2468,16 +2460,16 @@ p + .flex-list button {
   -webkit-text-stroke: 3px #010141;
 }
 
-.lyric-syllable-container.active .lyric-syllable-furigana::after,
 .lyric-syllable-container.active .lyric-syllable-original::after,
-.lyric-syllable-container.active .lyric-syllable-romanized::after {
+.lyric-syllable-container.active .lyric-syllable-romanized::after,
+.lyric-syllable-container.active .lyric-syllable-furigana::after {
   clip-path: inset(0 0 0 0);
   transition: clip-path var(--syllable-duration, 0.2s) linear;
 }
 
-.lyric-syllable-container.completed .lyric-syllable-furigana::after,
 .lyric-syllable-container.completed .lyric-syllable-original::after,
-.lyric-syllable-container.completed .lyric-syllable-romanized::after {
+.lyric-syllable-container.completed .lyric-syllable-romanized::after,
+.lyric-syllable-container.completed .lyric-syllable-furigana::after {
   clip-path: inset(0 0 0 0);
   transition: none;
 }
