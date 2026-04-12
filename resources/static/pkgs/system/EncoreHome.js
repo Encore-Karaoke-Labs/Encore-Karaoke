@@ -614,7 +614,9 @@ class EncoreController {
       }
     });
 
-    this.dom.introCard = new Html("div").classOn("intro-card").appendTo("body");
+    this.dom.introCard = new Html("div")
+      .classOn("intro-card")
+      .appendTo(this.wrapper);
 
     const introContent = new Html("div")
       .classOn("intro-card-content")

@@ -237,9 +237,9 @@ const createWindow = () => {
     height: 752,
     icon: "resources/icon.png",
     autoHideMenuBar: true,
+    thickFrame: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
-      nodeIntegration: true,
     },
   });
 
