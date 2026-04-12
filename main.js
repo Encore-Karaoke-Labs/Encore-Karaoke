@@ -1,6 +1,6 @@
 if (require("electron-squirrel-startup")) app.quit();
 
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, WebContentsView, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -105,7 +105,6 @@ function setupDiscordRPC() {
 
 // Server Routes & Logic
 server.use(express.static("resources/static"));
-server.use(express.static("public"));
 server.use(express.json());
 server.use(cors());
 
@@ -230,6 +229,8 @@ server.post("/auth/verify-hash", (req, res) => {
   res.json({ valid: computedHash === hash });
 });
 
+const TITLE_BAR_HEIGHT = 55;
+
 // Main App Startup
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -237,37 +238,99 @@ const createWindow = () => {
     height: 752,
     icon: "resources/icon.png",
     autoHideMenuBar: true,
-    thickFrame: true,
+    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
+    backgroundColor: "#000",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
     },
   });
 
-  win.setBackgroundColor("#000");
-  win.loadURL(`http://127.0.0.1:${PORT}/index.html`);
+  const appView = new WebContentsView({
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+    },
+  });
+
+  win.contentView.addChildView(appView);
+
+  const updateBounds = () => {
+    const bounds = win.getContentBounds();
+    if (bounds.width === 0 || bounds.height === 0) return;
+
+    const isFullScreen = win.isFullScreen() || win.isKiosk();
+
+    if (isFullScreen) {
+      appView.setBounds({
+        x: 0,
+        y: 0,
+        width: bounds.width,
+        height: bounds.height,
+      });
+    } else {
+      appView.setBounds({
+        x: 0,
+        y: TITLE_BAR_HEIGHT,
+        width: bounds.width,
+        height: bounds.height - TITLE_BAR_HEIGHT,
+      });
+    }
+  };
+
+  win.on("resize", updateBounds);
+  win.on("maximize", updateBounds);
+  win.on("enter-full-screen", updateBounds);
+  win.on("leave-full-screen", updateBounds);
+  win.on("restore", () => setTimeout(updateBounds, 50));
+  win.on("show", () => setTimeout(updateBounds, 50));
+  updateBounds();
+
+  win.loadURL(
+    `http://127.0.0.1:${PORT}/titlebar.html?platform=${process.platform}`,
+  );
+  appView.webContents.loadURL(`http://127.0.0.1:${PORT}/index.html`);
+
   if (kioskEnabled) {
     win.setKiosk(true);
     win.setAlwaysOnTop(true);
     if (process.platform === "win32") {
       exec("taskkill /f /im explorer.exe", (error) => {
-        if (error) {
+        if (error)
           logger.error(
             "SYSTEM",
             "Failed to kill explorer.exe: " + error.message,
           );
-        } else {
-          logger.info("SYSTEM", "Explorer killed for kiosk mode");
-        }
+        else logger.info("SYSTEM", "Explorer killed for kiosk mode");
       });
     }
   }
 
-  win.webContents.on("devtools-opened", () => {
+  appView.webContents.on("devtools-opened", () => {
     const css = `:root { --sys-color-base: var(--ref-palette-neutral100); } .-theme-with-dark-background { --sys-color-base: var(--ref-palette-secondary25); } body { --default-font-family: system-ui,sans-serif; }`;
-    win.webContents.devToolsWebContents.executeJavaScript(
+    appView.webContents.devToolsWebContents.executeJavaScript(
       `const s = document.createElement('style'); s.innerHTML = '${css.replaceAll("\n", " ")}'; document.body.append(s); document.body.classList.remove('platform-windows');`,
     );
   });
+
+  const handleSpecialKeys = (event, input) => {
+    if (input.type === "keyDown") {
+      if (
+        input.key === "F12" ||
+        (input.control && input.shift && input.key.toLowerCase() === "i")
+      ) {
+        if (appView.webContents.isDevToolsOpened())
+          appView.webContents.closeDevTools();
+        else appView.webContents.openDevTools({ mode: "detach" });
+        event.preventDefault();
+      }
+      if (input.key === "F11") {
+        win.setFullScreen(!win.isFullScreen());
+        event.preventDefault();
+      }
+    }
+  };
+
+  win.webContents.on("before-input-event", handleSpecialKeys);
+  appView.webContents.on("before-input-event", handleSpecialKeys);
 };
 
 app.whenReady().then(() => {
@@ -313,6 +376,37 @@ app.whenReady().then(() => {
     });
   });
 
+  ipcMain.on("window-minimize", (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.minimize();
+  });
+  ipcMain.on("window-maximize", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win.isMaximized()) win.restore();
+    else win.maximize();
+  });
+  ipcMain.on("window-close", (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+
+  ipcMain.on("simulate-key", (event, keyChar) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+
+    const view = win.contentView.children[0];
+
+    if (view) {
+      view.webContents
+        .executeJavaScript(
+          `
+      if (document.activeElement) document.activeElement.blur();
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: '${keyChar}', bubbles: true, cancelable: true }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: '${keyChar}', bubbles: true, cancelable: true }));
+    `,
+        )
+        .catch((err) => console.error("Simulate key error:", err));
+    }
+  });
+
   ipcMain.handle("get-version", () => versionInformation);
   ipcMain.handle("get-kiosk-enabled", () => kioskEnabled);
   ipcMain.handle("config-get-all", () => Config.getAll());
@@ -350,6 +444,8 @@ app.whenReady().then(() => {
         { label: arg.button1.label, url: arg.button1.url },
       ],
     });
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.webContents.send("update-now-playing", arg);
   });
 
   const knownRemotes = {};

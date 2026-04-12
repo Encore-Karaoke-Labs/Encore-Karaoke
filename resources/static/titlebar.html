@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Rajdhani:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-dark: #080810;
+        --bg-panel: #14141e;
+        --accent: #89cff0;
+        --text-main: #e2e8f0;
+        --text-muted: #64748b;
+      }
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: var(--bg-dark);
+        font-family: "Rajdhani", system-ui, sans-serif;
+        color: var(--text-main);
+        user-select: none;
+      }
+      .titlebar {
+        height: 55px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        -webkit-app-region: drag;
+        border-bottom: 1px solid rgba(137, 207, 240, 0.15);
+        padding: 0 15px;
+        position: relative;
+      }
+      .section {
+        display: flex;
+        align-items: center;
+        height: 100%;
+        -webkit-app-region: no-drag;
+        gap: 6px;
+      }
+
+      button {
+        background: var(--bg-panel);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: var(--text-main);
+        border-radius: 6px;
+        height: 30px;
+        padding: 0 12px;
+        font-family: "Rajdhani", sans-serif;
+        font-weight: 600;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        outline: none;
+      }
+      button:hover {
+        background: rgba(137, 207, 240, 0.15);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .lcd-display {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 480px;
+        height: 34px;
+        background: #040406;
+        border: 1px solid rgba(137, 207, 240, 0.25);
+        border-radius: 6px;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        -webkit-app-region: no-drag;
+      }
+
+      .lcd-text {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+        padding: 0 15px;
+        transition: opacity 0.2s;
+        font-family: "Rajdhani", sans-serif;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .lcd-title {
+        font-weight: 700;
+        font-size: 1rem;
+        color: #ffd700;
+        letter-spacing: 0.05em;
+      }
+      .lcd-separator {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+      }
+      .lcd-artist {
+        font-size: 1rem;
+        color: var(--accent);
+        opacity: 0.9;
+      }
+
+      .lcd-controls {
+        position: absolute;
+        inset: 0;
+        background: rgba(4, 4, 6, 0.95);
+        backdrop-filter: blur(4px);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 4px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+      .lcd-display:hover .lcd-controls {
+        opacity: 1;
+        pointer-events: all;
+      }
+      .lcd-controls-group {
+        display: flex;
+        gap: 4px;
+      }
+
+      .lcd-btn {
+        height: 26px;
+        padding: 0 8px;
+        font-size: 0.75rem;
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .stop-btn {
+        color: #ff5555;
+        font-size: 1rem;
+        padding: 0 10px;
+        border-color: rgba(255, 85, 85, 0.2);
+      }
+      .stop-btn:hover {
+        background: rgba(255, 85, 85, 0.15);
+        border-color: #ff5555;
+        color: #ff2222;
+      }
+
+      .window-controls button {
+        background: transparent;
+        border: none;
+        font-size: 1.1rem;
+        padding: 0 12px;
+        height: 100%;
+      }
+      .window-controls .close-btn:hover {
+        color: #e81123;
+      }
+
+      body.is-mac .titlebar {
+        padding-left: 80px;
+      }
+      body.is-mac .window-controls {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="titlebar">
+      <div class="section left-section">
+        <button onclick="sendKey(']')">BGV</button>
+        <button onclick="sendKey('Y')">SEARCH</button>
+        <button onclick="sendKey('M')">MIXER</button>
+      </div>
+
+      <div class="lcd-display">
+        <div class="lcd-text">
+          <span id="np-title" class="lcd-title">ENCORE KARAOKE</span>
+          <span id="np-separator" class="lcd-separator">•</span>
+          <span id="np-artist" class="lcd-artist">READY</span>
+        </div>
+
+        <div class="lcd-controls">
+          <div class="lcd-controls-group">
+            <button class="lcd-btn" onclick="sendKey('-')" title="Volume Down">
+              VOL -
+            </button>
+            <button class="lcd-btn" onclick="sendKey('=')" title="Volume Up">
+              VOL +
+            </button>
+          </div>
+
+          <button
+            class="lcd-btn stop-btn"
+            onclick="sendKey('Escape')"
+            title="Stop Playback"
+          >
+            ⏹ STOP
+          </button>
+
+          <div class="lcd-controls-group">
+            <button
+              class="lcd-btn"
+              onclick="sendKey('ArrowDown')"
+              title="Key Down"
+            >
+              KEY -
+            </button>
+            <button class="lcd-btn" onclick="sendKey('ArrowUp')" title="Key Up">
+              KEY +
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section window-controls" id="window-controls">
+        <button onclick="window.desktopIntegration.ipc.send('window-minimize')">
+          —
+        </button>
+        <button onclick="window.desktopIntegration.ipc.send('window-maximize')">
+          🗖
+        </button>
+        <button
+          class="close-btn"
+          onclick="window.desktopIntegration.ipc.send('window-close')"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("platform") === "darwin") {
+        document.body.classList.add("is-mac");
+      }
+
+      window.desktopIntegration.ipc
+        .invoke("get-kiosk-enabled")
+        .then((isKiosk) => {
+          if (isKiosk)
+            document.getElementById("window-controls").style.display = "none";
+        });
+
+      function sendKey(keyChar) {
+        window.desktopIntegration.ipc.send("simulate-key", keyChar);
+      }
+
+      const npTitle = document.getElementById("np-title");
+      const npArtist = document.getElementById("np-artist");
+      const npSeparator = document.getElementById("np-separator");
+
+      window.desktopIntegration.ipc.on("update-now-playing", (event, data) => {
+        if (data.details) npTitle.innerText = data.details.toUpperCase();
+
+        if (data.state) {
+          npArtist.innerText = data.state.toUpperCase();
+          npSeparator.style.display = "inline";
+        } else {
+          npArtist.innerText = "";
+          npSeparator.style.display = "none";
+        }
+      });
+    </script>
+  </body>
+</html>
