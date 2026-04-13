@@ -64,7 +64,7 @@ const kuroshiro = new Kuroshiro();
 kuroshiro.init(new KuromojiAnalyzer());
 
 const userData = app.getPath("userData");
-const userVidoes = app.getPath("videos");
+const userVideos = app.getPath("videos");
 logger.info("SYSTEM", `User Data Path: ${userData}`);
 logger.info("SYSTEM", `User Videos Path: ${userData}`);
 
@@ -501,7 +501,7 @@ app.whenReady().then(() => {
   ipcMain.handle("save-recording", async (event, arrayBuffer) => {
     try {
       const buffer = Buffer.from(arrayBuffer);
-      const videosDir = path.join(app.getPath("videos"), "Encore Recordings");
+      const videosDir = path.join(userVideos, "Encore Recordings");
 
       if (!fs.existsSync(videosDir)) {
         fs.mkdirSync(videosDir, { recursive: true });
