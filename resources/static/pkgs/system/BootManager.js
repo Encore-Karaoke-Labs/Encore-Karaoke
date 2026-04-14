@@ -9,7 +9,6 @@ const pkg = {
   start: async function (Root) {
     console.log("[BootManager] Started", Root);
 
-    // 1. Instantly set the body to our dark color to prevent early flashes
     document.body.style.backgroundColor = "#080810";
     document.body.style.margin = "0";
 
@@ -19,6 +18,9 @@ const pkg = {
 
     let columns = Math.floor(document.body.clientWidth / 50);
     let rows = Math.floor(document.body.clientHeight / 50);
+
+    const config = await window.config.getAll();
+    console.log("[BootManager] config", config);
 
     wrapper = new Html("div")
       .class("flex")
@@ -197,7 +199,8 @@ const pkg = {
           }, 1000);
         },
         begin: () => {
-          startupSound.volume = 1;
+          startupSound.volume =
+            config.audioConfig?.mix.instrumental.volume ?? 1;
           startupSound.play();
         },
       });
