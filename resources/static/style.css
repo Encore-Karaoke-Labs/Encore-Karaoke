@@ -1919,25 +1919,22 @@ p + .flex-list button {
   backdrop-filter: none;
   box-shadow: none;
   padding: 0;
-  min-height: 0; /* remove height constraint */
+  min-height: 0;
 }
 
-/* This rule applies a shadow directly to the image */
 .standby-bumper-image {
-  max-height: 15em; /* Made the image slightly larger */
+  max-height: 15em;
   max-width: 100%;
   width: auto;
   height: auto;
   object-fit: contain;
   opacity: 1;
   transition: opacity 0.5s ease-in-out;
-  /* This filter creates a shadow that respects transparency, perfect for logos */
   filter: drop-shadow(0 5px 15px rgba(0, 0, 0, 0.6));
   border-radius: 10px;
 }
 
 .standby-text {
-  /* This element no longer needs absolute positioning */
   font-family: "Rajdhani", sans-serif;
   font-size: 2rem;
   font-weight: 700;
@@ -1947,6 +1944,111 @@ p + .flex-list button {
   text-transform: uppercase;
   white-space: nowrap;
   padding: 0 1.5rem;
+}
+
+/* --- New Song Idle Screen --- */
+@keyframes slideInRightStagger {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.new-song-screen {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 1400px;
+  height: auto;
+  max-height: 85vh;
+  background: rgba(10, 10, 20, 0.85);
+  border: 1px solid rgba(137, 207, 240, 0.4);
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  z-index: 11;
+  overflow: hidden;
+  transition: opacity 0.5s ease-in-out;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.new-song-header {
+  padding: 1.5rem 2rem;
+  border-bottom: 2px solid rgba(137, 207, 240, 0.4);
+  background: rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.ns-head-text {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 3rem;
+  font-weight: 800;
+  color: #ffd700;
+  letter-spacing: 0.15em;
+  text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.8);
+}
+
+.new-song-list {
+  padding: 1rem 3rem 2rem 3rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  justify-content: flex-start;
+  gap: clamp(0.25rem, 1.2vh, 1.2rem);
+}
+
+.ns-row {
+  display: flex;
+  align-items: center;
+  font-family: "Rajdhani", sans-serif;
+  font-size: clamp(1.2rem, 3vh, 2.2rem);
+  font-weight: 600;
+  color: white;
+  opacity: 0;
+  animation: slideInRightStagger 0.4s ease-out forwards;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
+  padding-bottom: clamp(0.25rem, 1vh, 0.5rem);
+}
+
+.ns-row:last-child {
+  border-bottom: none;
+}
+
+.ns-code {
+  color: #89cff0;
+  width: 140px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ns-title-col {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ns-title {
+  margin-left: 0.5rem;
+}
+
+.ns-artist {
+  width: 30%;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .temp-dialog {

@@ -5,6 +5,7 @@ const state = {
   currentLibraryPath: null,
   currentManifest: null,
   songList: [],
+  newSongs: [],
   isBuilding: false,
 };
 
@@ -187,19 +188,24 @@ const pkg = {
 
       const cacheKey = `encore-songlist:${libraryPath}`;
       const signatureKey = `encore-signature:${libraryPath}`;
+      const newSongsKey = `encore-newsongs:${libraryPath}`;
       const currentSignature = files
         .map((f) => `${f.name}:${f.modified}`)
         .join("|");
       const cachedSignature = await window.localforage.getItem(signatureKey);
+      const cachedList = (await window.localforage.getItem(cacheKey)) || [];
+      const cachedNewSongs =
+        (await window.localforage.getItem(newSongsKey)) || [];
 
       // Check Cache
       if (cachedSignature === currentSignature) {
         const cachedList = await window.localforage.getItem(cacheKey);
-        if (cachedList) {
+        if (cachedList.length > 0) {
           console.log(
             `[FsSvc] Cache is fresh. Loaded ${cachedList.length} songs.`,
           );
           state.songList = cachedList;
+          state.newSongs = cachedNewSongs;
           state.currentLibraryPath = libraryPath;
           state.currentManifest = loadedManifest;
           state.isBuilding = false;
@@ -214,8 +220,11 @@ const pkg = {
       state.currentLibraryPath = libraryPath;
       state.currentManifest = loadedManifest;
       state.songList = [];
+      state.newSongs = [];
 
       const newSongList = [];
+      const newlyAddedSongs = [];
+      const oldPaths = new Set(cachedList.map((s) => s.path));
       let songCodeCounter = 1;
       const audioExtensions = new Set(["wav", "mp3", "m4a"]);
       const videoExtensions = new Set(["mp4", "mkv", "webm", "avi"]);
@@ -309,9 +318,8 @@ const pkg = {
             title = parts.slice(1).join(" - ").trim();
           }
         }
-
         if (songData) {
-          newSongList.push({
+          const newSongObj = {
             code: String(songCodeCounter++).padStart(5, "0"),
             artist,
             title,
@@ -319,20 +327,32 @@ const pkg = {
             path: fullPath,
             lrcPath: songData.lrcPath,
             videoPath: videoPath,
-          });
-        }
+          };
+          newSongList.push(newSongObj);
 
+          if (cachedList.length > 0 && !oldPaths.has(fullPath)) {
+            newlyAddedSongs.push(newSongObj);
+          }
+        }
         processed++;
         dispatchBuildProgress(processed, totalFiles);
       }
 
       state.songList = newSongList;
+
+      if (newlyAddedSongs.length > 0) {
+        state.newSongs = newlyAddedSongs;
+      } else {
+        state.newSongs = cachedNewSongs;
+      }
+
       console.log(
-        `[FsSvc] Build complete. Found ${state.songList.length} songs.`,
+        `[FsSvc] Build complete. Found ${state.songList.length} songs. ${state.newSongs.length} are marked as new.`,
       );
 
       await window.localforage.setItem(cacheKey, newSongList);
       await window.localforage.setItem(signatureKey, currentSignature);
+      await window.localforage.setItem(newSongsKey, state.newSongs);
 
       state.isBuilding = false;
       dispatchSongListReady();
@@ -345,6 +365,14 @@ const pkg = {
      */
     getSongList: () => {
       return state.songList;
+    },
+
+    /**
+     * [GETTER] Instantly returns the new song list.
+     * @returns {Array<object>} The cached list of song objects.
+     */
+    getNewSongs: () => {
+      return state.newSongs;
     },
 
     /**

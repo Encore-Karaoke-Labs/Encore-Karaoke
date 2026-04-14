@@ -103,6 +103,7 @@ class EncoreController {
       cheerQueue: [],
       activeCheerCount: 0,
       activeCheers: [],
+      isPromptingSetup: false,
     };
 
     console.log("[Encore] Enable fanfare?", this.state.isScoreFanfareEnabled);
@@ -115,6 +116,11 @@ class EncoreController {
     this.currentBumperIndex = 0;
     this.bumperInterval = null;
     this.versionInformation = null;
+
+    this.newSongsList = [];
+    this.idlePlaylist = [];
+    this.currentIdleIndex = 0;
+    this.idleState = "text";
 
     console.log(this.state);
 
@@ -191,6 +197,9 @@ class EncoreController {
     this.setupSocketListeners();
 
     this.songList = this.FsSvc.getSongList();
+    this.newSongsList = this.FsSvc.getNewSongs
+      ? this.FsSvc.getNewSongs() || []
+      : [];
     this.songMap = new Map(this.songList.map((s) => [s.code, s]));
     this.buildSearchIndex();
     this.socket.emit("broadcastData", {
@@ -314,8 +323,9 @@ class EncoreController {
       this.bumperImages = bumperPaths.map((p) =>
         pathJoin([this.libraryInfo.path, p]),
       );
-      this.startBumperCycle();
     }
+
+    this.startBumperCycle();
 
     await this.bgv.updatePlaylistForCategory();
 
@@ -488,6 +498,17 @@ class EncoreController {
       .classOn("standby-text")
       .text("SELECT SONG")
       .appendTo(this.dom.standbyScreen);
+
+    this.dom.newSongScreen = new Html("div")
+      .classOn("new-song-screen", "hidden")
+      .appendTo(this.dom.overlay);
+    this.dom.newSongHeader = new Html("div")
+      .classOn("new-song-header")
+      .html(`<span class="ns-head-text">NEWLY ADDED SONGS</span>`)
+      .appendTo(this.dom.newSongScreen);
+    this.dom.newSongList = new Html("div")
+      .classOn("new-song-list")
+      .appendTo(this.dom.newSongScreen);
 
     this.dom.searchUi = new Html("div")
       .classOn("search-ui")
@@ -936,40 +957,113 @@ class EncoreController {
   }
 
   /**
-   * Starts rotation of designated standby bumper images on the main screen.
+   * Starts rotation of designated standby bumper images and newly added songs on the main screen.
    */
   startBumperCycle() {
     if (this.bumperInterval) clearInterval(this.bumperInterval);
-    if (this.bumperImages.length === 0) {
+
+    this.idlePlaylist = [];
+
+    if (this.bumperImages && this.bumperImages.length > 0) {
+      this.bumperImages.forEach((imgPath) => {
+        this.idlePlaylist.push({ type: "bumper", data: imgPath });
+      });
+    }
+
+    if (this.newSongsList && this.newSongsList.length > 0) {
+      for (let i = 0; i < this.newSongsList.length; i += 8) {
+        this.idlePlaylist.push({
+          type: "newsong",
+          data: this.newSongsList.slice(i, i + 8),
+        });
+      }
+    }
+
+    if (this.idlePlaylist.length === 0) {
+      this.idleState = "text";
       this.dom.standbyBumper.classOn("hidden");
       this.dom.standbyText.classOff("hidden");
       this.dom.standbyScreen.classOff("has-bumper-image");
+      this.dom.newSongScreen.classOn("hidden");
       return;
     }
 
     this.dom.standbyText.classOn("hidden");
-    this.dom.standbyBumper.classOff("hidden");
-    this.dom.standbyScreen.classOn("has-bumper-image");
+    this.currentIdleIndex = -1;
 
     const cycle = () => {
+      this.currentIdleIndex =
+        (this.currentIdleIndex + 1) % this.idlePlaylist.length;
+      const currentItem = this.idlePlaylist[this.currentIdleIndex];
+
       this.dom.standbyBumper.styleJs({ opacity: 0 });
+      this.dom.newSongScreen.styleJs({ opacity: 0 });
+
       setTimeout(() => {
-        this.currentBumperIndex =
-          (this.currentBumperIndex + 1) % this.bumperImages.length;
-        const nextImage = this.bumperImages[this.currentBumperIndex];
-        const imageUrl = new URL("http://127.0.0.1:9864/getFile");
-        imageUrl.searchParams.append("path", nextImage);
-        this.dom.standbyBumper.attr({ src: imageUrl.href });
-        this.dom.standbyBumper.styleJs({ opacity: 1 });
+        this.idleState = currentItem.type;
+
+        const isIdling =
+          !this.state.showSongList &&
+          !this.state.isTypingNumber &&
+          this.state.mode === "menu" &&
+          !this.state.isPromptingSetup;
+
+        if (currentItem.type === "newsong") {
+          this.dom.newSongList.clear();
+          currentItem.data.forEach((song, idx) => {
+            const row = new Html("div")
+              .classOn("ns-row")
+              .appendTo(this.dom.newSongList);
+            row.styleJs({ animationDelay: `${idx * 0.08}s` });
+
+            const fmt = this.getFormatInfo(song);
+
+            new Html("div").classOn("ns-code").text(song.code).appendTo(row);
+
+            const titleCol = new Html("div")
+              .classOn("ns-title-col")
+              .appendTo(row);
+            new Html("span")
+              .classOn("format-badge")
+              .styleJs({ backgroundColor: fmt.color })
+              .text(fmt.label)
+              .appendTo(titleCol);
+            new Html("span")
+              .classOn("ns-title")
+              .text(song.title)
+              .appendTo(titleCol);
+
+            new Html("div")
+              .classOn("ns-artist")
+              .text(song.artist)
+              .appendTo(row);
+          });
+
+          if (isIdling) {
+            this.dom.standbyScreen.classOn("hidden");
+            this.dom.newSongScreen.classOff("hidden");
+            this.dom.newSongScreen.styleJs({ opacity: 1 });
+          }
+        } else if (currentItem.type === "bumper") {
+          const imageUrl = new URL("http://127.0.0.1:9864/getFile");
+          imageUrl.searchParams.append("path", currentItem.data);
+          this.dom.standbyBumper.attr({ src: imageUrl.href });
+
+          if (isIdling) {
+            this.dom.newSongScreen.classOn("hidden");
+            this.dom.standbyScreen.classOff("hidden");
+            this.dom.standbyBumper.classOff("hidden");
+            this.dom.standbyScreen.classOn("has-bumper-image");
+            this.dom.standbyText.classOn("hidden");
+            this.dom.standbyBumper.styleJs({ opacity: 1 });
+          }
+        }
       }, 500);
     };
 
-    const initialImage = this.bumperImages[0];
-    const imageUrl = new URL("http://127.0.0.1:9864/getFile");
-    imageUrl.searchParams.append("path", initialImage);
-    this.dom.standbyBumper.attr({ src: imageUrl.href });
+    cycle();
 
-    this.bumperInterval = setInterval(cycle, 8000);
+    this.bumperInterval = setInterval(cycle, 12000);
   }
 
   /**
@@ -1032,8 +1126,28 @@ class EncoreController {
    * Updates standard menu interfaces including list selection highlighting and the active title.
    */
   updateMenuUI() {
-    if (!this.state.showSongList && this.state.mode === "menu") {
-      this.dom.standbyScreen.classOff("hidden");
+    const isIdling =
+      !this.state.showSongList &&
+      !this.state.isTypingNumber &&
+      this.state.mode === "menu" &&
+      !this.state.isPromptingSetup;
+
+    if (isIdling) {
+      if (this.idleState === "newsong") {
+        this.dom.standbyScreen.classOn("hidden");
+        this.dom.newSongScreen.classOff("hidden");
+        this.dom.newSongScreen.styleJs({ opacity: 1 });
+      } else if (this.idleState === "bumper") {
+        this.dom.newSongScreen.classOn("hidden");
+        this.dom.standbyScreen.classOff("hidden");
+        this.dom.standbyBumper.styleJs({ opacity: 1 });
+      } else {
+        this.dom.newSongScreen.classOn("hidden");
+        this.dom.standbyScreen.classOff("hidden");
+        this.dom.standbyBumper.classOn("hidden");
+        this.dom.standbyText.classOff("hidden");
+      }
+
       this.dom.mainContent.classOn("hidden");
       this.dom.songListContainer.classOn("hidden");
       this.dom.bottomActions.classOn("hidden");
@@ -1044,6 +1158,10 @@ class EncoreController {
     }
 
     this.dom.standbyScreen.classOn("hidden");
+    this.dom.newSongScreen.classOn("hidden");
+    this.dom.standbyBumper.styleJs({ opacity: 0 });
+    this.dom.newSongScreen.styleJs({ opacity: 0 });
+
     this.dom.mainContent.classOff("hidden");
     this.dom.songListContainer.classOff("hidden");
     this.dom.bottomActions.classOff("hidden");
@@ -1617,7 +1735,6 @@ class EncoreController {
       let currentBpm = 120;
 
       if (tempoChanges && tempoChanges.length > 0) {
-        // Sort ascending by tick, resolving simultaneous events correctly by evaluating initial dummy tempos first.
         let chronologicalChanges = tempoChanges
           .map((tc, index) => {
             let tick = tc.ticks !== undefined ? tc.ticks : tc.tick;
@@ -2579,6 +2696,7 @@ class EncoreController {
       }
       if (!this.state.isPromptingSetup) {
         this.state.isPromptingSetup = true;
+        this.dom.newSongScreen.classOn("hidden");
         this.dom.standbyScreen.classOff("hidden");
         this.dom.standbyBumper.classOn("hidden");
         this.dom.standbyText
