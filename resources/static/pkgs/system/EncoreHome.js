@@ -90,6 +90,8 @@ class EncoreController {
       isTransitioning: false,
       isTypingNumber: false,
       lastPlaybackStatus: null,
+      isScoreFanfareEnabled: config.audioConfig?.enableScoreFanfare ?? true,
+      isScoreNarrationEnabled: config.audioConfig?.enableScoreNarration ?? true,
       isScoreScreenActive: false,
       scoreSkipResolver: null,
       scoreSkipped: false,
@@ -102,6 +104,12 @@ class EncoreController {
       activeCheerCount: 0,
       activeCheers: [],
     };
+
+    console.log("[Encore] Enable fanfare?", this.state.isScoreFanfareEnabled);
+    console.log(
+      "[Encore] Enable narration?",
+      this.state.isScoreNarrationEnabled,
+    );
 
     this.bumperImages = [];
     this.currentBumperIndex = 0;
@@ -2387,38 +2395,47 @@ class EncoreController {
         fanfareUrl = "/assets/audio/fanfare.mid";
       }
 
-      const fanfareFinished = await this.Forte.playSfx(fanfareUrl, 0.5);
-      if (!fanfareFinished || this.state.scoreSkipped) return;
-
-      let playedNarration = false;
-      const narrations =
-        this.libraryInfo?.manifest?.additionalContents?.scoreNarrations;
-
-      if (narrations && Array.isArray(narrations)) {
-        const match = narrations.find((n) => s >= n.min && s <= n.max);
-        if (match && match.file) {
-          const narrationUrl = new URL("http://127.0.0.1:9864/getFile");
-          narrationUrl.searchParams.append(
-            "path",
-            pathJoin([this.libraryInfo.path, match.file]),
-          );
-          await this.Forte.playSfx(narrationUrl.href);
-          playedNarration = true;
-        }
+      let fanfareFinished;
+      if (this.state.isScoreFanfareEnabled) {
+        fanfareFinished = await this.Forte.playSfx(fanfareUrl, 0.5);
+        if (!fanfareFinished || this.state.scoreSkipped) return;
+      } else {
+        await new Promise((r) => setTimeout(r, 4000));
       }
 
-      if (!playedNarration) {
-        let defaultNarrationUrl = "/assets/audio/scores/0.wav";
+      let playedNarration = false;
+      if (this.state.isScoreNarrationEnabled) {
+        const narrations =
+          this.libraryInfo?.manifest?.additionalContents?.scoreNarrations;
 
-        if (s >= 70) {
-          defaultNarrationUrl = "/assets/audio/scores/70.wav";
-        } else if (s >= 50) {
-          defaultNarrationUrl = "/assets/audio/scores/50.wav";
-        } else if (s >= 20) {
-          defaultNarrationUrl = "/assets/audio/scores/20.wav";
+        if (narrations && Array.isArray(narrations)) {
+          const match = narrations.find((n) => s >= n.min && s <= n.max);
+          if (match && match.file) {
+            const narrationUrl = new URL("http://127.0.0.1:9864/getFile");
+            narrationUrl.searchParams.append(
+              "path",
+              pathJoin([this.libraryInfo.path, match.file]),
+            );
+            await this.Forte.playSfx(narrationUrl.href);
+            playedNarration = true;
+          }
         }
 
-        await this.Forte.playSfx(defaultNarrationUrl);
+        if (!playedNarration) {
+          let defaultNarrationUrl = "/assets/audio/scores/0.wav";
+
+          if (s >= 70) {
+            defaultNarrationUrl = "/assets/audio/scores/70.wav";
+          } else if (s >= 50) {
+            defaultNarrationUrl = "/assets/audio/scores/50.wav";
+          } else if (s >= 20) {
+            defaultNarrationUrl = "/assets/audio/scores/20.wav";
+          }
+
+          await this.Forte.playSfx(defaultNarrationUrl);
+        }
+      } else {
+        await new Promise((r) => setTimeout(r, 5000));
       }
     };
 

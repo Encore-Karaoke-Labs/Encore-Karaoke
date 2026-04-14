@@ -235,25 +235,6 @@ class EncoreSetupController {
             },
           },
           {
-            id: "use_library_font",
-            label: "Use Library Soundfont",
-            type: "select",
-            options: [
-              { value: false, label: "No" },
-              { value: true, label: "Yes" },
-            ],
-            get: () => this.config.audioConfig?.useLibraryFont ?? true,
-            set: (v) => {
-              this.config.audioConfig ??= {};
-              this.config.audioConfig.useLibraryFont = v;
-              window.config.setItem("audioConfig.useLibraryFont", v);
-              this.showToast(
-                "THIS CHANGE TAKES EFFECT ON THE NEXT RESTART",
-                "info",
-              );
-            },
-          },
-          {
             id: "buffer_size",
             label: "Buffer Size (ms) (restart required)",
             type: "range",
@@ -297,6 +278,51 @@ class EncoreSetupController {
             action: () => {
               this.Forte.playSfx("/assets/audio/fanfare.mid");
               this.showToast("PLAYING TEST SOUND...", "info");
+            },
+          },
+          {
+            id: "use_library_font",
+            label: "Use Library Soundfont",
+            type: "select",
+            options: [
+              { value: false, label: "No" },
+              { value: true, label: "Yes" },
+            ],
+            get: () => this.config.audioConfig?.useLibraryFont ?? true,
+            set: (v) => {
+              this.config.audioConfig ??= {};
+              this.config.audioConfig.useLibraryFont = v;
+              window.config.setItem("audioConfig.useLibraryFont", v);
+            },
+          },
+          {
+            id: "enable_score_fanfare",
+            label: "Enable Score Fanfare",
+            type: "select",
+            options: [
+              { value: false, label: "No" },
+              { value: true, label: "Yes" },
+            ],
+            get: () => this.config.audioConfig?.enableScoreFanfare ?? true,
+            set: (v) => {
+              this.config.audioConfig ??= {};
+              this.config.audioConfig.enableScoreFanfare = v;
+              window.config.setItem("audioConfig.enableScoreFanfare", v);
+            },
+          },
+          {
+            id: "enable_score_narration",
+            label: "Enable Score Narration",
+            type: "select",
+            options: [
+              { value: false, label: "No" },
+              { value: true, label: "Yes" },
+            ],
+            get: () => this.config.audioConfig?.enableScoreNarration ?? true,
+            set: (v) => {
+              this.config.audioConfig ??= {};
+              this.config.audioConfig.enableScoreNarration = v;
+              window.config.setItem("audioConfig.enableScoreNarration", v);
             },
           },
         ],
