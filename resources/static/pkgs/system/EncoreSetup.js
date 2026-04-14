@@ -27,6 +27,7 @@ class EncoreSetupController {
       authInput: "",
       dashboardIndex: 0,
       submenuIndex: 0,
+      submenuScrollTop: 0,
       activeMenuId: null,
       pinChangeStep: 0,
       newPinTemp: "",
@@ -545,6 +546,11 @@ class EncoreSetupController {
       const menu = this.SUBMENUS[this.state.activeMenuId];
       const items = menu.items;
       const currentItem = items[this.state.submenuIndex];
+
+      const listEl = document.querySelector(".submenu-list");
+      if (listEl) {
+        this.state.submenuScrollTop = listEl.scrollTop;
+      }
 
       if (e.key === "ArrowDown") {
         this.state.submenuIndex = Math.min(
@@ -1319,6 +1325,7 @@ class EncoreSetupController {
     } else if (this.state.view === "dashboard") {
       this.renderDashboard(body);
     } else if (this.state.view === "submenu") {
+      body.classOn("is-submenu");
       this.renderSubmenu(body);
     }
 
@@ -1607,6 +1614,17 @@ class EncoreSetupController {
         valWrap.html(
           `<span>◀</span> <span class="select-text">${opt ? opt.label : val}</span> <span>▶</span>`,
         );
+      }
+    });
+
+    requestAnimationFrame(() => {
+      if (list.elm) {
+        list.elm.scrollTop = this.state.submenuScrollTop || 0;
+
+        const activeItem = list.elm.children[this.state.submenuIndex];
+        if (activeItem) {
+          activeItem.scrollIntoView({ block: "nearest", behavior: "auto" });
+        }
       }
     });
   }
