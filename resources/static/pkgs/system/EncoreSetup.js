@@ -20,12 +20,14 @@ class EncoreSetupController {
     this.config = {};
     this.micDevices = [];
     this.playbackDevices = [];
+    this.updateServers = [];
     this.songList = [];
 
     this.state = {
       view: "auth",
       authInput: "",
       dashboardIndex: 0,
+      dashboardScrollTop: 0,
       submenuIndex: 0,
       submenuScrollTop: 0,
       activeMenuId: null,
@@ -35,6 +37,10 @@ class EncoreSetupController {
       dialog: null,
       previewingVideo: false,
       manualCalib: null,
+      syncing: false,
+      syncProgress: { current: 0, total: 0, filename: "" },
+      buildingLibrary: false,
+      buildProgress: { current: 0, total: 0, percentage: 0 },
     };
 
     this.previewVideoEl = null;
@@ -42,6 +48,24 @@ class EncoreSetupController {
     this.previewSyncFrame = null;
 
     this.boundKeydown = this.handleKeyDown.bind(this);
+
+    this.boundBuildProgress = (e) => {
+      if (!this.state.buildingLibrary) return;
+      this.state.buildProgress = e.detail;
+
+      if (this.buildProgressText) {
+        this.buildProgressText.text(
+          `Processing: ${e.detail.current} / ${e.detail.total}`,
+        );
+      }
+      if (this.buildProgressBar) {
+        this.buildProgressBar.styleJs({ width: `${e.detail.percentage}%` });
+      }
+    };
+    document.addEventListener(
+      "CherryTree.FsSvc.SongList.Progress",
+      this.boundBuildProgress,
+    );
   }
 
   /**
@@ -53,17 +77,14 @@ class EncoreSetupController {
     this.config = await window.config.getAll();
     this.micDevices = await this.Forte.getMicDevices();
     this.playbackDevices = await this.Forte.getPlaybackDevices();
+    this.updateServers =
+      await window.desktopIntegration.ipc.invoke("get-update-servers");
 
     const micDevice = this.config.audioConfig?.mix?.scoring?.inputDevice;
     if (micDevice) {
       await this.Forte.setMicDevice(micDevice);
     } else {
       await this.Forte.setMicDevice("default");
-    }
-
-    if (this.config.libraryPath) {
-      await this.FsSvc.buildSongList(this.config.libraryPath);
-      this.songList = this.FsSvc.getSongList();
     }
 
     const foundLibs = await this.FsSvc.findEncoreLibraries();
@@ -73,6 +94,36 @@ class EncoreSetupController {
       : { title: "Unknown", description: "No metadata available." };
 
     this.buildSettingsMap();
+
+    this.wrapper = new Html("div").class("full-ui").appendTo("body").styleJs({
+      background: "linear-gradient(135deg, #05050A 0%, #1A1A2E 100%)",
+      color: "white",
+      fontFamily: "'Rajdhani', sans-serif",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      opacity: 0,
+    });
+
+    this.container = new Html("div")
+      .classOn("setup-container")
+      .appendTo(this.wrapper);
+
+    window.addEventListener("keydown", this.boundKeydown);
+    this.renderView();
+
+    setTimeout(() => {
+      window.desktopIntegration.ipc.send("setRPC", { details: `In setup` });
+      this.wrapper.styleJs({ opacity: 1 });
+      this.Ui.transition("fadeIn", this.wrapper);
+    }, 100);
+
+    if (this.config.libraryPath) {
+      this.songList = this.FsSvc.getSongList();
+      setTimeout(async () => {
+        await this.triggerLibraryBuild(false);
+      }, 500);
+    }
 
     this.wrapper = new Html("div").class("full-ui").appendTo("body").styleJs({
       background: "linear-gradient(135deg, #05050A 0%, #1A1A2E 100%)",
@@ -157,6 +208,7 @@ class EncoreSetupController {
   buildSettingsMap() {
     this.DASHBOARD_TILES = [
       { id: "library", label: "Library & Storage", icon: "📁" },
+      { id: "sync", label: "Network Sync", icon: "🌐" },
       { id: "audio", label: "Sound Settings", icon: "🔊" },
       { id: "mic", label: "Microphone Settings", icon: "🎤" },
       { id: "video", label: "Video Settings", icon: "📺" },
@@ -172,6 +224,18 @@ class EncoreSetupController {
       label: d.label || "Default",
       value: d.deviceId,
     }));
+
+    const serverOptions =
+      this.updateServers && this.updateServers.length > 0
+        ? this.updateServers.map((s) => ({ label: s.host, value: s.id }))
+        : [{ label: "No servers found", value: "none" }];
+
+    if (
+      !this.state.selectedServerId ||
+      !serverOptions.find((o) => o.value === this.state.selectedServerId)
+    ) {
+      this.state.selectedServerId = serverOptions[0].value;
+    }
 
     this.SUBMENUS = {
       library: {
@@ -209,6 +273,39 @@ class EncoreSetupController {
             label: "Rescan & Change Library",
             type: "action",
             action: async () => await this.handleLibraryScan(),
+          },
+        ],
+      },
+      sync: {
+        title: "Network Sync",
+        items: [
+          {
+            id: "server_select",
+            label: "Target Update Server",
+            type: "select",
+            options: serverOptions,
+            get: () => this.state.selectedServerId,
+            set: (v) => (this.state.selectedServerId = v),
+          },
+          {
+            id: "refresh_servers",
+            label: "Refresh Server List",
+            type: "action",
+            action: async () => {
+              this.showToast("REFRESHING...", "info");
+              this.updateServers =
+                await window.desktopIntegration.ipc.invoke(
+                  "get-update-servers",
+                );
+              this.buildSettingsMap();
+              this.renderView();
+            },
+          },
+          {
+            id: "start_sync",
+            label: "Start Network Download",
+            type: "action",
+            action: () => this.startNetworkSync(),
           },
         ],
       },
@@ -537,6 +634,7 @@ class EncoreSetupController {
       if (e.key === "Enter") {
         const selected = this.DASHBOARD_TILES[this.state.dashboardIndex];
         this.executeAction(selected.id);
+        return;
       }
       this.renderView();
       return;
@@ -614,6 +712,262 @@ class EncoreSetupController {
         return txt ? { time, text: txt } : null;
       })
       .filter(Boolean);
+  }
+
+  async triggerLibraryBuild(showOverlay = true) {
+    if (showOverlay) {
+      this.state.buildingLibrary = true;
+      this.state.buildProgress = { current: 0, total: 0, percentage: 0 };
+      this.renderView();
+    }
+
+    const success = await this.FsSvc.buildSongList(this.config.libraryPath);
+
+    if (success) {
+      this.songList = this.FsSvc.getSongList();
+    }
+
+    if (showOverlay) {
+      this.state.buildingLibrary = false;
+      this.renderView();
+      if (!success) this.showToast("FAILED TO BUILD SONG LIST", "error");
+    }
+  }
+
+  renderBuildOverlay(container) {
+    const overlay = new Html("div")
+      .classOn("setup-manual-calib-overlay")
+      .appendTo(container);
+
+    new Html("h2").text("BUILDING SONG LIST").appendTo(overlay);
+    new Html("p")
+      .text("Scanning library files and extracting metadata...")
+      .appendTo(overlay);
+
+    const progressContainer = new Html("div")
+      .styleJs({ width: "80%", maxWidth: "600px", marginTop: "2rem" })
+      .appendTo(overlay);
+
+    const barBg = new Html("div")
+      .classOn("setup-slider-bar")
+      .styleJs({ height: "20px" })
+      .appendTo(progressContainer);
+
+    this.buildProgressBar = new Html("div")
+      .classOn("setup-slider-fill")
+      .styleJs({ width: `${this.state.buildProgress.percentage}%` })
+      .appendTo(barBg);
+
+    this.buildProgressText = new Html("p")
+      .styleJs({
+        marginTop: "1rem",
+        color: "#89cff0",
+        fontSize: "1.2rem",
+        fontWeight: "bold",
+      })
+      .text(
+        `Processing: ${this.state.buildProgress.current} / ${this.state.buildProgress.total}`,
+      )
+      .appendTo(progressContainer);
+  }
+
+  async startNetworkSync() {
+    if (
+      this.state.selectedServerId === "none" ||
+      !this.updateServers ||
+      this.updateServers.length === 0
+    ) {
+      this.showToast("NO VALID SERVERS FOUND", "error");
+      return;
+    }
+    if (!this.config.libraryPath) {
+      this.showToast("PLEASE SET LIBRARY PATH FIRST", "error");
+      return;
+    }
+
+    const server = this.updateServers.find(
+      (s) => s.id === this.state.selectedServerId,
+    );
+    if (!server) return;
+
+    this.state.syncing = true;
+    this.state.syncProgress = {
+      current: 0,
+      total: 0,
+      filename: "Connecting to Server...",
+    };
+
+    const formatBytes = (bytes) => {
+      if (!bytes || bytes === 0) return "0.00 MB";
+      return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+    };
+
+    this.boundSyncProgress = (...args) => {
+      const data = args.length === 2 ? args[1] : args[0];
+      this.state.syncProgress = data;
+
+      const pctOverall = data.total > 0 ? (data.current / data.total) * 100 : 0;
+      let pctFile = 0;
+
+      if (data.fileTotalBytes > 0) {
+        pctFile = (data.fileLoadedBytes / data.fileTotalBytes) * 100;
+      } else if (data.status === "validating") {
+        pctFile = 100;
+      }
+
+      if (this.syncOverallText) {
+        this.syncOverallText.text(`File ${data.current} of ${data.total}`);
+      }
+      if (this.syncProgressBarOverall) {
+        this.syncProgressBarOverall.styleJs({ width: `${pctOverall}%` });
+      }
+
+      if (this.syncProgressText) {
+        this.syncProgressText.text(data.filename);
+
+        if (data.status === "validating") {
+          this.syncProgressText.styleJs({ color: "#ffd700" });
+          this.syncFileBytesText.text("");
+          this.syncProgressBarFile.styleJs({
+            width: "100%",
+            backgroundColor: "#ffd700",
+            opacity: "0.4",
+          });
+        } else {
+          this.syncProgressText.styleJs({ color: "#89cff0" });
+          this.syncProgressBarFile.styleJs({
+            width: `${pctFile}%`,
+            backgroundColor: "#89cff0",
+            opacity: "1",
+          });
+
+          if (data.fileTotalBytes > 0) {
+            this.syncFileBytesText.text(
+              `${formatBytes(data.fileLoadedBytes)} / ${formatBytes(data.fileTotalBytes)}`,
+            );
+          } else {
+            this.syncFileBytesText.text(`${formatBytes(data.fileLoadedBytes)}`);
+          }
+        }
+      }
+    };
+
+    const ipc = window.desktopIntegration.ipc;
+    if (ipc.on) ipc.on("sync-progress", this.boundSyncProgress);
+
+    this.renderView();
+
+    try {
+      const res = await ipc.invoke("sync-library", {
+        serverIp: server.ip,
+        serverPort: server.port,
+        libraryPath: this.config.libraryPath,
+      });
+
+      this.state.syncing = false;
+
+      if (res.success) {
+        this.showToast("NETWORK SYNC COMPLETE", "success");
+        await this.triggerLibraryBuild(true);
+      } else {
+        this.showToast("SYNC FAILED: " + res.error, "error");
+        this.renderView();
+      }
+    } catch (error) {
+      this.state.syncing = false;
+      this.showToast("SYNC CRASHED: " + error.message, "error");
+    } finally {
+      if (ipc.off) {
+        ipc.off("sync-progress", this.boundSyncProgress);
+      } else if (ipc.removeListener) {
+        ipc.removeListener("sync-progress", this.boundSyncProgress);
+      }
+      this.renderView();
+    }
+  }
+
+  renderSyncOverlay(container) {
+    const overlay = new Html("div")
+      .classOn("setup-manual-calib-overlay")
+      .appendTo(container);
+
+    new Html("h2").text("NETWORK LIBRARY SYNC").appendTo(overlay);
+    new Html("p")
+      .text("Checking for differences and downloading missing files...")
+      .appendTo(overlay);
+
+    const progressContainer = new Html("div")
+      .styleJs({
+        width: "90%",
+        maxWidth: "700px",
+        marginTop: "2rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "1.5rem",
+      })
+      .appendTo(overlay);
+
+    const overallWrap = new Html("div").appendTo(progressContainer);
+
+    const overallLabel = new Html("div")
+      .styleJs({
+        display: "flex",
+        justifyContent: "space-between",
+        color: "#ffd700",
+        fontWeight: "bold",
+        fontSize: "1.2rem",
+        marginBottom: "0.5rem",
+      })
+      .appendTo(overallWrap);
+    new Html("span").text("OVERALL PROGRESS").appendTo(overallLabel);
+    this.syncOverallText = new Html("span")
+      .text("0 / 0")
+      .appendTo(overallLabel);
+
+    const barBgOverall = new Html("div")
+      .classOn("setup-slider-bar")
+      .styleJs({ height: "15px", background: "rgba(0,0,0,0.6)" })
+      .appendTo(overallWrap);
+    this.syncProgressBarOverall = new Html("div")
+      .classOn("setup-slider-fill")
+      .styleJs({ width: "0%", backgroundColor: "#ffd700" })
+      .appendTo(barBgOverall);
+
+    const fileWrap = new Html("div").appendTo(progressContainer);
+
+    const fileLabel = new Html("div")
+      .styleJs({
+        display: "flex",
+        justifyContent: "space-between",
+        color: "#89cff0",
+        fontWeight: "bold",
+        fontSize: "1.1rem",
+        marginBottom: "0.5rem",
+      })
+      .appendTo(fileWrap);
+
+    this.syncProgressText = new Html("span")
+      .styleJs({
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        maxWidth: "70%",
+      })
+      .text("Connecting...")
+      .appendTo(fileLabel);
+
+    this.syncFileBytesText = new Html("span")
+      .text("0.00 MB / 0.00 MB")
+      .appendTo(fileLabel);
+
+    const barBgFile = new Html("div")
+      .classOn("setup-slider-bar")
+      .styleJs({ height: "15px", background: "rgba(0,0,0,0.6)" })
+      .appendTo(fileWrap);
+    this.syncProgressBarFile = new Html("div")
+      .classOn("setup-slider-fill")
+      .styleJs({ width: "0%", backgroundColor: "#89cff0" })
+      .appendTo(barBgFile);
   }
 
   /**
@@ -1129,7 +1483,7 @@ class EncoreSetupController {
    *
    * @param {string} id - The action ID corresponding to a dashboard tile
    */
-  executeAction(id) {
+  async executeAction(id) {
     if (id === "reboot") {
       const fadeOverlay = new Html("div")
         .styleJs({
@@ -1160,10 +1514,17 @@ class EncoreSetupController {
       this.state.view = "pin_change";
       this.state.pinChangeStep = 0;
       this.state.authInput = "";
+      this.renderView();
     } else if (this.SUBMENUS[id]) {
+      if (id === "sync") {
+        this.updateServers =
+          await window.desktopIntegration.ipc.invoke("get-update-servers");
+        this.buildSettingsMap();
+      }
       this.state.activeMenuId = id;
       this.state.submenuIndex = 0;
       this.state.view = "submenu";
+      this.renderView();
     }
   }
 
@@ -1186,11 +1547,10 @@ class EncoreSetupController {
     this.currentManifest = newLib.manifest;
     window.config.setItem("libraryPath", newLib.path);
 
-    await this.FsSvc.buildSongList(newLib.path);
-    this.songList = this.FsSvc.getSongList();
-
     this.showToast(`LIBRARY SET TO: ${newLib.manifest.title}`, "success");
-    this.renderView();
+    this.buildSettingsMap();
+
+    await this.triggerLibraryBuild(true);
   }
 
   /**
@@ -1201,7 +1561,7 @@ class EncoreSetupController {
    */
   async startVideoPreview() {
     if (!this.songList || this.songList.length === 0) {
-      this.showToast("LIBRARY EMPTY OR NOT LOADED", "error");
+      this.showToast("LIBRARY IS STILL LOADING... PLEASE WAIT", "error");
       return;
     }
 
@@ -1310,6 +1670,16 @@ class EncoreSetupController {
 
     if (this.state.previewingVideo) {
       this.renderVideoPreviewOverlay(this.container);
+      return;
+    }
+
+    if (this.state.syncing) {
+      this.renderSyncOverlay(this.container);
+      return;
+    }
+
+    if (this.state.buildingLibrary) {
+      this.renderBuildOverlay(this.container);
       return;
     }
 
@@ -1549,12 +1919,28 @@ class EncoreSetupController {
 
   /**
    * Renders the dashboard grid with configuration tiles.
-   * Highlights the currently selected tile.
    *
    * @param {Object} container - Parent DOM element
    */
   renderDashboard(container) {
-    const grid = new Html("div").classOn("setup-grid").appendTo(container);
+    const scrollWrapper = new Html("div")
+      .classOn("dashboard-scroll-wrapper", "submenu-list")
+      .styleJs({
+        width: "100%",
+        maxHeight: "100%",
+        overflowY: "auto",
+        paddingTop: "0.5rem",
+      })
+      .appendTo(container);
+
+    const grid = new Html("div")
+      .classOn("setup-grid")
+      .styleJs({
+        margin: "0 auto",
+        paddingBottom: "2rem",
+      })
+      .appendTo(scrollWrapper);
+
     this.DASHBOARD_TILES.forEach((tile, idx) => {
       const tileEl = new Html("div").classOn("setup-tile").appendTo(grid);
       if (idx === this.state.dashboardIndex) tileEl.classOn("active");
@@ -1567,6 +1953,19 @@ class EncoreSetupController {
         .classOn("setup-tile-label")
         .text(tile.label)
         .appendTo(tileEl);
+    });
+
+    requestAnimationFrame(() => {
+      if (scrollWrapper.elm) {
+        const activeTile = document.querySelector(".setup-tile.active");
+        if (activeTile) {
+          if (this.state.dashboardIndex < 3) {
+            scrollWrapper.elm.scrollTop = 0;
+          } else {
+            activeTile.scrollIntoView({ block: "nearest", behavior: "auto" });
+          }
+        }
+      }
     });
   }
 
@@ -1635,6 +2034,10 @@ class EncoreSetupController {
    */
   destroy() {
     window.removeEventListener("keydown", this.boundKeydown);
+    document.removeEventListener(
+      "CherryTree.FsSvc.SongList.Progress",
+      this.boundBuildProgress,
+    );
     if (this.previewSyncFrame) cancelAnimationFrame(this.previewSyncFrame);
     if (this.state.manualCalib?.active) this.exitManualCalibration();
     this.Ui.giveUpUi(this.Pid);

@@ -61,6 +61,74 @@ const io = new Server(serverHttp);
 const instance = new Bonjour();
 const bonjourId = `encore-link-${crypto.randomUUID()}`;
 
+// Pre-compute CRC32 table for maximum performance
+const crcTable = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+  let c = i;
+  for (let j = 0; j < 8; j++) {
+    c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  }
+  crcTable[i] = c;
+}
+
+// Memory-safe chunked CRC32 stream calculator
+function calculateFileCRC32(filePath) {
+  return new Promise((resolve, reject) => {
+    const stream = fs.createReadStream(filePath);
+    let crc = 0 ^ -1;
+
+    stream.on("data", (chunk) => {
+      for (let i = 0; i < chunk.length; i++) {
+        crc = (crc >>> 8) ^ crcTable[(crc ^ chunk[i]) & 0xff];
+      }
+    });
+
+    stream.on("end", () => {
+      resolve((crc ^ -1) >>> 0);
+    });
+
+    stream.on("error", reject);
+  });
+}
+
+let activeUpdateServers = [];
+const serverBrowser = instance.find({ type: "encore-server" });
+
+serverBrowser.on("up", async (service) => {
+  try {
+    let res = await fetch(
+      `http://${service.referer.address}:${service.port}/info`,
+    );
+    let serverInfo = await res.json();
+
+    const serverId = `${service.referer.address}:${service.port}`;
+    const serverObj = {
+      id: serverId,
+      ip: service.referer.address,
+      host: service.host,
+      port: service.port,
+      name: serverInfo.serverName,
+      info: serverInfo.libraryInformation,
+    };
+
+    const existsIdx = activeUpdateServers.findIndex((s) => s.id === serverId);
+    if (existsIdx !== -1) {
+      activeUpdateServers[existsIdx] = serverObj;
+    } else {
+      activeUpdateServers.push(serverObj);
+    }
+    logger.info("SYSTEM", `Server UP: ${serverInfo.serverName} (${serverId})`);
+  } catch (e) {
+    logger.error("SYSTEM", "Failed to fetch info from a discovered UP server.");
+  }
+});
+
+serverBrowser.on("down", (service) => {
+  const serverId = `${service.referer.address}:${service.port}`;
+  activeUpdateServers = activeUpdateServers.filter((s) => s.id !== serverId);
+  logger.info("SYSTEM", `Server DOWN: ${serverId}`);
+});
+
 instance.find({ type: "encore-server" }, async (service) => {
   try {
     let res = await fetch(
@@ -647,6 +715,200 @@ app.whenReady().then(() => {
       return { success: false, error: error.message };
     }
   });
+
+  ipcMain.handle("get-update-servers", () => activeUpdateServers);
+  ipcMain.handle(
+    "sync-library",
+    async (event, { serverIp, serverPort, libraryPath }) => {
+      try {
+        if (!fs.existsSync(libraryPath)) {
+          fs.mkdirSync(libraryPath, { recursive: true });
+        }
+
+        const syncCacheDir = path.join(userData, "SyncCache");
+        if (!fs.existsSync(syncCacheDir))
+          fs.mkdirSync(syncCacheDir, { recursive: true });
+
+        const libPathHash = crypto
+          .createHash("md5")
+          .update(libraryPath)
+          .digest("hex");
+        const hashCachePath = path.join(
+          syncCacheDir,
+          `hashes-${libPathHash}.json`,
+        );
+
+        let hashCache = {};
+        let cacheDirty = false;
+
+        if (fs.existsSync(hashCachePath)) {
+          try {
+            hashCache = JSON.parse(fs.readFileSync(hashCachePath, "utf8"));
+          } catch (e) {
+            logger.warn(
+              "SYNC",
+              "Failed to parse local hash cache, generating a new one.",
+            );
+          }
+        }
+
+        logger.info(
+          "SYNC",
+          `Fetching file list from ${serverIp}:${serverPort}...`,
+        );
+        const res = await fetch(`http://${serverIp}:${serverPort}/files`);
+        const remoteFiles = await res.json();
+
+        const toDownload = [];
+
+        logger.info("SYNC", `Validating ${remoteFiles.length} files...`);
+        for (let i = 0; i < remoteFiles.length; i++) {
+          const rFile = remoteFiles[i];
+          const localFilePath = path.join(libraryPath, rFile.name);
+
+          event.sender.send("sync-progress", {
+            status: "validating",
+            current: i + 1,
+            total: remoteFiles.length,
+            filename: `Validating: ${rFile.name}`,
+          });
+
+          if (!fs.existsSync(localFilePath)) {
+            toDownload.push(rFile);
+          } else {
+            const stat = fs.statSync(localFilePath);
+            let localCrc;
+
+            if (
+              hashCache[rFile.name] &&
+              hashCache[rFile.name].mtime === stat.mtimeMs
+            ) {
+              localCrc = hashCache[rFile.name].crc32;
+            } else {
+              localCrc = await calculateFileCRC32(localFilePath);
+              hashCache[rFile.name] = { mtime: stat.mtimeMs, crc32: localCrc };
+              cacheDirty = true;
+            }
+
+            if (localCrc !== rFile.crc32) {
+              logger.warn("SYNC", `CRC mismatch for ${rFile.name}`);
+              toDownload.push(rFile);
+            }
+          }
+        }
+
+        if (toDownload.length === 0) {
+          if (cacheDirty)
+            fs.writeFileSync(hashCachePath, JSON.stringify(hashCache, null, 2));
+          return {
+            success: true,
+            message: "Library is completely up to date!",
+          };
+        }
+
+        logger.info(
+          "SYNC",
+          `${toDownload.length} files need syncing. Starting download...`,
+        );
+        for (let i = 0; i < toDownload.length; i++) {
+          const fileToGet = toDownload[i];
+          const safeName = fileToGet.name.replace(/\\/g, "/");
+
+          event.sender.send("sync-progress", {
+            status: "downloading",
+            current: i + 1,
+            total: toDownload.length,
+            filename: `Downloading: ${safeName}`,
+            fileLoadedBytes: 0,
+            fileTotalBytes: 0,
+          });
+
+          const fileUrl = `http://${serverIp}:${serverPort}/file?path=${encodeURIComponent(safeName)}`;
+          const localFilePath = path.join(libraryPath, safeName);
+          const dir = path.dirname(localFilePath);
+
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+          await new Promise((resolve, reject) => {
+            const req = http
+              .get(fileUrl, { timeout: 15000 }, (response) => {
+                if (response.statusCode !== 200) {
+                  return reject(
+                    new Error(
+                      `Failed to get '${safeName}' (Status: ${response.statusCode})`,
+                    ),
+                  );
+                }
+
+                const fileTotalBytes = parseInt(
+                  response.headers["content-length"] || "0",
+                  10,
+                );
+                let fileLoadedBytes = 0;
+                let lastIpcTime = 0;
+
+                const fileStream = fs.createWriteStream(localFilePath);
+
+                response.on("data", (chunk) => {
+                  fileLoadedBytes += chunk.length;
+                  const now = Date.now();
+
+                  if (
+                    now - lastIpcTime > 50 ||
+                    fileLoadedBytes === fileTotalBytes
+                  ) {
+                    lastIpcTime = now;
+                    event.sender.send("sync-progress", {
+                      status: "downloading",
+                      current: i + 1,
+                      total: toDownload.length,
+                      filename: `Downloading: ${safeName}`,
+                      fileLoadedBytes,
+                      fileTotalBytes,
+                    });
+                  }
+                });
+
+                response.pipe(fileStream);
+                fileStream.on("finish", () => {
+                  fileStream.close();
+                  resolve();
+                });
+              })
+              .on("error", reject);
+
+            req.on("timeout", () => {
+              req.abort();
+              reject(
+                new Error(
+                  `Timeout getting '${safeName}' - Server disconnected.`,
+                ),
+              );
+            });
+          });
+
+          const newStat = fs.statSync(localFilePath);
+          hashCache[safeName] = {
+            mtime: newStat.mtimeMs,
+            crc32: fileToGet.crc32,
+          };
+          cacheDirty = true;
+        }
+
+        if (cacheDirty) {
+          fs.writeFileSync(hashCachePath, JSON.stringify(hashCache, null, 2));
+        }
+
+        return {
+          success: true,
+          message: `Successfully synced ${toDownload.length} files.`,
+        };
+      } catch (error) {
+        logger.error("SYNC", `Sync failed: ${error.message}`);
+        return { success: false, error: error.message };
+      }
+    },
+  );
 
   ipcMain.on("setRPC", (event, arg) => {
     discordClient.user?.setActivity({
