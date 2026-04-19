@@ -286,6 +286,7 @@ const state = {
     sfxVolume: 1,
     smoothedTime: 0,
     lastFrameTime: 0,
+    guideRange: { min: 42, max: 90 },
     midiInfo: {
       ticks: [],
       timeDivision: 480,
@@ -589,9 +590,9 @@ function updateScore(currentTime) {
     pianoRollContainer.elm.classList.contains("visible")
   ) {
     const pitchToY = (pitch) => {
-      const minMidi = 48; // C3
-      const maxMidi = 84; // C6
-      const rollHeight = 150;
+      const minMidi = state.playback.guideRange?.min ?? 42;
+      const maxMidi = state.playback.guideRange?.max ?? 90;
+      const rollHeight = 250;
       if (pitch < minMidi) return rollHeight;
       if (pitch > maxMidi) return 0;
       return (
@@ -695,9 +696,9 @@ function renderPianoRollNotes(notes) {
   const fragment = document.createDocumentFragment();
 
   const pitchToY = (pitch) => {
-    const minMidi = 48; // C3
-    const maxMidi = 84; // C6
-    const rollHeight = 150;
+    const minMidi = state.playback.guideRange?.min ?? 42;
+    const maxMidi = state.playback.guideRange?.max ?? 90;
+    const rollHeight = 250;
     if (pitch < minMidi) return rollHeight;
     if (pitch > maxMidi) return 0;
     const normalizedPitch = (pitch - minMidi) / (maxMidi - minMidi);
@@ -1349,6 +1350,7 @@ const pkg = {
       state.playback.isMultiplexed = false;
       state.playback.multiplexPan = -1;
       state.playback.guideNotes = [];
+      state.playback.guideRange = { min: 42, max: 90 };
       state.playback.isAnalyzing = false;
       state.scoring.activeMidiNotes.clear();
 
@@ -1528,6 +1530,7 @@ const pkg = {
                 if (polyphonyRatio > 0.25) continue;
 
                 let matches = 0;
+                let pitchSum = 0;
                 for (const lTime of lyricTimes) {
                   if (notes.some((n) => Math.abs(n.start - lTime) < 0.1)) {
                     matches++;
@@ -1535,32 +1538,43 @@ const pkg = {
                 }
                 const matchRatio = matches / lyricTimes.length;
 
+                notes.forEach((n) => (pitchSum += n.midiNote));
+                const avgPitch = pitchSum / notes.length;
+
+                let pitchPenalty = 0;
+                if (avgPitch < 50) pitchPenalty = (50 - avgPitch) * 0.15;
+                if (avgPitch > 85) pitchPenalty = (avgPitch - 85) * 0.15;
+
+                const score = matchRatio - polyphonyRatio * 1.5 - pitchPenalty;
+
                 candidateChannels.push({
                   index: i,
                   notes: notes,
                   matchRatio,
                   polyphonyRatio,
+                  avgPitch,
+                  score,
                 });
               }
 
-              candidateChannels.sort((a, b) => {
-                if (Math.abs(b.matchRatio - a.matchRatio) < 0.05) {
-                  return a.polyphonyRatio - b.polyphonyRatio;
-                }
-                return b.matchRatio - a.matchRatio;
-              });
+              candidateChannels.sort((a, b) => b.score - a.score);
 
               if (
                 candidateChannels.length > 0 &&
-                candidateChannels[0].matchRatio > 0.2
+                candidateChannels[0].matchRatio > 0.15
               ) {
                 const best = candidateChannels[0];
                 console.log(
-                  `[FORTE SVC] 🎵 Vocal Guide tracked on Channel ${best.index + 1} (Match: ${(best.matchRatio * 100).toFixed(1)}%, Polyphony: ${(best.polyphonyRatio * 100).toFixed(1)}%)`,
+                  `[FORTE SVC] 🎵 Vocal Guide tracked on Channel ${best.index + 1} (Score: ${best.score.toFixed(2)}, Match: ${(best.matchRatio * 100).toFixed(1)}%, Polyphony: ${(best.polyphonyRatio * 100).toFixed(1)}%, Avg Pitch: ${best.avgPitch.toFixed(1)})`,
                 );
 
                 const monoNotes = [];
+                let minPitch = 127;
+                let maxPitch = 0;
+
                 best.notes.forEach((n) => {
+                  const duration = Math.max(n.length, 0.1);
+
                   const existing = monoNotes.find(
                     (mn) => Math.abs(mn.startTime - n.start) < 0.05,
                   );
@@ -1572,11 +1586,20 @@ const pkg = {
                       id: monoNotes.length,
                       pitch: n.midiNote,
                       startTime: n.start,
-                      duration: n.length,
+                      duration: duration,
                     });
                   }
+
+                  if (n.midiNote < minPitch) minPitch = n.midiNote;
+                  if (n.midiNote > maxPitch) maxPitch = n.midiNote;
                 });
+
                 state.playback.guideNotes = monoNotes;
+
+                state.playback.guideRange = {
+                  min: Math.max(0, minPitch - 4),
+                  max: Math.min(127, maxPitch + 4),
+                };
               } else {
                 console.log(
                   "[FORTE SVC] ⚠️ No clear vocal guide track found. Falling back to Key-Aware Scoring.",
