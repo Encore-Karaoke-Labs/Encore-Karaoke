@@ -1515,7 +1515,6 @@ const pkg = {
 
                 const notes = channels[i];
                 if (!notes || notes.length === 0) continue;
-                s;
                 if (notes.length < lyricTimes.length * 0.3) continue;
                 if (notes.length > lyricTimes.length * 4) continue;
 
