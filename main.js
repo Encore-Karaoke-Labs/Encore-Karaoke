@@ -354,7 +354,7 @@ server.post("/auth/verify-hash", (req, res) => {
 });
 
 const titleBarHeight = 55;
-let zoomFactor = Config.getItem("zoomLevel") || 1;
+let zoomFactor = Config.getItem("zoomLevel") || 0.75;
 
 // Main App Startup
 const createWindow = () => {
