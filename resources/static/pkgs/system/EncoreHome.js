@@ -1905,13 +1905,15 @@ class EncoreController {
       this.state.currentSongIsMultiplexed = pbState.isMultiplexed;
       this.state.currentSongIsMIDI = pbState.isMidi;
 
-      console.log("Is multiplexed?", this.state.currentSongIsMultiplexed);
-      console.log("Is midi?", this.state.currentSongIsMIDI);
-      console.log("Is mtv?", this.state.currentSongIsMV);
+      console.log(
+        "[Encore] Is track multiplexed?",
+        this.state.currentSongIsMultiplexed,
+      );
+      console.log("[Encore] Is track MIDI?", this.state.currentSongIsMIDI);
+      console.log("[Encore] Is track an MTV?", this.state.currentSongIsMV);
       if (this.state.currentSongIsMultiplexed) {
         this.Forte.togglePianoRollVisibility(true);
       } else if (this.state.currentSongIsMIDI) {
-        console.log("this should appear");
         this.Forte.togglePianoRollVisibility(true);
       } else {
         this.Forte.togglePianoRollVisibility(false);
