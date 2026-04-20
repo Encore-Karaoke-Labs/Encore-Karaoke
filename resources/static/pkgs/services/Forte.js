@@ -1570,15 +1570,43 @@ const pkg = {
                 candidateChannels.length > 0 &&
                 candidateChannels[0].matchRatio > 0.15
               ) {
-                const bestScore = candidateChannels[0].score;
+                const mainChannel = candidateChannels[0];
+                const validChannels = [mainChannel];
 
-                const validChannels = candidateChannels.filter(
-                  (c) => bestScore - c.score < 0.8 && c.matchRatio > 0.1,
+                logVerbose(
+                  `🎵 Primary Vocal Guide on Channel ${mainChannel.index + 1} (Score: ${mainChannel.score.toFixed(2)}, Match: ${(mainChannel.matchRatio * 100).toFixed(1)}%)`,
                 );
 
-                console.log(
-                  `[FORTE SVC] 🎵 Vocal Guide tracked across ${validChannels.length} Channel(s). Top Score: ${bestScore.toFixed(2)}`,
-                );
+                for (let i = 1; i < candidateChannels.length; i++) {
+                  const candidate = candidateChannels[i];
+
+                  if (mainChannel.score - candidate.score > 0.6) continue;
+                  if (candidate.matchRatio < 0.15) continue;
+
+                  if (Math.abs(mainChannel.avgPitch - candidate.avgPitch) > 18)
+                    continue;
+
+                  let overlapCount = 0;
+                  for (const n1 of candidate.notes) {
+                    for (const n2 of mainChannel.notes) {
+                      const n1End = n1.start + n1.length;
+                      const n2End = n2.start + n2.length;
+                      if (n1.start < n2End && n1End > n2.start) {
+                        overlapCount++;
+                        break;
+                      }
+                    }
+                  }
+
+                  const overlapRatio = overlapCount / candidate.notes.length;
+
+                  if (overlapRatio < 0.2) {
+                    logVerbose(
+                      `🔗 Merging Channel ${candidate.index + 1} as split melody (Overlap: ${(overlapRatio * 100).toFixed(1)}%)`,
+                    );
+                    validChannels.push(candidate);
+                  }
+                }
 
                 let combinedNotes = [];
                 validChannels.forEach((c) => {
@@ -1620,8 +1648,8 @@ const pkg = {
                   max: Math.min(127, maxPitch + 4),
                 };
               } else {
-                console.log(
-                  "[FORTE SVC] ⚠️ No clear vocal guide track found. Falling back to Key-Aware Scoring.",
+                logVerbose(
+                  "⚠️ No clear vocal guide track found. Falling back to Key-Aware Scoring.",
                 );
               }
             }
