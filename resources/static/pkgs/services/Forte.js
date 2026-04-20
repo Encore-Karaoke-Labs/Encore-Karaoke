@@ -322,7 +322,10 @@ const state = {
  * @param {string} [type="pitch"] - Sub-type for styling.
  */
 function showScoreReason(text, type = "pitch") {
-  if (scoreReasonTimeout) clearTimeout(scoreReasonTimeout);
+  if (scoreReasonTimeout) {
+    clearTimeout(scoreReasonTimeout);
+    scoreReasonTimeout = null;
+  }
   if (!state.ui.pianoRollVisible) return;
   scoreReasonDisplay
     .classOff("type-pitch", "type-vibrato", "type-transition")
@@ -332,6 +335,7 @@ function showScoreReason(text, type = "pitch") {
 
   scoreReasonTimeout = setTimeout(() => {
     scoreReasonDisplay.classOff("visible");
+    scoreReasonTimeout = null;
   }, 1200);
 }
 
@@ -358,6 +362,8 @@ function updateScore(currentTime) {
     micAnalyserBuffer,
     sampleRate,
   );
+
+  let isCorrectPitch;
 
   let sumSquares = 0;
   for (let i = 0; i < micAnalyserBuffer.length; i++) {
@@ -425,7 +431,7 @@ function updateScore(currentTime) {
       state.scoring.hasHitCurrentNote = false;
     }
 
-    let isCorrectPitch = false;
+    isCorrectPitch = false;
     if (isGuideNoteActive && isSinging) {
       let normalizedMicMidi = midiMicPitch;
       while (normalizedMicMidi < targetMidiPitch - 6) normalizedMicMidi += 12;
@@ -447,12 +453,6 @@ function updateScore(currentTime) {
       ) {
         const notes = state.playback.guideNotes;
         if (notes) {
-          if (
-            lastHitNoteElement &&
-            lastHitNoteElement.elm.classList.contains("hit")
-          ) {
-            lastHitNoteElement.classOff("hit");
-          }
           const currentNote = notes.find(
             (n) =>
               currentTime >= n.startTime &&
@@ -589,22 +589,26 @@ function updateScore(currentTime) {
     pianoRollContainer &&
     pianoRollContainer.elm.classList.contains("visible")
   ) {
-    const pitchToY = (pitch) => {
-      const minMidi = state.playback.guideRange?.min ?? 42;
-      const maxMidi = state.playback.guideRange?.max ?? 90;
-      const rollHeight = 250;
-      if (pitch < minMidi) return rollHeight;
-      if (pitch > maxMidi) return 0;
-      return (
-        rollHeight - ((pitch - minMidi) / (maxMidi - minMidi)) * rollHeight
-      );
-    };
+    if (pianoRollUserPitch) pianoRollUserPitch.elm.style.opacity = "0";
 
-    if (isSinging && midiMicPitch > 0) {
-      pianoRollUserPitch.elm.style.transform = `translateY(${pitchToY(midiMicPitch) - 2}px)`;
-      pianoRollUserPitch.elm.style.opacity = "1";
-    } else {
-      pianoRollUserPitch.elm.style.opacity = "0";
+    if (hasGuideNotes) {
+      const currentNote = state.playback.guideNotes.find(
+        (n) =>
+          currentTime >= n.startTime && currentTime < n.startTime + n.duration,
+      );
+
+      if (currentNote) {
+        const noteEl = pianoRollTrack.qs(`#forte-note-${currentNote.id}`);
+        if (noteEl) {
+          if (isCorrectPitch) {
+            noteEl.classOn("hit");
+            noteEl.classOff("miss");
+          } else if (isSinging) {
+            noteEl.classOn("miss");
+            noteEl.classOff("hit");
+          }
+        }
+      }
     }
   }
 }
@@ -1358,7 +1362,10 @@ const pkg = {
       if (pianoRollTrack) pianoRollTrack.clear();
       if (scoreReasonDisplay) {
         scoreReasonDisplay.classOff("visible");
-        if (scoreReasonTimeout) clearTimeout(scoreReasonTimeout);
+        if (scoreReasonTimeout) {
+          clearTimeout(scoreReasonTimeout);
+          scoreReasonTimeout = null;
+        }
       }
 
       const isMidi =
@@ -1727,6 +1734,8 @@ const pkg = {
           if (state.ui.pianoRollVisible && pianoRollContainer) {
             pianoRollContainer.classOn("visible");
           }
+        } else {
+          if (pianoRollContainer) pianoRollContainer.classOff("visible");
         }
 
         state.playback.sequencer.currentTime = 0;
@@ -1885,7 +1894,10 @@ const pkg = {
       if (pianoRollContainer) pianoRollContainer.classOff("visible");
       if (scoreReasonDisplay) {
         scoreReasonDisplay.classOff("visible");
-        if (scoreReasonTimeout) clearTimeout(scoreReasonTimeout);
+        if (scoreReasonTimeout) {
+          clearTimeout(scoreReasonTimeout);
+          scoreReasonTimeout = null;
+        }
       }
 
       if (state.playback.status === "stopped") return;
@@ -2068,6 +2080,8 @@ const pkg = {
         currentDeviceId: state.playback.currentDeviceId,
         isMidi: state.playback.isMidi,
         isMultiplexed: state.playback.isMultiplexed,
+        hasGuideNotes:
+          state.playback.guideNotes && state.playback.guideNotes.length > 0,
         decodedLyrics: state.playback.decodedLyrics,
         midiInfo: state.playback.midiInfo,
         transpose: state.playback.transpose,

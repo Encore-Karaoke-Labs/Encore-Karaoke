@@ -1913,7 +1913,7 @@ class EncoreController {
       console.log("[Encore] Is track an MTV?", this.state.currentSongIsMV);
       if (this.state.currentSongIsMultiplexed) {
         this.Forte.togglePianoRollVisibility(true);
-      } else if (this.state.currentSongIsMIDI) {
+      } else if (this.state.currentSongIsMIDI && pbState.hasGuideNotes) {
         this.Forte.togglePianoRollVisibility(true);
       } else {
         this.Forte.togglePianoRollVisibility(false);

@@ -3981,20 +3981,13 @@ p + .flex-list button {
   box-shadow: 0 0 8px #39ff14;
 }
 
+.forte-piano-note.miss {
+  background-color: #ff4444;
+  box-shadow: 0 0 8px #ff4444;
+}
+
 .forte-piano-roll-user-pitch {
-  position: absolute;
-  left: 45%;
-  width: 10%;
-  height: 8px;
-  background: #f7b733;
-  border-radius: 4px;
-  box-shadow: 0 0 8px #f7b733;
-  z-index: 2;
-  opacity: 0;
-  transition:
-    top 0.05s linear,
-    opacity 0.1s linear;
-  will-change: top, opacity;
+  display: none;
 }
 
 .forte-score-reason {
