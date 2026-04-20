@@ -1563,16 +1563,28 @@ const pkg = {
                 candidateChannels.length > 0 &&
                 candidateChannels[0].matchRatio > 0.15
               ) {
-                const best = candidateChannels[0];
-                console.log(
-                  `[FORTE SVC] 🎵 Vocal Guide tracked on Channel ${best.index + 1} (Score: ${best.score.toFixed(2)}, Match: ${(best.matchRatio * 100).toFixed(1)}%, Polyphony: ${(best.polyphonyRatio * 100).toFixed(1)}%, Avg Pitch: ${best.avgPitch.toFixed(1)})`,
+                const bestScore = candidateChannels[0].score;
+
+                const validChannels = candidateChannels.filter(
+                  (c) => bestScore - c.score < 0.8 && c.matchRatio > 0.1,
                 );
+
+                console.log(
+                  `[FORTE SVC] 🎵 Vocal Guide tracked across ${validChannels.length} Channel(s). Top Score: ${bestScore.toFixed(2)}`,
+                );
+
+                let combinedNotes = [];
+                validChannels.forEach((c) => {
+                  combinedNotes.push(...c.notes);
+                });
+
+                combinedNotes.sort((a, b) => a.start - b.start);
 
                 const monoNotes = [];
                 let minPitch = 127;
                 let maxPitch = 0;
 
-                best.notes.forEach((n) => {
+                combinedNotes.forEach((n) => {
                   const duration = Math.max(n.length, 0.1);
 
                   const existing = monoNotes.find(
