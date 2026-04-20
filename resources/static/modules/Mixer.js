@@ -621,9 +621,13 @@ export class MixerModule {
         isCustomGUI = true;
     }
 
-    if (this.focusedPane === "chain" && isPluginNode) {
+    if (
+      (this.focusedPane === "chain" || this.focusedPane === "plugin") &&
+      isPluginNode
+    ) {
       const idx = currentChainItem.index;
       if (e.key === "Backspace" || e.key === "Delete") {
+        e.preventDefault();
         const newConfig = [...(this.state.rawConfig || [])];
         newConfig.splice(idx, 1);
         if (this.isExpanded) this._closePluginEditor();
@@ -631,29 +635,32 @@ export class MixerModule {
         this._applyAndSaveChain(newConfig);
         return;
       }
-      if (e.shiftKey && e.key === "ArrowUp" && idx > 0) {
-        const newConfig = [...(this.state.rawConfig || [])];
-        [newConfig[idx - 1], newConfig[idx]] = [
-          newConfig[idx],
-          newConfig[idx - 1],
-        ];
-        this.chainIndex--;
-        this._applyAndSaveChain(newConfig);
-        return;
-      }
-      if (
-        e.shiftKey &&
-        e.key === "ArrowDown" &&
-        idx < this.state.chain.length - 1
-      ) {
-        const newConfig = [...(this.state.rawConfig || [])];
-        [newConfig[idx + 1], newConfig[idx]] = [
-          newConfig[idx],
-          newConfig[idx + 1],
-        ];
-        this.chainIndex++;
-        this._applyAndSaveChain(newConfig);
-        return;
+
+      if (this.focusedPane === "chain") {
+        if (e.shiftKey && e.key === "ArrowUp" && idx > 0) {
+          const newConfig = [...(this.state.rawConfig || [])];
+          [newConfig[idx - 1], newConfig[idx]] = [
+            newConfig[idx],
+            newConfig[idx - 1],
+          ];
+          this.chainIndex--;
+          this._applyAndSaveChain(newConfig);
+          return;
+        }
+        if (
+          e.shiftKey &&
+          e.key === "ArrowDown" &&
+          idx < this.state.chain.length - 1
+        ) {
+          const newConfig = [...(this.state.rawConfig || [])];
+          [newConfig[idx + 1], newConfig[idx]] = [
+            newConfig[idx],
+            newConfig[idx + 1],
+          ];
+          this.chainIndex++;
+          this._applyAndSaveChain(newConfig);
+          return;
+        }
       }
     }
 
