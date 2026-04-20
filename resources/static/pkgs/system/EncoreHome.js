@@ -2291,16 +2291,21 @@ class EncoreController {
         let targetSyllable = allSyllables[currentVisualIndex];
         let matchFound = false;
 
-        if (targetSyllable && targetSyllable.rawText === text)
+        if (targetSyllable && targetSyllable.rawText === text) {
           matchFound = true;
-        else {
-          const limit = Math.min(currentVisualIndex + 15, allSyllables.length);
-          for (let i = currentVisualIndex + 1; i < limit; i++) {
-            if (allSyllables[i].rawText === text) {
-              currentVisualIndex = i;
-              targetSyllable = allSyllables[i];
-              matchFound = true;
-              break;
+        } else {
+          if (text.trim().length > 0) {
+            const limit = Math.min(
+              currentVisualIndex + 15,
+              allSyllables.length,
+            );
+            for (let i = currentVisualIndex + 1; i < limit; i++) {
+              if (allSyllables[i].rawText === text) {
+                currentVisualIndex = i;
+                targetSyllable = allSyllables[i];
+                matchFound = true;
+                break;
+              }
             }
           }
         }

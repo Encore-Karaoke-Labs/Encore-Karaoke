@@ -1467,7 +1467,7 @@ const pkg = {
             "metaEvent",
             "forte-meta",
             (e) => {
-              if (!e) return;
+              if (!e || !e.event) return;
 
               const dataArray = e.event.data;
 
@@ -1476,17 +1476,40 @@ const pkg = {
                 state.playback.lyricsEncoding,
               ).decode(dataArray);
               const cleanText = text.replace(/[\r\n\/\\]/g, "");
+
               if (
                 cleanText &&
                 !cleanText.startsWith("@") &&
                 !cleanText.startsWith("#")
               ) {
-                document.dispatchEvent(
-                  new CustomEvent("CherryTree.Forte.Playback.LyricEvent", {
-                    detail: { index: displayableLyricIndex, text: cleanText },
-                  }),
+                let isVerifiedLyric = false;
+
+                const maxLookahead = Math.min(
+                  displayableLyricIndex + 5,
+                  state.playback.decodedLyrics.length,
                 );
-                displayableLyricIndex++;
+                for (let i = displayableLyricIndex; i < maxLookahead; i++) {
+                  const expectedClean = state.playback.decodedLyrics[i].replace(
+                    /[\r\n\/\\]/g,
+                    "",
+                  );
+                  if (cleanText === expectedClean) {
+                    isVerifiedLyric = true;
+                    displayableLyricIndex = i;
+                    break;
+                  }
+                }
+
+                if (isVerifiedLyric) {
+                  document.dispatchEvent(
+                    new CustomEvent("CherryTree.Forte.Playback.LyricEvent", {
+                      detail: { index: displayableLyricIndex, text: cleanText },
+                    }),
+                  );
+                  displayableLyricIndex++;
+                } else {
+                  logVerbose("Ignored non-lyric meta event:", cleanText);
+                }
               }
             },
           );
