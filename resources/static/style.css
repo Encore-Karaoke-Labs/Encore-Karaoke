@@ -1820,6 +1820,7 @@ p + .flex-list button {
   inset: 0;
   z-index: 2;
   background: #000;
+  pointer-events: none;
 }
 
 .youtube-player-container iframe {
