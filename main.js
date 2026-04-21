@@ -415,7 +415,7 @@ const createWindow = () => {
   updateBounds();
 
   win.loadURL(
-    `file://${__dirname}/resources/static/titlebar.html?platform=${process.platform}`,
+    `file://${__dirname}/resources/titlebar.html?platform=${process.platform}`,
   );
   appView.webContents.loadURL(`http://127.0.0.1:${PORT}/index.html`);
   appView.webContents.setZoomFactor(zoomFactor);
@@ -944,7 +944,7 @@ app.whenReady().then(() => {
     });
 
     libraryManagerWin.loadURL(
-      `file://${__dirname}/resources/static/library-manager.html?platform=${process.platform}`,
+      `file://${__dirname}/resources/library-manager.html?platform=${process.platform}`,
     );
 
     libraryManagerWin.on("closed", () => {
