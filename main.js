@@ -368,6 +368,7 @@ const createWindow = () => {
     icon: "resources/icon.png",
     autoHideMenuBar: true,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
+    trafficLightPosition: { x: 14, y: 20 },
     backgroundColor: "#000",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -935,6 +936,7 @@ app.whenReady().then(() => {
       icon: "resources/icon.png",
       frame: process.platform !== "darwin" ? false : true,
       titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
+      trafficLightPosition: { x: 14, y: 19 },
       backgroundColor: "#080810",
       webPreferences: {
         preload: path.join(__dirname, "preload.js"),
