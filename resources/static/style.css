@@ -1,5 +1,5 @@
 /* ==========================================================================
-   01. CSS Variables & Theming
+   CSS Variables & Theming
    ========================================================================== */
 :root {
   --cursor-inactive: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20.806 9.83906L5.32577 2.09758C3.90581 1.38748 2.13086 2.2751 2.13086 3.69531L2.13086 20.2409C2.13086 22.0419 4.91136 22.8422 6.24435 21.46C8.91706 18.6887 12.3646 15.5483 14.9105 14.762C16.3439 14.3192 18.0631 14.0089 19.7689 13.7914C21.9248 13.5165 22.6932 10.7828 20.806 9.83906Z' fill='%23E76565' fill-opacity='0.33'/%3E%3Cpath fill-rule='evenodd' clip-rule='evenodd' d='M6.24343 21.46C4.91044 22.8422 2.12994 22.0419 2.12994 20.2409L2.12994 3.6953C2.12994 2.2751 3.90489 1.38747 5.32484 2.09757L20.8051 9.83906C22.6923 10.7828 21.9238 13.5165 19.7679 13.7914C18.0621 14.0089 16.3429 14.3192 14.9096 14.762C12.3637 15.5483 8.91614 18.6887 6.24343 21.46ZM6.38981 0.499844L21.8701 8.24133C23.8324 9.22265 24.2567 11.0791 23.8766 12.4863C23.4995 13.8826 22.2117 15.3446 20.0781 15.6166C18.4372 15.8259 16.8719 16.1145 15.625 16.4997C14.7927 16.7567 13.5642 17.5077 12.0809 18.7124C10.6548 19.8707 9.18654 21.286 7.87807 22.6428C6.55476 24.0149 4.55248 24.2453 3.00449 23.7918C1.44645 23.3355 0 22.0768 0 20.2409L0 3.6953C0 0.85489 3.5499 -0.920359 6.38981 0.499844Z' fill='%23E76565' fill-opacity='0.59'/%3E%3C/svg%3E");
@@ -112,7 +112,7 @@
 }
 
 /* ==========================================================================
-   02. Global Styles & Elements
+    Global Styles & Elements
    ========================================================================== */
 * {
   box-sizing: border-box;
@@ -237,14 +237,12 @@ kbd {
 }
 
 /* ==========================================================================
-   03. Form Controls (Buttons & Inputs)
+   Form Controls (Buttons & Inputs)
    ========================================================================== */
 .hv,
 button {
   border: 0.125rem solid transparent;
   scroll-margin: 2rem;
-  /* backdrop-filter: blur(0.5rem) brightness(0.5) contrast(1.05); */
-  /* transition: border-color 0.05s linear; */
 }
 
 button svg {
@@ -290,7 +288,6 @@ button.auto {
 
 button.pressed {
   background-color: var(--background-lightest);
-  /* color: var(--accent-default); */
   color: var(--current-player);
 }
 
@@ -377,13 +374,12 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ==========================================================================
-   04. Utilities & Layout
+   Utilities & Layout
    ========================================================================== */
 .box {
   display: flex;
   justify-content: center;
   align-items: center;
-  /* margin: 0.75rem 0; */
 }
 
 .flex-list,
@@ -444,8 +440,6 @@ input[type="range"]::-moz-range-thumb {
 
 .mouse-disabled,
 .mouse-disabled * {
-  /* cursor: none !important; */
-  /* cursor: var(--cursor-inactive), auto !important; */
   cursor: var(--cursor-inactive), auto !important;
   pointer-events: none;
 }
@@ -500,7 +494,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ==========================================================================
-   05. Animations & Keyframes
+   Animations & Keyframes
    ========================================================================== */
 @keyframes load {
   to {
@@ -518,10 +512,6 @@ input[type="range"]::-moz-range-thumb {
     opacity: 1;
   }
 }
-/* @keyframes animateIn {
-  from { transform: scale(0.9); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-} */
 
 @keyframes animateOut {
   from {
@@ -533,10 +523,6 @@ input[type="range"]::-moz-range-thumb {
     opacity: 0;
   }
 }
-/* @keyframes animateOut {
-  from { transform: scale(1); opacity: 1; }
-  to { transform: scale(0.9); opacity: 0; }
-} */
 
 @keyframes slideIn {
   from {
@@ -697,7 +683,6 @@ input[type="range"]::-moz-range-thumb {
     filter: saturate(1) brightness(1);
     opacity: 1;
   }
-  /* 75% { transform: scale(1); filter: saturate(1) brightness(1); opacity: 1; } */
   100% {
     transform: scale(5) translateY(0);
     filter: saturate(0) brightness(0);
@@ -803,7 +788,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ==========================================================================
-   06. Core UI Containers
+    Core UI Containers
    ========================================================================== */
 .ui {
   position: fixed;
@@ -811,9 +796,8 @@ input[type="range"]::-moz-range-thumb {
   width: 100%;
   height: 100%;
   background-color: unset;
-  /* background-color: var(--background-dimmer); */
   padding: 1rem 2rem;
-  max-width: 80rem; /* 1280px */
+  max-width: 80rem;
   margin: 0 auto;
   display: flex;
   overflow: auto;
@@ -856,8 +840,6 @@ p + .flex-list button {
 }
 
 .modal-content {
-  /* width: 75%; */
-  /* max-width: 50rem; */
   max-width: 90%;
   display: flex;
   flex-direction: column;
@@ -878,7 +860,6 @@ p + .flex-list button {
 
 .modal-buttons {
   display: flex;
-  /* flex-wrap: wrap; */
   overflow-x: auto;
   gap: 0.75rem;
 }
@@ -995,7 +976,7 @@ p + .flex-list button {
 }
 
 /* ==========================================================================
-   07. Main Menu & Games List
+   Main Menu & Games List
    ========================================================================== */
 .main-menu-attached {
   width: 100%;
@@ -1007,18 +988,13 @@ p + .flex-list button {
 .main-menu-container,
 .oobe-bar {
   background-color: #0004;
-  /* background-color: unset !important; */
-  /* backdrop-filter: brightness(0.5) contrast(1.5); */
 }
 
 .game-list {
   overflow: auto;
-  /* overflow-x: clip; */
   align-items: flex-end;
   width: 100%;
   padding: 0 9rem 8rem 9rem;
-  /* scroll-snap-type: x mandatory; */
-  /* min-height: 24rem; */
   min-height: 27rem;
 }
 
@@ -1037,26 +1013,10 @@ p + .flex-list button {
     height 0.25s ease;
 }
 
-/* .game-list .game:first-of-type { width: 26.5rem; height: 18rem; } */
 .game-list .game.over {
   width: 26.5rem;
   height: 18rem;
 }
-
-/* .game.over {
-  border-color: transparent !important;
-  position: relative;
-}
-.game.over::before {
-  content: "";
-  position: absolute;
-  top: -0.4rem;
-  left: -0.4rem;
-  border-radius: 0.32rem;
-  width: calc(100% + 0.8rem);
-  height: calc(100% + 0.8rem);
-  border: 0.1rem solid var(--accent-default)
-} */
 
 .game-list .game:first-of-type {
   scroll-margin-left: 9rem;
@@ -1094,18 +1054,13 @@ p + .flex-list button {
 }
 
 .main-menu {
-  /* max-width: 100%; width: 100%; */
   align-items: center;
   flex-shrink: 1;
   padding: 0 !important;
   max-width: unset !important;
   gap: 0 !important;
   background-color: unset;
-  /* backdrop-filter: brightness(0.8) contrast(1); */
-  /* position: relative; */
 }
-
-/* .main-menu::after { content: ''; position: fixed; background-color: red; left: 1280px; top: 0; height: 100%; width: 48px; } */
 
 .main-menu-container {
   padding: 3.5rem 9rem 3.75rem 9rem;
@@ -1190,7 +1145,7 @@ p + .flex-list button {
 }
 
 /* ==========================================================================
-   08. OOBE & Setup UI
+   OOBE & Setup UI
    ========================================================================== */
 .oobe-page {
   flex: 1;
@@ -1198,7 +1153,6 @@ p + .flex-list button {
   flex-direction: row;
   justify-content: center;
   align-items: center;
-  /* background-color: var(--background-dimmer); */
   position: relative;
 }
 
@@ -1785,7 +1739,7 @@ p + .flex-list button {
 }
 
 /* ==========================================================================
-   09. In-Game Core & Standby
+   In-Game Core & Standby
    ========================================================================== */
 .overlay-ui {
   display: flex;
@@ -2095,7 +2049,7 @@ p + .flex-list button {
 }
 
 /* ==========================================================================
-   10. Search & Song Lists
+   Search & Song Lists
    ========================================================================== */
 .mode-menu:not(.is-typing) .main-content {
   opacity: 0;
@@ -2107,8 +2061,6 @@ p + .flex-list button {
   opacity: 0;
   pointer-events: none;
 }
-
-/* .mode-menu.is-typing .main-content { opacity: 1; pointer-events: all; } */
 
 .mode-menu:not(.is-typing) .song-list-container {
   opacity: 1;
@@ -2662,7 +2614,7 @@ p + .flex-list button {
 }
 
 /* ==========================================================================
-   11. Player Elements (Lyrics & Progress)
+   Player Elements (Lyrics & Progress)
    ========================================================================== */
 /* Player UI Styles */
 .player-ui {
@@ -2897,6 +2849,8 @@ p + .flex-list button {
 }
 
 /* it would be REALLY funny if I just use the characters from my novel for this */
+/* speaking of which, I haven't written this 💩 in months */
+/* https://www.wattpad.com/story/402321783-soulmates-in-fate-you-and-the-flower-of-fate */
 
 /* Female 1 (Yellow) (Hoshi) */
 .is-duet .duet-role-f .lyric-syllable-original::after,
@@ -2986,7 +2940,7 @@ p + .flex-list button {
 }
 
 /* ==========================================================================
-   12. Player Overlays (Intro, Info Bar, Score HUD)
+   Player Overlays (Intro, Info Bar, Score HUD)
    ========================================================================== */
 .intro-card {
   position: absolute;
@@ -3146,9 +3100,6 @@ p + .flex-list button {
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
   opacity: 0.9;
 }
-
-/* Add smooth transition to the lyrics container for interlude fading */
-/* (Added inline in the midi-lyrics-container definition) */
 
 .info-bar {
   position: absolute;
@@ -3375,7 +3326,7 @@ p + .flex-list button {
 }
 
 /* ==========================================================================
-   13. Scoring & Post-Song Screen
+   Scoring & Post-Song Screen
    ========================================================================== */
 .post-song-score-screen {
   position: absolute;
@@ -3663,7 +3614,7 @@ p + .flex-list button {
 }
 
 /* ==========================================================================
-   14. Calibration & Mixer
+   Calibration & Mixer
    ========================================================================== */
 .calibration-screen {
   position: absolute;
@@ -3860,7 +3811,7 @@ p + .flex-list button {
   padding: 2rem 4rem;
   background: rgba(0, 0, 0, 0.6);
   border-right: 1px solid rgba(255, 255, 255, 0.1);
-  flex-shrink: 0; /* --- FIX: Prevent faders from squishing --- */
+  flex-shrink: 0;
 }
 .mixer-chain-section {
   flex: 1;
@@ -4006,7 +3957,7 @@ p + .flex-list button {
 }
 
 /* ==========================================================================
-   15. Forte Piano Roll
+    Forte Piano Roll
    ========================================================================== */
 .forte-piano-roll-container {
   position: fixed;
@@ -4075,7 +4026,7 @@ p + .flex-list button {
 }
 
 /* ==========================================================================
-   16. Badges & QR Code
+   Badges & QR Code
    ========================================================================== */
 /* --- QR Code Display --- */
 .qr-code-container {
@@ -4175,44 +4126,4 @@ p + .flex-list button {
   text-transform: uppercase;
   z-index: 9999;
   pointer-events: none;
-}
-
-/* --- Retail Credits Overlay Badge --- */
-.credits-overlay-badge {
-  position: fixed;
-  bottom: 2rem;
-  left: 3rem;
-  background: rgba(10, 10, 20, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.8);
-  padding: 0.6rem 1.5rem;
-  border-radius: 0.5rem;
-  font-family: "Rajdhani", sans-serif;
-  font-weight: 700;
-  font-size: 1.5rem;
-  backdrop-filter: blur(5px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  z-index: 9999;
-  pointer-events: none;
-  display: flex;
-  align-items: center;
-  letter-spacing: 0.15em;
-  transition:
-    border-color 0.3s ease,
-    color 0.3s ease,
-    box-shadow 0.3s ease;
-}
-
-/* Lights up blue when user has inserted coins */
-.credits-overlay-badge.has-credits {
-  border-color: #89cff0;
-  color: #89cff0;
-  box-shadow: 0 0 15px rgba(137, 207, 240, 0.25);
-}
-
-/* Lights up gold/yellow when set to Free Play */
-.credits-overlay-badge.free-play {
-  border-color: #ffd700;
-  color: #ffd700;
-  box-shadow: 0 0 15px rgba(255, 215, 0, 0.25);
 }
