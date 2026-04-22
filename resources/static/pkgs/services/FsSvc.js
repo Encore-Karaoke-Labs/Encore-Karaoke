@@ -212,29 +212,41 @@ const pkg = {
       const cacheKey = `encore-songlist:${libraryPath}`;
       const signatureKey = `encore-signature:${libraryPath}`;
       const newSongsKey = `encore-newsongs:${libraryPath}`;
-      const currentSignature = files
+
+      const audioExtensions = new Set(["wav", "mp3", "m4a"]);
+      const videoExtensions = new Set(["mp4", "mkv", "webm", "avi"]);
+      const validExts = new Set([
+        ...audioExtensions,
+        ...videoExtensions,
+        "mid",
+        "kar",
+        "lrc",
+        "json",
+      ]);
+
+      const currentSignature = [...files]
+        .filter((f) => validExts.has(f.name.split(".").pop().toLowerCase()))
+        .sort((a, b) => a.name.localeCompare(b.name))
         .map((f) => `${f.name}:${f.modified}`)
         .join("|");
+
       const cachedSignature = await window.localforage.getItem(signatureKey);
       const cachedList = (await window.localforage.getItem(cacheKey)) || [];
       const cachedNewSongs =
         (await window.localforage.getItem(newSongsKey)) || [];
 
       // Check Cache
-      if (cachedSignature === currentSignature) {
-        const cachedList = await window.localforage.getItem(cacheKey);
-        if (cachedList.length > 0) {
-          console.log(
-            `[FsSvc] Cache is fresh. Loaded ${cachedList.length} songs.`,
-          );
-          state.songList = cachedList;
-          state.newSongs = cachedNewSongs;
-          state.currentLibraryPath = libraryPath;
-          state.currentManifest = loadedManifest;
-          state.isBuilding = false;
-          dispatchSongListReady();
-          return true;
-        }
+      if (cachedSignature === currentSignature && cachedList.length > 0) {
+        console.log(
+          `[FsSvc] Cache is fresh. Loaded ${cachedList.length} songs.`,
+        );
+        state.songList = cachedList;
+        state.newSongs = cachedNewSongs;
+        state.currentLibraryPath = libraryPath;
+        state.currentManifest = loadedManifest;
+        state.isBuilding = false;
+        dispatchSongListReady();
+        return true;
       }
 
       console.log(
@@ -249,8 +261,6 @@ const pkg = {
       const newlyAddedSongs = [];
       const oldPaths = new Set(cachedList.map((s) => s.path));
       let songCodeCounter = 1;
-      const audioExtensions = new Set(["wav", "mp3", "m4a"]);
-      const videoExtensions = new Set(["mp4", "mkv", "webm", "avi"]);
       const allFilenames = new Set(files.map((f) => f.name));
 
       const processableFiles = files.filter(
