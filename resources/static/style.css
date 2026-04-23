@@ -2638,9 +2638,9 @@ p + .flex-list button {
 
 .player-bottom-section {
   width: 100%;
-  max-width: 1800px;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   align-items: center;
   gap: 1rem;
 }
@@ -2669,7 +2669,7 @@ p + .flex-list button {
     transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   pointer-events: none;
   line-height: 1;
-  margin-bottom: 30px;
+  margin-bottom: 0;
 }
 
 .countdown-display.visible {
@@ -2677,249 +2677,14 @@ p + .flex-list button {
   transform: scale(1);
 }
 
-.lyrics-container,
-.midi-lyrics-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  width: 85%;
-  height: auto;
-  position: relative;
-  bottom: 25px;
-}
-
-.lyrics-container {
+.lyrics-render-surface {
+  width: 100%;
+  max-width: 1400px;
+  display: block;
+  margin: 2rem auto -8rem auto;
+  pointer-events: none;
+  z-index: 10;
   transition: opacity 0.3s ease;
-}
-
-.midi-lyrics-container {
-  transition: opacity 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-}
-
-.lyric-line {
-  margin: 0;
-  text-align: center;
-  font-size: 4.5rem;
-  font-weight: bold;
-  text-shadow: 2px 5px 6px #000;
-  transition:
-    color 0.3s ease,
-    opacity 0.3s ease;
-  color: rgba(255, 255, 255, 0.4);
-  -webkit-text-stroke: 0;
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  perspective: 1000;
-}
-
-.lyric-line.past {
-  opacity: 0.5;
-}
-
-.lyric-line.active {
-  color: #ffffff;
-  text-shadow: none;
-  -webkit-text-stroke: 6px #010141;
-  paint-order: stroke fill;
-  text-shadow: 2px 5px 6px #000;
-}
-
-.lyric-line-original {
-  line-height: 1.2;
-}
-
-.lyric-line-romanized {
-  font-size: 2rem;
-  color: rgba(255, 255, 255, 0.5);
-  line-height: 1.1;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-}
-
-.lyric-line.active .lyric-line-romanized {
-  color: #ffffff;
-}
-
-.midi-lyric-line {
-  display: flex;
-  width: 100%;
-  max-width: 100%;
-  justify-content: center;
-  flex-wrap: wrap;
-  white-space: pre;
-  color: rgba(255, 255, 255, 0.4);
-  text-shadow: 2px 5px 6px #000;
-}
-
-.midi-lyric-line.next {
-  opacity: 0.8;
-  text-shadow: 2px 5px 6px #000;
-}
-
-.lyric-syllable-container {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 0;
-  contain: layout style;
-}
-
-.lyric-word {
-  display: inline-flex;
-  white-space: pre;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.lyric-syllable-original,
-.lyric-syllable-romanized,
-.lyric-syllable-furigana {
-  position: relative;
-  paint-order: stroke fill;
-}
-
-.lyric-syllable-original {
-  font-size: inherit;
-  color: rgba(255, 255, 255, 0.4);
-  -webkit-text-stroke: 5px #010141;
-}
-
-.lyric-syllable-romanized {
-  font-size: 2rem;
-  margin-top: 0.25rem;
-  line-height: 1;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.4);
-  -webkit-text-stroke: 5px #010141;
-}
-
-.lyric-syllable-furigana {
-  font-size: 1.25rem;
-  margin-bottom: 0.1rem;
-  line-height: 1;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.5);
-  -webkit-text-stroke: 3px #010141;
-}
-
-.lyric-syllable-original::after,
-.lyric-syllable-romanized::after,
-.lyric-syllable-furigana::after {
-  content: attr(data-text);
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-
-  clip-path: inset(0 100% 0 0);
-  will-change: clip-path;
-}
-
-.lyric-syllable-original::after,
-.lyric-syllable-romanized::after {
-  color: #ffffff;
-  -webkit-text-stroke: 5px #010141;
-}
-
-.lyric-syllable-furigana::after {
-  color: #ffb74d;
-  -webkit-text-stroke: 3px #010141;
-}
-
-.lyric-syllable-container.active .lyric-syllable-original::after,
-.lyric-syllable-container.active .lyric-syllable-romanized::after,
-.lyric-syllable-container.active .lyric-syllable-furigana::after {
-  clip-path: inset(0 0 0 0);
-  transition: clip-path var(--syllable-duration, 0.2s) linear;
-}
-
-.lyric-syllable-container.completed .lyric-syllable-original::after,
-.lyric-syllable-container.completed .lyric-syllable-romanized::after,
-.lyric-syllable-container.completed .lyric-syllable-furigana::after {
-  clip-path: inset(0 0 0 0);
-  transition: none;
-}
-
-.hidden-syllable {
-  display: none !important;
-}
-
-/* it would be REALLY funny if I just use the characters from my novel for this */
-/* speaking of which, I haven't written this 💩 in months */
-/* https://www.wattpad.com/story/402321783-soulmates-in-fate-you-and-the-flower-of-fate */
-
-/* Female 1 (Yellow) (Hoshi) */
-.is-duet .duet-role-f .lyric-syllable-original::after,
-.is-duet .duet-role-f .lyric-syllable-romanized::after,
-.is-duet .duet-role-f .lyric-syllable-furigana::after {
-  color: #ffff33;
-  -webkit-text-stroke-color: #806600;
-}
-.is-duet .duet-role-f .lyric-syllable-original,
-.is-duet .duet-role-f .lyric-syllable-romanized,
-.is-duet .duet-role-f .lyric-syllable-furigana {
-  color: rgba(255, 255, 51, 0.35);
-  -webkit-text-stroke-color: rgba(128, 102, 0, 0.6);
-}
-
-/* Female 2 (Green) (Yuni) */
-.is-duet .duet-role-f2 .lyric-syllable-original::after,
-.is-duet .duet-role-f2 .lyric-syllable-romanized::after,
-.is-duet .duet-role-f2 .lyric-syllable-furigana::after {
-  color: #66ff66;
-  -webkit-text-stroke-color: #004d00;
-}
-.is-duet .duet-role-f2 .lyric-syllable-original,
-.is-duet .duet-role-f2 .lyric-syllable-romanized,
-.is-duet .duet-role-f2 .lyric-syllable-furigana {
-  color: rgba(102, 255, 102, 0.35);
-  -webkit-text-stroke-color: rgba(0, 77, 0, 0.6);
-}
-
-/* Male 1 (Blue) (Kai) */
-.is-duet .duet-role-m .lyric-syllable-original::after,
-.is-duet .duet-role-m .lyric-syllable-romanized::after,
-.is-duet .duet-role-m .lyric-syllable-furigana::after {
-  color: #66e6ff;
-  -webkit-text-stroke-color: #004d66;
-}
-.is-duet .duet-role-m .lyric-syllable-original,
-.is-duet .duet-role-m .lyric-syllable-romanized,
-.is-duet .duet-role-m .lyric-syllable-furigana {
-  color: rgba(102, 230, 255, 0.35);
-  -webkit-text-stroke-color: rgba(0, 77, 102, 0.6);
-}
-
-/* Male 2 (Red) (Rei) */
-.is-duet .duet-role-m2 .lyric-syllable-original::after,
-.is-duet .duet-role-m2 .lyric-syllable-romanized::after,
-.is-duet .duet-role-m2 .lyric-syllable-furigana::after {
-  color: #ff6666;
-  -webkit-text-stroke-color: #660000;
-}
-.is-duet .duet-role-m2 .lyric-syllable-original,
-.is-duet .duet-role-m2 .lyric-syllable-romanized,
-.is-duet .duet-role-m2 .lyric-syllable-furigana {
-  color: rgba(255, 102, 102, 0.35);
-  -webkit-text-stroke-color: rgba(102, 0, 0, 0.6);
-}
-
-/* All (Orange) */
-.is-duet .duet-role-a .lyric-syllable-original::after,
-.is-duet .duet-role-a .lyric-syllable-romanized::after,
-.is-duet .duet-role-a .lyric-syllable-furigana::after {
-  color: #ffb233;
-  -webkit-text-stroke-color: #804000;
-}
-.is-duet .duet-role-a .lyric-syllable-original,
-.is-duet .duet-role-a .lyric-syllable-romanized,
-.is-duet .duet-role-a .lyric-syllable-furigana {
-  color: rgba(255, 178, 51, 0.35);
-  -webkit-text-stroke-color: rgba(128, 64, 0, 0.6);
 }
 
 .player-progress {
