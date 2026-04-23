@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/skywarspro15/Encore-Karaoke.git"
+    "url": "git+https://github.com/Encore-Karaoke-Labs/Encore-Karaoke"
   },
   "keywords": [
     "htpc",
@@ -24,7 +24,7 @@
   "author": "Encore Karaoke Labs",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/skywarspro15/Cherry-Tree/issues"
+    "url": "https://github.com/Encore-Karaoke-Labs/Encore-Karaoke/issues"
   },
   "homepage": "./",
   "dependencies": {
