@@ -720,6 +720,8 @@ class EncoreController {
       this.lyricsCtx.setTransform(1, 0, 0, 1, 0, 0);
       this.lyricsCtx.scale(dpr, dpr);
       if (this.state.mode === "player") this.calculateLyricLayout();
+      this.logicalWidth = width;
+      this.logicalHeight = this.dom.lyricsCanvas.elm.height / dpr;
     };
     window.addEventListener("resize", this.resizeLyricsCanvas);
 
@@ -862,8 +864,8 @@ class EncoreController {
 
     const ctx = this.lyricsCtx;
     const canvas = this.dom.lyricsCanvas.elm;
-    const logicalWidth = parseFloat(canvas.style.width);
-    const logicalHeight = parseFloat(canvas.style.height);
+    const logicalWidth = this.logicalWidth || window.innerWidth * 0.9;
+    const logicalHeight = this.logicalHeight || 500;
 
     ctx.clearRect(0, 0, logicalWidth, logicalHeight);
     ctx.textBaseline = "alphabetic";

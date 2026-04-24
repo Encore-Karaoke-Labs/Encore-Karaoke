@@ -207,6 +207,7 @@ let sfxMidiOriginalVolume = null;
 let pianoRollContainer = null;
 let pianoRollCanvas = null;
 let pianoRollCtx = null;
+let cachedPianoWidth;
 let scoreReasonTimeout = null;
 const PIXELS_PER_SECOND = 150;
 
@@ -662,7 +663,7 @@ function drawPianoRoll(currentTime) {
   const canvas = pianoRollCanvas.elm;
   const ctx = pianoRollCtx;
 
-  const expectedWidth = pianoRollContainer.elm.clientWidth || window.innerWidth;
+  const expectedWidth = cachedPianoWidth;
   if (canvas.width !== expectedWidth) canvas.width = expectedWidth;
   if (canvas.height !== 250) canvas.height = 250;
 
@@ -910,9 +911,12 @@ const pkg = {
       .appendTo(pianoRollContainer);
     pianoRollCtx = pianoRollCanvas.elm.getContext("2d");
 
+    cachedPianoWidth = window.innerWidth;
     window.addEventListener("resize", () => {
       if (pianoRollCanvas && pianoRollContainer) {
-        pianoRollCanvas.elm.width = pianoRollContainer.elm.clientWidth;
+        cachedPianoWidth =
+          pianoRollContainer.elm.clientWidth || window.innerWidth;
+        pianoRollCanvas.elm.width = cachedPianoWidth;
         pianoRollCanvas.elm.height = 250;
         if (state.playback.status !== "playing" && pkg.data) {
           drawPianoRoll(pkg.data.getPlaybackState().currentTime);
