@@ -1536,11 +1536,6 @@ const pkg = {
                 }
 
                 if (isVerifiedLyric) {
-                  document.dispatchEvent(
-                    new CustomEvent("CherryTree.Forte.Playback.LyricEvent", {
-                      detail: { index: displayableLyricIndex, text: cleanText },
-                    }),
-                  );
                   displayableLyricIndex++;
                 } else {
                   logVerbose("Ignored non-lyric meta event:", cleanText);

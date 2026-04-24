@@ -165,6 +165,14 @@ class EncoreController {
     this.countdownTargetTime = null;
     this.lastCountdownTick = null;
     this.parsedLrc = [];
+
+    this.dimCanvas = document.createElement("canvas");
+    this.dimCtx = this.dimCanvas.getContext("2d", { alpha: true });
+
+    this.mainCanvas = document.createElement("canvas");
+    this.mainCtx = this.mainCanvas.getContext("2d", { alpha: true });
+
+    this.requestCanvasCacheUpdate = false;
   }
 
   /**
@@ -715,13 +723,28 @@ class EncoreController {
     this.resizeLyricsCanvas = () => {
       const dpr = window.devicePixelRatio || 1;
       const width = Math.min(window.innerWidth * 0.9, 1400);
+
+      const logicalWidth = width;
+      const mainFontSize = Math.floor(logicalWidth * 0.045);
+      const fixedHeight = Math.max(250, mainFontSize * 10);
+
+      this.logicalWidth = logicalWidth;
+      this.logicalHeight = fixedHeight;
+
       this.dom.lyricsCanvas.elm.width = width * dpr;
-      this.dom.lyricsCanvas.styleJs({ width: `${width}px` });
-      this.lyricsCtx.setTransform(1, 0, 0, 1, 0, 0);
-      this.lyricsCtx.scale(dpr, dpr);
+      this.dom.lyricsCanvas.elm.height = fixedHeight * dpr;
+      this.dom.lyricsCanvas.styleJs({
+        width: `${width}px`,
+        height: `${fixedHeight}px`,
+      });
+
+      if (this.lyricsCtx) {
+        this.lyricsCtx.setTransform(1, 0, 0, 1, 0, 0);
+        this.lyricsCtx.scale(dpr, dpr);
+      }
+
+      this.requestCanvasCacheUpdate = true;
       if (this.state.mode === "player") this.calculateLyricLayout();
-      this.logicalWidth = width;
-      this.logicalHeight = this.dom.lyricsCanvas.elm.height / dpr;
     };
     window.addEventListener("resize", this.resizeLyricsCanvas);
 
@@ -847,16 +870,126 @@ class EncoreController {
       currentY += paragraphGap;
     }
 
-    const requiredHeight = currentY + mainFontSize * 0.8;
-    const dpr = window.devicePixelRatio || 1;
-    const newHeight = requiredHeight * dpr;
+    const fixedHeight = this.logicalHeight || 250;
+    const yOffset = Math.max(0, fixedHeight - currentY - mainFontSize * 0.5);
 
-    if (canvas.height !== newHeight) {
-      canvas.height = newHeight;
-      canvas.style.height = `${requiredHeight}px`;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.scale(dpr, dpr);
+    if (this.renderableLines) {
+      this.renderableLines.forEach((line) => {
+        line.syllables.forEach((s) => {
+          s.layoutY += yOffset;
+        });
+      });
     }
+
+    if (this.parsedLrc) {
+      this.lrcLine1Y += yOffset;
+      this.lrcLine2Y += yOffset;
+    }
+
+    this.requestCanvasCacheUpdate = true;
+  }
+
+  updateCanvasCache() {
+    const canvas = this.dom.lyricsCanvas.elm;
+    const width = canvas.width;
+    const height = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    const logicalWidth =
+      parseFloat(canvas.style.width) || window.innerWidth * 0.9;
+
+    if (this.dimCanvas.width !== width || this.dimCanvas.height !== height) {
+      this.dimCanvas.width = width;
+      this.dimCanvas.height = height;
+      this.mainCanvas.width = width;
+      this.mainCanvas.height = height;
+
+      this.dimCtx.setTransform(1, 0, 0, 1, 0, 0);
+      this.mainCtx.setTransform(1, 0, 0, 1, 0, 0);
+      this.dimCtx.scale(dpr, dpr);
+      this.mainCtx.scale(dpr, dpr);
+    } else {
+      this.dimCtx.clearRect(0, 0, width, height);
+      this.mainCtx.clearRect(0, 0, width, height);
+    }
+
+    this.dimCtx.textBaseline = "alphabetic";
+    this.mainCtx.textBaseline = "alphabetic";
+    this.dimCtx.lineJoin = "round";
+    this.mainCtx.lineJoin = "round";
+
+    const mainFontSize = Math.floor(logicalWidth * 0.045);
+    const subFontSize = Math.floor(logicalWidth * 0.018);
+
+    this.renderableLines.forEach((line) => {
+      line.syllables.forEach((s) => {
+        if (s.isHidden) return;
+        const centerX = s.layoutX + s.blockWidth / 2;
+        const colors = this.state.isDuet
+          ? this.getDuetColors(s.duetRole)
+          : this.getDuetColors("default");
+
+        const renderTextToCtx = (ctx, text, y, font, w, isMain) => {
+          if (!text) return;
+          ctx.font = font;
+          ctx.fillStyle = isMain ? colors.main : colors.dim;
+          ctx.strokeStyle = isMain ? colors.stroke : colors.dimStroke;
+          ctx.lineWidth =
+            (font.includes(mainFontSize) ? mainFontSize : subFontSize) * 0.15;
+          ctx.strokeText(text, centerX - w / 2, y);
+          ctx.fillText(text, centerX - w / 2, y);
+        };
+
+        renderTextToCtx(
+          this.dimCtx,
+          s.furigana,
+          s.layoutY - mainFontSize * 1.1,
+          `700 ${subFontSize}px "Radio Canada"`,
+          s.furiW,
+          false,
+        );
+        renderTextToCtx(
+          this.dimCtx,
+          s.text,
+          s.layoutY,
+          `900 ${mainFontSize}px "Radio Canada"`,
+          s.origW,
+          false,
+        );
+        renderTextToCtx(
+          this.dimCtx,
+          s.romanized,
+          s.layoutY + mainFontSize * 0.6,
+          `700 ${subFontSize}px "Radio Canada"`,
+          s.romW,
+          false,
+        );
+
+        renderTextToCtx(
+          this.mainCtx,
+          s.furigana,
+          s.layoutY - mainFontSize * 1.1,
+          `700 ${subFontSize}px "Radio Canada"`,
+          s.furiW,
+          true,
+        );
+        renderTextToCtx(
+          this.mainCtx,
+          s.text,
+          s.layoutY,
+          `900 ${mainFontSize}px "Radio Canada"`,
+          s.origW,
+          true,
+        );
+        renderTextToCtx(
+          this.mainCtx,
+          s.romanized,
+          s.layoutY + mainFontSize * 0.6,
+          `700 ${subFontSize}px "Radio Canada"`,
+          s.romW,
+          true,
+        );
+      });
+    });
   }
 
   drawLyricsFrame() {
@@ -864,15 +997,18 @@ class EncoreController {
 
     const ctx = this.lyricsCtx;
     const canvas = this.dom.lyricsCanvas.elm;
-    const logicalWidth = this.logicalWidth || window.innerWidth * 0.9;
-    const logicalHeight = this.logicalHeight || 500;
-
-    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
-    ctx.textBaseline = "alphabetic";
-    ctx.lineJoin = "round";
+    const logicalWidth =
+      parseFloat(canvas.style.width) || window.innerWidth * 0.9;
+    const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
 
     const mainFontSize = Math.floor(logicalWidth * 0.045);
-    const subFontSize = Math.floor(logicalWidth * 0.018);
+
+    if (this.requestCanvasCacheUpdate) {
+      this.updateCanvasCache();
+      this.requestCanvasCacheUpdate = false;
+    }
+
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
     if (this.state.currentSongIsMIDI || this.state.currentSongIsMultiplexed) {
       if (!this.renderableLines) {
@@ -880,82 +1016,54 @@ class EncoreController {
         return;
       }
 
+      ctx.drawImage(this.dimCanvas, 0, 0, logicalWidth, logicalHeight);
+      ctx.save();
+      ctx.beginPath();
+
+      const currentTime = this.currentMediaTime || 0;
+
       this.renderableLines.forEach((line) => {
+        if (line.isNextLine) return;
+
         line.syllables.forEach((s) => {
           if (s.isHidden) return;
 
           const centerX = s.layoutX + s.blockWidth / 2;
-
-          const colors = this.state.isDuet
-            ? this.getDuetColors(s.duetRole)
-            : this.getDuetColors("default");
-
           let progress = 0;
-          if (s.globalIndex <= this.lastCompletedSyllableIndex) {
+
+          if (currentTime >= s.endTime) {
             progress = 1;
-          } else if (s.globalIndex === this.lastCompletedSyllableIndex + 1) {
-            if (s.wipeStartTime) {
-              progress = Math.max(
-                0,
-                Math.min(
-                  1,
-                  (performance.now() - s.wipeStartTime) / s.wipeDurationMs,
-                ),
-              );
-            }
+          } else if (currentTime >= s.absoluteTime) {
+            progress =
+              (currentTime - s.absoluteTime) / (s.endTime - s.absoluteTime);
           }
 
-          const drawText = (text, y, font, w, isActiveDraw) => {
-            if (!text) return;
-            if (ctx.font !== font) ctx.font = font;
+          if (progress > 0) {
+            let clipTop = s.layoutY - mainFontSize * 0.9;
+            let clipBottom = s.layoutY + mainFontSize * 0.35;
 
-            ctx.fillStyle = colors.dim;
-            ctx.strokeStyle = colors.dimStroke;
-            ctx.lineWidth = isActiveDraw
-              ? mainFontSize * 0.15
-              : subFontSize * 0.15;
-            ctx.strokeText(text, centerX - w / 2, y);
-            ctx.fillText(text, centerX - w / 2, y);
-
-            if (progress > 0 && !line.isNextLine) {
-              ctx.save();
-              ctx.beginPath();
-              ctx.rect(
-                centerX - w / 2 - 5,
-                y - mainFontSize * 1.5,
-                (w + 10) * progress,
-                mainFontSize * 3,
-              );
-              ctx.clip();
-
-              ctx.fillStyle = colors.main;
-              ctx.strokeStyle = colors.stroke;
-              ctx.strokeText(text, centerX - w / 2, y);
-              ctx.fillText(text, centerX - w / 2, y);
-              ctx.restore();
+            if (s.furigana) {
+              clipTop -= mainFontSize * 0.6;
             }
-          };
+            if (s.romanized) {
+              clipBottom += mainFontSize * 0.55;
+            }
 
-          const subFontStr = `700 ${subFontSize}px "Radio Canada", sans-serif`;
-          const mainFontStr = `900 ${mainFontSize}px "Radio Canada", sans-serif`;
+            const clipHeight = clipBottom - clipTop;
 
-          drawText(
-            s.furigana,
-            s.layoutY - mainFontSize * 1.1,
-            subFontStr,
-            s.furiW,
-            false,
-          );
-          drawText(s.text, s.layoutY, mainFontStr, s.origW, true);
-          drawText(
-            s.romanized,
-            s.layoutY + mainFontSize * 0.6,
-            subFontStr,
-            s.romW,
-            false,
-          );
+            ctx.rect(
+              centerX - s.blockWidth / 2 - 5,
+              clipTop,
+              (s.blockWidth + 10) * progress,
+              clipHeight,
+            );
+          }
         });
       });
+
+      ctx.clip();
+      ctx.drawImage(this.mainCanvas, 0, 0, logicalWidth, logicalHeight);
+      ctx.restore();
     } else if (this.parsedLrc && this.currentLrcLine1) {
       ctx.textAlign = "center";
       const cx = logicalWidth / 2;
@@ -2114,6 +2222,7 @@ class EncoreController {
     this.state.isDuet = false;
     this.boundDuetEvent = () => {
       this.state.isDuet = true;
+      this.requestCanvasCacheUpdate = true;
     };
     document.addEventListener(
       "CherryTree.Forte.Playback.DuetDetected",
@@ -2472,6 +2581,20 @@ class EncoreController {
         cur.durationTicks = Math.max(0, next.tick - cur.tick);
         let gapTicks = next.tick - cur.tick;
 
+        cur.endTime = getSecondsForTick(
+          cur.tick + cur.durationTicks,
+          midiInfo.tempoChanges,
+          ppqm,
+        );
+
+        if (cur.rawText.match(/[\r\n\/\\]$/)) {
+          const beatDuration =
+            getSecondsForTick(cur.tick + ppqm, midiInfo.tempoChanges, ppqm) -
+            cur.absoluteTime;
+          cur.endTime = Math.min(cur.endTime, cur.absoluteTime + beatDuration);
+        }
+        cur.endTime = Math.min(cur.endTime, cur.absoluteTime + 1.5);
+
         if (gapTicks >= 8 * ppqm) {
           let intStart = cur.tick + 2 * ppqm;
           let intEnd = next.tick - 4 * ppqm;
@@ -2501,8 +2624,14 @@ class EncoreController {
           });
         }
       }
-      if (allSyllables.length > 0)
-        allSyllables[allSyllables.length - 1].durationTicks = ppqm;
+      if (allSyllables.length > 0) {
+        let last = allSyllables[allSyllables.length - 1];
+        last.durationTicks = ppqm;
+        const beatDuration =
+          getSecondsForTick(last.tick + ppqm, midiInfo.tempoChanges, ppqm) -
+          last.absoluteTime;
+        last.endTime = last.absoluteTime + Math.min(beatDuration, 1.5);
+      }
 
       this.allMidiSyllables = allSyllables;
       this.lastCompletedSyllableIndex = -1;
@@ -2518,6 +2647,7 @@ class EncoreController {
       this.resolveRomajiForLine = async (lineIndex) => {
         if (!this.midiLines || lineIndex >= this.midiLines.length) return;
         const line = this.midiLines[lineIndex];
+        let hasChanges = false;
 
         for (const syllable of line) {
           if (!syllable.romanized && !syllable.romanizationPromise) {
@@ -2527,13 +2657,18 @@ class EncoreController {
               syllable.romanized = rt || "";
             });
             await syllable.romanizationPromise;
+            hasChanges = true;
+
+            await new Promise((r) => setTimeout(r, 2));
           }
         }
 
         if (
-          lineIndex === this.currentSongLineIndex ||
-          lineIndex === this.currentSongLineIndex + 1
+          hasChanges &&
+          (lineIndex === this.currentSongLineIndex ||
+            lineIndex === this.currentSongLineIndex + 1)
         ) {
+          this.calculateLyricLayout();
           this.requestCanvasCacheUpdate = true;
         }
       };
@@ -2702,6 +2837,49 @@ class EncoreController {
 
     this.boundTimeUpdate = (e) => {
       const { currentTime } = e.detail;
+      this.currentMediaTime = currentTime;
+
+      if (this.midiLines && this.midiLines.length > 0) {
+        let newLineIndex = 0;
+
+        for (let i = 0; i < this.midiLines.length; i++) {
+          let line = this.midiLines[i];
+          if (line.length === 0) continue;
+
+          let lastSyllable = line[line.length - 1];
+
+          if (currentTime >= lastSyllable.endTime + 0.1) {
+            newLineIndex = i + 1;
+          } else {
+            break;
+          }
+        }
+
+        newLineIndex = Math.min(newLineIndex, this.midiLines.length - 1);
+
+        if (this.currentSongLineIndex !== newLineIndex) {
+          this.currentSongLineIndex = newLineIndex;
+
+          if (this.currentSongLineIndex % 2 === 0) {
+            this.currentMidiLine1 =
+              this.midiLines[this.currentSongLineIndex] || [];
+            this.currentMidiLine2 =
+              this.midiLines[this.currentSongLineIndex + 1] || [];
+          } else {
+            this.currentMidiLine2 =
+              this.midiLines[this.currentSongLineIndex] || [];
+            this.currentMidiLine1 =
+              this.midiLines[this.currentSongLineIndex + 1] || [];
+          }
+
+          this.calculateLyricLayout();
+          this.requestCanvasCacheUpdate = true;
+
+          if (this.resolveRomajiForLine) {
+            this.resolveRomajiForLine(this.currentSongLineIndex + 2);
+          }
+        }
+      }
 
       if (mvPlayer) {
         const target = currentTime + this.state.videoSyncOffset / 1000;
