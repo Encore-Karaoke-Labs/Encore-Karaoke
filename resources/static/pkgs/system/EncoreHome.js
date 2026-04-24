@@ -859,7 +859,7 @@ class EncoreController {
       this.renderableLines.push({ isNextLine, syllables: lineData });
     };
 
-    if (this.state.currentSongIsMIDI || this.state.currentSongIsMultiplexed) {
+    if (this.state.currentSongIsMIDI) {
       const isLine1Active = this.currentSongLineIndex % 2 === 0;
       buildLineLayout(this.currentMidiLine1, !isLine1Active);
       buildLineLayout(this.currentMidiLine2, isLine1Active);
@@ -1002,6 +1002,7 @@ class EncoreController {
     const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
 
     const mainFontSize = Math.floor(logicalWidth * 0.045);
+    const subFontSize = Math.floor(logicalWidth * 0.018);
 
     if (this.requestCanvasCacheUpdate) {
       this.updateCanvasCache();
@@ -1010,7 +1011,7 @@ class EncoreController {
 
     ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
-    if (this.state.currentSongIsMIDI || this.state.currentSongIsMultiplexed) {
+    if (this.state.currentSongIsMIDI) {
       if (!this.renderableLines) {
         this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
         return;
@@ -2209,6 +2210,8 @@ class EncoreController {
     this.currentMidiLine2 = [];
     this.currentLrcLine1 = null;
     this.currentLrcLine2 = null;
+    this.midiLines = null;
+    this.allMidiSyllables = null;
     this.dom.lyricsCanvas.styleJs({ opacity: "0" });
     this.scoreHud.hide();
     this.dom.introCard.classOff("visible");
