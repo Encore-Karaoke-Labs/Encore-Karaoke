@@ -722,16 +722,10 @@ function drawPianoRoll(currentTime) {
 
     if (note.hitStatus === "hit") {
       ctx.fillStyle = "#39ff14";
-      // ctx.shadowColor = "#39ff14";
-      ctx.shadowBlur = 8;
     } else if (note.hitStatus === "miss") {
       ctx.fillStyle = "#ff4444";
-      // ctx.shadowColor = "#ff4444";
-      ctx.shadowBlur = 8;
     } else {
       ctx.fillStyle = "#89cff0";
-      // ctx.shadowColor = "rgba(1, 1, 65, 0.8)";
-      ctx.shadowBlur = 0;
     }
 
     ctx.beginPath();
@@ -744,7 +738,6 @@ function drawPianoRoll(currentTime) {
 
     ctx.fill();
 
-    ctx.shadowBlur = 0;
     ctx.strokeStyle = "rgba(1, 1, 65, 0.8)";
     ctx.lineWidth = 1;
     ctx.stroke();
