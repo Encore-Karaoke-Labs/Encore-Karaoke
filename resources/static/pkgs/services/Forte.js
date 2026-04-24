@@ -354,6 +354,9 @@ function updateScore(currentTime) {
     micClarity > MIC_CLARITY_THRESHOLD && isValidPitch && rms > RMS_NOISE_GATE;
   let midiMicPitch = isSinging ? 12 * Math.log2(micPitch / 440) + 69 : 0;
 
+  state.scoring.isSinging = isSinging;
+  state.scoring.currentMicMidi = midiMicPitch;
+
   const isKeyAwareSinging =
     micClarity > KEY_AWARE_CLARITY && isValidPitch && rms > KEY_AWARE_RMS_GATE;
   let keyAwareMidiPitch = isKeyAwareSinging
@@ -615,10 +618,7 @@ function timingLoop() {
     pianoRollContainer &&
     pianoRollContainer.elm.classList.contains("visible")
   ) {
-    if (now - lastPianoRollTime > 33) {
-      drawPianoRoll(currentTime);
-      lastPianoRollTime = now;
-    }
+    drawPianoRoll(currentTime);
   }
 
   if (state.scoring.enabled) {
@@ -669,7 +669,6 @@ function renderPianoRollNotes(notes) {
 
 /**
  * Draws the active viewport of the piano roll directly onto the canvas.
- * Highly optimized: culls off-screen notes and avoids DOM layout recalculations.
  */
 function drawPianoRoll(currentTime) {
   if (!pianoRollCanvas || !pianoRollCtx || !pianoRollContainer) return;
@@ -683,17 +682,45 @@ function drawPianoRoll(currentTime) {
 
   const width = canvas.width;
   const height = canvas.height;
-
   if (width === 0 || height === 0) return;
 
   ctx.clearRect(0, 0, width, height);
-  ctx.globalAlpha = 1.0;
 
-  const playheadX = width / 2;
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+  const numGridLines = 8;
+  ctx.beginPath();
+  for (let i = 1; i < numGridLines; i++) {
+    const lineY = (height / numGridLines) * i;
+    ctx.moveTo(0, lineY);
+    ctx.lineTo(width, lineY);
+  }
+  ctx.stroke();
+
+  const notes = state.playback.guideNotes || [];
+
+  const PRE_ROLL_SECONDS = 2.5;
+  let firstNoteTime = 0;
+  if (notes.length > 0) {
+    firstNoteTime = notes[0].startTime;
+  }
+
+  const globalOffset = Math.max(0, firstNoteTime - PRE_ROLL_SECONDS);
+  const adjustedTime = currentTime - globalOffset;
+  const PAGE_DURATION = width / PIXELS_PER_SECOND;
+
+  const pageIndex = Math.floor(Math.max(0, adjustedTime) / PAGE_DURATION);
+  const pageAdjustedStartTime = pageIndex * PAGE_DURATION;
+
+  const pageRealStartTime = pageAdjustedStartTime + globalOffset;
+  const pageRealEndTime = pageRealStartTime + PAGE_DURATION;
+
+  const playheadX = (adjustedTime - pageAdjustedStartTime) * PIXELS_PER_SECOND;
+
   const minMidi = state.playback.guideRange?.min ?? 42;
   const maxMidi = state.playback.guideRange?.max ?? 90;
-
   const rangeDiff = Math.max(1, maxMidi - minMidi);
+  const NOTE_HEIGHT = 16;
 
   const pitchToY = (pitch) => {
     if (pitch < minMidi) return height;
@@ -702,65 +729,145 @@ function drawPianoRoll(currentTime) {
     return height - normalized * height;
   };
 
-  const notes = state.playback.guideNotes || [];
-
-  const viewStart = currentTime - playheadX / PIXELS_PER_SECOND;
-  const viewEnd = currentTime + (width - playheadX) / PIXELS_PER_SECOND;
-
   for (let i = 0; i < notes.length; i++) {
     const note = notes[i];
+    if (note.startTime + note.duration < pageRealStartTime) continue;
+    if (note.startTime > pageRealEndTime) break;
 
-    if (note.startTime + note.duration < viewStart) continue;
-    if (note.startTime > viewEnd) break;
-
-    const startX =
-      playheadX + (note.startTime - currentTime) * PIXELS_PER_SECOND;
-    const noteWidth = Math.max(note.duration * PIXELS_PER_SECOND, 4);
+    const startX = (note.startTime - pageRealStartTime) * PIXELS_PER_SECOND;
+    const noteWidth = Math.max(note.duration * PIXELS_PER_SECOND, 8);
     const y = pitchToY(note.pitch);
 
     if (!isFinite(startX) || !isFinite(y) || !isFinite(noteWidth)) continue;
 
+    const isActive = playheadX >= startX && playheadX <= startX + noteWidth;
+
+    const grad = ctx.createLinearGradient(
+      0,
+      y - NOTE_HEIGHT / 2,
+      0,
+      y + NOTE_HEIGHT / 2,
+    );
     if (note.hitStatus === "hit") {
-      ctx.fillStyle = "#39ff14";
+      grad.addColorStop(0, "#a3e635");
+      grad.addColorStop(1, "#4d7c0f");
+      ctx.shadowColor = "#a3e635";
+      ctx.shadowBlur = isActive ? 15 : 5;
     } else if (note.hitStatus === "miss") {
-      ctx.fillStyle = "#ff4444";
+      grad.addColorStop(0, "#fca5a5");
+      grad.addColorStop(1, "#991b1b");
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
     } else {
-      ctx.fillStyle = "#89cff0";
+      grad.addColorStop(0, "#7dd3fc");
+      grad.addColorStop(1, "#0284c7");
+      ctx.shadowColor = "#38bdf8";
+      ctx.shadowBlur = isActive ? 10 : 0;
     }
 
+    ctx.fillStyle = grad;
     ctx.beginPath();
-
     if (typeof ctx.roundRect === "function") {
-      ctx.roundRect(startX, y - 6, noteWidth, 12, 6);
+      ctx.roundRect(
+        startX,
+        y - NOTE_HEIGHT / 2,
+        noteWidth,
+        NOTE_HEIGHT,
+        NOTE_HEIGHT / 2,
+      );
     } else {
-      ctx.rect(startX, y - 6, noteWidth, 12);
+      ctx.rect(startX, y - NOTE_HEIGHT / 2, noteWidth, NOTE_HEIGHT);
     }
+    ctx.fill();
+    ctx.shadowBlur = 0;
 
+    ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(
+        startX + 2,
+        y - NOTE_HEIGHT / 2 + 1,
+        noteWidth - 4,
+        NOTE_HEIGHT / 3,
+        3,
+      );
+    } else {
+      ctx.rect(
+        startX + 2,
+        y - NOTE_HEIGHT / 2 + 1,
+        noteWidth - 4,
+        NOTE_HEIGHT / 3,
+      );
+    }
     ctx.fill();
 
-    ctx.strokeStyle = "rgba(1, 1, 65, 0.8)";
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
-
-  if (state.scoring.isSinging && state.scoring.currentMicMidi > 0) {
-    const userY = pitchToY(state.scoring.currentMicMidi);
-    if (isFinite(userY)) {
-      ctx.fillStyle = "#ffffff";
-      ctx.shadowColor = "#ffffff";
-      ctx.shadowBlur = 10;
-      ctx.beginPath();
-      ctx.arc(playheadX, userY, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
+    if (isActive && note.hitStatus === "hit" && state.scoring.isSinging) {
+      const sparkGrad = ctx.createRadialGradient(
+        playheadX,
+        y,
+        0,
+        playheadX,
+        y,
+        20,
+      );
+      sparkGrad.addColorStop(0, "rgba(255, 255, 255, 1)");
+      sparkGrad.addColorStop(0.3, "rgba(163, 230, 53, 0.8)");
+      sparkGrad.addColorStop(1, "rgba(163, 230, 53, 0)");
+      ctx.fillStyle = sparkGrad;
+      ctx.fillRect(playheadX - 20, y - 20, 40, 40);
     }
   }
 
-  ctx.fillStyle = "#ffd700";
-  ctx.shadowColor = "#ffd700";
-  ctx.shadowBlur = 10;
-  ctx.fillRect(playheadX - 1.5, 0, 3, height);
-  ctx.shadowBlur = 0;
+  if (playheadX >= 0) {
+    const sweepWidth = 120;
+    const sweepGrad = ctx.createLinearGradient(
+      playheadX - sweepWidth,
+      0,
+      playheadX,
+      0,
+    );
+    sweepGrad.addColorStop(0, "transparent");
+    sweepGrad.addColorStop(1, "rgba(255, 215, 0, 0.15)");
+    ctx.fillStyle = sweepGrad;
+    ctx.fillRect(playheadX - sweepWidth, 0, sweepWidth, height);
+
+    ctx.fillStyle = "#ffd700";
+    ctx.shadowColor = "#ffd700";
+    ctx.shadowBlur = 15;
+    ctx.fillRect(playheadX - 1, 0, 2, height);
+    ctx.shadowBlur = 0;
+  }
+
+  if (
+    state.scoring.isSinging &&
+    state.scoring.currentMicMidi > 0 &&
+    playheadX >= 0
+  ) {
+    const userY = pitchToY(state.scoring.currentMicMidi);
+    if (isFinite(userY)) {
+      const time = performance.now();
+      const pulse = Math.sin(time / 100) * 3;
+
+      ctx.beginPath();
+      ctx.arc(playheadX, userY, 12 + pulse, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(137, 207, 240, 0.3)";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(playheadX, userY, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowColor = "#38bdf8";
+      ctx.shadowBlur = 15;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.beginPath();
+      ctx.arc(playheadX, userY, 8, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
 }
 
 /**

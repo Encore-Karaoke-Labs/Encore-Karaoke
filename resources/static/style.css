@@ -1767,6 +1767,8 @@ p + .flex-list button {
   background-color: #000;
   overflow: hidden;
   z-index: 1;
+  transform: translateZ(0);
+  will-change: contents;
 }
 
 .youtube-player-container {
@@ -1775,6 +1777,7 @@ p + .flex-list button {
   z-index: 2;
   background: #000;
   pointer-events: none;
+  transform: translateZ(0);
 }
 
 .youtube-player-container iframe {
@@ -2668,9 +2671,11 @@ p + .flex-list button {
   pointer-events: none;
   z-index: 20;
   position: absolute;
-  top: calc(calc(2rem + 50px + 1rem + 6.3rem + 1rem) + 5rem);
+  /* Top aligns with piano roll top + exactly half its height (125px) */
+  top: calc(2rem + 50px + 1rem + 6.3rem + 1rem + 125px);
   left: 50%;
-  transform: translateX(-50%) scale(0.8);
+  /* Translates perfectly onto the center point */
+  transform: translate(-50%, -50%) scale(0.8);
   transition:
     opacity 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
     transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -2678,7 +2683,7 @@ p + .flex-list button {
 
 .countdown-display.visible {
   opacity: 1;
-  transform: translateX(-50%) scale(1);
+  transform: translate(-50%, -50%) scale(1);
 }
 
 .lyrics-render-surface {
@@ -3734,15 +3739,28 @@ p + .flex-list button {
   left: 0;
   width: 100%;
   height: 250px;
-  background: rgba(0, 0, 0, 0.4);
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.03) 2px,
+      rgba(255, 255, 255, 0.03) 4px
+    ),
+    linear-gradient(180deg, rgba(5, 5, 15, 0.65) 0%, rgba(10, 10, 20, 0.8) 100%);
+  border-top: 2px solid rgba(137, 207, 240, 0.5);
+  border-bottom: 2px solid rgba(137, 207, 240, 0.5);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.7),
+    inset 0 0 20px rgba(137, 207, 240, 0.1);
   overflow: hidden;
   z-index: 14;
   opacity: 0;
   transition: opacity 0.5s ease;
   pointer-events: none;
   will-change: opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .forte-piano-roll-container.visible {
