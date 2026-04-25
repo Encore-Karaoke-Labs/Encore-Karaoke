@@ -383,7 +383,9 @@ class EncoreSetupController {
             label: "Test Audio Output",
             type: "action",
             action: () => {
-              this.Forte.playSfx("/assets/audio/fanfare.mid");
+              this.Forte.playSfx(
+                "/assets/audio/Uta wa I Love You (I Sing I Love You) [Encore Karaoke Jingle].mid",
+              );
               this.showToast("PLAYING TEST SOUND...", "info");
             },
           },
