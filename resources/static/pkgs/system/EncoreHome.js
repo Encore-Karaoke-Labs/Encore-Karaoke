@@ -925,11 +925,16 @@ class EncoreController {
       const isLine1Active = this.currentSongLineIndex % 2 === 0;
       buildLineLayout(this.currentMidiLine1, !isLine1Active);
       buildLineLayout(this.currentMidiLine2, isLine1Active);
-    } else if (this.parsedLrc) {
-      this.lrcLine1Y = currentY;
-      currentY += paragraphGap;
-      this.lrcLine2Y = currentY;
-      currentY += paragraphGap;
+    } else if (
+      !this.state.currentSongIsMIDI &&
+      this.parsedLrc &&
+      this.parsedLrc.length > 0
+    ) {
+      const isLine1Active = !this.isLrcLine2Active && this.currentLrcIndex >= 0;
+      const isLine2Active = this.isLrcLine2Active && this.currentLrcIndex >= 0;
+
+      buildLineLayout(this.currentLrcLine1?.syllables || [], !isLine1Active);
+      buildLineLayout(this.currentLrcLine2?.syllables || [], !isLine2Active);
     }
 
     const fixedHeight = this.logicalHeight || 250;
@@ -941,11 +946,6 @@ class EncoreController {
           s.layoutY += yOffset;
         });
       });
-    }
-
-    if (this.parsedLrc) {
-      this.lrcLine1Y += yOffset;
-      this.lrcLine2Y += yOffset;
     }
 
     this.requestCanvasCacheUpdate = true;
@@ -1116,7 +1116,12 @@ class EncoreController {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    if (this.state.currentSongIsMIDI) {
+    const isLrcMode =
+      !this.state.currentSongIsMIDI &&
+      this.parsedLrc &&
+      this.parsedLrc.length > 0;
+
+    if (this.state.currentSongIsMIDI || isLrcMode) {
       if (!this.renderableLines) {
         this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
         return;
@@ -1150,6 +1155,12 @@ class EncoreController {
         if (!cache) return;
 
         ctx.save();
+
+        if (isLrcMode && this.lrcChangeTime) {
+          const elapsed = performance.now() - this.lrcChangeTime;
+          ctx.globalAlpha = Math.min(1.0, Math.max(0, elapsed / 300));
+        }
+
         ctx.beginPath();
 
         line.syllables.forEach((s) => {
@@ -1158,23 +1169,23 @@ class EncoreController {
           const centerX = s.layoutX + s.blockWidth / 2;
           let progress = 0;
 
-          if (currentTime >= s.endTime) {
+          if (isLrcMode) {
             progress = 1;
-          } else if (currentTime >= s.absoluteTime) {
-            progress =
-              (currentTime - s.absoluteTime) / (s.endTime - s.absoluteTime);
+          } else {
+            if (currentTime >= s.endTime) {
+              progress = 1;
+            } else if (currentTime >= s.absoluteTime) {
+              progress =
+                (currentTime - s.absoluteTime) / (s.endTime - s.absoluteTime);
+            }
           }
 
           if (progress > 0) {
             let clipTop = s.layoutY - mainFontSize * 0.9;
             let clipBottom = s.layoutY + mainFontSize * 0.35;
 
-            if (s.furigana) {
-              clipTop -= mainFontSize * 0.6;
-            }
-            if (s.romanized) {
-              clipBottom += mainFontSize * 0.55;
-            }
+            if (s.furigana) clipTop -= mainFontSize * 0.6;
+            if (s.romanized) clipBottom += mainFontSize * 0.55;
 
             const clipHeight = clipBottom - clipTop;
 
@@ -1191,53 +1202,6 @@ class EncoreController {
         ctx.drawImage(cache.main, 0, 0, logicalWidth, logicalHeight);
         ctx.restore();
       });
-    } else if (this.parsedLrc && this.currentLrcLine1) {
-      ctx.textAlign = "center";
-      const cx = logicalWidth / 2;
-
-      const fadeProgress = this.lrcChangeTime
-        ? Math.min(1, (performance.now() - this.lrcChangeTime) / 300)
-        : 1;
-
-      const drawLrcLine = (lineData, y, isActive, isStarted) => {
-        if (!lineData) return;
-
-        let mainAlpha = 0.4;
-        let strokeAlpha = 0.6;
-
-        if (isActive && isStarted) {
-          mainAlpha = 0.4 + 0.6 * fadeProgress;
-          strokeAlpha = 0.6 + 0.4 * fadeProgress;
-        }
-
-        ctx.font = `900 ${mainFontSize}px "Radio Canada"`;
-        ctx.strokeStyle = `rgba(1, 1, 65, ${strokeAlpha})`;
-        ctx.lineWidth = mainFontSize * 0.15;
-        ctx.strokeText(lineData.text, cx, y);
-        ctx.fillStyle = `rgba(255, 255, 255, ${mainAlpha})`;
-        ctx.fillText(lineData.text, cx, y);
-
-        if (lineData.romanized) {
-          ctx.font = `700 ${subFontSize}px "Radio Canada"`;
-          ctx.lineWidth = subFontSize * 0.15;
-          ctx.strokeText(lineData.romanized, cx, y + mainFontSize * 0.6);
-          ctx.fillText(lineData.romanized, cx, y + mainFontSize * 0.6);
-        }
-      };
-
-      const hasStarted = this.currentLrcIndex >= 0;
-      drawLrcLine(
-        this.currentLrcLine1,
-        this.lrcLine1Y,
-        !this.isLrcLine2Active,
-        hasStarted,
-      );
-      drawLrcLine(
-        this.currentLrcLine2,
-        this.lrcLine2Y,
-        this.isLrcLine2Active,
-        hasStarted,
-      );
     }
 
     this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
@@ -2893,11 +2857,87 @@ class EncoreController {
       this.parsedLrc = await this.parseLrc(lrcText);
 
       if (this.parsedLrc.length > 0) {
+        const asianRegex =
+          /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/;
+
+        for (let i = 0; i < this.parsedLrc.length; i++) {
+          let line = this.parsedLrc[i];
+
+          let needsRomaji = asianRegex.test(line.text);
+          let syllables = [];
+
+          if (!needsRomaji) {
+            const blocks = line.text.match(/\S+\s*/g) || [line.text];
+            syllables = blocks.map((block) => ({
+              text: block,
+              rawText: block,
+              furigana: null,
+              romanized: null,
+              blockWidth: 0,
+              absoluteTime: line.time,
+              endTime: line.time + 1,
+              durationTicks: 0,
+              duetRole: "default",
+              isHidden: block.trim() === "",
+            }));
+          } else {
+            let chunks = [];
+
+            if (line.text.match(/[ 　]/)) {
+              chunks = line.text.match(/[^ 　]+[ 　]*/g) || [line.text];
+            } else if (line.text.length > 16) {
+              let puncChunks = line.text.match(/[^、。！？]+[、。！？]*/g) || [
+                line.text,
+              ];
+
+              for (let c of puncChunks) {
+                if (c.length > 16) {
+                  chunks.push(...(c.match(/.{1,12}/g) || [c]));
+                } else {
+                  chunks.push(c);
+                }
+              }
+            } else {
+              chunks = [line.text];
+            }
+
+            for (let chunk of chunks) {
+              let chunkRomaji = null;
+              const trimmed = chunk.trim();
+
+              if (trimmed.length > 0) {
+                let romResult = await Romanizer.romanize(trimmed);
+
+                if (romResult && romResult !== "null") {
+                  chunkRomaji = romResult;
+                  if (chunk.match(/[ 　]$/)) chunkRomaji += " ";
+                }
+              }
+
+              syllables.push({
+                text: chunk,
+                rawText: chunk,
+                furigana: null,
+                romanized: chunkRomaji,
+                blockWidth: 0,
+                absoluteTime: line.time,
+                endTime: line.time + 1,
+                durationTicks: 0,
+                duetRole: "default",
+                isHidden: trimmed === "",
+              });
+            }
+          }
+          line.syllables = syllables;
+        }
         this.currentLrcLine1 = this.parsedLrc[0];
         this.currentLrcLine2 = this.parsedLrc[1];
         this.isLrcLine2Active = false;
         this.currentLrcIndex = -1;
         this.lrcChangeTime = 0;
+
+        this.nextLineFadeStartMs = performance.now();
+        this.nextLineFadeDurationMs = 500;
 
         this.resizeLyricsCanvas();
         this.dom.lyricsCanvas.styleJs({ opacity: "1" });
@@ -3133,33 +3173,26 @@ class EncoreController {
         if (newIdx !== currentLrcIndex && newIdx >= 0) {
           if (this.nextLineUpdateTimeout)
             clearTimeout(this.nextLineUpdateTimeout);
-          currentLrcIndex = newIdx;
 
-          this.isLrcLine2Active = currentLrcIndex % 2 !== 0;
+          currentLrcIndex = newIdx;
           this.currentLrcIndex = currentLrcIndex;
+          this.isLrcLine2Active = currentLrcIndex % 2 !== 0;
           this.lrcChangeTime = performance.now();
 
-          const curLine = this.parsedLrc[currentLrcIndex];
-          const nextLine = this.parsedLrc[currentLrcIndex + 1];
-
           if (this.isLrcLine2Active) {
-            this.currentLrcLine2 = curLine;
+            this.currentLrcLine2 = this.parsedLrc[currentLrcIndex];
+            this.currentLrcLine1 = this.parsedLrc[currentLrcIndex + 1];
           } else {
-            this.currentLrcLine1 = curLine;
+            this.currentLrcLine1 = this.parsedLrc[currentLrcIndex];
+            this.currentLrcLine2 = this.parsedLrc[currentLrcIndex + 1];
           }
 
-          if (nextLine) {
-            this.nextLineUpdateTimeout = setTimeout(
-              () => {
-                if (this.isLrcLine2Active) {
-                  this.currentLrcLine1 = nextLine;
-                } else {
-                  this.currentLrcLine2 = nextLine;
-                }
-              },
-              (nextLine.time - curLine.time) * 500,
-            );
+          if (currentLrcIndex > 0) {
+            this.nextLineFadeStartMs = performance.now();
+            this.nextLineFadeDurationMs = 500;
           }
+
+          this.calculateLyricLayout();
         }
       }
     };
