@@ -383,6 +383,7 @@ class EncoreSetupController {
             label: "Test Audio Output",
             type: "action",
             action: () => {
+              this.Forte.stopSfx();
               this.Forte.playSfx(
                 "/assets/audio/Uta wa I Love You (I Sing I Love You) [Encore Karaoke Jingle].mid",
               );
@@ -594,6 +595,7 @@ class EncoreSetupController {
 
     if (e.key === "Escape") {
       if (this.state.view === "submenu" || this.state.view === "pin_change") {
+        this.Forte.stopSfx();
         this.state.view = "dashboard";
         this.renderView();
       } else if (
