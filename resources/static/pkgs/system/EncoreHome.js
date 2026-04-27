@@ -2011,12 +2011,11 @@ class EncoreController {
     this.dom.songArtist.text(activeSong ? activeSong.artist : "");
 
     if (this.state.showSongList) {
-      this.renderVirtualList();
-
       if (!this.state.isTypingNumber && this.state.highlightedIndex >= 0) {
         const itemTop = this.state.highlightedIndex * this.ITEM_HEIGHT;
         const itemBottom = itemTop + this.ITEM_HEIGHT;
         const container = this.dom.songListContainer.elm;
+
         const viewTop = container.scrollTop;
         const viewBottom = viewTop + container.clientHeight;
         const headerHeight = 35;
@@ -2026,12 +2025,13 @@ class EncoreController {
         } else if (itemBottom > viewBottom) {
           container.scrollTop = itemBottom - container.clientHeight;
         }
+      }
 
-        for (const [idx, item] of this.visibleItemsMap.entries()) {
-          item[idx === this.state.highlightedIndex ? "classOn" : "classOff"](
-            "highlighted",
-          );
-        }
+      this.renderVirtualList();
+      for (const [idx, item] of this.visibleItemsMap.entries()) {
+        item[idx === this.state.highlightedIndex ? "classOn" : "classOff"](
+          "highlighted",
+        );
       }
     }
   }
@@ -3762,7 +3762,7 @@ class EncoreController {
         e.key.startsWith("Arrow") ||
         e.key.toLowerCase() === "y"
       ) {
-        this.showTheSongList();
+        this.state.showSongList = true;
       }
     }
 
@@ -4374,7 +4374,7 @@ class EncoreController {
 
       switch (d.type) {
         case "digit":
-          this.showTheSongList();
+          this.state.showSongList = true;
           this.handleDigitInput(d.value);
           break;
         case "backspace":
