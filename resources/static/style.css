@@ -433,9 +433,9 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .hidden {
-  display: none;
-  opacity: 0;
-  pointer-events: none;
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .mouse-disabled,
@@ -2754,12 +2754,14 @@ p + .flex-list button {
     opacity 0.4s ease-out,
     transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
   pointer-events: none;
+  visibility: hidden;
   display: flex;
   justify-content: center;
 }
 
 .intro-card.visible {
   opacity: 1;
+  visibility: visible;
   transform: scaleY(1);
 }
 
@@ -2847,9 +2849,11 @@ p + .flex-list button {
   z-index: 100;
   opacity: 0;
   pointer-events: none;
+  visibility: hidden;
   transition:
     opacity 0.5s ease-out,
-    transform 0.5s ease-out;
+    transform 0.5s ease-out,
+    visibility 0.5s;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2858,6 +2862,7 @@ p + .flex-list button {
 
 .interlude-overlay.visible {
   opacity: 1;
+  visibility: visible;
   transform: translate(-50%, -50%) scale(1.05);
   animation: pulse-interlude 3s infinite ease-in-out;
 }
@@ -3129,11 +3134,6 @@ p + .flex-list button {
   pointer-events: none;
 }
 
-.post-song-score-screen.visible {
-  opacity: 1;
-  pointer-events: all;
-}
-
 .score-card {
   background: linear-gradient(
     145deg,
@@ -3283,9 +3283,19 @@ p + .flex-list button {
   z-index: 1000;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.4s ease;
+  visibility: hidden;
+  transition:
+    opacity 0.4s ease,
+    visibility 0.4s;
   font-family: "Radio Canada", sans-serif;
   color: white;
+}
+
+.post-song-score-screen.visible,
+.post-song-screen-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: all;
 }
 
 .score-title-text {
