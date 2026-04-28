@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Encore Library Manager</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-dark: #080810;
+        --bg-panel: #14141e;
+        --accent: #89cff0;
+        --text-main: #e2e8f0;
+        --text-muted: #64748b;
+        --success: #39ff14;
+        --danger: #ff5555;
+      }
+      body {
+        background-color: var(--bg-dark);
+        color: var(--text-main);
+        font-family: "Rajdhani", sans-serif;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        scrollbar-color: rgba(137, 207, 240, 0.4) transparent;
+        scrollbar-width: thin;
+        user-select: none;
+      }
+
+      .titlebar {
+        height: 55px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        -webkit-app-region: drag;
+        border-bottom: 1px solid rgba(137, 207, 240, 0.15);
+        padding: 0 15px;
+        background: var(--bg-dark);
+        flex-shrink: 0;
+      }
+      .titlebar-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: 2px;
+      }
+      .window-controls {
+        display: flex;
+        align-items: center;
+        height: 100%;
+        -webkit-app-region: no-drag;
+      }
+      .window-controls button {
+        background: transparent;
+        border: none;
+        color: var(--text-main);
+        font-family: "Rajdhani", sans-serif;
+        font-weight: 600;
+        font-size: 1.1rem;
+        padding: 0 12px;
+        height: 100%;
+        cursor: pointer;
+        transition: all 0.2s;
+        outline: none;
+        border-radius: 0;
+      }
+      .window-controls button:hover {
+        background: rgba(137, 207, 240, 0.15);
+        color: var(--accent);
+      }
+      .window-controls .close-btn:hover {
+        background: transparent;
+        color: #e81123;
+      }
+      body.is-mac .titlebar {
+        padding-left: 80px;
+      }
+      body.is-mac .window-controls {
+        display: none;
+      }
+
+      .app-body {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+      .sidebar {
+        width: 300px;
+        background: rgba(20, 20, 30, 0.5);
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        flex-direction: column;
+      }
+      .sidebar-actions {
+        padding: 15px;
+        display: flex;
+        gap: 10px;
+        flex-direction: column;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .lib-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+      }
+      .main-pane {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: radial-gradient(
+          circle at top right,
+          rgba(137, 207, 240, 0.05),
+          transparent
+        );
+      }
+
+      .tabs-header {
+        display: flex;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 0 30px;
+        background: rgba(0, 0, 0, 0.2);
+      }
+      .tab-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-family: "Rajdhani", sans-serif;
+        padding: 15px 20px;
+        font-size: 1.2rem;
+        cursor: pointer;
+        font-weight: 700;
+        border-bottom: 3px solid transparent;
+        border-radius: 0;
+        transition: 0.2s;
+      }
+      .tab-btn:hover {
+        color: #fff;
+        background: transparent;
+      }
+      .tab-btn.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+      .tab-content {
+        padding: 30px;
+        flex: 1;
+        overflow-y: auto;
+        display: none;
+      }
+      .tab-content.active {
+        display: flex;
+        flex-direction: column;
+      }
+
+      button.action-btn {
+        background: rgba(137, 207, 240, 0.1);
+        border: 1px solid var(--accent);
+        color: #fff;
+        font-family: "Rajdhani", sans-serif;
+        font-size: 1.1rem;
+        font-weight: 600;
+        padding: 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      button.action-btn:hover {
+        background: var(--accent);
+        color: var(--bg-dark);
+      }
+      button.action-btn.outline {
+        background: transparent;
+        border-color: rgba(255, 255, 255, 0.3);
+        color: var(--text-main);
+      }
+      button.action-btn.outline:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        border-color: #fff;
+      }
+      button.action-btn.success {
+        border-color: var(--success);
+        color: var(--success);
+        background: transparent;
+      }
+      button.action-btn.success:hover {
+        background: var(--success);
+        color: #000;
+      }
+      button.action-btn.danger {
+        border-color: var(--danger);
+        color: var(--danger);
+        background: transparent;
+      }
+      button.action-btn.danger:hover {
+        background: var(--danger);
+        color: #fff;
+      }
+
+      .lib-item {
+        padding: 12px;
+        margin-bottom: 8px;
+        border-radius: 6px;
+        border-left: 4px solid transparent;
+        cursor: pointer;
+        transition: 0.2s;
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .lib-item:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .lib-item.selected {
+        background: rgba(137, 207, 240, 0.15);
+        border-left-color: var(--accent);
+      }
+      .lib-item.active-lib {
+        border-left-color: var(--success);
+      }
+      .lib-item-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .lib-item-path {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .editor-group {
+        margin-bottom: 20px;
+      }
+      label {
+        display: block;
+        font-weight: 700;
+        color: var(--accent);
+        margin-bottom: 8px;
+        letter-spacing: 1px;
+      }
+      input[type="text"],
+      textarea {
+        width: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #fff;
+        font-family: "Rajdhani", sans-serif;
+        font-size: 1.2rem;
+        padding: 10px;
+        border-radius: 6px;
+        box-sizing: border-box;
+      }
+      input:focus,
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      .path-display {
+        font-family: monospace;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 10px;
+        border-radius: 6px;
+        color: var(--text-muted);
+        word-break: break-all;
+        margin-bottom: 20px;
+      }
+      .bottom-actions {
+        display: flex;
+        justify-content: space-between;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding-top: 20px;
+        margin-top: auto;
+      }
+
+      .data-list {
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        padding: 10px;
+        flex: 1;
+        overflow-y: auto;
+      }
+      .song-row {
+        padding: 8px 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        font-family: monospace;
+      }
+
+      .bgv-category {
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 15px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .bgv-category-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 10px;
+      }
+      .bgv-category-header input {
+        width: auto;
+        flex: 1;
+        min-width: 200px;
+        padding: 5px 10px;
+      }
+      .bgv-file-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 10px;
+        background: rgba(0, 0, 0, 0.3);
+        margin-bottom: 5px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.9rem;
+        word-break: break-all;
+      }
+      .bgv-file-row button {
+        background: transparent;
+        border: none;
+        color: var(--danger);
+        cursor: pointer;
+        font-weight: bold;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 15px 25px;
+        border-radius: 6px;
+        font-size: 1.2rem;
+        font-weight: 700;
+        opacity: 0;
+        pointer-events: none;
+        transition: 0.3s;
+        background: rgba(20, 20, 30, 0.95);
+        border: 1px solid var(--accent);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+      }
+
+      .empty-state {
+        text-align: center;
+        color: var(--text-muted);
+        padding: 50px 20px;
+        font-size: 1.4rem;
+      }
+
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        opacity: 1;
+        transition: opacity 0.2s;
+      }
+      .modal-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .modal-box {
+        background: rgba(15, 15, 25, 0.95);
+        border: 2px solid var(--danger);
+        border-radius: 12px;
+        padding: 30px;
+        width: 450px;
+        text-align: center;
+        box-shadow: 0 15px 50px rgba(0, 0, 0, 0.9);
+      }
+      .modal-box h2 {
+        margin: 0 0 15px 0;
+        color: var(--danger);
+        font-size: 2rem;
+        letter-spacing: 1px;
+      }
+      .modal-box p {
+        font-size: 1.2rem;
+        color: #fff;
+        margin-bottom: 25px;
+        line-height: 1.4;
+        word-wrap: break-word;
+      }
+      .modal-actions {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="titlebar">
+      <div class="titlebar-title">ENCORE LIBRARY MANAGER</div>
+      <div class="window-controls" id="window-controls">
+        <button onclick="ipc.send('window-minimize')">—</button>
+        <button onclick="ipc.send('window-maximize')">🗖</button>
+        <button class="close-btn" onclick="ipc.send('window-close')">✕</button>
+      </div>
+    </div>
+
+    <div class="app-body">
+      <div class="sidebar">
+        <div class="sidebar-actions">
+          <button onclick="scanDrives()" class="action-btn outline">
+            Scan for Drives
+          </button>
+          <button onclick="addLibrary()" class="action-btn">
+            Import Folder
+          </button>
+        </div>
+        <div class="lib-list" id="lib-list"></div>
+      </div>
+
+      <div class="main-pane" id="main-pane" style="display: none">
+        <div class="tabs-header">
+          <button class="tab-btn active" onclick="switchTab('overview')">
+            Overview
+          </button>
+          <button class="tab-btn" onclick="switchTab('songs')">Files</button>
+          <button class="tab-btn" onclick="switchTab('bgvs')">
+            Background Videos
+          </button>
+        </div>
+
+        <div id="tab-overview" class="tab-content active">
+          <div class="editor-group">
+            <label>LIBRARY TITLE</label>
+            <input type="text" id="lib-title" />
+          </div>
+          <div class="editor-group">
+            <label>DESCRIPTION</label>
+            <textarea id="lib-desc" rows="2"></textarea>
+          </div>
+          <button
+            onclick="saveManifest()"
+            class="action-btn outline"
+            style="margin-bottom: 20px; width: max-content"
+          >
+            Save Details
+          </button>
+
+          <label>LIBRARY ROOT DIRECTORY</label>
+          <div class="path-display" id="lib-path"></div>
+          <button
+            onclick="openFolder()"
+            class="action-btn outline"
+            style="width: max-content; margin-bottom: 20px"
+            id="openFolderBtn"
+          >
+            Open in File Explorer
+          </button>
+
+          <div class="bottom-actions">
+            <button class="action-btn danger" onclick="confirmRemoveLibrary()">
+              Remove from List
+            </button>
+            <div id="active-action-container"></div>
+          </div>
+        </div>
+
+        <div id="tab-songs" class="tab-content">
+          <p style="margin-top: 0; color: var(--text-muted)">
+            Showing audio and video files found in the root directory. Songs
+            inside subfolders are ignored.
+          </p>
+          <div class="data-list" id="song-list-container">Loading songs...</div>
+        </div>
+
+        <div id="tab-bgvs" class="tab-content">
+          <div
+            style="
+              display: flex;
+              flex-wrap: wrap;
+              justify-content: space-between;
+              gap: 15px;
+              margin-bottom: 15px;
+              align-items: center;
+            "
+          >
+            <p style="margin: 0; color: var(--text-muted); flex: 1 1 300px">
+              Background Videos must be located inside the library folder. Add
+              files here to map them into the manifest.
+            </p>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap">
+              <button onclick="addBgvCategory()" class="action-btn outline">
+                + Add Category
+              </button>
+              <button onclick="saveBgvs()" class="action-btn success">
+                Save BGV Config
+              </button>
+            </div>
+          </div>
+          <div
+            class="data-list"
+            id="bgv-container"
+            style="background: transparent; border: none; padding: 0"
+          ></div>
+        </div>
+      </div>
+
+      <div
+        class="main-pane"
+        id="empty-pane"
+        style="align-items: center; justify-content: center"
+      >
+        <div class="empty-state">
+          Select a library from the left or create a new one to begin managing
+          it.
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <div id="confirm-modal" class="modal-overlay hidden">
+      <div class="modal-box">
+        <h2 id="modal-title">CONFIRM</h2>
+        <p id="modal-desc">Are you sure?</p>
+        <div class="modal-actions">
+          <button class="action-btn outline" onclick="closeConfirmModal()">
+            Cancel
+          </button>
+          <button class="action-btn danger" id="modal-confirm-btn">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const urlParams = new URLSearchParams(window.location.search);
+      const isMac = urlParams.get("platform") === "darwin";
+      if (isMac) {
+        document.body.classList.add("is-mac");
+        document.getElementById("openFolderBtn").innerText = "Open in Finder";
+      }
+      const ipc = window.desktopIntegration.ipc;
+
+      let appData = { active: null, libraries: [] };
+      let selectedLib = null;
+      let bgvData = [];
+
+      let confirmCallback = null;
+      function openConfirmModal(title, text, onConfirm) {
+        document.getElementById("modal-title").innerText = title;
+        document.getElementById("modal-desc").innerText = text;
+        confirmCallback = onConfirm;
+        document.getElementById("confirm-modal").classList.remove("hidden");
+      }
+      function closeConfirmModal() {
+        document.getElementById("confirm-modal").classList.add("hidden");
+        confirmCallback = null;
+      }
+      document
+        .getElementById("modal-confirm-btn")
+        .addEventListener("click", () => {
+          if (confirmCallback) confirmCallback();
+          closeConfirmModal();
+        });
+
+      async function loadData() {
+        appData = await ipc.invoke("libmgr-get-config");
+        renderSidebar();
+
+        if (selectedLib) {
+          selectedLib =
+            appData.libraries.find((l) => l.path === selectedLib.path) || null;
+        }
+
+        if (selectedLib) renderMainPane();
+        else if (appData.libraries.length > 0) {
+          selectedLib = appData.libraries[0];
+          renderMainPane();
+        } else {
+          document.getElementById("main-pane").style.display = "none";
+          document.getElementById("empty-pane").style.display = "flex";
+        }
+      }
+
+      function renderSidebar() {
+        const container = document.getElementById("lib-list");
+        container.innerHTML = "";
+
+        appData.libraries.forEach((lib) => {
+          const isActive = appData.active === lib.path;
+          const isSelected = selectedLib && selectedLib.path === lib.path;
+
+          const item = document.createElement("div");
+          item.className = `lib-item ${isActive ? "active-lib" : ""} ${isSelected ? "selected" : ""}`;
+          item.onclick = () => {
+            selectedLib = lib;
+            renderSidebar();
+            renderMainPane();
+          };
+
+          item.innerHTML = `
+          <div class="lib-item-title">${lib.manifest.title || "Unknown Library"}</div>
+          <div class="lib-item-path">${lib.path}</div>
+        `;
+          container.appendChild(item);
+        });
+      }
+
+      function renderMainPane() {
+        document.getElementById("empty-pane").style.display = "none";
+        document.getElementById("main-pane").style.display = "flex";
+
+        document.getElementById("lib-title").value =
+          selectedLib.manifest.title || "";
+        document.getElementById("lib-desc").value =
+          selectedLib.manifest.description || "";
+        document.getElementById("lib-path").innerText = selectedLib.path;
+
+        const isActive = appData.active === selectedLib.path;
+        const actionContainer = document.getElementById(
+          "active-action-container",
+        );
+        if (!isActive) {
+          actionContainer.innerHTML = `<button class="action-btn success" onclick="setActive()">Set as Active & Reboot</button>`;
+        } else {
+          actionContainer.innerHTML = `<button class="action-btn outline" disabled style="opacity:0.5;">Currently Active</button>`;
+        }
+
+        bgvData = selectedLib.manifest.additionalContents?.bgvCategories || [];
+        renderBgvs();
+        loadSongs();
+      }
+
+      function switchTab(tabId) {
+        document
+          .querySelectorAll(".tab-btn")
+          .forEach((b) => b.classList.remove("active"));
+        document
+          .querySelectorAll(".tab-content")
+          .forEach((c) => c.classList.remove("active"));
+        event.target.classList.add("active");
+        document.getElementById("tab-" + tabId).classList.add("active");
+      }
+
+      async function loadSongs() {
+        const container = document.getElementById("song-list-container");
+        container.innerHTML = "Scanning directory...";
+        const songs = await ipc.invoke(
+          "libmgr-get-library-contents",
+          selectedLib.path,
+        );
+
+        if (songs.length === 0) {
+          container.innerHTML =
+            "<div class='empty-state'>No valid media files found in the root directory.</div>";
+          return;
+        }
+
+        container.innerHTML = "";
+        songs.forEach((song) => {
+          const row = document.createElement("div");
+          row.className = "song-row";
+          row.innerText = song;
+          container.appendChild(row);
+        });
+      }
+
+      function renderBgvs() {
+        const container = document.getElementById("bgv-container");
+        container.innerHTML = "";
+
+        if (bgvData.length === 0) {
+          container.innerHTML =
+            "<div class='empty-state' style='padding:20px'>No BGV Categories defined.</div>";
+          return;
+        }
+
+        bgvData.forEach((cat, cIdx) => {
+          const catDiv = document.createElement("div");
+          catDiv.className = "bgv-category";
+
+          let html = `
+          <div class="bgv-category-header">
+            <input type="text" value="${cat.BGV_CATEGORY}" onchange="updateBgvCategoryName(${cIdx}, this.value)" placeholder="Category Name (e.g. KPOP)">
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button class="action-btn outline" style="padding: 5px 10px; font-size: 0.9rem;" onclick="addVideoToCategory(${cIdx})">+ Add Videos</button>
+              <button class="action-btn danger" style="padding: 5px 10px; font-size: 0.9rem;" onclick="confirmRemoveBgvCategory(${cIdx}, '${cat.BGV_CATEGORY.replace(/'/g, "\\'")}')">Delete Category</button>
+            </div>
+          </div>
+        `;
+
+          if (!cat.BGV_LIST || cat.BGV_LIST.length === 0) {
+            html += `<div style="color:var(--text-muted); font-size: 0.9rem; padding: 5px;">No videos in this category.</div>`;
+          } else {
+            cat.BGV_LIST.forEach((vid, vIdx) => {
+              html += `
+              <div class="bgv-file-row">
+                <span>${vid}</span>
+                <button onclick="removeVideoFromCategory(${cIdx}, ${vIdx})">✕</button>
+              </div>
+            `;
+            });
+          }
+
+          catDiv.innerHTML = html;
+          container.appendChild(catDiv);
+        });
+      }
+
+      function addBgvCategory() {
+        bgvData.push({ BGV_CATEGORY: "New Category", BGV_LIST: [] });
+        renderBgvs();
+      }
+      function updateBgvCategoryName(idx, val) {
+        bgvData[idx].BGV_CATEGORY = val;
+      }
+
+      function confirmRemoveBgvCategory(idx, catName) {
+        openConfirmModal(
+          "DELETE CATEGORY",
+          `Are you sure you want to delete the category "${catName}"? This will not delete the video files from your disk.`,
+          () => {
+            bgvData.splice(idx, 1);
+            renderBgvs();
+          },
+        );
+      }
+
+      function removeVideoFromCategory(cIdx, vIdx) {
+        bgvData[cIdx].BGV_LIST.splice(vIdx, 1);
+        renderBgvs();
+      }
+
+      async function addVideoToCategory(idx) {
+        const res = await ipc.invoke(
+          "libmgr-select-bgv-files",
+          selectedLib.path,
+        );
+        if (res.outsideCount > 0) {
+          showToast(
+            `${res.outsideCount} ${res.outsideCount > 1 ? "videos" : "video"} must be inside the library folder!`,
+            "var(--danger)",
+          );
+        }
+
+        if (res.relativePaths.length > 0) {
+          if (!bgvData[idx].BGV_LIST) bgvData[idx].BGV_LIST = [];
+          res.relativePaths.forEach((p) => {
+            if (!bgvData[idx].BGV_LIST.includes(p))
+              bgvData[idx].BGV_LIST.push(p);
+          });
+          renderBgvs();
+        }
+      }
+
+      async function saveBgvs() {
+        selectedLib.manifest.additionalContents =
+          selectedLib.manifest.additionalContents || {};
+        selectedLib.manifest.additionalContents.bgvCategories = bgvData;
+
+        const res = await ipc.invoke("libmgr-update-manifest", {
+          folderPath: selectedLib.path,
+          manifestData: selectedLib.manifest,
+        });
+
+        if (res.success) {
+          showToast("Background Videos saved successfully!", "var(--success)");
+          loadData();
+        } else {
+          console.error("BGV Save Error:", res.error);
+          showToast(`Failed to save: ${res.error}`, "var(--danger)");
+        }
+      }
+
+      async function scanDrives() {
+        showToast("Scanning drives...");
+        const foundCount = await ipc.invoke("libmgr-scan-drives");
+        if (foundCount > 0)
+          showToast(`Found ${foundCount} new libraries!`, "var(--success)");
+        else showToast("No new libraries found.", "var(--text-muted)");
+        loadData();
+      }
+
+      async function addLibrary() {
+        const addedPath = await ipc.invoke("libmgr-add-library");
+        if (addedPath) {
+          appData = await ipc.invoke("libmgr-get-config");
+          selectedLib = appData.libraries.find((l) => l.path === addedPath);
+          showToast("Library added successfully!", "var(--success)");
+          loadData();
+        }
+      }
+
+      async function saveManifest() {
+        selectedLib.manifest.title = document.getElementById("lib-title").value;
+        selectedLib.manifest.description =
+          document.getElementById("lib-desc").value;
+
+        const res = await ipc.invoke("libmgr-update-manifest", {
+          folderPath: selectedLib.path,
+          manifestData: selectedLib.manifest,
+        });
+
+        if (res.success) {
+          showToast("Library details saved!", "var(--success)");
+          loadData();
+        } else {
+          console.error("Manifest Save Error:", res.error);
+          showToast(`Failed to save details: ${res.error}`, "var(--danger)");
+        }
+      }
+
+      function openFolder() {
+        ipc.send("libmgr-open-folder", selectedLib.path);
+      }
+
+      async function setActive() {
+        const res = await ipc.invoke("libmgr-set-active", selectedLib.path);
+        if (!res.success) {
+          showToast(res.reason, "var(--danger)");
+        } else {
+          showToast("System rebooting to load library...", "var(--accent)");
+          loadData();
+        }
+      }
+
+      function confirmRemoveLibrary() {
+        openConfirmModal(
+          "REMOVE LIBRARY",
+          `Remove "${selectedLib.manifest.title || "Unknown Library"}" from the list?\n\n(No actual files will be deleted)`,
+          async () => {
+            await ipc.invoke("libmgr-remove-library", selectedLib.path);
+            selectedLib = null;
+            loadData();
+          },
+        );
+      }
+
+      function showToast(msg, color = "var(--accent)") {
+        const toast = document.getElementById("toast");
+        toast.style.borderColor = color;
+        toast.style.color = color;
+        toast.innerText = msg;
+        toast.style.opacity = "1";
+        setTimeout(() => (toast.style.opacity = "0"), 4000);
+      }
+
+      loadData();
+    </script>
+  </body>
+</html>

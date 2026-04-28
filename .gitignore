@@ -133,3 +133,6 @@ thumbnails/
 
 # node-persist
 .node-persist/
+
+# esbuild output
+resources/
