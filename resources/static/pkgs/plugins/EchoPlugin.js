@@ -1,1 +1,298 @@
-import{a as u}from"../../chunk-4T6CDWB5.js";import"../../chunk-ZWRDP37E.js";var p=[{key:"time",label:"TIME",format:l=>l.toFixed(2)+" s"},{key:"feedback",label:"FDBK",format:l=>Math.round(l*100)+" %"},{key:"mix",label:"MIX",format:l=>Math.round(l*100)+" %"}],c=class extends u{constructor(t){super(t),this.name="Echo",this.delayNode=this.audioContext.createDelay(2),this.feedbackGain=this.audioContext.createGain(),this.dryGain=this.audioContext.createGain(),this.wetGain=this.audioContext.createGain(),this.parameters={time:{type:"slider",min:0,max:2,step:.01,value:.4},feedback:{type:"slider",min:0,max:.95,step:.01,value:.5},mix:{type:"slider",min:0,max:1,step:.01,value:.35}},this.delayNode.delayTime.value=this.parameters.time.value,this.feedbackGain.gain.value=this.parameters.feedback.value,this.dryGain.gain.value=1-this.parameters.mix.value,this.wetGain.gain.value=this.parameters.mix.value,this.input.connect(this.dryGain),this.input.connect(this.delayNode),this.delayNode.connect(this.feedbackGain),this.feedbackGain.connect(this.delayNode),this.dryGain.connect(this.output),this.delayNode.connect(this.wetGain),this.wetGain.connect(this.output),this.isDragging=!1,this.currentDragIndex=-1}setParameter(t,e){let s=this.audioContext.currentTime,a=.02;switch(t){case"time":this.parameters.time.value=e,this.delayNode.delayTime.setTargetAtTime(e,s,a);break;case"feedback":this.parameters.feedback.value=e,this.feedbackGain.gain.setTargetAtTime(e,s,a);break;case"mix":this.parameters.mix.value=e,this.dryGain.gain.setTargetAtTime(1-e,s,a),this.wetGain.gain.setTargetAtTime(e,s,a);break}}renderGUI(t,e){this.activeControlIndex=0,this.controlElements=[];let s=new e("div").styleJs({display:"flex",gap:"2rem",justifyContent:"space-evenly",alignItems:"center",padding:"2rem 1.5rem",backgroundColor:"rgba(0, 0, 0, 0.4)",borderRadius:"12px",border:"1px solid rgba(255, 255, 255, 0.1)",boxShadow:"inset 0 5px 20px rgba(0,0,0,0.5)",height:"100%",width:"100%",boxSizing:"border-box"}).appendTo(t);p.forEach((a,i)=>{let o=new e("div").styleJs({display:"flex",flexDirection:"column",alignItems:"center",gap:"1.5rem",flex:"1"}).appendTo(s),n=new e("div").styleJs({fontFamily:"'Rajdhani', sans-serif",fontWeight:"700",fontSize:"1.4rem",color:"#89cff0",height:"1.5rem",transition:"color 0.2s ease"}).appendTo(o),r=new e("div").styleJs({position:"relative",width:"14px",height:"200px",backgroundColor:"rgba(0, 0, 0, 0.6)",borderRadius:"7px",border:"1px solid rgba(255, 255, 255, 0.15)",display:"flex",justifyContent:"center"}).appendTo(o),h=new e("div").styleJs({position:"absolute",bottom:"0",width:"100%",backgroundColor:"rgba(137, 207, 240, 0.2)",borderRadius:"7px",transition:"height 0.1s linear, background-color 0.2s ease"}).appendTo(r),d=new e("div").styleJs({position:"absolute",width:"36px",height:"16px",backgroundColor:"#89cff0",borderRadius:"4px",boxShadow:"0 0 10px rgba(137, 207, 240, 0.4)",zIndex:2,pointerEvents:"none",transition:"background-color 0.2s ease, box-shadow 0.2s ease"}).appendTo(r);new e("div").styleJs({position:"absolute",top:"-15px",bottom:"-15px",left:"-25px",right:"-25px",cursor:"pointer",zIndex:5}).appendTo(r).on("mousedown",g=>{this.isDragging=!0,this.currentDragIndex=i,this.activeControlIndex=i,this._updatePluginHighlight(),this._handleMouseFader(g,i)});let m=new e("div").styleJs({fontFamily:"'Rajdhani', sans-serif",fontWeight:"700",fontSize:"1.2rem",color:"rgba(255, 255, 255, 0.5)",padding:"0.4rem 0.8rem",borderRadius:"6px",letterSpacing:"0.1em",transition:"all 0.2s ease"}).text(a.label).appendTo(o);this.controlElements.push({valLabel:n,trackContainer:r,trackFill:h,faderThumb:d,nameLabel:m,ctrl:a}),this._updateControlVisuals(i)}),this._updatePluginHighlight(),this._setupGlobalMouseEvents()}_setupGlobalMouseEvents(){this._mouseMoveHandler=t=>{!this.isDragging||this.currentDragIndex===-1||this._handleMouseFader(t,this.currentDragIndex)},this._mouseUpHandler=()=>{this.isDragging=!1,this.currentDragIndex=-1},window.addEventListener("mousemove",this._mouseMoveHandler),window.addEventListener("mouseup",this._mouseUpHandler)}_handleMouseFader(t,e){let s=this.controlElements[e],a=s.trackContainer.elm.getBoundingClientRect(),i=t.clientY-a.top;i=Math.max(0,Math.min(a.height,i));let o=1-i/a.height,n=s.ctrl.key,r=this.parameters[n].min,h=this.parameters[n].max,d=r+o*(h-r);d=Math.round(d*100)/100,this.setParameter(n,d),this._updateControlVisuals(e)}_updateControlVisuals(t){let e=this.controlElements[t],s=e.ctrl.key,a=this.parameters[s].value;e.valLabel.text(e.ctrl.format(a));let i=this.parameters[s].min,o=this.parameters[s].max,n=(a-i)/(o-i)*100;e.faderThumb.styleJs({bottom:`calc(${n}% - 8px)`}),e.trackFill.styleJs({height:`${n}%`})}_updatePluginHighlight(){this.controlElements.forEach((t,e)=>{e===this.activeControlIndex?(t.valLabel.styleJs({color:"#ffd700"}),t.faderThumb.styleJs({backgroundColor:"#ffd700",boxShadow:"0 0 15px rgba(255, 215, 0, 0.6)"}),t.trackFill.styleJs({backgroundColor:"rgba(255, 215, 0, 0.2)"}),t.nameLabel.styleJs({color:"#010141",backgroundColor:"#ffd700"})):(t.valLabel.styleJs({color:"#89cff0"}),t.faderThumb.styleJs({backgroundColor:"#89cff0",boxShadow:"0 0 10px rgba(137, 207, 240, 0.4)"}),t.trackFill.styleJs({backgroundColor:"rgba(137, 207, 240, 0.15)"}),t.nameLabel.styleJs({color:"rgba(255, 255, 255, 0.5)",backgroundColor:"transparent"}))})}handleKeyDown(t){if(t.key==="ArrowLeft")return this.activeControlIndex>0?(this.activeControlIndex--,this._updatePluginHighlight(),!0):!1;if(t.key==="ArrowRight")return this.activeControlIndex<p.length-1?(this.activeControlIndex++,this._updatePluginHighlight(),!0):!1;if(t.key==="ArrowUp"||t.key==="ArrowDown"){t.preventDefault();let s=this.controlElements[this.activeControlIndex].ctrl.key,a=this.parameters[s].value,i=.05;return a+=t.key==="ArrowUp"?i:-i,a=Math.max(this.parameters[s].min,Math.min(this.parameters[s].max,a)),this.setParameter(s,a),this._updateControlVisuals(this.activeControlIndex),!0}return!1}disconnect(){super.disconnect(),this.delayNode.disconnect(),this.feedbackGain.disconnect(),this.wetGain.disconnect(),this.dryGain.disconnect(),this._mouseMoveHandler&&window.removeEventListener("mousemove",this._mouseMoveHandler),this._mouseUpHandler&&window.removeEventListener("mouseup",this._mouseUpHandler)}};export{c as default};
+import {
+  BasePlugin
+} from "../../chunk-CSEMMDI5.js";
+import "../../chunk-7D4SUZUM.js";
+
+// src/pkgs/plugins/EchoPlugin.js
+var CONTROLS = [
+  { key: "time", label: "TIME", format: (v) => v.toFixed(2) + " s" },
+  { key: "feedback", label: "FDBK", format: (v) => Math.round(v * 100) + " %" },
+  { key: "mix", label: "MIX", format: (v) => Math.round(v * 100) + " %" }
+];
+var EchoPlugin = class extends BasePlugin {
+  constructor(audioContext) {
+    super(audioContext);
+    this.name = "Echo";
+    this.delayNode = this.audioContext.createDelay(2);
+    this.feedbackGain = this.audioContext.createGain();
+    this.dryGain = this.audioContext.createGain();
+    this.wetGain = this.audioContext.createGain();
+    this.parameters = {
+      time: {
+        type: "slider",
+        min: 0,
+        max: 2,
+        step: 0.01,
+        value: 0.4
+      },
+      feedback: {
+        type: "slider",
+        min: 0,
+        max: 0.95,
+        step: 0.01,
+        value: 0.5
+      },
+      mix: {
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.01,
+        value: 0.35
+      }
+    };
+    this.delayNode.delayTime.value = this.parameters.time.value;
+    this.feedbackGain.gain.value = this.parameters.feedback.value;
+    this.dryGain.gain.value = 1 - this.parameters.mix.value;
+    this.wetGain.gain.value = this.parameters.mix.value;
+    this.input.connect(this.dryGain);
+    this.input.connect(this.delayNode);
+    this.delayNode.connect(this.feedbackGain);
+    this.feedbackGain.connect(this.delayNode);
+    this.dryGain.connect(this.output);
+    this.delayNode.connect(this.wetGain);
+    this.wetGain.connect(this.output);
+    this.isDragging = false;
+    this.currentDragIndex = -1;
+  }
+  setParameter(key, value) {
+    const now = this.audioContext.currentTime;
+    const smoothTime = 0.02;
+    switch (key) {
+      case "time":
+        this.parameters.time.value = value;
+        this.delayNode.delayTime.setTargetAtTime(value, now, smoothTime);
+        break;
+      case "feedback":
+        this.parameters.feedback.value = value;
+        this.feedbackGain.gain.setTargetAtTime(value, now, smoothTime);
+        break;
+      case "mix":
+        this.parameters.mix.value = value;
+        this.dryGain.gain.setTargetAtTime(1 - value, now, smoothTime);
+        this.wetGain.gain.setTargetAtTime(value, now, smoothTime);
+        break;
+    }
+  }
+  // ======================================================================
+  // --- CUSTOM GUI IMPLEMENTATION ---
+  // ======================================================================
+  renderGUI(wrapper, Html) {
+    this.activeControlIndex = 0;
+    this.controlElements = [];
+    const echoContainer = new Html("div").styleJs({
+      display: "flex",
+      gap: "2rem",
+      justifyContent: "space-evenly",
+      alignItems: "center",
+      padding: "2rem 1.5rem",
+      backgroundColor: "rgba(0, 0, 0, 0.4)",
+      borderRadius: "12px",
+      border: "1px solid rgba(255, 255, 255, 0.1)",
+      boxShadow: "inset 0 5px 20px rgba(0,0,0,0.5)",
+      height: "100%",
+      width: "100%",
+      boxSizing: "border-box"
+    }).appendTo(wrapper);
+    CONTROLS.forEach((ctrl, idx) => {
+      const col = new Html("div").styleJs({
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "1.5rem",
+        flex: "1"
+      }).appendTo(echoContainer);
+      const valLabel = new Html("div").styleJs({
+        fontFamily: "'Rajdhani', sans-serif",
+        fontWeight: "700",
+        fontSize: "1.4rem",
+        color: "#89cff0",
+        height: "1.5rem",
+        transition: "color 0.2s ease"
+      }).appendTo(col);
+      const trackContainer = new Html("div").styleJs({
+        position: "relative",
+        width: "14px",
+        height: "200px",
+        backgroundColor: "rgba(0, 0, 0, 0.6)",
+        borderRadius: "7px",
+        border: "1px solid rgba(255, 255, 255, 0.15)",
+        display: "flex",
+        justifyContent: "center"
+      }).appendTo(col);
+      const trackFill = new Html("div").styleJs({
+        position: "absolute",
+        bottom: "0",
+        width: "100%",
+        backgroundColor: "rgba(137, 207, 240, 0.2)",
+        borderRadius: "7px",
+        transition: "height 0.1s linear, background-color 0.2s ease"
+      }).appendTo(trackContainer);
+      const faderThumb = new Html("div").styleJs({
+        position: "absolute",
+        width: "36px",
+        height: "16px",
+        backgroundColor: "#89cff0",
+        borderRadius: "4px",
+        boxShadow: "0 0 10px rgba(137, 207, 240, 0.4)",
+        zIndex: 2,
+        pointerEvents: "none",
+        transition: "background-color 0.2s ease, box-shadow 0.2s ease"
+      }).appendTo(trackContainer);
+      const hitArea = new Html("div").styleJs({
+        position: "absolute",
+        top: "-15px",
+        bottom: "-15px",
+        left: "-25px",
+        right: "-25px",
+        cursor: "pointer",
+        zIndex: 5
+      }).appendTo(trackContainer);
+      hitArea.on("mousedown", (e) => {
+        this.isDragging = true;
+        this.currentDragIndex = idx;
+        this.activeControlIndex = idx;
+        this._updatePluginHighlight();
+        this._handleMouseFader(e, idx);
+      });
+      const nameLabel = new Html("div").styleJs({
+        fontFamily: "'Rajdhani', sans-serif",
+        fontWeight: "700",
+        fontSize: "1.2rem",
+        color: "rgba(255, 255, 255, 0.5)",
+        padding: "0.4rem 0.8rem",
+        borderRadius: "6px",
+        letterSpacing: "0.1em",
+        transition: "all 0.2s ease"
+      }).text(ctrl.label).appendTo(col);
+      this.controlElements.push({
+        valLabel,
+        trackContainer,
+        trackFill,
+        faderThumb,
+        nameLabel,
+        ctrl
+      });
+      this._updateControlVisuals(idx);
+    });
+    this._updatePluginHighlight();
+    this._setupGlobalMouseEvents();
+  }
+  // --- MOUSE EVENT HANDLERS ---
+  _setupGlobalMouseEvents() {
+    this._mouseMoveHandler = (e) => {
+      if (!this.isDragging || this.currentDragIndex === -1) return;
+      this._handleMouseFader(e, this.currentDragIndex);
+    };
+    this._mouseUpHandler = () => {
+      this.isDragging = false;
+      this.currentDragIndex = -1;
+    };
+    window.addEventListener("mousemove", this._mouseMoveHandler);
+    window.addEventListener("mouseup", this._mouseUpHandler);
+  }
+  _handleMouseFader(e, idx) {
+    const elData = this.controlElements[idx];
+    const rect = elData.trackContainer.elm.getBoundingClientRect();
+    let y = e.clientY - rect.top;
+    y = Math.max(0, Math.min(rect.height, y));
+    const percent = 1 - y / rect.height;
+    const key = elData.ctrl.key;
+    const min = this.parameters[key].min;
+    const max = this.parameters[key].max;
+    let val = min + percent * (max - min);
+    val = Math.round(val * 100) / 100;
+    this.setParameter(key, val);
+    this._updateControlVisuals(idx);
+  }
+  // --- VISUAL UPDATES ---
+  _updateControlVisuals(idx) {
+    const elData = this.controlElements[idx];
+    const key = elData.ctrl.key;
+    const val = this.parameters[key].value;
+    elData.valLabel.text(elData.ctrl.format(val));
+    const min = this.parameters[key].min;
+    const max = this.parameters[key].max;
+    const percentage = (val - min) / (max - min) * 100;
+    elData.faderThumb.styleJs({ bottom: `calc(${percentage}% - 8px)` });
+    elData.trackFill.styleJs({ height: `${percentage}%` });
+  }
+  _updatePluginHighlight() {
+    this.controlElements.forEach((elData, idx) => {
+      if (idx === this.activeControlIndex) {
+        elData.valLabel.styleJs({ color: "#ffd700" });
+        elData.faderThumb.styleJs({
+          backgroundColor: "#ffd700",
+          boxShadow: "0 0 15px rgba(255, 215, 0, 0.6)"
+        });
+        elData.trackFill.styleJs({ backgroundColor: "rgba(255, 215, 0, 0.2)" });
+        elData.nameLabel.styleJs({
+          color: "#010141",
+          backgroundColor: "#ffd700"
+        });
+      } else {
+        elData.valLabel.styleJs({ color: "#89cff0" });
+        elData.faderThumb.styleJs({
+          backgroundColor: "#89cff0",
+          boxShadow: "0 0 10px rgba(137, 207, 240, 0.4)"
+        });
+        elData.trackFill.styleJs({
+          backgroundColor: "rgba(137, 207, 240, 0.15)"
+        });
+        elData.nameLabel.styleJs({
+          color: "rgba(255, 255, 255, 0.5)",
+          backgroundColor: "transparent"
+        });
+      }
+    });
+  }
+  // --- KEYBOARD INTERACTION ---
+  handleKeyDown(e) {
+    if (e.key === "ArrowLeft") {
+      if (this.activeControlIndex > 0) {
+        this.activeControlIndex--;
+        this._updatePluginHighlight();
+        return true;
+      }
+      return false;
+    } else if (e.key === "ArrowRight") {
+      if (this.activeControlIndex < CONTROLS.length - 1) {
+        this.activeControlIndex++;
+        this._updatePluginHighlight();
+        return true;
+      }
+      return false;
+    } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const elData = this.controlElements[this.activeControlIndex];
+      const key = elData.ctrl.key;
+      let val = this.parameters[key].value;
+      const step = 0.05;
+      val += e.key === "ArrowUp" ? step : -step;
+      val = Math.max(
+        this.parameters[key].min,
+        Math.min(this.parameters[key].max, val)
+      );
+      this.setParameter(key, val);
+      this._updateControlVisuals(this.activeControlIndex);
+      return true;
+    }
+    return false;
+  }
+  disconnect() {
+    super.disconnect();
+    this.delayNode.disconnect();
+    this.feedbackGain.disconnect();
+    this.wetGain.disconnect();
+    this.dryGain.disconnect();
+    if (this._mouseMoveHandler) {
+      window.removeEventListener("mousemove", this._mouseMoveHandler);
+    }
+    if (this._mouseUpHandler) {
+      window.removeEventListener("mouseup", this._mouseUpHandler);
+    }
+  }
+};
+export {
+  EchoPlugin as default
+};
+//# sourceMappingURL=EchoPlugin.js.map

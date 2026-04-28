@@ -1,6 +1,387 @@
-import{a as m}from"../../chunk-RR3LXZFH.js";import{a as i}from"../../chunk-KXAEPP22.js";import"../../chunk-ZWRDP37E.js";var g,f,w;var c,l,y=9864;function b(o,s){let n=s||"/";return o=o.map((t,e)=>(e&&(t=t.replace(new RegExp("^"+n),"")),e!==o.length-1&&(t=t.replace(new RegExp(n+"$"),"")),t)),o.join(n)}var v={name:"Encore Loader",type:"app",privs:0,async promptUserToSelectLibrary(o){return new Promise(s=>{let n=0,t=new i("div").class("modal-container").appendTo(g).styleJs({color:"white"}),e=new i("div").class("modal-content").appendTo(t);new i("h2").text("Multiple Libraries Found").appendTo(e),new i("p").text("Please select which library you'd like to use for this session.").appendTo(e);let d=new i("div").class("modal-buttons").styleJs({flexDirection:"column",alignItems:"stretch"}).appendTo(e),h=r=>{document.removeEventListener("keydown",u),t.cleanup(),s(r)};o.forEach(r=>{new i("button").html(`${r.manifest.title}<br><small style="opacity: 0.7;">${r.path}</small>`).styleJs({textAlign:"left",lineHeight:"1.5",height:"auto",padding:"1rem"}).on("click",()=>h(r.path)).appendTo(d)});let a=d.elm.children,p=()=>{for(let r=0;r<a.length;r++)a[r].classList.toggle("over",r===n);a[n]?.scrollIntoView({behavior:"smooth",block:"nearest"})},u=r=>{if(r.preventDefault(),r.stopPropagation(),r.key==="ArrowDown")n=(n+1)%a.length;else if(r.key==="ArrowUp")n=(n-1+a.length)%a.length;else if(r.key==="Enter"){a[n]?.click();return}p()};document.addEventListener("keydown",u),p()})},async waitForLibrary(){let o=c.Processes.getService("FsSvc").data;return l.text(`No library detected.
-Open the Library Manager to import a Library by clicking the LIB button.`),new Promise(s=>{let n=setInterval(async()=>{let t=await o.findEncoreLibraries();t.length>0&&(clearInterval(n),s(t[0].path))},3e3)})},async proceedWithLoading(o){let s=c.Processes.getService("FsSvc").data,n=c.Processes.getService("ForteSvc").data;l.text("Loading Library...");let t=a=>{this.aborted||l.text(`Loading library...
-${a.detail.current}/${a.detail.total} (${a.detail.percentage}%)`)};document.addEventListener("CherryTree.FsSvc.SongList.Progress",t);let e=await s.buildSongList(o);if(document.removeEventListener("CherryTree.FsSvc.SongList.Progress",t),this.aborted||!e)return!1;this.f2Handler&&(document.removeEventListener("keydown",this.f2Handler),this.f2Handler=null);let d=s.getLibraryInfo(),h=await window.config.getAll();if(d?.manifest?.additionalContents?.soundFont&&h.audioConfig?.useLibraryFont){l.text("Loading sounds...");let a=new URL(`http://127.0.0.1:${y}/getFile`),p=b([d.path,d.manifest.additionalContents.soundFont]);a.searchParams.append("path",p),await n.loadSoundFont(a.href)}return await c.Libs.startPkg("system:EncoreHome",[]),document.addEventListener("CherryTree.UI.Ready",()=>{c.end()},{once:!0}),!0},async startLoadingSequence(){let o=c.Processes.getService("FsSvc").data;if(window.setupRequested){window.setupRequested=!1,l.text("Entering System Setup..."),setTimeout(()=>{this.end(),c.Core.pkg.run("system:EncoreSetup",[])},500);return}this.f2Handler=s=>{s.key==="F2"&&!this.aborted&&(this.aborted=!0,document.removeEventListener("keydown",this.f2Handler),l.text("Entering System Setup..."),sessionStorage.setItem("encore_boot_setup","true"),setTimeout(()=>window.location.reload(),500))},document.addEventListener("keydown",this.f2Handler);try{let n=(await window.config.getAll()).libraryPath;if(n&&!this.aborted)if(!await this.proceedWithLoading(n))console.warn("Configured library not found. Falling back to search."),await window.config.merge({libraryPath:null}),n=null,l.text("Library missing. Re-evaluating...");else return;if(!n){l.text("Searching for libraries...");let t=await o.findEncoreLibraries();if(this.aborted)return;if(t.length===1){l.text("Found one library. Configuring automatically...");let e=t[0].path;await window.config.merge({libraryPath:e,setupComplete:!0}),await this.proceedWithLoading(e)}else if(t.length>1){l.text("Multiple libraries found. Please choose one.");let e=await this.promptUserToSelectLibrary(t);if(this.aborted)return;await window.config.merge({libraryPath:e,setupComplete:!0}),await this.proceedWithLoading(e)}else{let e=await this.waitForLibrary();if(this.aborted)return;l.text("Library detected! Loading..."),await window.config.merge({libraryPath:e,setupComplete:!0}),await this.proceedWithLoading(e)}}}catch(s){console.error("Failed to load or process config:",s),l.text("Configuration error. Please restart the application.")}},start:async function(o){c=o,y=await m.getPort(),window.desktopIntegration?.ipc.send("setRPC",{details:"Booting up..."}),w=o.Pid,f=o.Processes.getService("UiLib").data,g=new i("div").class("full-ui").appendTo("body").styleJs({color:"black",opacity:1});let s=new i("div").styleJs({position:"absolute",top:"0",left:"0",width:"100%",height:"100%",overflow:"hidden"}).appendTo(g),n=new i("img").attr({src:"assets/img/oobe/hoshi_hi.png"}).styleJs({position:"absolute",top:"0",left:"-250px",width:"100%",height:"100%",objectFit:"cover",opacity:0}).appendTo(s),t=new i("div").styleJs({position:"absolute",top:"0",left:"0",width:"100%",height:"100%",overflow:"hidden",display:"flex",padding:"80px"}).appendTo(g);new i("div").styleJs({height:"100%",width:"50%"}).appendTo(t);let e=new i("div").styleJs({height:"100%",width:"50%",display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"right"}).appendTo(t),d=new i("p").styleJs({fontSize:"2rem",textAlign:"right",margin:"0",padding:"0",fontWeight:"500"}).text("\u30C6\u30EC\u30D3").appendTo(e);new i("h1").styleJs({fontFamily:"Rajdhani",fontSize:"10rem",lineHeight:"9rem",fontWeight:"bold",textAlign:"right",margin:"0",padding:"0",overflow:"hidden"}).appendTo(e).html("ENCORE".split("").map(u=>`<span class="encore-letter" style="display: inline-block;">${u}</span>`).join(""));let a=new i("h2").styleJs({margin:"0",padding:"0",fontFamily:"Rajdhani",fontSize:"3.5rem",lineHeight:"2rem",fontWeight:"bold",textAlign:"right"}).text("KARAOKE").appendTo(e);new i("br").appendTo(e),new i("br").appendTo(e),l=new i("p").text("Booting up...").appendTo(e).styleJs({textAlign:"right",fontSize:"2rem",whiteSpace:"pre-wrap"});let p=anime.timeline({easing:"easeInOutExpo"});p.add({targets:n.elm,translateX:["-50%",0],opacity:[0,1],duration:1200},0).add({targets:".encore-letter",translateY:["100%",0],opacity:[0,1],delay:anime.stagger(70)},"-=1000").add({targets:[d.elm,a.elm],translateY:[-20,0],opacity:[0,1],duration:800},"-=600").add({targets:l.elm,opacity:[0,1],duration:1e3},"-=500").complete=()=>{l.classOn("pulse-status"),this.startLoadingSequence()},f.init(w,"horizontal",[])},end:async function(){this.f2Handler&&document.removeEventListener("keydown",this.f2Handler),f.cleanup(w),await f.transition("fadeOut",g,500),g.cleanup()}},x=v;export{x as default};
+import {
+  networkingUtility_default
+} from "../../chunk-CHA2DGDG.js";
+import {
+  Html
+} from "../../chunk-FX4GTR7E.js";
+import "../../chunk-7D4SUZUM.js";
+
+// src/pkgs/system/EncoreLoader.js
+var wrapper;
+var Ui;
+var Pid;
+var root;
+var statusP;
+var actualPort = 9864;
+function pathJoin(parts, sep) {
+  const separator = sep || "/";
+  parts = parts.map((part, index) => {
+    if (index) {
+      part = part.replace(new RegExp("^" + separator), "");
+    }
+    if (index !== parts.length - 1) {
+      part = part.replace(new RegExp(separator + "$"), "");
+    }
+    return part;
+  });
+  return parts.join(separator);
+}
+var pkg = {
+  name: "Encore Loader",
+  type: "app",
+  privs: 0,
+  /**
+   * Creates a modal to allow the user to select from multiple detected libraries.
+   *
+   * @param {Array<Object>} libraries - The list of found library objects.
+   * @returns {Promise<string>} A promise resolving to the selected library path.
+   */
+  async promptUserToSelectLibrary(libraries) {
+    return new Promise((resolve) => {
+      let selectedIndex = 0;
+      const modal = new Html("div").class("modal-container").appendTo(wrapper).styleJs({ color: "white" });
+      const content = new Html("div").class("modal-content").appendTo(modal);
+      new Html("h2").text("Multiple Libraries Found").appendTo(content);
+      new Html("p").text("Please select which library you'd like to use for this session.").appendTo(content);
+      const buttonsContainer = new Html("div").class("modal-buttons").styleJs({ flexDirection: "column", alignItems: "stretch" }).appendTo(content);
+      const cleanupAndResolve = (path) => {
+        document.removeEventListener("keydown", handleKeyDown);
+        modal.cleanup();
+        resolve(path);
+      };
+      libraries.forEach((lib) => {
+        new Html("button").html(
+          `${lib.manifest.title}<br><small style="opacity: 0.7;">${lib.path}</small>`
+        ).styleJs({
+          textAlign: "left",
+          lineHeight: "1.5",
+          height: "auto",
+          padding: "1rem"
+        }).on("click", () => cleanupAndResolve(lib.path)).appendTo(buttonsContainer);
+      });
+      const libraryButtons = buttonsContainer.elm.children;
+      const updateSelection = () => {
+        for (let i = 0; i < libraryButtons.length; i++) {
+          libraryButtons[i].classList.toggle("over", i === selectedIndex);
+        }
+        libraryButtons[selectedIndex]?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest"
+        });
+      };
+      const handleKeyDown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key === "ArrowDown") {
+          selectedIndex = (selectedIndex + 1) % libraryButtons.length;
+        } else if (e.key === "ArrowUp") {
+          selectedIndex = (selectedIndex - 1 + libraryButtons.length) % libraryButtons.length;
+        } else if (e.key === "Enter") {
+          libraryButtons[selectedIndex]?.click();
+          return;
+        }
+        updateSelection();
+      };
+      document.addEventListener("keydown", handleKeyDown);
+      updateSelection();
+    });
+  },
+  /**
+   * Enters a polling state, waiting for a valid library drive to be connected.
+   *
+   * @returns {Promise<string>} A promise that resolves with the path of the first library found.
+   */
+  async waitForLibrary() {
+    const fsSvc = root.Processes.getService("FsSvc").data;
+    statusP.text(
+      "No library detected.\nOpen the Library Manager to import a Library by clicking the LIB button."
+    );
+    return new Promise((resolve) => {
+      const intervalId = setInterval(async () => {
+        const foundLibraries = await fsSvc.findEncoreLibraries();
+        if (foundLibraries.length > 0) {
+          clearInterval(intervalId);
+          resolve(foundLibraries[0].path);
+        }
+      }, 3e3);
+    });
+  },
+  /**
+   * The core loading logic executing after a library path has been determined.
+   * Parses the song list, loads sound fonts, and transitions to the main application.
+   *
+   * @param {string} libraryPath - The full absolute path to the selected library.
+   * @returns {Promise<boolean>} True if successful, False if the library failed to load.
+   */
+  async proceedWithLoading(libraryPath) {
+    let fsSvc = root.Processes.getService("FsSvc").data;
+    let forteSvc = root.Processes.getService("ForteSvc").data;
+    statusP.text("Loading Library...");
+    const progressHandler = (e) => {
+      if (this.aborted) return;
+      statusP.text(
+        `Loading library...
+${e.detail.current}/${e.detail.total} (${e.detail.percentage}%)`
+      );
+    };
+    document.addEventListener(
+      "CherryTree.FsSvc.SongList.Progress",
+      progressHandler
+    );
+    const success = await fsSvc.buildSongList(libraryPath);
+    document.removeEventListener(
+      "CherryTree.FsSvc.SongList.Progress",
+      progressHandler
+    );
+    if (this.aborted) return false;
+    if (!success) {
+      return false;
+    }
+    if (this.f2Handler) {
+      document.removeEventListener("keydown", this.f2Handler);
+      this.f2Handler = null;
+    }
+    const libInfo = fsSvc.getLibraryInfo();
+    const config = await window.config.getAll();
+    if (libInfo?.manifest?.additionalContents?.soundFont && config.audioConfig?.useLibraryFont) {
+      statusP.text("Loading sounds...");
+      const url = new URL(`http://127.0.0.1:${actualPort}/getFile`);
+      const soundFontPath = pathJoin([
+        libInfo.path,
+        libInfo.manifest.additionalContents.soundFont
+      ]);
+      url.searchParams.append("path", soundFontPath);
+      await forteSvc.loadSoundFont(url.href);
+    }
+    await root.Libs.startPkg("system:EncoreHome", []);
+    document.addEventListener(
+      "CherryTree.UI.Ready",
+      () => {
+        root.end();
+      },
+      { once: true }
+    );
+    return true;
+  },
+  /**
+   * Orchestrates the initial boot logic, handling library detection, setup redirects, and loading sequences.
+   *
+   * @returns {Promise<void>}
+   */
+  async startLoadingSequence() {
+    let fsSvc = root.Processes.getService("FsSvc").data;
+    if (window.setupRequested) {
+      window.setupRequested = false;
+      statusP.text("Entering System Setup...");
+      setTimeout(() => {
+        this.end();
+        root.Core.pkg.run("system:EncoreSetup", []);
+      }, 500);
+      return;
+    }
+    this.f2Handler = (e) => {
+      if (e.key === "F2" && !this.aborted) {
+        this.aborted = true;
+        document.removeEventListener("keydown", this.f2Handler);
+        statusP.text("Entering System Setup...");
+        sessionStorage.setItem("encore_boot_setup", "true");
+        setTimeout(() => window.location.reload(), 500);
+      }
+    };
+    document.addEventListener("keydown", this.f2Handler);
+    try {
+      const config = await window.config.getAll();
+      let currentLibraryPath = config.libraryPath;
+      if (currentLibraryPath) {
+        if (!this.aborted) {
+          const loaded = await this.proceedWithLoading(currentLibraryPath);
+          if (!loaded) {
+            console.warn(
+              "Configured library not found. Falling back to search."
+            );
+            await window.config.merge({ libraryPath: null });
+            currentLibraryPath = null;
+            statusP.text("Library missing. Re-evaluating...");
+          } else {
+            return;
+          }
+        }
+      }
+      if (!currentLibraryPath) {
+        statusP.text("Searching for libraries...");
+        const foundLibraries = await fsSvc.findEncoreLibraries();
+        if (this.aborted) return;
+        if (foundLibraries.length === 1) {
+          statusP.text("Found one library. Configuring automatically...");
+          const libraryPath = foundLibraries[0].path;
+          await window.config.merge({
+            libraryPath,
+            setupComplete: true
+          });
+          await this.proceedWithLoading(libraryPath);
+        } else if (foundLibraries.length > 1) {
+          statusP.text("Multiple libraries found. Please choose one.");
+          const selectedPath = await this.promptUserToSelectLibrary(foundLibraries);
+          if (this.aborted) return;
+          await window.config.merge({
+            libraryPath: selectedPath,
+            setupComplete: true
+          });
+          await this.proceedWithLoading(selectedPath);
+        } else {
+          const libraryPath = await this.waitForLibrary();
+          if (this.aborted) return;
+          statusP.text("Library detected! Loading...");
+          await window.config.merge({
+            libraryPath,
+            setupComplete: true
+          });
+          await this.proceedWithLoading(libraryPath);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load or process config:", error);
+      statusP.text("Configuration error. Please restart the application.");
+    }
+  },
+  /**
+   * Initializes the loader application, setting up the UI and boot animations.
+   *
+   * @param {Object} Root - The root CherryTree system context.
+   */
+  start: async function(Root) {
+    root = Root;
+    actualPort = await networkingUtility_default.getPort();
+    window.desktopIntegration?.ipc.send("setRPC", {
+      details: "Booting up..."
+    });
+    Pid = Root.Pid;
+    Ui = Root.Processes.getService("UiLib").data;
+    wrapper = new Html("div").class("full-ui").appendTo("body").styleJs({
+      color: "black",
+      opacity: 1
+    });
+    let imgContainer = new Html("div").styleJs({
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: "100%",
+      height: "100%",
+      overflow: "hidden"
+    }).appendTo(wrapper);
+    let mascotImg = new Html("img").attr({ src: "assets/img/oobe/hoshi_hi.png" }).styleJs({
+      position: "absolute",
+      top: "0",
+      left: "-250px",
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      opacity: 0
+    }).appendTo(imgContainer);
+    let elementContainer = new Html("div").styleJs({
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: "100%",
+      height: "100%",
+      overflow: "hidden",
+      display: "flex",
+      padding: "80px"
+    }).appendTo(wrapper);
+    new Html("div").styleJs({ height: "100%", width: "50%" }).appendTo(elementContainer);
+    let right = new Html("div").styleJs({
+      height: "100%",
+      width: "50%",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "right"
+    }).appendTo(elementContainer);
+    let telebiText = new Html("p").styleJs({
+      fontSize: "2rem",
+      textAlign: "right",
+      margin: "0",
+      padding: "0",
+      fontWeight: "500"
+    }).text("\u30C6\u30EC\u30D3").appendTo(right);
+    let encoreH1 = new Html("h1").styleJs({
+      fontFamily: "Rajdhani",
+      fontSize: "10rem",
+      lineHeight: "9rem",
+      fontWeight: "bold",
+      textAlign: "right",
+      margin: "0",
+      padding: "0",
+      overflow: "hidden"
+    }).appendTo(right);
+    encoreH1.html(
+      "ENCORE".split("").map(
+        (letter) => `<span class="encore-letter" style="display: inline-block;">${letter}</span>`
+      ).join("")
+    );
+    let karaokeH2 = new Html("h2").styleJs({
+      margin: "0",
+      padding: "0",
+      fontFamily: "Rajdhani",
+      fontSize: "3.5rem",
+      lineHeight: "2rem",
+      fontWeight: "bold",
+      textAlign: "right"
+    }).text("KARAOKE").appendTo(right);
+    new Html("br").appendTo(right);
+    new Html("br").appendTo(right);
+    statusP = new Html("p").text("Booting up...").appendTo(right).styleJs({
+      textAlign: "right",
+      fontSize: "2rem",
+      whiteSpace: "pre-wrap"
+    });
+    const tl = anime.timeline({
+      easing: "easeInOutExpo"
+    });
+    tl.add(
+      {
+        targets: mascotImg.elm,
+        translateX: ["-50%", 0],
+        opacity: [0, 1],
+        duration: 1200
+      },
+      0
+    ).add(
+      {
+        targets: ".encore-letter",
+        translateY: ["100%", 0],
+        opacity: [0, 1],
+        delay: anime.stagger(70)
+      },
+      "-=1000"
+    ).add(
+      {
+        targets: [telebiText.elm, karaokeH2.elm],
+        translateY: [-20, 0],
+        opacity: [0, 1],
+        duration: 800
+      },
+      "-=600"
+    ).add(
+      { targets: statusP.elm, opacity: [0, 1], duration: 1e3 },
+      "-=500"
+    ).complete = () => {
+      statusP.classOn("pulse-status");
+      this.startLoadingSequence();
+    };
+    Ui.init(Pid, "horizontal", []);
+  },
+  end: async function() {
+    if (this.f2Handler) document.removeEventListener("keydown", this.f2Handler);
+    Ui.cleanup(Pid);
+    await Ui.transition("fadeOut", wrapper, 500);
+    wrapper.cleanup();
+  }
+};
+var EncoreLoader_default = pkg;
+export {
+  EncoreLoader_default as default
+};
 /**
  * Joins path parts with a given separator, normalizing leading and trailing slashes.
  *
@@ -12,3 +393,4 @@ ${a.detail.current}/${a.detail.total} (${a.detail.percentage}%)`)};document.addE
  * @param {string} [sep="/"] - The separator to use.
  * @returns {string} The normalized joined path.
  */
+//# sourceMappingURL=EncoreLoader.js.map

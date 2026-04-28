@@ -1,3 +1,282 @@
-import{a as o}from"../../chunk-KXAEPP22.js";import"../../chunk-ZWRDP37E.js";var i,g,H={name:"Boot Manager",type:"app",privs:1,start:async function(n){console.log("[BootManager] Started",n),document.body.style.backgroundColor="#080810",document.body.style.margin="0";let f=sessionStorage.getItem("encore_boot_setup")==="true";sessionStorage.removeItem("encore_boot_setup");let c=Math.floor(window.innerWidth/50),p=Math.floor(window.innerHeight/50),w=await window.config.getAll();console.log("[BootManager] config",w),i=new o("div").class("flex").styleJs({width:"100%",height:"100%",position:"absolute",display:"flex",justifyContent:"center",alignItems:"center",top:"0",left:"0",opacity:1,backgroundColor:"#080810"}).appendTo("body");let u=e=>{e.key==="F2"&&(f=!0,window.removeEventListener("keydown",u))};window.addEventListener("keydown",u);let m=new o("canvas").styleJs({position:"absolute",top:"0",left:"0",width:"100%",height:"100%",pointerEvents:"none",zIndex:0}).appendTo(i),a=m.elm.getContext("2d"),r=window.devicePixelRatio||1;m.elm.width=window.innerWidth*r,m.elm.height=window.innerHeight*r,a.scale(r,r);let y=window.innerWidth/c,h=window.innerHeight/p,s=[];for(let e=0;e<p;e++)for(let t=0;t<c;t++)s.push({c:t,r:e,opacity:1});let v=()=>{a.clearRect(0,0,window.innerWidth,window.innerHeight);for(let e=0;e<s.length;e++){let t=s[e];t.opacity>0&&(a.fillStyle=`rgba(0, 0, 0, ${t.opacity})`,a.fillRect(t.c*y,t.r*h,y+.5,h+.5))}g=requestAnimationFrame(v)};g=requestAnimationFrame(v);let b="\u30C6\u30EC\u30D3";Math.floor(Math.random()*100)==7&&(b="\u30C6\u30EC\u30B5");let E=new o("h1").styleJs({fontFamily:"Rajdhani, sans-serif",fontSize:"15rem",lineHeight:"18rem",fontWeight:"bold",textAlign:"center",margin:0,padding:0,color:"white",display:"flex",opacity:0,position:"relative",zIndex:10}).html(b.split("").map(e=>`<div class="char-mask" style="display: inline-block; overflow: hidden;">
-                 <span class="terebi-char" style="display: inline-block;">${e}</span>
-               </div>`).join("")).appendTo(i),S=new o("div").styleJs({position:"absolute",bottom:"50px",left:"50%",transform:"translateX(-50%)",color:"white",mixBlendMode:"difference",fontSize:"1.5rem",fontFamily:"Rajdhani, sans-serif",textAlign:"center",opacity:0,zIndex:10}).text("Press F2 to go into Setup").appendTo(i),l=new o("div").styleJs({position:"absolute",top:"0",left:"0",width:"100%",height:"100%",backgroundColor:"#080810",color:"#ffffff",display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",zIndex:676767,fontFamily:"Rajdhani, sans-serif",textAlign:"center",padding:"2rem"}).appendTo(i);new o("h1").text("PHOTOSENSITIVITY WARNING").styleJs({color:"#ff5555",fontSize:"4rem",margin:"0 0 1rem 0",letterSpacing:"0.1em"}).appendTo(l),new o("p").html("This application contains rapid color changes, flashing lights, and visual patterns<br>that may trigger seizures for people with photosensitive epilepsy.<br><br>Viewer discretion is advised.").styleJs({margin:"0",fontSize:"1.8rem",opacity:.8,lineHeight:"1.5"}).appendTo(l);let x=document.querySelector("#loading");x&&x.remove();let T=!1,k=!1,I=!1,d=new Audio("/assets/audio/startup.wav");d.addEventListener("loadeddata",()=>{T=!0,C()}),setTimeout(()=>d.load(),16),setTimeout(()=>{anime({targets:l.elm,opacity:0,duration:1e3,easing:"linear",complete:()=>{l.cleanup(),k=!0,C()}})},4e3);function C(){T&&k&&!I&&(I=!0,anime({targets:S.elm,opacity:1,duration:500,easing:"linear"}),L())}function L(){let e=anime.timeline({easing:"easeInOutExpo",complete:()=>{setTimeout(()=>{i.cleanup(),A()},1e3)},begin:()=>{d.volume=w.audioConfig?.mix.instrumental.volume??1,d.play()}});e.add({targets:".terebi-char",translateY:["100%",0],opacity:[0,1],delay:anime.stagger(80)}),e.add({targets:E.elm,scale:[1,.75],opacity:[1,0],duration:400}),e.add({targets:s,opacity:0,delay:anime.stagger(35,{grid:[c,p],from:"center",ease:"outExpo",duration:100}),duration:100,ease:"outExpo",begin:()=>{i.styleJs({backgroundColor:"white"}),document.body.style.backgroundColor="white"}})}await n.Core.pkg.run("services:UiLib",[],!0),await n.Core.pkg.run("services:Forte",[],!0),await n.Core.pkg.run("services:FsSvc",[],!0);async function A(){let e=setInterval(()=>{try{n.Processes.getService("UiLib").data,n.Processes.getService("FsSvc").data,n.Processes.getService("ForteSvc").data,clearInterval(e),F()}catch{}},50)}async function F(){n.Security.setSecureVariable("TV_NAME","Encore Karaoke"),window.removeEventListener("keydown",u),anime({targets:S.elm,opacity:[1,0],duration:200,easing:"linear"}),f?await n.Core.pkg.run("system:EncoreSetup",[],!0):await n.Core.pkg.run("system:EncoreLoader",[],!0);let t;window.addEventListener("mousemove",z=>{clearTimeout(t),document.body.classList.remove("mouse-disabled"),window.mouseDisabled=!1,t=setTimeout(()=>{window.mouseDisabled=!0,document.body.classList.add("mouse-disabled")},4e3)})}},end:async function(){cancelAnimationFrame(g),document.body.style.backgroundColor="",i&&i.cleanup()}},J=H;export{J as default};
+import {
+  Html
+} from "../../chunk-FX4GTR7E.js";
+import "../../chunk-7D4SUZUM.js";
+
+// src/pkgs/system/BootManager.js
+var wrapper;
+var renderLoopId;
+var pkg = {
+  name: "Boot Manager",
+  type: "app",
+  privs: 1,
+  start: async function(Root) {
+    console.log("[BootManager] Started", Root);
+    document.body.style.backgroundColor = "#080810";
+    document.body.style.margin = "0";
+    let shouldBootSetup = sessionStorage.getItem("encore_boot_setup") === "true";
+    sessionStorage.removeItem("encore_boot_setup");
+    let columns = Math.floor(window.innerWidth / 50);
+    let rows = Math.floor(window.innerHeight / 50);
+    const config = await window.config.getAll();
+    console.log("[BootManager] config", config);
+    wrapper = new Html("div").class("flex").styleJs({
+      width: "100%",
+      height: "100%",
+      position: "absolute",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      top: "0",
+      left: "0",
+      opacity: 1,
+      backgroundColor: "#080810"
+    }).appendTo("body");
+    const f2BootListener = (e) => {
+      if (e.key === "F2") {
+        shouldBootSetup = true;
+        window.removeEventListener("keydown", f2BootListener);
+      }
+    };
+    window.addEventListener("keydown", f2BootListener);
+    const tilesCanvas = new Html("canvas").styleJs({
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: "100%",
+      height: "100%",
+      pointerEvents: "none",
+      zIndex: 0
+    }).appendTo(wrapper);
+    const ctx = tilesCanvas.elm.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    tilesCanvas.elm.width = window.innerWidth * dpr;
+    tilesCanvas.elm.height = window.innerHeight * dpr;
+    ctx.scale(dpr, dpr);
+    const drawTileW = window.innerWidth / columns;
+    const drawTileH = window.innerHeight / rows;
+    let canvasTiles = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < columns; c++) {
+        canvasTiles.push({ c, r, opacity: 1 });
+      }
+    }
+    const renderLoop = () => {
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      for (let i = 0; i < canvasTiles.length; i++) {
+        let tile = canvasTiles[i];
+        if (tile.opacity > 0) {
+          ctx.fillStyle = `rgba(0, 0, 0, ${tile.opacity})`;
+          ctx.fillRect(
+            tile.c * drawTileW,
+            tile.r * drawTileH,
+            drawTileW + 0.5,
+            drawTileH + 0.5
+          );
+        }
+      }
+      renderLoopId = requestAnimationFrame(renderLoop);
+    };
+    renderLoopId = requestAnimationFrame(renderLoop);
+    let terebiText = "\u30C6\u30EC\u30D3";
+    if (Math.floor(Math.random() * 100) == 7) {
+      terebiText = "\u30C6\u30EC\u30B5";
+    }
+    const terebiH1 = new Html("h1").styleJs({
+      fontFamily: "Rajdhani, sans-serif",
+      fontSize: "15rem",
+      lineHeight: "18rem",
+      fontWeight: "bold",
+      textAlign: "center",
+      margin: 0,
+      padding: 0,
+      color: "white",
+      display: "flex",
+      opacity: 0,
+      position: "relative",
+      zIndex: 10
+    }).html(
+      terebiText.split("").map(
+        (char) => `<div class="char-mask" style="display: inline-block; overflow: hidden;">
+                 <span class="terebi-char" style="display: inline-block;">${char}</span>
+               </div>`
+      ).join("")
+    ).appendTo(wrapper);
+    const setupText = new Html("div").styleJs({
+      position: "absolute",
+      bottom: "50px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      color: "white",
+      mixBlendMode: "difference",
+      fontSize: "1.5rem",
+      fontFamily: "Rajdhani, sans-serif",
+      textAlign: "center",
+      opacity: 0,
+      zIndex: 10
+    }).text("Press F2 to go into Setup").appendTo(wrapper);
+    const warningScreen = new Html("div").styleJs({
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: "100%",
+      height: "100%",
+      backgroundColor: "#080810",
+      color: "#ffffff",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 676767,
+      fontFamily: "Rajdhani, sans-serif",
+      textAlign: "center",
+      padding: "2rem"
+    }).appendTo(wrapper);
+    new Html("h1").text("PHOTOSENSITIVITY WARNING").styleJs({
+      color: "#ff5555",
+      fontSize: "4rem",
+      margin: "0 0 1rem 0",
+      letterSpacing: "0.1em"
+    }).appendTo(warningScreen);
+    new Html("p").html(
+      "This application contains rapid color changes, flashing lights, and visual patterns<br>that may trigger seizures for people with photosensitive epilepsy.<br><br>Viewer discretion is advised."
+    ).styleJs({
+      margin: "0",
+      fontSize: "1.8rem",
+      opacity: 0.8,
+      lineHeight: "1.5"
+    }).appendTo(warningScreen);
+    const loadingScreen = document.querySelector("#loading");
+    if (loadingScreen) loadingScreen.remove();
+    let audioLoaded = false;
+    let warningDone = false;
+    let hasStarted = false;
+    let startupSound = new Audio("/assets/audio/startup.wav");
+    startupSound.addEventListener("loadeddata", () => {
+      audioLoaded = true;
+      checkReadyToAnimate();
+    });
+    setTimeout(() => startupSound.load(), 16);
+    setTimeout(() => {
+      anime({
+        targets: warningScreen.elm,
+        opacity: 0,
+        duration: 1e3,
+        easing: "linear",
+        complete: () => {
+          warningScreen.cleanup();
+          warningDone = true;
+          checkReadyToAnimate();
+        }
+      });
+    }, 4e3);
+    function checkReadyToAnimate() {
+      if (audioLoaded && warningDone && !hasStarted) {
+        hasStarted = true;
+        anime({
+          targets: setupText.elm,
+          opacity: 1,
+          duration: 500,
+          easing: "linear"
+        });
+        beginAnimation();
+      }
+    }
+    function beginAnimation() {
+      const tl = anime.timeline({
+        easing: "easeInOutExpo",
+        complete: () => {
+          setTimeout(() => {
+            wrapper.cleanup();
+            checkServicesLoaded();
+          }, 1e3);
+        },
+        begin: () => {
+          startupSound.volume = config.audioConfig?.mix.instrumental.volume ?? 1;
+          startupSound.play();
+        }
+      });
+      tl.add({
+        targets: ".terebi-char",
+        translateY: ["100%", 0],
+        opacity: [0, 1],
+        delay: anime.stagger(80)
+      });
+      tl.add({
+        targets: terebiH1.elm,
+        scale: [1, 0.75],
+        opacity: [1, 0],
+        duration: 400
+      });
+      tl.add({
+        targets: canvasTiles,
+        opacity: 0,
+        delay: anime.stagger(35, {
+          grid: [columns, rows],
+          from: "center",
+          ease: "outExpo",
+          duration: 100
+        }),
+        duration: 100,
+        ease: "outExpo",
+        begin: () => {
+          wrapper.styleJs({ backgroundColor: "white" });
+          document.body.style.backgroundColor = "white";
+        }
+      });
+    }
+    await Root.Core.pkg.run("services:UiLib", [], true);
+    await Root.Core.pkg.run("services:Forte", [], true);
+    await Root.Core.pkg.run("services:FsSvc", [], true);
+    async function checkServicesLoaded() {
+      let curInterval = setInterval(() => {
+        try {
+          Root.Processes.getService("UiLib").data;
+          Root.Processes.getService("FsSvc").data;
+          Root.Processes.getService("ForteSvc").data;
+          clearInterval(curInterval);
+          doEverythingElse();
+        } catch (e) {
+        }
+      }, 50);
+    }
+    async function doEverythingElse() {
+      let tvName = "Encore Karaoke";
+      Root.Security.setSecureVariable("TV_NAME", tvName);
+      window.removeEventListener("keydown", f2BootListener);
+      anime({
+        targets: setupText.elm,
+        opacity: [1, 0],
+        duration: 200,
+        easing: "linear"
+      });
+      if (shouldBootSetup) {
+        await Root.Core.pkg.run("system:EncoreSetup", [], true);
+      } else {
+        await Root.Core.pkg.run("system:EncoreLoader", [], true);
+      }
+      let mvT;
+      window.addEventListener("mousemove", (e) => {
+        clearTimeout(mvT);
+        document.body.classList.remove("mouse-disabled");
+        window.mouseDisabled = false;
+        mvT = setTimeout(() => {
+          window.mouseDisabled = true;
+          document.body.classList.add("mouse-disabled");
+        }, 4e3);
+      });
+    }
+  },
+  end: async function() {
+    cancelAnimationFrame(renderLoopId);
+    document.body.style.backgroundColor = "";
+    if (wrapper) {
+      wrapper.cleanup();
+    }
+  }
+};
+var BootManager_default = pkg;
+export {
+  BootManager_default as default
+};
+//# sourceMappingURL=BootManager.js.map
