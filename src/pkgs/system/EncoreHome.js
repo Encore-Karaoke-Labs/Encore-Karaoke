@@ -194,7 +194,11 @@ class EncoreController {
     this.Forte.setPianoRollContainer(this.wrapper);
 
     this.state.actualPort = await NetworkingUtility.getPort();
-    this.state.windowsVolume = await window.volume.getVolume();
+    try {
+      this.state.windowsVolume = await window.volume.getVolume();
+    } catch (e) {
+      console.log("[Encore] Failed to get volume");
+    }
     console.log("[Encore] Windows volume", this.state.windowsVolume);
 
     console.log("[Encore] Loading assets...");
@@ -2462,9 +2466,17 @@ class EncoreController {
       this.Forte.stopTrack();
       this.Forte.togglePianoRollVisibility(false);
 
-      this.state.windowsVolume = await window.volume.getVolume();
+      try {
+        this.state.windowsVolume = await window.volume.getVolume();
+      } catch (e) {
+        console.log("[Encore] Failed to get volume");
+      }
       let maxVolume = this.state.windowsVolume;
-      window.volume.setVolume(this.state.volume * maxVolume);
+      try {
+        window.volume.setVolume(this.state.volume * maxVolume);
+      } catch (e) {
+        console.log("[Encore] Failed to set volume");
+      }
 
       this.bgv.stop();
       this.dom.bgvContainer.classOn("hidden");
@@ -3340,7 +3352,11 @@ class EncoreController {
     }
 
     if (this.state.currentSongIsYouTube) {
-      window.volume.setVolume(this.state.windowsVolume);
+      try {
+        window.volume.setVolume(this.state.windowsVolume);
+      } catch (e) {
+        console.log("[Encore] Failed to set volume");
+      }
     }
 
     this.state.currentSongIsMV = false;
@@ -4232,7 +4248,11 @@ class EncoreController {
     this.Forte.setTrackVolume(this.state.volume);
     if (this.state.currentSongIsYouTube) {
       let maxVolume = this.state.windowsVolume;
-      window.volume.setVolume(this.state.volume * maxVolume);
+      try {
+        window.volume.setVolume(this.state.volume * maxVolume);
+      } catch (e) {
+        console.log("[Encore] Failed to set volume");
+      }
     }
     const p = Math.round(this.state.volume * 100);
     this.infoBar.showTemp(
