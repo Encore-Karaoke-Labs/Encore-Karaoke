@@ -1,6 +1,6 @@
 {
   "name": "encore-karaoke",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "Turn your PC into a karaoke machine, complete with scoring and recording features. For karaoke fans, by karaoke fans. Runs offline.",
   "main": "main.js",
   "scripts": {
