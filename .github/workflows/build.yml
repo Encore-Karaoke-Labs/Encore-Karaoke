@@ -20,7 +20,7 @@ jobs:
             - name: Install build dependencies
               run: |
                   pacman --noconfirm -Syyu
-                  pacman --noconfirm -S git nodejs npm dpkg fakeroot
+                  pacman --noconfirm -S git nodejs npm dpkg fakeroot 7zip
             
             - name: Install node dependencies
               run: |
