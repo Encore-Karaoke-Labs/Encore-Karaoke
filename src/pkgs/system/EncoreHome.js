@@ -19,6 +19,8 @@ const INTERLUDE_TIPS = [
   "”Rock resonates as the music of the perpetual underdog. Is it really rock if it's sung by life's winners?” - Hitori Gotoh, Bocchi The Rock!",
   "TIP: You can search for songs by title, artist, or song number by pressing Y.",
   "”Get freaky 🤑🤑” - Stariix, Encore Karaoke Labs",
+  // We found out that Forge was packaging Encore into itself...
+  "”it had to wait 9 months” - Austin, Encore Karaoke Labs\n”Who's the mother? Electron Forge” - Austin, Encore Karaoke Labs\n”It's a girl! Who's the father? SkySorcerer!” - ”Dave”, Encore Karaoke Labs\n”ok 'dave'” - SkySorcerer, Founder @ Encore Karaoke Labs",
 ];
 
 let TEMP_TIPS = structuredClone(INTERLUDE_TIPS);
