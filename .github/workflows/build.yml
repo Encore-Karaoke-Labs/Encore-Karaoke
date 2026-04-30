@@ -45,4 +45,4 @@ jobs:
               uses: actions/upload-artifact@v4.6.2
               with:
                 name: encore-linux-zip
-                path: ./out/encore-karaoke-linux-x64.zip
+                path: "./out/Encore Karaoke-linux-x64/encore-karaoke-linux-x64.zip"
