@@ -46,10 +46,6 @@ module.exports = {
         "category": "Games"
       },
     },
-    {
-      name: "@electron-forge/maker-rpm",
-      config: {},
-    },
   ],
   plugins: [
     {
