@@ -219,7 +219,7 @@ function setupDiscordRPC() {
 }
 
 // Server Routes & Logic
-server.use(express.static("resources/static"));
+server.use(express.static(path.join(__dirname, "resources", "static")));
 server.use(express.json());
 server.use(cors());
 
