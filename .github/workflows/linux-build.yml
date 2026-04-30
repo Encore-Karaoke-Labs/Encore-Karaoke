@@ -1,4 +1,4 @@
-name: Build Binaries
+name: Build Linux Binaries
 
 on:
     workflow_dispatch:
