@@ -19,8 +19,6 @@ jobs:
             
             - name: Install build dependencies
               run: |
-                  rm /etc/pacman.conf
-                  cp pacman.conf /etc/pacman.conf
                   pacman --noconfirm -Syyu
                   pacman --noconfirm -S git nodejs npm dpkg fakeroot
             
