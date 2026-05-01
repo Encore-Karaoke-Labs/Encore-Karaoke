@@ -24,7 +24,7 @@ jobs:
 
       - name: Show build info
         run: |
-          echo "Building Commit: $(git rev-parse --short HEAD)"
+          echo "Building Commit: ${{ github.sha }}"
           echo "App Version: $(node -p "require('./package.json').version")"
 
       - name: Install node dependencies
