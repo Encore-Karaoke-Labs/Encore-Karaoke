@@ -219,11 +219,14 @@ function setupDiscordRPC() {
 }
 
 // Server Routes & Logic
-const rootPath = app.isPackaged
-  ? path.join(process.resourcesPath, "app")
-  : app.getAppPath();
+let staticAssetsPath;
+if (app.isPackaged) {
+  staticAssetsPath = path.join(process.resourcesPath, "static");
+} else {
+  staticAssetsPath = path.join(__dirname, "resources", "static");
+}
 
-server.use(express.static(path.join(rootPath, "resources", "static")));
+server.use(express.static(staticAssetsPath));
 server.use(express.json());
 server.use(cors());
 
