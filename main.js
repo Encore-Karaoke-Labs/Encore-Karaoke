@@ -219,7 +219,11 @@ function setupDiscordRPC() {
 }
 
 // Server Routes & Logic
-server.use(express.static(path.join(__dirname, "resources", "static")));
+const rootPath = app.isPackaged
+  ? path.join(process.resourcesPath, "app")
+  : app.getAppPath();
+
+server.use(express.static(path.join(rootPath, "resources", "static")));
 server.use(express.json());
 server.use(cors());
 
