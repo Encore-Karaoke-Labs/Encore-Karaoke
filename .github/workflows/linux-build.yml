@@ -17,6 +17,11 @@ jobs:
           pacman-key --init
           pacman --noconfirm -Sy archlinux-keyring
 
+      - name: Show Build Info
+        run: |
+          echo "Building Commit: $(git rev-parse --short HEAD)"
+          echo "App Version: $(node -p "require('./package.json').version")"
+
       - name: Install build dependencies
         run: |
           pacman --noconfirm -Syyu
