@@ -1,0 +1,1448 @@
+<!-- index.html (Local Link Client) -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content"
+    />
+    <title>Encore Link</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-color: #0a0a14;
+        --bg-secondary: #141423;
+        --primary: #89cff0;
+        --secondary: #ffd700;
+        --text: #ffffff;
+        --text-dim: rgba(255, 255, 255, 0.6);
+        --border: rgba(255, 255, 255, 0.15);
+        --btn-bg: rgba(255, 255, 255, 0.05);
+        --btn-active: rgba(137, 207, 240, 0.2);
+        --radius: 12px;
+        --header-height: 60px;
+      }
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+      }
+
+      body {
+        font-family: "Rajdhani", sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text);
+        margin: 0;
+        height: 100dvh;
+        width: 100vw;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .app-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+        position: relative;
+      }
+      .app-header {
+        height: var(--header-height);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-color);
+        z-index: 10;
+        flex-shrink: 0;
+      }
+      .app-header h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary);
+        letter-spacing: 0.2rem;
+        margin: 0;
+        text-shadow: 0 0 10px rgba(137, 207, 240, 0.5);
+      }
+      .view-container {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+        width: 100%;
+      }
+      .view {
+        position: absolute;
+        inset: 0;
+        background: var(--bg-color);
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      #remote-view {
+        z-index: 1;
+      }
+      #songlist-view {
+        z-index: 2;
+        transform: translateX(100%);
+        transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        visibility: hidden;
+      }
+      #songlist-view.active {
+        transform: translateX(0);
+        visibility: visible;
+      }
+
+      /* --- Chat & Cheer UI --- */
+      #chat-view {
+        z-index: 40;
+        transform: translateY(100%);
+        transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        visibility: hidden;
+      }
+      #chat-view.active {
+        transform: translateY(0);
+        visibility: visible;
+      }
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .chat-msg {
+        background: var(--bg-secondary);
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        word-wrap: break-word;
+        max-width: 90%;
+        align-self: flex-start;
+      }
+      .chat-msg .sender {
+        font-weight: 700;
+        color: var(--primary);
+        font-size: 0.95rem;
+        margin-bottom: 0.25rem;
+      }
+      .chat-msg.self {
+        background: rgba(137, 207, 240, 0.1);
+        border-color: rgba(137, 207, 240, 0.3);
+        align-self: flex-end;
+      }
+      .chat-input-area {
+        padding: 1rem;
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border);
+        display: flex;
+        gap: 0.5rem;
+        flex-direction: column;
+        flex-shrink: 0;
+      }
+      .chat-controls {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .typing-indicator {
+        font-size: 0.85rem;
+        color: var(--secondary);
+        height: 20px;
+        font-style: italic;
+      }
+      .cheer-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
+      .cheer-btn {
+        background: rgba(255, 215, 0, 0.1);
+        border-color: rgba(255, 215, 0, 0.3);
+        color: var(--secondary);
+        height: 70px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+      }
+      .cheer-btn:active {
+        background: rgba(255, 215, 0, 0.3);
+        border-color: var(--secondary);
+      }
+      .cheer-emoji {
+        font-size: 1.8rem;
+        line-height: 1;
+      }
+      .cheer-text {
+        font-size: 0.9rem;
+        letter-spacing: 1px;
+      }
+
+      #remote-view-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .remote-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.75rem;
+        width: 100%;
+        max-width: 400px;
+        padding-bottom: 2rem;
+      }
+      .numpad-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+      .controls-wrapper {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+      .control-column {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      button {
+        font-family: "Rajdhani", sans-serif;
+        background: var(--btn-bg);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 1.2rem;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+        user-select: none;
+        height: 60px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        -webkit-tap-highlight-color: transparent;
+      }
+      button:active {
+        transform: scale(0.96);
+        background: var(--btn-active);
+        border-color: var(--primary);
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: var(--bg-color);
+        border: none;
+      }
+      .btn-secondary {
+        background: var(--secondary);
+        color: var(--bg-color);
+        border: none;
+      }
+      .btn-danger {
+        color: #ff5555;
+        border-color: rgba(255, 85, 85, 0.3);
+      }
+      .span-2 {
+        grid-column: span 2;
+      }
+      .span-4 {
+        grid-column: span 4;
+      }
+      .numpad-btn {
+        font-size: 1.8rem;
+        height: 70px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .library-header {
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+      .library-tabs {
+        display: flex;
+        width: 100%;
+      }
+      .library-tab {
+        flex: 1;
+        text-align: center;
+        padding: 1rem 0;
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: var(--text-dim);
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s;
+        letter-spacing: 1px;
+      }
+      .library-tab.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+        background: rgba(137, 207, 240, 0.05);
+      }
+      .search-row {
+        padding: 0.75rem;
+        display: flex;
+        gap: 0.5rem;
+      }
+      .search-bar {
+        flex: 1;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: white;
+        padding: 0.5rem 1rem;
+        font-family: "Rajdhani";
+        font-size: 1.1rem;
+        outline: none;
+      }
+      .search-bar:focus {
+        border-color: var(--primary);
+      }
+
+      .library-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        position: relative;
+      }
+      #yt-loader {
+        position: absolute;
+        inset: 0;
+        background: rgba(10, 10, 20, 0.9);
+        backdrop-filter: blur(5px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      #yt-loader.active {
+        visibility: visible;
+        opacity: 1;
+      }
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid var(--border);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 1rem;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .virtual-scroller {
+        position: relative;
+        overflow-y: auto;
+        width: 100%;
+        height: 100%;
+        -webkit-overflow-scrolling: touch;
+      }
+      .virtual-scroller-content {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+      }
+
+      #artist-view-container {
+        flex: 1;
+        display: block;
+      }
+      .artist-row,
+      .song-item {
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid var(--border);
+        padding: 0.8rem;
+        cursor: pointer;
+        height: 75px;
+        box-sizing: border-box;
+      }
+      .artist-row:active,
+      .song-item:active {
+        background: var(--btn-active);
+      }
+      .artist-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: rgba(255, 255, 255, 0.9);
+        margin-right: 1rem;
+        flex-shrink: 0;
+      }
+      .artist-name-list {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: white;
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .song-code {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--primary);
+        width: 60px;
+        flex-shrink: 0;
+      }
+      .yt-thumb {
+        width: 80px;
+        height: 45px;
+        object-fit: cover;
+        border-radius: 6px;
+        margin-right: 12px;
+        flex-shrink: 0;
+        border: 1px solid var(--border);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translate(-50%, 100px);
+        background: rgba(20, 20, 30, 0.95);
+        border: 1px solid var(--primary);
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 50px;
+        font-weight: 700;
+        opacity: 0;
+        transition: all 0.3s;
+        z-index: 9999;
+      }
+      .toast.show {
+        transform: translate(-50%, 0);
+        opacity: 1;
+      }
+      .toast.error {
+        border-color: #ff5555;
+        color: #ff5555;
+      }
+
+      #nickname-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 10, 20, 0.95);
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 2rem;
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      #nickname-overlay.active {
+        visibility: visible;
+        opacity: 1;
+      }
+      .nickname-box {
+        background: var(--bg-secondary);
+        border: 1px solid var(--primary);
+        padding: 2rem;
+        border-radius: var(--radius);
+        width: 100%;
+        max-width: 400px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      @media (min-width: 768px) {
+        .view-container {
+          display: flex;
+          flex-direction: row;
+          width: 100%;
+          height: 100%;
+        }
+        .app-header {
+          display: none;
+        }
+        #remote-view {
+          position: relative;
+          width: 380px;
+          flex-shrink: 0;
+          border-right: 1px solid var(--border);
+          transform: none;
+          display: flex;
+          z-index: 10;
+        }
+        .remote-title-desktop {
+          display: block;
+          text-align: center;
+          font-size: 2.5rem;
+          color: var(--primary);
+          font-weight: 800;
+          margin-bottom: 2rem;
+          letter-spacing: 0.3rem;
+          width: 100%;
+        }
+        #songlist-view {
+          position: relative;
+          flex: 1;
+          transform: none !important;
+          visibility: visible !important;
+          display: flex;
+          z-index: 5;
+          border-left: none;
+        }
+        .mobile-only {
+          display: none !important;
+        }
+        #unified-back-btn {
+          display: none;
+        }
+        #unified-back-btn.desktop-visible {
+          display: block;
+        }
+        button {
+          font-size: 1.3rem;
+          height: 70px;
+        }
+        .numpad-btn {
+          height: 80px;
+          font-size: 2.2rem;
+        }
+      }
+      @media (max-width: 767px) {
+        .remote-title-desktop {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="nickname-overlay">
+      <div class="nickname-box">
+        <h2 style="margin-top: 0; color: var(--primary); letter-spacing: 2px">
+          JOIN SESSION
+        </h2>
+        <p
+          style="
+            color: var(--text-dim);
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+          "
+        >
+          Enter a nickname to join the chat and send cheers!
+        </p>
+        <input
+          type="text"
+          id="nickname-input"
+          class="search-bar"
+          placeholder="Your Nickname..."
+          maxlength="15"
+          style="
+            width: 100%;
+            margin-bottom: 1rem;
+            text-align: center;
+            font-size: 1.3rem;
+            padding: 1rem;
+          "
+        />
+        <button
+          id="nickname-submit"
+          class="btn-primary"
+          style="width: 100%; height: 60px; font-size: 1.2rem"
+        >
+          START
+        </button>
+      </div>
+    </div>
+
+    <div class="app-container">
+      <header class="app-header">
+        <h1>ENCORE LINK</h1>
+      </header>
+
+      <div class="view-container">
+        <div id="remote-view" class="view">
+          <div id="remote-view-content">
+            <div class="remote-title-desktop">ENCORE</div>
+
+            <div class="remote-grid">
+              <button data-type="stop" data-value="Escape" class="btn-danger">
+                STOP
+              </button>
+              <button
+                data-type="reserve"
+                data-value="Enter"
+                class="btn-primary span-2"
+              >
+                RESERVE
+              </button>
+              <button data-type="toggle_bgv">BGV</button>
+
+              <div class="numpad-grid" style="grid-column: span 4">
+                <button class="numpad-btn" data-type="digit" data-value="1">
+                  1
+                </button>
+                <button class="numpad-btn" data-type="digit" data-value="2">
+                  2
+                </button>
+                <button class="numpad-btn" data-type="digit" data-value="3">
+                  3
+                </button>
+                <button class="numpad-btn" data-type="digit" data-value="4">
+                  4
+                </button>
+                <button class="numpad-btn" data-type="digit" data-value="5">
+                  5
+                </button>
+                <button class="numpad-btn" data-type="digit" data-value="6">
+                  6
+                </button>
+                <button class="numpad-btn" data-type="digit" data-value="7">
+                  7
+                </button>
+                <button class="numpad-btn" data-type="digit" data-value="8">
+                  8
+                </button>
+                <button class="numpad-btn" data-type="digit" data-value="9">
+                  9
+                </button>
+                <button
+                  class="numpad-btn"
+                  data-type="backspace"
+                  data-value="Backspace"
+                >
+                  &larr;
+                </button>
+                <button class="numpad-btn" data-type="digit" data-value="0">
+                  0
+                </button>
+                <div></div>
+              </div>
+
+              <div class="controls-wrapper span-4">
+                <div class="control-column">
+                  <button data-type="key_up" data-value="ArrowUp">
+                    KEY &uarr;
+                  </button>
+                  <button data-type="key_down" data-value="ArrowDown">
+                    KEY &darr;
+                  </button>
+                </div>
+                <div class="control-column">
+                  <button data-type="vol_up" data-value="=">VOL &uarr;</button>
+                  <button data-type="vol_down" data-value="-">
+                    VOL &darr;
+                  </button>
+                </div>
+              </div>
+
+              <button
+                class="btn-secondary span-4 mobile-only"
+                id="open-library-btn"
+              >
+                BROWSE SONGLIST
+              </button>
+              <button class="btn-primary span-4" id="open-chat-btn">
+                PARTY CHAT & CHEER
+              </button>
+              <button
+                id="open-yt-btn"
+                class="span-4"
+                style="margin-top: 0.5rem"
+              >
+                YOUTUBE SEARCH
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="chat-view" class="view">
+          <div class="library-header">
+            <div class="library-tabs">
+              <div class="library-tab active" id="tab-chat">PARTY CHAT</div>
+              <div class="library-tab" id="tab-cheer">SEND CHEER</div>
+            </div>
+            <div
+              class="search-row"
+              style="border-top: 1px solid var(--border); align-items: center"
+            >
+              <button
+                id="close-chat-btn"
+                style="width: 50px; font-size: 1.5rem; padding: 0"
+              >
+                &larr;
+              </button>
+              <div
+                style="
+                  flex: 1;
+                  text-align: right;
+                  padding-right: 0.5rem;
+                  font-weight: 700;
+                  font-size: 1.1rem;
+                  color: var(--primary);
+                "
+              >
+                <span id="user-count">1 User Connected</span>
+              </div>
+            </div>
+          </div>
+
+          <div
+            id="chat-content-area"
+            style="
+              display: flex;
+              flex-direction: column;
+              flex: 1;
+              overflow: hidden;
+            "
+          >
+            <div class="chat-messages" id="chat-messages-container"></div>
+            <div class="chat-input-area">
+              <div class="typing-indicator" id="typing-indicator"></div>
+              <div class="chat-controls">
+                <input
+                  type="text"
+                  id="chat-input"
+                  class="search-bar"
+                  placeholder="Type a message..."
+                  maxlength="150"
+                />
+                <button
+                  id="chat-send-btn"
+                  style="width: 80px"
+                  class="btn-primary"
+                >
+                  SEND
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            id="cheer-content-area"
+            style="
+              display: none;
+              flex-direction: column;
+              flex: 1;
+              padding: 1.5rem;
+              overflow-y: auto;
+              gap: 2rem;
+            "
+          >
+            <div>
+              <h3
+                style="
+                  margin-top: 0;
+                  color: var(--primary);
+                  letter-spacing: 1px;
+                "
+              >
+                QUICK CHEER
+              </h3>
+              <div class="cheer-grid">
+                <button class="cheer-btn" data-cheer="👏 Great Job!">
+                  <span class="cheer-emoji">👏</span
+                  ><span class="cheer-text">Great Job!</span>
+                </button>
+                <button class="cheer-btn" data-cheer="🔥 On Fire!">
+                  <span class="cheer-emoji">🔥</span
+                  ><span class="cheer-text">On Fire!</span>
+                </button>
+                <button class="cheer-btn" data-cheer="💯 Perfect!">
+                  <span class="cheer-emoji">💯</span
+                  ><span class="cheer-text">Perfect!</span>
+                </button>
+                <button class="cheer-btn" data-cheer="🌟 Superstar!">
+                  <span class="cheer-emoji">🌟</span
+                  ><span class="cheer-text">Superstar!</span>
+                </button>
+                <button class="cheer-btn" data-cheer="🎤 Encore!">
+                  <span class="cheer-emoji">🎤</span
+                  ><span class="cheer-text">Encore!</span>
+                </button>
+                <button class="cheer-btn" data-cheer="👎 Boo!">
+                  <span class="cheer-emoji">👎</span
+                  ><span class="cheer-text">Boo!</span>
+                </button>
+              </div>
+            </div>
+            <div>
+              <h3 style="color: var(--primary); letter-spacing: 1px">
+                CUSTOM CHEER
+              </h3>
+              <div style="display: flex; flex-direction: column; gap: 1rem">
+                <input
+                  type="text"
+                  id="custom-cheer-input"
+                  class="search-bar"
+                  placeholder="Type your cheer text..."
+                  maxlength="50"
+                  style="padding: 1rem; font-size: 1.2rem; text-align: center"
+                />
+                <button
+                  id="custom-cheer-btn"
+                  class="btn-secondary"
+                  style="width: 100%"
+                >
+                  BLAST CHEER TO TV
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="songlist-view" class="view">
+          <div class="library-header">
+            <div class="library-tabs">
+              <div class="library-tab active" id="tab-local">SONGBOOK</div>
+              <div class="library-tab" id="tab-yt">YOUTUBE</div>
+            </div>
+            <div class="search-row">
+              <button
+                id="unified-back-btn"
+                style="width: 50px; font-size: 1.5rem; padding: 0"
+              >
+                &larr;
+              </button>
+              <input
+                type="text"
+                id="library-search"
+                class="search-bar"
+                placeholder="Search songs or artists..."
+              />
+              <button
+                id="yt-search-btn"
+                class="btn-primary"
+                style="width: 80px; font-size: 1rem; display: none"
+              >
+                SEARCH
+              </button>
+            </div>
+          </div>
+
+          <div class="library-content">
+            <div id="yt-loader">
+              <div class="spinner"></div>
+              <div
+                style="
+                  color: var(--primary);
+                  font-weight: 700;
+                  letter-spacing: 1px;
+                "
+              >
+                SEARCHING YOUTUBE...
+              </div>
+            </div>
+
+            <div id="artist-view-container" class="virtual-scroller">
+              <div class="virtual-scroller-content" id="artist-list"></div>
+            </div>
+
+            <div
+              id="song-view-container"
+              style="display: none; flex-direction: column; height: 100%"
+            >
+              <h3
+                id="current-artist-name"
+                style="
+                  margin: 0;
+                  padding: 1rem;
+                  color: var(--primary);
+                  background: rgba(0, 0, 0, 0.2);
+                  border-bottom: 1px solid var(--border);
+                "
+              >
+                Artist Name
+              </h3>
+              <div
+                id="song-scroller-container"
+                class="virtual-scroller"
+                style="flex: 1"
+              >
+                <div
+                  class="virtual-scroller-content"
+                  id="artist-songs-list"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">Song Reserved!</div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      class VirtualScroller {
+        constructor(containerId, contentId, itemHeight, renderCallback) {
+          this.container = document.getElementById(containerId);
+          this.content = document.getElementById(contentId);
+          this.itemHeight = itemHeight;
+          this.renderCallback = renderCallback;
+          this.items = [];
+          this.container.addEventListener("scroll", () => this.render());
+        }
+        setItems(items) {
+          this.items = items;
+          this.content.style.height = `${this.items.length * this.itemHeight}px`;
+          this.container.scrollTop = 0;
+          this.render();
+        }
+        render() {
+          const scrollTop = this.container.scrollTop;
+          const containerHeight = this.container.clientHeight;
+          let startIndex = Math.max(
+            0,
+            Math.floor(scrollTop / this.itemHeight) - 5,
+          );
+          let endIndex = Math.min(
+            this.items.length,
+            Math.ceil((scrollTop + containerHeight) / this.itemHeight) + 5,
+          );
+          this.content.innerHTML = "";
+          const fragment = document.createDocumentFragment();
+          for (let i = startIndex; i < endIndex; i++) {
+            const node = this.renderCallback(this.items[i], i);
+            node.style.position = "absolute";
+            node.style.top = `${i * this.itemHeight}px`;
+            node.style.width = "100%";
+            fragment.appendChild(node);
+          }
+          this.content.appendChild(fragment);
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const socket = io({ query: { clientType: "remote" } });
+
+        let fullSongList = [],
+          artistsMap = {},
+          currentArtistSongs = [],
+          ytCache = [];
+        let currentLibraryTab = "local";
+        let navState = { view: "artists", mobileLibraryOpen: false };
+
+        function getOrCreateDeviceId() {
+          let id = localStorage.getItem("encore_device_id");
+          if (!id) {
+            id =
+              (crypto.randomUUID && crypto.randomUUID()) ||
+              "dev_" + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem("encore_device_id", id);
+          }
+          return id;
+        }
+
+        const deviceId = getOrCreateDeviceId();
+        let myNickname = localStorage.getItem("encore_nickname") || "";
+        let chatMessages = [];
+        let typingTimeout = null;
+
+        const nickOverlay = document.getElementById("nickname-overlay"),
+          nickInput = document.getElementById("nickname-input"),
+          nickSubmit = document.getElementById("nickname-submit");
+
+        const librarySearch = document.getElementById("library-search");
+        const ytSearchBtn = document.getElementById("yt-search-btn");
+        const ytLoader = document.getElementById("yt-loader");
+        const unifiedBackBtn = document.getElementById("unified-back-btn");
+        const songlistView = document.getElementById("songlist-view");
+
+        const tabLocal = document.getElementById("tab-local");
+        const tabYt = document.getElementById("tab-yt");
+        const artistViewContainer = document.getElementById(
+          "artist-view-container",
+        );
+        const songViewContainer = document.getElementById(
+          "song-view-container",
+        );
+        const currentArtistName = document.getElementById(
+          "current-artist-name",
+        );
+
+        const chatView = document.getElementById("chat-view");
+        const tabChat = document.getElementById("tab-chat");
+        const tabCheer = document.getElementById("tab-cheer");
+        const chatContentArea = document.getElementById("chat-content-area");
+        const cheerContentArea = document.getElementById("cheer-content-area");
+        const chatInput = document.getElementById("chat-input");
+        const typingIndicator = document.getElementById("typing-indicator");
+        const chatContainer = document.getElementById(
+          "chat-messages-container",
+        );
+
+        const artistScroller = new VirtualScroller(
+          "artist-view-container",
+          "artist-list",
+          75,
+          (artist) => {
+            const row = document.createElement("div");
+            row.className = "artist-row";
+            const color1 = stringToColor(artist);
+            const color2 = stringToColor(artist.split("").reverse().join(""));
+            row.innerHTML = `<div class="artist-avatar" style="background: linear-gradient(135deg, ${color1}, ${color2})">${artist.charAt(0).toUpperCase()}</div><div class="artist-name-list">${artist}</div>`;
+            row.onclick = () => openArtistSongs(artist);
+            return row;
+          },
+        );
+
+        const songScroller = new VirtualScroller(
+          "song-scroller-container",
+          "artist-songs-list",
+          75,
+          (song) => {
+            const item = document.createElement("div");
+            item.className = "song-item";
+            if (song.isYouTube) {
+              item.innerHTML = `
+              <img src="${song.thumbnail}" class="yt-thumb" loading="lazy">
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 2px;">${song.title}</div>
+                <div style="font-size:0.85rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${song.artist || ""}</div>
+              </div>
+            `;
+            } else {
+              item.innerHTML = `
+              <div class="song-code">${song.code}</div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 2px;">${song.title}</div>
+                <div style="font-size:0.85rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${song.artist || ""}</div>
+              </div>
+            `;
+            }
+            item.onclick = () => reserveSong(song);
+            return item;
+          },
+        );
+
+        socket.on("connect", () => {
+          socket.emit("remote-command", { type: "get_song_list", value: "" });
+          if (!myNickname) {
+            nickOverlay.classList.add("active");
+            nickInput.focus();
+          } else {
+            socket.emit("remote-command", {
+              type: "set_nickname",
+              value: myNickname,
+              deviceId,
+            });
+          }
+        });
+
+        nickSubmit.onclick = () => {
+          const val = nickInput.value.trim();
+          if (val) {
+            myNickname = val;
+            localStorage.setItem("encore_nickname", myNickname);
+            nickOverlay.classList.remove("active");
+            socket.emit("remote-command", {
+              type: "set_nickname",
+              value: myNickname,
+              deviceId,
+            });
+          }
+        };
+
+        nickInput.addEventListener("keyup", (e) => {
+          if (e.key === "Enter") nickSubmit.onclick();
+        });
+
+        socket.on("fromRemote", (payload) => {
+          if (payload.type === "songlist" && Array.isArray(payload.contents)) {
+            fullSongList = payload.contents;
+            processSongList(fullSongList);
+          }
+          if (payload.type === "reserve_response") {
+            if (payload.success) showToast(`Reserved: ${payload.song.title}`);
+            else showToast(`Song not found.`, true);
+          }
+          if (payload.type === "yt_search_results") {
+            ytLoader.classList.remove("active");
+            const ytItems = payload.results.map((res) => ({
+              code: "YT",
+              title: res.title,
+              artist: res.channelTitle,
+              id: res.id,
+              durationText: res.length?.simpleText,
+              isLive: res.isLive,
+              thumbnail: res.thumbnail,
+              isYouTube: true,
+            }));
+            ytCache = ytItems;
+            if (currentLibraryTab === "yt") {
+              currentArtistSongs = ytItems;
+              songScroller.setItems(ytItems);
+              currentArtistName.textContent =
+                ytItems.length === 0 ? "No results found." : "YouTube Results";
+            }
+          }
+
+          if (payload.type === "social_init") {
+            myNickname = payload.nickname;
+            localStorage.setItem("encore_nickname", myNickname);
+            chatMessages = payload.history || [];
+            renderChat();
+          }
+          if (payload.type === "social_update") {
+            const uCount = payload.usersCount || 1;
+            document.getElementById("user-count").textContent =
+              `${uCount} User${uCount !== 1 ? "s" : ""}`;
+            const typers = payload.typing.filter((n) => n !== myNickname);
+            if (typers.length === 0) typingIndicator.textContent = "";
+            else if (typers.length === 1)
+              typingIndicator.textContent = `${typers[0]} is typing...`;
+            else typingIndicator.textContent = `Several people are typing...`;
+          }
+          if (payload.type === "new_chat") {
+            chatMessages.push(payload.message);
+            renderChat();
+          }
+        });
+
+        function renderChat() {
+          const isNearBottom =
+            chatContainer.scrollHeight -
+              chatContainer.scrollTop -
+              chatContainer.clientHeight <
+            100;
+          chatContainer.innerHTML = "";
+          chatMessages.forEach((msg) => {
+            const isSelf = msg.sender === myNickname;
+            chatContainer.innerHTML += `<div class="chat-msg ${isSelf ? "self" : ""}"><div class="sender">${isSelf ? "You" : msg.sender}</div><div class="text">${msg.text}</div></div>`;
+          });
+          if (isNearBottom || chatMessages.length === 1)
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        tabChat.onclick = () => {
+          tabChat.classList.add("active");
+          tabCheer.classList.remove("active");
+          chatContentArea.style.display = "flex";
+          cheerContentArea.style.display = "none";
+        };
+        tabCheer.onclick = () => {
+          tabCheer.classList.add("active");
+          tabChat.classList.remove("active");
+          cheerContentArea.style.display = "flex";
+          chatContentArea.style.display = "none";
+        };
+
+        document.getElementById("open-chat-btn").onclick = () => {
+          chatView.classList.add("active");
+          setTimeout(
+            () => (chatContainer.scrollTop = chatContainer.scrollHeight),
+            50,
+          );
+        };
+        document.getElementById("close-chat-btn").onclick = () =>
+          chatView.classList.remove("active");
+
+        const sendChatMessage = () => {
+          const val = chatInput.value.trim();
+          if (!val) return;
+          socket.emit("remote-command", { type: "chat_message", value: val });
+          chatInput.value = "";
+          socket.emit("remote-command", { type: "typing_state", value: false });
+          clearTimeout(typingTimeout);
+        };
+
+        document.getElementById("chat-send-btn").onclick = sendChatMessage;
+
+        chatInput.addEventListener("input", (e) => {
+          if (e.target.value.trim().length > 0) {
+            socket.emit("remote-command", {
+              type: "typing_state",
+              value: true,
+            });
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+              socket.emit("remote-command", {
+                type: "typing_state",
+                value: false,
+              });
+            }, 2000);
+          } else {
+            socket.emit("remote-command", {
+              type: "typing_state",
+              value: false,
+            });
+            clearTimeout(typingTimeout);
+          }
+        });
+
+        chatInput.addEventListener("keypress", (e) => {
+          if (e.key === "Enter") sendChatMessage();
+        });
+
+        document.querySelectorAll(".cheer-btn").forEach((btn) => {
+          btn.onclick = () => {
+            socket.emit("remote-command", {
+              type: "send_cheer",
+              value: btn.getAttribute("data-cheer"),
+            });
+            showToast("Cheer Sent!");
+          };
+        });
+        document.getElementById("custom-cheer-btn").onclick = () => {
+          const v = document.getElementById("custom-cheer-input").value.trim();
+          if (!v) return showToast("Type a message to Cheer!");
+          socket.emit("remote-command", { type: "send_cheer", value: v });
+          document.getElementById("custom-cheer-input").value = "";
+          showToast("Custom Cheer Sent!");
+        };
+
+        function processSongList(songs) {
+          artistsMap = {};
+          songs.forEach((song) => {
+            const artistKey = (song.artist || "Unknown Artist").trim();
+            if (!artistsMap[artistKey]) artistsMap[artistKey] = [];
+            artistsMap[artistKey].push(song);
+          });
+          if (currentLibraryTab === "local" && navState.view === "artists") {
+            artistScroller.setItems(
+              Object.keys(artistsMap).sort((a, b) =>
+                a.localeCompare(b, undefined, { sensitivity: "base" }),
+              ),
+            );
+          }
+        }
+
+        function switchToLocal() {
+          currentLibraryTab = "local";
+          tabLocal.classList.add("active");
+          tabYt.classList.remove("active");
+          librarySearch.placeholder = "Search songs or artists...";
+          librarySearch.value = "";
+          ytSearchBtn.style.display = "none";
+          ytLoader.classList.remove("active");
+
+          if (navState.view === "artists") {
+            artistViewContainer.style.display = "block";
+            songViewContainer.style.display = "none";
+            unifiedBackBtn.classList.remove("desktop-visible");
+            artistScroller.setItems(
+              Object.keys(artistsMap).sort((a, b) =>
+                a.localeCompare(b, undefined, { sensitivity: "base" }),
+              ),
+            );
+          } else {
+            artistViewContainer.style.display = "none";
+            songViewContainer.style.display = "flex";
+            unifiedBackBtn.classList.add("desktop-visible");
+            songScroller.setItems(currentArtistSongs);
+            currentArtistName.textContent =
+              currentArtistName.getAttribute("data-last-local") || "Songs";
+          }
+        }
+
+        function switchToYouTube() {
+          currentLibraryTab = "yt";
+          tabYt.classList.add("active");
+          tabLocal.classList.remove("active");
+          librarySearch.placeholder = "Search YouTube...";
+          librarySearch.value = "";
+          ytSearchBtn.style.display = "flex";
+
+          artistViewContainer.style.display = "none";
+          songViewContainer.style.display = "flex";
+          unifiedBackBtn.classList.add("desktop-visible");
+
+          if (ytCache.length > 0) {
+            currentArtistName.textContent = "YouTube Results";
+            songScroller.setItems(ytCache);
+          } else {
+            currentArtistName.textContent = "Search above to find videos";
+            songScroller.setItems([]);
+          }
+        }
+
+        tabLocal.onclick = switchToLocal;
+        tabYt.onclick = switchToYouTube;
+
+        function openArtistSongs(artistName) {
+          navState.view = "songs";
+          currentArtistName.textContent = artistName;
+          currentArtistName.setAttribute("data-last-local", artistName);
+          currentArtistSongs = artistsMap[artistName] || [];
+
+          artistViewContainer.style.display = "none";
+          songViewContainer.style.display = "flex";
+          songScroller.setItems(currentArtistSongs);
+          librarySearch.value = "";
+          unifiedBackBtn.classList.add("desktop-visible");
+        }
+
+        function handleBackNavigation() {
+          if (currentLibraryTab === "local" && navState.view === "songs") {
+            navState.view = "artists";
+            artistViewContainer.style.display = "block";
+            songViewContainer.style.display = "none";
+            librarySearch.value = "";
+            artistScroller.setItems(
+              Object.keys(artistsMap).sort((a, b) =>
+                a.localeCompare(b, undefined, { sensitivity: "base" }),
+              ),
+            );
+            unifiedBackBtn.classList.remove("desktop-visible");
+          } else if (window.innerWidth < 768) {
+            songlistView.classList.remove("active");
+            navState.mobileLibraryOpen = false;
+          }
+        }
+
+        unifiedBackBtn.onclick = handleBackNavigation;
+
+        document.getElementById("open-library-btn").onclick = () => {
+          navState.mobileLibraryOpen = true;
+          songlistView.classList.add("active");
+          switchToLocal();
+        };
+
+        document.getElementById("open-yt-btn").onclick = () => {
+          navState.mobileLibraryOpen = true;
+          songlistView.classList.add("active");
+          switchToYouTube();
+        };
+
+        function triggerYTSearch() {
+          const query = librarySearch.value.trim();
+          if (query) {
+            ytLoader.classList.add("active");
+            librarySearch.blur();
+            socket.emit("remote-command", {
+              type: "client_yt_search",
+              value: query,
+            });
+          } else {
+            showToast("Enter a search term to find videos.");
+          }
+        }
+
+        ytSearchBtn.onclick = triggerYTSearch;
+
+        librarySearch.addEventListener("keypress", (e) => {
+          if (e.key === "Enter" && currentLibraryTab === "yt") {
+            triggerYTSearch();
+          }
+        });
+
+        librarySearch.addEventListener("input", (e) => {
+          if (currentLibraryTab === "yt") return;
+          const query = e.target.value.toLowerCase();
+          if (navState.view === "artists") {
+            const allArtists = Object.keys(artistsMap);
+            if (!query)
+              return artistScroller.setItems(
+                allArtists.sort((a, b) => a.localeCompare(b)),
+              );
+            const matched = new Set();
+            allArtists.forEach((a) => {
+              if (a.toLowerCase().includes(query)) matched.add(a);
+            });
+            fullSongList.forEach((s) => {
+              if (s.title && s.title.toLowerCase().includes(query)) {
+                if (artistsMap[s.artist.trim()]) matched.add(s.artist.trim());
+              }
+            });
+            artistScroller.setItems(
+              Array.from(matched).sort((a, b) => a.localeCompare(b)),
+            );
+          } else {
+            songScroller.setItems(
+              currentArtistSongs.filter(
+                (s) =>
+                  s.title.toLowerCase().includes(query) ||
+                  s.code.includes(query),
+              ),
+            );
+          }
+        });
+
+        function reserveSong(song) {
+          if (song.isYouTube) {
+            socket.emit("remote-command", { type: "reserve_yt", value: song });
+          } else {
+            socket.emit("remote-command", {
+              type: "reserve_code",
+              value: song.code,
+            });
+          }
+        }
+
+        document.querySelectorAll("button[data-type]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const type = btn.dataset.type;
+            const value = btn.dataset.value;
+            socket.emit("remote-command", { type, value });
+          });
+        });
+
+        function stringToColor(str) {
+          let hash = 0;
+          for (let i = 0; i < str.length; i++)
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+          const c = (hash & 0x00ffffff).toString(16).toUpperCase();
+          return "#" + "00000".substring(0, 6 - c.length) + c;
+        }
+
+        let toastTimeout;
+        function showToast(msg, isError = false) {
+          const toast = document.getElementById("toast");
+          toast.textContent = msg;
+          isError
+            ? toast.classList.add("error")
+            : toast.classList.remove("error");
+          toast.classList.add("show");
+          clearTimeout(toastTimeout);
+          toastTimeout = setTimeout(() => toast.classList.remove("show"), 2500);
+        }
+      });
+    </script>
+  </body>
+</html>

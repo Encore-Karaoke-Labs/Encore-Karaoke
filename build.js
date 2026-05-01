@@ -68,6 +68,7 @@ Promise.all([buildOS, buildWindows])
     console.log("Copying static assets...");
     copyRecursiveSync("src/libs", "resources/static/libs");
     copyRecursiveSync("src/assets", "resources/static/assets");
+    copyRecursiveSync("src/remote", "resources/static/remote");
 
     if (fs.existsSync("src/index.html"))
       fs.copyFileSync("src/index.html", "resources/static/index.html");
