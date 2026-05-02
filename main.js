@@ -14,6 +14,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const dgram = require("dgram");
 const { exec } = require("child_process");
+const os = require("os");
 
 const Bonjour = require("bonjour-service").Bonjour;
 const express = require("express");
@@ -1283,6 +1284,10 @@ app.whenReady().then(() => {
       name: bonjourId,
       type: "enmoku",
       port: PORT,
+      txt: {
+        deviceName: os.hostname(),
+        versionInformation: `${versionInformation.channel} ${versionInformation.number} (${versionInformation.codename})`,
+      },
     });
     instance.find({ type: "enmoku" }, async (service) => {
       if (service.name == bonjourId) {
