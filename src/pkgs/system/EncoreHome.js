@@ -169,6 +169,8 @@ class EncoreController {
     this.countdownTargetTime = null;
     this.lastCountdownTick = null;
     this.parsedLrc = [];
+    this.drums = this.Forte.getAvailableDrumPresets();
+    this.currentDrumPresetIndex = 0;
 
     this.lineCaches = [];
     for (let i = 0; i < 2; i++) {
@@ -216,6 +218,8 @@ class EncoreController {
       ...Array.from({ length: 10 }, (_, i) => `numbers/${i}.wav`),
     ];
     await Promise.all(sfx.map((s) => this.Forte.loadSfx(`/assets/audio/${s}`)));
+
+    console.log("[Encore] drums", this.drums);
 
     this.socket = io({ query: { clientType: "app" } });
     this.socket.on("connect", () => {
@@ -2391,6 +2395,7 @@ class EncoreController {
     this.recorder.setSongInfo(song);
     this.cleanupPlayerEvents();
     this.lastCompletedSyllableIndex = -1;
+    this.currentDrumPresetIndex = -1;
 
     this.dom.countdownDisplay.classOff("visible").text("");
     this.countdownTargetTime = null;
@@ -3838,7 +3843,109 @@ class EncoreController {
     else if (e.key === "-") this.handleVolume("down");
     else if (e.key === "=") this.handleVolume("up");
     else if (e.key === "[" || e.key === "]") this.handleBracket(e.key);
+    else if (e.key === ";") this.cycleDrumPreset(-1);
+    else if (e.key === "'") this.cycleDrumPreset(1);
     else if (e.key.toLowerCase() === "y") this.handleYKey();
+  }
+
+  /**
+   * Cycles the active drum preset on the standard MIDI percussion channel.
+   * Remembers the user's selection throughout the song.
+   *
+   * @param {number} direction - -1 for previous preset, 1 for next preset.
+   */
+  cycleDrumPreset(direction) {
+    if (this.state.mode !== "player" || !this.state.currentSongIsMIDI) {
+      this.infoBar.showTemp("RHYTHM", "Not available for this format.", 3000);
+      generateDialog(
+        new Html("div").classOn("temp-dialog-text").text("NOT AVAILABLE"),
+        2000,
+      );
+      return;
+    }
+
+    this.drums = this.Forte.getAvailableDrumPresets();
+    if (!this.drums || this.drums.length === 0) {
+      this.infoBar.showTemp("RHYTHM", "No rhythm patches available", 3000);
+      return;
+    }
+
+    const channelNumber = 9;
+
+    if (this.currentDrumPresetIndex === -1) {
+      const current = this.Forte.getCurrentDrumPreset(channelNumber);
+      if (current) {
+        const matchedIndex = this.drums.findIndex(
+          (p) =>
+            p.program === current.program &&
+            p.bankMSB === current.bankMSB &&
+            p.bankLSB === current.bankLSB,
+        );
+        this.currentDrumPresetIndex = matchedIndex !== -1 ? matchedIndex : 0;
+      } else {
+        this.currentDrumPresetIndex = 0;
+      }
+    }
+
+    const nextIndex =
+      (this.currentDrumPresetIndex + direction + this.drums.length) %
+      this.drums.length;
+    const nextPreset = this.drums[nextIndex];
+
+    if (this.Forte.switchDrumPreset(channelNumber, nextPreset)) {
+      this.currentDrumPresetIndex = nextIndex;
+
+      const html = `
+        <div class="rhythm-carousel" style="display: flex; gap: 30px; align-items: center; overflow: hidden; padding: 10px; width: 100%; white-space: nowrap;">
+          ${this.drums
+            .map((preset, idx) => {
+              const isSelected = idx === this.currentDrumPresetIndex;
+              const rhythmNumber = (idx + 1).toString().padStart(2, "0");
+
+              return `
+              <div class="rhythm-item ${isSelected ? "selected" : ""}" style="
+                display: flex; flex-direction: column; align-items: center;
+                transition: all 0.2s ease-in-out;
+                ${isSelected ? "transform: scale(1.1); min-width: 120px;" : "opacity: 0.3; min-width: 80px;"}
+              ">
+                <span style="
+                  font-family: 'Rajdhani', sans-serif;
+                  font-weight: 800;
+                  font-size: ${isSelected ? "1.2rem" : "1.2rem"};
+                  color: ${isSelected ? "#ffca28" : "#fff"};
+                  text-shadow: ${isSelected ? "0 0 15px rgba(255,202,40,0.5)" : "none"};
+                ">RHYTHM ${rhythmNumber}</span>
+                
+                <span style="
+                  font-size: 0.6rem;
+                  text-transform: uppercase;
+                  color: rgba(255,255,255,0.5);
+                  margin-top: -5px;
+                  display: ${isSelected ? "block" : "none"};
+                  letter-spacing: 1px;
+                ">${preset.name.substring(0, 12)}</span>
+              </div>
+            `;
+            })
+            .join("")}
+        </div>
+      `;
+
+      this.infoBar.showTemp("RHYTHM", html, 3000);
+
+      setTimeout(() => {
+        const activeRhythm = document.querySelector(".rhythm-item.selected");
+        if (activeRhythm) {
+          activeRhythm.scrollIntoView({
+            behavior: "auto",
+            block: "nearest",
+            inline: "center",
+          });
+        }
+      }, 50);
+    } else {
+      this.infoBar.showTemp("RHYTHM", "FAILED TO SWITCH", 3000);
+    }
   }
 
   /**

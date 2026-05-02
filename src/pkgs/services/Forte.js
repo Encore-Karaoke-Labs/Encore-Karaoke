@@ -1,6 +1,8 @@
 import { WorkletSynthesizer as Synthetizer, Sequencer } from "spessasynth_lib";
-import { BasicMIDI } from "spessasynth_core";
+import { BasicMIDI, midiControllers } from "spessasynth_core";
 import { PitchDetector } from "pitchy";
+
+console.log(midiControllers);
 
 import Html from "../../libs/html.js";
 
@@ -1111,6 +1113,8 @@ const pkg = {
           soundFontBuffer,
         );
         state.playback.synthesizer.connect(state.playback.midiGain);
+        logVerbose("synthion", state.playback.synthesizer);
+        logVerbose("Preset list", state.playback.synthesizer.presetList);
 
         console.log("[FORTE SVC] MIDI Synthesizer initialized successfully.");
       } catch (synthError) {
@@ -1444,6 +1448,7 @@ const pkg = {
           arrayBuffer,
         );
         state.playback.synthesizer.connect(state.playback.midiGain);
+        logVerbose("Preset list", state.playback.synthesizer.presetList);
 
         if (state.playback.transpose !== 0) {
           state.playback.synthesizer.setMasterParameter(
@@ -2210,6 +2215,128 @@ const pkg = {
         );
       }
       dispatchPlaybackUpdate();
+    },
+
+    /**
+     * Changes the drum kit preset on a specific channel
+     * @param {number} channelNumber - The MIDI channel (0-15)
+     * @param {Object} drumPreset - The drum preset object with structure:
+     *   { program: number, bankMSB: number, bankLSB: number, name: string, isAnyDrums: boolean }
+     * @returns {boolean} Success indicator
+     */
+    switchDrumPreset: (channelNumber, drumPreset) => {
+      if (!state.playback.synthesizer) {
+        console.error("[FORTE SVC] Synthesizer not initialized");
+        return false;
+      }
+
+      if (channelNumber < 0 || channelNumber > 15) {
+        console.error("[FORTE SVC] Invalid channel number:", channelNumber);
+        return false;
+      }
+
+      try {
+        logVerbose(`Switching drum preset on channel ${channelNumber + 1}`, {
+          preset: drumPreset.name,
+          program: drumPreset.program,
+          bankMSB: drumPreset.bankMSB,
+          bankLSB: drumPreset.bankLSB,
+        });
+
+        state.playback.synthesizer.lockController(
+          channelNumber,
+          0xffffffff, // ALL_CHANNELS_OR_DIFFERENT_ACTION constant
+          false,
+        );
+
+        if (!drumPreset.isGMGSDrum) {
+          state.playback.synthesizer.controllerChange(
+            channelNumber,
+            0, // CC#0 = Bank Select MSB
+            drumPreset.bankMSB,
+          );
+          state.playback.synthesizer.controllerChange(
+            channelNumber,
+            32, // CC#32 = Bank Select LSB
+            drumPreset.bankLSB,
+          );
+        }
+
+        state.playback.synthesizer.programChange(
+          channelNumber,
+          drumPreset.program,
+        );
+
+        state.playback.synthesizer.lockController(
+          channelNumber,
+          0xffffffff,
+          true,
+        );
+
+        logVerbose(
+          `Drum preset switched successfully on channel ${channelNumber + 1}`,
+        );
+        dispatchPlaybackUpdate();
+        return true;
+      } catch (e) {
+        console.error(
+          `[FORTE SVC] Failed to switch drum preset on channel ${channelNumber}:`,
+          e,
+        );
+        return false;
+      }
+    },
+
+    /**
+     * Gets available drum presets from the loaded SoundFont
+     * @returns {Array<Object>} Array of drum preset objects
+     */
+    getAvailableDrumPresets: () => {
+      if (!state.playback.synthesizer) {
+        console.error("[FORTE SVC] Synthesizer not initialized");
+        return [];
+      }
+
+      try {
+        const presetList = state.playback.synthesizer.presetList || [];
+        return presetList.filter((p) => p.isAnyDrums || p.isGMGSDrum);
+      } catch (e) {
+        console.error("[FORTE SVC] Failed to get drum presets:", e);
+        return [];
+      }
+    },
+
+    /**
+     * Gets the current drum preset on a specific channel
+     * @param {number} channelNumber - The MIDI channel (0-15)
+     * @returns {Object|null} Current drum preset or null if not available
+     */
+    getCurrentDrumPreset: (channelNumber) => {
+      if (!state.playback.synthesizer) return null;
+
+      try {
+        const channel =
+          state.playback.synthesizer.channelProperties[channelNumber];
+        if (!channel) return null;
+
+        return {
+          program: channel.program || 0,
+          bankMSB: channel.bankMSB || 0,
+          bankLSB: channel.bankLSB || 0,
+          name: channel.presetName || "Unknown",
+          isGMGSDrum:
+            channel.isGMGSDrum ??
+            (channel.isDrum === true && channel.bankMSB !== undefined
+              ? channel.bankMSB === 0
+              : false),
+        };
+      } catch (e) {
+        console.error(
+          `[FORTE SVC] Failed to get current drum preset on channel ${channelNumber}:`,
+          e,
+        );
+        return null;
+      }
     },
 
     /**
