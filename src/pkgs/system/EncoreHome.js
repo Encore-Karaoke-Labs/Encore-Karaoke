@@ -3907,34 +3907,16 @@ class EncoreController {
       this.currentDrumPresetIndex = nextIndex;
 
       const html = `
-        <div class="rhythm-carousel" style="display: flex; gap: 30px; align-items: center; overflow: hidden; padding: 10px; width: 100%; white-space: nowrap;">
+        <div class="rhythm-carousel" style="opacity: 0; transition: opacity 0.2s ease-out;">
           ${this.drums
             .map((preset, idx) => {
               const isSelected = idx === this.currentDrumPresetIndex;
               const rhythmNumber = (idx + 1).toString().padStart(2, "0");
 
               return `
-              <div class="rhythm-item ${isSelected ? "selected" : ""}" style="
-                display: flex; flex-direction: column; align-items: center;
-                transition: all 0.2s ease-in-out;
-                ${isSelected ? "transform: scale(1.1); min-width: 120px;" : "opacity: 0.3; min-width: 80px;"}
-              ">
-                <span style="
-                  font-family: 'Rajdhani', sans-serif;
-                  font-weight: 800;
-                  font-size: ${isSelected ? "1.2rem" : "1.2rem"};
-                  color: ${isSelected ? "#ffca28" : "#fff"};
-                  text-shadow: ${isSelected ? "0 0 15px rgba(255,202,40,0.5)" : "none"};
-                ">RHYTHM ${rhythmNumber}</span>
-                
-                <span style="
-                  font-size: 0.6rem;
-                  text-transform: uppercase;
-                  color: rgba(255,255,255,0.5);
-                  margin-top: -5px;
-                  display: ${isSelected ? "block" : "none"};
-                  letter-spacing: 1px;
-                ">${preset.name.substring(0, 12)}</span>
+              <div class="rhythm-item ${isSelected ? "selected" : ""}">
+                <span>RHYTHM ${rhythmNumber}</span>
+                <span>${preset.name.substring(0, 12)}</span>
               </div>
             `;
             })
@@ -3945,13 +3927,16 @@ class EncoreController {
       this.infoBar.showTemp("RHYTHM", html, 3000);
 
       setTimeout(() => {
-        const activeRhythm = document.querySelector(".rhythm-item.selected");
-        if (activeRhythm) {
+        const carousel = document.querySelector(".rhythm-carousel");
+        const activeRhythm = carousel?.querySelector(".rhythm-item.selected");
+
+        if (carousel && activeRhythm) {
           activeRhythm.scrollIntoView({
             behavior: "auto",
             block: "nearest",
             inline: "center",
           });
+          carousel.style.opacity = "1";
         }
       }, 50);
     } else {
@@ -4409,28 +4394,34 @@ class EncoreController {
       this.bgv.cycleCategory(key === "[" ? -1 : 1);
       const cats = ["Auto", ...this.bgv.categories.map((c) => c.BGV_CATEGORY)];
 
-      const html =
-        `<div class="bgv-category-list">` +
-        cats
-          .map(
-            (c) =>
-              `<span class="bgv-category-item ${
-                c === this.bgv.selectedCategory ? "selected" : ""
-              }">${c}</span>`,
-          )
-          .join("") +
-        `</div>`;
+      const html = `
+        <div class="bgv-carousel" style="opacity: 0; transition: opacity 0.2s ease-out;">
+          ${cats
+            .map(
+              (c) =>
+                `<div class="bgv-item ${
+                  c === this.bgv.selectedCategory ? "selected" : ""
+                }">
+                  <span>${c}</span>
+                </div>`,
+            )
+            .join("")}
+        </div>
+      `;
 
       this.infoBar.showTemp("BGV", html, 3000);
 
       setTimeout(() => {
-        const activeCat = document.querySelector(".bgv-category-item.selected");
-        if (activeCat) {
+        const carousel = document.querySelector(".bgv-carousel");
+        const activeCat = carousel?.querySelector(".bgv-item.selected");
+
+        if (carousel && activeCat) {
           activeCat.scrollIntoView({
             behavior: "auto",
             block: "nearest",
             inline: "center",
           });
+          carousel.style.opacity = "1";
         }
       }, 50);
     }

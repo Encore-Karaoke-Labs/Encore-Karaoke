@@ -3027,30 +3027,77 @@ p + .flex-list button {
   opacity: 0.7;
 }
 
-.bgv-category-list {
+.bgv-carousel,
+.rhythm-carousel {
   display: flex;
+  gap: 1rem;
   align-items: center;
-  gap: 0.5rem;
+  overflow: hidden;
+  padding: 10px;
   width: 100%;
-  overflow-x: hidden;
-  padding: 0 0.5rem;
+  white-space: nowrap;
 }
 
-.bgv-category-item {
+.rhythm-carousel {
+  gap: 30px;
+}
+
+.bgv-item,
+.rhythm-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-in-out;
+  opacity: 0.4;
+  min-width: 80px;
+  padding: 0.5rem;
   flex-shrink: 0;
-  padding: 0.25rem 0.75rem;
-  margin: 0;
-  border-radius: 0.25rem;
-  opacity: 0.6;
-  transition: all 0.2s ease;
-  font-size: 1.2rem;
 }
 
-.bgv-category-item.selected {
+.bgv-item.selected,
+.rhythm-item.selected {
+  transform: scale(1.1);
   opacity: 1;
-  font-weight: bold;
-  color: #000;
-  background-color: #89cff0;
+  min-width: 120px;
+}
+
+.bgv-item > span {
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: #fff;
+  transition: all 0.2s ease-in-out;
+}
+
+.bgv-item.selected > span {
+  color: #89cff0;
+  text-shadow: 0 0 15px rgba(137, 207, 240, 0.5);
+}
+
+.rhythm-item > span:first-child {
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+.rhythm-item.selected > span:first-child {
+  color: #ffca28;
+  text-shadow: 0 0 15px rgba(255, 202, 40, 0.5);
+}
+
+.rhythm-item > span:last-child {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: -5px;
+  letter-spacing: 1px;
+  display: none;
+}
+
+.rhythm-item.selected > span:last-child {
+  display: block;
 }
 
 .transpose-display {
