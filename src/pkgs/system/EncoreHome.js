@@ -3843,8 +3843,8 @@ class EncoreController {
     else if (e.key === "-") this.handleVolume("down");
     else if (e.key === "=") this.handleVolume("up");
     else if (e.key === "[" || e.key === "]") this.handleBracket(e.key);
-    else if (e.key === ";") this.cycleDrumPreset(-1);
-    else if (e.key === "'") this.cycleDrumPreset(1);
+    else if (e.key === ";") this.cycleDrumPreset("left");
+    else if (e.key === "'") this.cycleDrumPreset("right");
     else if (e.key.toLowerCase() === "y") this.handleYKey();
   }
 
@@ -3852,9 +3852,20 @@ class EncoreController {
    * Cycles the active drum preset on the standard MIDI percussion channel.
    * Remembers the user's selection throughout the song.
    *
-   * @param {number} direction - -1 for previous preset, 1 for next preset.
+   * @param {string} direction - "left" to cycle to the previous preset, "right" to cycle to the next preset
    */
   cycleDrumPreset(direction) {
+    let numDir = 0;
+
+    switch (direction) {
+      case "left":
+        numDir = -1;
+        break;
+      case "right":
+        numDir = 1;
+        break;
+    }
+
     if (this.state.mode !== "player" || !this.state.currentSongIsMIDI) {
       this.infoBar.showTemp("RHYTHM", "Not available for this format.", 3000);
       generateDialog(
@@ -3888,7 +3899,7 @@ class EncoreController {
     }
 
     const nextIndex =
-      (this.currentDrumPresetIndex + direction + this.drums.length) %
+      (this.currentDrumPresetIndex + numDir + this.drums.length) %
       this.drums.length;
     const nextPreset = this.drums[nextIndex];
 
