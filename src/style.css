@@ -2405,7 +2405,8 @@ p + .flex-list button {
   font-family: "Rajdhani", sans-serif;
 }
 
-.song-item.highlighted {
+.song-item.highlighted,
+.song-item:hover {
   background-color: #89cff044;
 }
 
@@ -2628,7 +2629,8 @@ p + .flex-list button {
   border-bottom: none;
 }
 
-.search-result-item.highlighted {
+.search-result-item.highlighted,
+.search-result-item:hover {
   background-color: #89cff044;
 }
 

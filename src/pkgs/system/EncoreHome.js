@@ -855,15 +855,6 @@ class EncoreController {
           .appendTo(item);
 
         item.on("click", () => this.startPlayer(song));
-        item.on("mouseover", () => {
-          if (this.state.mode === "menu" && !this.state.isTypingNumber) {
-            if (this.state.highlightedIndex !== i) {
-              this.state.highlightedIndex = i;
-              this.updateMenuUI(true);
-            }
-          }
-        });
-
         if (i === this.state.highlightedIndex) item.classOn("highlighted");
 
         item.appendTo(this.dom.listInner);
@@ -2338,10 +2329,6 @@ class EncoreController {
       item.on("click", () => {
         this.state.highlightedSearchIndex = idx;
         this.handleEnter();
-      });
-      item.on("mouseover", () => {
-        this.state.highlightedSearchIndex = idx;
-        this.updateSearchHighlight();
       });
 
       const info = new Html("div").classOn("search-info").appendTo(item);
