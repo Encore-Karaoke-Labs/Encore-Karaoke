@@ -1649,78 +1649,40 @@ class EncoreController {
   }
 
   /**
-   * Displays a single cheer with its own animation and cleanup.
-   * Multiple cheers are stacked vertically.
+   * Displays a single cheer as a Danmaku.
    *
    * @param {Object} cheer - The cheer object with nickname and message.
    */
   displayCheer(cheer) {
+    const laneCount = 12;
+    const lane = Math.floor(Math.random() * laneCount);
+    const topPercent = 4 + lane * 4.5;
+
+    const duration = 6 + Math.random() * 4;
+
     const cheerContainer = new Html("div")
-      .classOn("cheer-overlay-container")
+      .classOn("danmaku-item")
       .styleJs({
-        position: "absolute",
-        top: `calc(20px + var(--cheer-index, 0) * 110px)`,
-        left: "-500px",
-        zIndex: `calc(9000 + var(--cheer-index, 0))`,
-        transition: "all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-        backgroundColor: "rgba(20, 20, 30, 0.9)",
-        border: "2px solid #ffd700",
-        borderRadius: "15px",
-        padding: "15px 25px",
-        display: "flex",
-        flexDirection: "column",
-        boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
-        maxWidth: "400px",
+        top: `${topPercent}%`,
+        animationDuration: `${duration}s`,
       })
       .appendTo(this.wrapper);
 
-    new Html("div")
-      .styleJs({
-        color: "#ffd700",
-        fontWeight: "700",
-        fontSize: "1.2rem",
-        marginBottom: "5px",
-      })
-      .html(`🎉 <span>${cheer.nickname}</span> cheers:`)
+    new Html("span")
+      .classOn("danmaku-sender")
+      .text(cheer.nickname)
       .appendTo(cheerContainer);
 
-    new Html("div")
-      .styleJs({
-        color: "#fff",
-        fontSize: "1.5rem",
-        fontWeight: "600",
-        wordWrap: "break-word",
-      })
+    new Html("span")
+      .classOn("danmaku-message")
       .text(cheer.message)
       .appendTo(cheerContainer);
 
-    this.state.activeCheers.push(cheerContainer);
-    this.repositionCheers();
+    cheerContainer.elm.addEventListener("animationend", () => {
+      cheerContainer.cleanup();
 
-    setTimeout(() => {
-      cheerContainer.styleJs({ left: "20px" });
-    }, 10);
-
-    setTimeout(() => {
-      cheerContainer.styleJs({ left: "-500px" });
-      setTimeout(() => {
-        const index = this.state.activeCheers.indexOf(cheerContainer);
-        if (index > -1) {
-          this.state.activeCheers.splice(index, 1);
-          cheerContainer.cleanup();
-          this.repositionCheers();
-        }
-      }, 600);
-    }, 5500);
-  }
-
-  /**
-   * Reposition all active cheers based on their index in the array.
-   * CSS custom properties handle the actual positioning and animation.
-   */
-  repositionCheers() {
-    this.state.activeCheers.forEach((cheerContainer, index) => {
-      cheerContainer.elm.style.setProperty("--cheer-index", index);
+      const index = this.state.activeCheers.indexOf(cheerContainer);
+      if (index > -1) this.state.activeCheers.splice(index, 1);
     });
   }
 

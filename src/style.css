@@ -3907,7 +3907,7 @@ p + .flex-list button {
 /* ==========================================================================
    Badges & QR Code
    ========================================================================== */
-/* --- QR Code Display --- */
+/* QR Code Display*/
 .qr-code-container {
   position: absolute;
   top: calc(2rem + 50px + 1rem);
@@ -4005,4 +4005,57 @@ p + .flex-list button {
   text-transform: uppercase;
   z-index: 9999;
   pointer-events: none;
+}
+
+/* ==========================================================================
+   Danmaku (Cheers)
+   ========================================================================== */
+.danmaku-item {
+  position: absolute;
+  left: 100vw;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  white-space: nowrap;
+
+  z-index: 99999;
+  pointer-events: none;
+  will-change: transform;
+  animation-name: danmaku-scroll;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+
+  font-family: "Radio Canada", sans-serif;
+  font-size: 2.5rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+
+  text-shadow:
+    -2px -2px 0 #000,
+    2px -2px 0 #000,
+    -2px 2px 0 #000,
+    2px 2px 0 #000,
+    0px 4px 15px rgba(0, 0, 0, 0.8);
+  -webkit-text-stroke: 1px black;
+}
+
+.danmaku-sender {
+  color: #ffd700;
+  font-size: 2rem;
+  border-right: 3px solid rgba(255, 215, 0, 0.5);
+  padding-right: 12px;
+  opacity: 0.9;
+}
+
+.danmaku-message {
+  color: #ffffff;
+}
+
+@keyframes danmaku-scroll {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(calc(-100vw - 100%), 0, 0);
+  }
 }
