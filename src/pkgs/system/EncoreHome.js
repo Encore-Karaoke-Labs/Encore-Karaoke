@@ -163,6 +163,9 @@ class EncoreController {
       generateDialog,
     );
 
+    this.asianRegex =
+      /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/;
+
     this.boundKeydown = this.handleKeyDown.bind(this);
     this.boundPlaybackUpdate = this.handlePlaybackUpdate.bind(this);
     this.boundTimeUpdate = null;
@@ -2172,14 +2175,12 @@ class EncoreController {
    * Builds a search index in the background to prevent lagging the UI during searches.
    */
   async buildSearchIndex() {
-    const asianRegex =
-      /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/;
     console.log("[Encore] Building search index...");
     for (let song of this.songList) {
-      if (asianRegex.test(song.title) && !song._romaTitle) {
+      if (this.asianRegex.test(song.title) && !song._romaTitle) {
         song._romaTitle = await Romanizer.romanize(song.title);
       }
-      if (asianRegex.test(song.artist) && !song._romaArtist) {
+      if (this.asianRegex.test(song.artist) && !song._romaArtist) {
         song._romaArtist = await Romanizer.romanize(song.artist);
       }
     }
@@ -3040,13 +3041,10 @@ class EncoreController {
       this.parsedLrc = await this.parseLrc(lrcText);
 
       if (this.parsedLrc.length > 0) {
-        const asianRegex =
-          /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/;
-
         for (let i = 0; i < this.parsedLrc.length; i++) {
           let line = this.parsedLrc[i];
 
-          let needsRomaji = asianRegex.test(line.text);
+          let needsRomaji = this.asianRegex.test(line.text);
           let syllables = [];
 
           if (!needsRomaji) {
