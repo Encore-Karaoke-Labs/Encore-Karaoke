@@ -307,6 +307,7 @@ class EncoreController {
       playerUi: this.dom.playerUi,
       lyricsCanvas: this.dom.lyricsCanvas,
       scoreDisplay: this.scoreHud.scoreDisplay,
+      danmakuCanvas: this.dom.danmakuCanvas,
     });
 
     window.addEventListener("keydown", this.boundKeydown);

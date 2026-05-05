@@ -712,6 +712,13 @@ export class RecorderModule {
       }
     }
 
+    if (this.uiRefs && this.uiRefs.danmakuCanvas) {
+      const danmakuEl = this.uiRefs.danmakuCanvas.elm;
+      if (danmakuEl && danmakuEl.width > 0 && danmakuEl.height > 0) {
+        ctx.drawImage(danmakuEl, 0, 0, w, h);
+      }
+    }
+
     if (this.metaCanvas) {
       ctx.drawImage(this.metaCanvas, 0, 0);
     }
