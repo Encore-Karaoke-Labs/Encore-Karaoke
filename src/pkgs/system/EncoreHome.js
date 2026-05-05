@@ -135,6 +135,11 @@ class EncoreController {
     this.currentIdleIndex = 0;
     this.idleState = "text";
 
+    this.activeDanmaku = [];
+    this.lastDanmakuTime = performance.now();
+    this.danmakuRafId = null;
+    this.MAX_DANMAKU = 200;
+
     console.log(this.state);
 
     this.mixer = new MixerModule(this.Forte);
@@ -753,6 +758,37 @@ class EncoreController {
       if (this.state.mode === "player") this.calculateLyricLayout();
     };
     window.addEventListener("resize", this.resizeLyricsCanvas);
+
+    this.dom.danmakuCanvas = new Html("canvas")
+      .classOn("danmaku-surface")
+      .appendTo(this.wrapper);
+
+    this.danmakuCtx = this.dom.danmakuCanvas.elm.getContext("2d", {
+      alpha: true,
+    });
+
+    this.resizeDanmakuCanvas = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      this.dom.danmakuCanvas.elm.width = w * dpr;
+      this.dom.danmakuCanvas.elm.height = h * dpr;
+      this.dom.danmakuCanvas.styleJs({
+        width: `${w}px`,
+        height: `${h}px`,
+      });
+
+      if (this.danmakuCtx) {
+        this.danmakuCtx.setTransform(1, 0, 0, 1, 0, 0);
+        this.danmakuCtx.scale(dpr, dpr);
+      }
+    };
+
+    window.addEventListener("resize", this.resizeDanmakuCanvas);
+    this.resizeDanmakuCanvas();
+
+    this.drawDanmakuFrame();
 
     this.buildRecordingsUI();
   }
@@ -1654,36 +1690,99 @@ class EncoreController {
    * @param {Object} cheer - The cheer object with nickname and message.
    */
   displayCheer(cheer) {
-    const laneCount = 12;
+    if (!this.danmakuCtx) return;
+
+    // Prevent crashing on copious amounts of spammed messages
+    if (this.activeDanmaku.length >= this.MAX_DANMAKU) {
+      this.activeDanmaku.shift();
+    }
+
+    const fontSize = Math.max(20, Math.floor(window.innerHeight * 0.035));
+    this.danmakuCtx.font = `900 ${fontSize}px "Radio Canada", sans-serif`;
+
+    const senderText = `${cheer.nickname} | `;
+    const msgText = cheer.message;
+
+    const senderWidth = this.danmakuCtx.measureText(senderText).width;
+    const msgWidth = this.danmakuCtx.measureText(msgText).width;
+    const totalWidth = senderWidth + msgWidth;
+
+    const safeAreaHeight = window.innerHeight * 0.45;
+    const topPadding = window.innerHeight * 0.05;
+    const usableHeight = safeAreaHeight - topPadding;
+
+    const laneHeight = fontSize * 1.5;
+    const laneCount = Math.max(1, Math.floor(usableHeight / laneHeight));
+
     const lane = Math.floor(Math.random() * laneCount);
-    const topPercent = 4 + lane * 4.5;
+
+    const y = topPadding + lane * laneHeight + fontSize / 2;
 
     const duration = 6 + Math.random() * 4;
+    const speed = (window.innerWidth + totalWidth) / duration;
 
-    const cheerContainer = new Html("div")
-      .classOn("danmaku-item")
-      .styleJs({
-        top: `${topPercent}%`,
-        animationDuration: `${duration}s`,
-      })
-      .appendTo(this.wrapper);
-
-    new Html("span")
-      .classOn("danmaku-sender")
-      .text(cheer.nickname)
-      .appendTo(cheerContainer);
-
-    new Html("span")
-      .classOn("danmaku-message")
-      .text(cheer.message)
-      .appendTo(cheerContainer);
-
-    cheerContainer.elm.addEventListener("animationend", () => {
-      cheerContainer.cleanup();
-
-      const index = this.state.activeCheers.indexOf(cheerContainer);
-      if (index > -1) this.state.activeCheers.splice(index, 1);
+    this.activeDanmaku.push({
+      sender: senderText,
+      message: msgText,
+      senderWidth,
+      totalWidth,
+      x: window.innerWidth,
+      y,
+      speed,
+      fontSize,
     });
+  }
+
+  /**
+   * The dedicated Canvas rendering loop for Danmaku messages.
+   */
+  drawDanmakuFrame() {
+    const now = performance.now();
+    let dt = (now - this.lastDanmakuTime) / 1000;
+
+    // Clamp DT so if the user backgrounds the app, the text doesn't instantly teleport bounds
+    if (dt > 0.1) dt = 0.1;
+    this.lastDanmakuTime = now;
+
+    if (this.danmakuCtx) {
+      const canvas = this.dom.danmakuCanvas.elm;
+      const w = parseFloat(canvas.style.width) || window.innerWidth;
+      const h = parseFloat(canvas.style.height) || window.innerHeight;
+
+      this.danmakuCtx.clearRect(0, 0, w, h);
+
+      if (this.activeDanmaku.length > 0) {
+        this.danmakuCtx.textBaseline = "middle";
+        this.danmakuCtx.lineJoin = "round";
+
+        for (let i = this.activeDanmaku.length - 1; i >= 0; i--) {
+          const d = this.activeDanmaku[i];
+
+          d.x -= d.speed * dt;
+
+          if (d.x + d.totalWidth < 0) {
+            this.activeDanmaku.splice(i, 1);
+            continue;
+          }
+
+          this.danmakuCtx.font = `900 ${d.fontSize}px "Radio Canada", sans-serif`;
+          this.danmakuCtx.lineWidth = d.fontSize * 0.18;
+
+          this.danmakuCtx.strokeStyle = "#000000";
+          this.danmakuCtx.strokeText(d.sender, d.x, d.y);
+          this.danmakuCtx.fillStyle = "#ffd700";
+          this.danmakuCtx.fillText(d.sender, d.x, d.y);
+
+          const msgX = d.x + d.senderWidth;
+          this.danmakuCtx.strokeStyle = "#000000";
+          this.danmakuCtx.strokeText(d.message, msgX, d.y);
+          this.danmakuCtx.fillStyle = "#ffffff";
+          this.danmakuCtx.fillText(d.message, msgX, d.y);
+        }
+      }
+    }
+
+    this.danmakuRafId = requestAnimationFrame(() => this.drawDanmakuFrame());
   }
 
   /**
