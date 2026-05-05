@@ -1352,20 +1352,42 @@ class EncoreController {
       .classOn("recordings-modal", "hidden")
       .appendTo(this.wrapper);
 
+    this.dom.recordingsScreen.on("click", (e) => {
+      if (e.target === this.dom.recordingsScreen.elm)
+        this.toggleRecordingsList(false);
+    });
+
     const recContent = new Html("div")
       .classOn("recordings-content")
       .appendTo(this.dom.recordingsScreen);
 
     const recHeader = new Html("div")
-      .classOn("recordings-header")
+      .styleJs({
+        padding: "1rem 1.5rem",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
+        flexShrink: "0",
+      })
       .appendTo(recContent);
 
-    new Html("h1").text("RECORDING SESSIONS").appendTo(recHeader);
-    new Html("div")
-      .classOn("rec-key-hint")
-      .html(
-        "<kbd>ESC</kbd> Close &nbsp;&nbsp; <kbd>DEL</kbd> Delete &nbsp;&nbsp; <kbd>ENTER</kbd> Play",
-      )
+    new Html("h1")
+      .text("RECORDING SESSIONS")
+      .styleJs({
+        margin: "0",
+        fontSize: "1.8rem",
+        letterSpacing: "0.1em",
+        color: "#89cff0",
+      })
+      .appendTo(recHeader);
+
+    new Html("p")
+      .text("Navigate: Arrows | Play: Enter | Delete: Del | Close: ESC")
+      .styleJs({
+        margin: "0.25rem 0 0 0",
+        color: "#89cff0",
+        fontWeight: "600",
+        fontSize: "1rem",
+        opacity: "0.6",
+      })
       .appendTo(recHeader);
 
     this.dom.recordingsList = new Html("div")
@@ -1376,23 +1398,65 @@ class EncoreController {
       .classOn("rec-delete-overlay", "hidden")
       .appendTo(this.dom.recordingsScreen);
 
+    this.dom.recDeleteOverlay.on("click", (e) => {
+      if (e.target === this.dom.recDeleteOverlay.elm) this.cancelDeletePrompt();
+    });
+
     const deleteBox = new Html("div")
       .classOn("rec-delete-box")
       .appendTo(this.dom.recDeleteOverlay);
+
     new Html("h2").text("DELETE RECORDING?").appendTo(deleteBox);
     this.dom.recDeleteText = new Html("p").appendTo(deleteBox);
-    new Html("div")
-      .classOn("rec-key-hint")
-      .html("<kbd>ENTER</kbd> Confirm &nbsp;&nbsp; <kbd>ESC</kbd> Cancel")
+
+    const btnRow = new Html("div")
+      .styleJs({
+        display: "flex",
+        justifyContent: "center",
+        gap: "1rem",
+        marginTop: "1rem",
+      })
+      .appendTo(deleteBox);
+
+    new Html("button")
+      .text("CANCEL")
+      .on("click", () => this.cancelDeletePrompt())
+      .appendTo(btnRow);
+
+    new Html("button")
+      .classOn("negative")
+      .text("DELETE")
+      .on("click", () => this.confirmDeleteRecording())
+      .appendTo(btnRow);
+
+    new Html("p")
+      .text("Confirm: Enter | Cancel: ESC")
+      .styleJs({
+        margin: "1.5rem 0 0 0",
+        color: "#ff5555",
+        fontWeight: "600",
+        fontSize: "1rem",
+        opacity: "0.6",
+      })
       .appendTo(deleteBox);
 
     this.dom.recPlayerOverlay = new Html("div")
       .classOn("rec-player-overlay", "hidden")
       .appendTo(this.wrapper);
 
+    this.dom.recPlayerOverlay.on("click", (e) => {
+      if (e.target === this.dom.recPlayerOverlay.elm)
+        this.closeRecordingPlayer();
+    });
+
     this.dom.recVideoPlayer = new Html("video")
       .classOn("rec-video-element")
       .appendTo(this.dom.recPlayerOverlay);
+
+    this.dom.recVideoPlayer.on("click", () => {
+      const v = this.dom.recVideoPlayer.elm;
+      v.paused ? v.play() : v.pause();
+    });
 
     this.dom.recVideoOsd = new Html("div")
       .classOn("rec-video-osd")
@@ -1415,15 +1479,20 @@ class EncoreController {
     const osdBottom = new Html("div")
       .classOn("rec-osd-bottom")
       .appendTo(this.dom.recVideoOsd);
+
     this.dom.recVideoTime = new Html("div")
       .classOn("rec-video-time")
       .text("00:00 / 00:00")
       .appendTo(osdBottom);
+
     new Html("div")
-      .classOn("rec-key-hint")
-      .html(
-        "<kbd>SPACE</kbd> Play/Pause &nbsp;&nbsp; <kbd>←</kbd> <kbd>→</kbd> Seek &nbsp;&nbsp; <kbd>-</kbd> <kbd>=</kbd> Vol &nbsp;&nbsp; <kbd>ESC</kbd> Stop",
-      )
+      .text("Play/Pause: Space | Seek: ←/→ | Vol: -/= | Close: ESC")
+      .styleJs({
+        color: "#ffd700",
+        fontWeight: "600",
+        fontSize: "1rem",
+        opacity: "0.6",
+      })
       .appendTo(osdBottom);
 
     this.dom.recVideoPlayer.on("timeupdate", () => {
@@ -1490,7 +1559,13 @@ class EncoreController {
         await window.desktopIntegration.ipc.invoke("get-recordings");
       if (!recordings || recordings.length === 0) {
         new Html("div")
-          .classOn("rec-empty-state")
+          .styleJs({
+            opacity: "0.5",
+            fontStyle: "italic",
+            padding: "2rem",
+            textAlign: "center",
+            fontSize: "1.2rem",
+          })
           .text("No recordings found. Go sing a song and capture the moment!")
           .appendTo(this.dom.recordingsList);
         return;
@@ -1498,24 +1573,78 @@ class EncoreController {
 
       this.state.recordingsData = recordings;
 
-      this.state.recordingsData.forEach((rec) => {
+      this.state.recordingsData.forEach((rec, idx) => {
         const item = new Html("div")
           .classOn("rec-item")
+          .styleJs({ cursor: "pointer" })
           .appendTo(this.dom.recordingsList);
+
         const displayTitle =
           rec.title.split("-").slice(0, -3).join("-") || rec.title;
 
-        new Html("div").classOn("rec-title").text(displayTitle).appendTo(item);
+        const infoCol = new Html("div")
+          .styleJs({ display: "flex", flexDirection: "column", flexGrow: "1" })
+          .appendTo(item);
+
+        new Html("div")
+          .classOn("rec-title")
+          .text(displayTitle)
+          .appendTo(infoCol);
         new Html("div")
           .classOn("rec-date")
           .text(new Date(rec.date).toLocaleString())
+          .appendTo(infoCol);
+
+        const deleteBtn = new Html("div")
+          .text("✕")
+          .styleJs({
+            color: "rgba(255, 85, 85, 0.5)",
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "1.5rem",
+            padding: "0.5rem 1rem",
+            marginLeft: "1rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "color 0.2s ease, transform 0.2s ease",
+          })
           .appendTo(item);
+
+        deleteBtn.elm.onmouseover = () =>
+          deleteBtn.styleJs({ color: "#ff5555", transform: "scale(1.2)" });
+        deleteBtn.elm.onmouseout = () =>
+          deleteBtn.styleJs({
+            color: "rgba(255, 85, 85, 0.5)",
+            transform: "scale(1)",
+          });
+
+        item.on("click", (e) => {
+          if (e.target === deleteBtn.elm) return;
+          this.state.highlightedRecordingIndex = idx;
+          this.updateRecordingsHighlight();
+          this.playRecording(rec);
+        });
+
+        deleteBtn.on("click", (e) => {
+          e.stopPropagation();
+          this.state.highlightedRecordingIndex = idx;
+          this.updateRecordingsHighlight();
+          this.openDeletePrompt(rec);
+        });
       });
 
       this.updateRecordingsHighlight();
     } catch (e) {
       new Html("div")
-        .classOn("rec-empty-state")
+        .styleJs({
+          opacity: "0.5",
+          fontStyle: "italic",
+          padding: "2rem",
+          textAlign: "center",
+          fontSize: "1.2rem",
+          color: "#ff5555",
+        })
         .text("Failed to load recordings.")
         .appendTo(this.dom.recordingsList);
     }

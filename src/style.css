@@ -2219,9 +2219,11 @@ p + .flex-list button {
   transition:
     background-color 0.2s ease,
     border-color 0.2s ease;
+  cursor: var(--cursor-pointer), pointer;
 }
 
-.rec-item.active {
+.rec-item.active,
+.rec-item:hover {
   background-color: rgba(137, 207, 240, 0.2);
   border-left-color: #89cff0;
 }
