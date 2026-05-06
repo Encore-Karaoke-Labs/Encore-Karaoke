@@ -457,6 +457,24 @@ class EncoreSetupController {
             },
           },
           {
+            id: "enable_monitor",
+            label: "Enable Real-time Monitoring (Experimental)",
+            type: "select",
+            options: [
+              { value: false, label: "Disabled" },
+              { value: true, label: "Enabled" },
+            ],
+            get: () => this.config.audioConfig?.enableMicMonitor ?? false,
+            set: (v) => {
+              this.config.audioConfig ??= {};
+              this.config.audioConfig.enableMicMonitor = v;
+              window.config.setItem("audioConfig.enableMicMonitor", v);
+              if (this.Forte.setMicMonitorEnabled) {
+                this.Forte.setMicMonitorEnabled(v);
+              }
+            },
+          },
+          {
             id: "latency",
             label: "Mic Latency Override (ms)",
             type: "range",
