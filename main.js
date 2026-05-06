@@ -34,6 +34,7 @@ const mime = require("mime-types");
 
 const { Client } = require("@xhayper/discord-rpc");
 const Config = require("./config-manager");
+const { log } = require("console");
 
 // Logging System
 const logger = {
@@ -55,6 +56,7 @@ const versionInformation = {
 };
 
 const kioskEnabled = process.argv.includes("--kiosk");
+const isLowLatency = process.argv.includes("--low-latency");
 const isDev = process.argv.includes("--dev");
 
 let PORT = 0;
@@ -524,6 +526,16 @@ const createWindow = () => {
   win.webContents.on("before-input-event", handleSpecialKeys);
   appView.webContents.on("before-input-event", handleSpecialKeys);
 };
+
+if (isLowLatency) {
+  logger.warn(
+    "SYSTEM",
+    "Low-latency audio mode is VERY experimental and may lead to degraded audio performance!",
+  );
+  app.commandLine.appendSwitch("audio-buffer-size", "256");
+  app.commandLine.appendSwitch("enable-exclusive-audio");
+  app.commandLine.appendSwitch("alsa-output-buffer-size", "512");
+}
 
 app.whenReady().then(() => {
   setupDiscordRPC();
