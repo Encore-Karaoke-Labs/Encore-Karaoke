@@ -1141,24 +1141,19 @@ class EncoreController {
     }
 
     const baseHeight = Math.max(250, mainFontSize * 10);
-    const requiredHeight = Math.max(baseHeight, currentY + mainFontSize * 0.5);
+    const requiredHeight = Math.max(baseHeight, currentY + mainFontSize);
     const dpr = window.devicePixelRatio || 1;
 
-    if (Math.abs(this.logicalHeight - requiredHeight) > 1) {
-      this.logicalHeight = requiredHeight;
-      this.dom.lyricsCanvas.elm.height = requiredHeight * dpr;
-      this.dom.lyricsCanvas.styleJs({ height: `${requiredHeight}px` });
+    this.logicalHeight = requiredHeight;
 
-      if (this.lyricsCtx) {
-        this.lyricsCtx.setTransform(1, 0, 0, 1, 0, 0);
-        this.lyricsCtx.scale(dpr, dpr);
-      }
+    const currentPhysicalHeight = this.dom.lyricsCanvas.elm.height;
+    const requiredPhysicalHeight = requiredHeight * dpr;
+
+    if (Math.abs(currentPhysicalHeight - requiredPhysicalHeight) > 1) {
+      this.pendingCanvasHeight = requiredHeight;
     }
 
-    const yOffset = Math.max(
-      0,
-      this.logicalHeight - currentY - mainFontSize * 0.5,
-    );
+    const yOffset = Math.max(0, this.logicalHeight - currentY - mainFontSize);
 
     if (this.renderableLines) {
       for (let i = 0; i < this.renderableLines.length; i++) {
@@ -1322,8 +1317,20 @@ class EncoreController {
     const canvas = this.dom.lyricsCanvas.elm;
     const logicalWidth =
       parseFloat(canvas.style.width) || window.innerWidth * 0.9;
-    const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
 
+    if (this.pendingCanvasHeight) {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.height = this.pendingCanvasHeight * dpr;
+      this.dom.lyricsCanvas.styleJs({
+        height: `${this.pendingCanvasHeight}px`,
+      });
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      this.pendingCanvasHeight = null;
+      this.requestCanvasCacheUpdate = true;
+    }
+
+    const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
     const mainFontSize = Math.floor(logicalWidth * 0.045);
     const subFontSize = Math.floor(logicalWidth * 0.018);
 
