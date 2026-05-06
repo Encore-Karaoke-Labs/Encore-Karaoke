@@ -916,6 +916,8 @@ class EncoreController {
 
     const mainFontSize = Math.floor(logicalWidth * 0.045);
     const subFontSize = Math.floor(logicalWidth * 0.018);
+    const mainFontStr = `900 ${mainFontSize}px "Radio Canada", sans-serif`;
+    const rubyFontStr = `700 ${subFontSize}px "Radio Canada", sans-serif`;
 
     const lineSpacing = mainFontSize * 1.5;
     const paragraphGap = mainFontSize * 2.4;
@@ -926,106 +928,200 @@ class EncoreController {
     const buildLineLayout = (lineData, isNextLine) => {
       if (!lineData || lineData.length === 0) return;
 
-      let currentX = 0;
-      let row = [];
-      let rows = [row];
+      const flatSyllables = [];
+      ctx.font = mainFontStr;
 
-      ctx.font = `900 ${mainFontSize}px "Radio Canada", sans-serif`;
+      for (let i = 0; i < lineData.length; i++) {
+        const s = lineData[i];
+        if (!s.furigana && !s.romanized && s.text && s.text.match(/[ 　]/)) {
+          const parts = s.text.match(/([^ 　]+[ 　]*|[ 　]+)/g);
+          if (parts && parts.length > 1) {
+            const totalWidth = ctx.measureText(s.text).width;
+            let curAbs = s.absoluteTime;
+            const totDur = s.endTime - s.absoluteTime || 0;
 
-      let words = [];
+            for (let j = 0; j < parts.length; j++) {
+              const p = parts[j];
+              const pW = ctx.measureText(p).width;
+              const pDur =
+                totalWidth > 0
+                  ? totDur * (pW / totalWidth)
+                  : totDur / parts.length;
+              flatSyllables.push({
+                ...s,
+                text: p,
+                rawText: p,
+                absoluteTime: curAbs,
+                endTime: curAbs + pDur,
+              });
+              curAbs += pDur;
+            }
+            continue;
+          }
+        }
+        flatSyllables.push({ ...s });
+      }
+
+      const words = [];
       let currentWord = [];
 
-      lineData.forEach((s) => {
-        if (
-          currentWord.length > 0 &&
-          (s.rawText.startsWith(" ") || s.rawText.startsWith("　"))
-        ) {
-          words.push(currentWord);
-          currentWord = [];
+      for (let i = 0; i < flatSyllables.length; i++) {
+        const s = flatSyllables[i];
+        const isAsian = this.asianRegex.test(s.rawText || "");
+
+        if (currentWord.length > 0) {
+          const prev = currentWord[currentWord.length - 1];
+          const prevAsian = this.asianRegex.test(prev.rawText || "");
+          if (
+            s.rawText.startsWith(" ") ||
+            s.rawText.startsWith("　") ||
+            isAsian ||
+            prevAsian
+          ) {
+            words.push({ syllables: currentWord });
+            currentWord = [];
+          }
         }
+
+        ctx.font = rubyFontStr;
+        s.furiW = s.furigana ? ctx.measureText(s.furigana).width : 0;
+        s.romW = s.romanized ? ctx.measureText(s.romanized).width : 0;
+
+        ctx.font = mainFontStr;
+        s.standaloneW = s.text ? ctx.measureText(s.text).width : 0;
 
         currentWord.push(s);
+      }
+      if (currentWord.length > 0) words.push({ syllables: currentWord });
 
-        if (s.rawText.endsWith(" ") || s.rawText.endsWith("　")) {
-          words.push(currentWord);
-          currentWord = [];
-        }
-      });
-      if (currentWord.length > 0) words.push(currentWord);
-
-      words.forEach((word) => {
-        let accText = "";
-        let previousSubWidth = 0;
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i].syllables;
         let requiresExpansion = false;
 
-        word.forEach((s) => {
-          ctx.font = `900 ${mainFontSize}px "Radio Canada", sans-serif`;
-          s.standaloneW = s.text ? ctx.measureText(s.text).width : 0;
-
-          ctx.font = `700 ${subFontSize}px "Radio Canada", sans-serif`;
-          s.furiW = s.furigana ? ctx.measureText(s.furigana).width : 0;
-          s.romW = s.romanized ? ctx.measureText(s.romanized).width : 0;
-
-          if (s.furiW > s.standaloneW || s.romW > s.standaloneW) {
+        for (let j = 0; j < word.length; j++) {
+          if (
+            word[j].furiW > word[j].standaloneW ||
+            word[j].romW > word[j].standaloneW
+          ) {
             requiresExpansion = true;
+            break;
           }
-        });
+        }
 
-        let fullWordText = word.map((s) => s.text || "").join("");
+        let accText = "";
+        let previousSubWidth = 0;
+        let wordTotalWidth = 0;
 
-        word.forEach((s, index) => {
-          ctx.font = `900 ${mainFontSize}px "Radio Canada", sans-serif`;
-
+        for (let j = 0; j < word.length; j++) {
+          const s = word[j];
           if (requiresExpansion) {
             s.origW = s.standaloneW;
             s.blockWidth = Math.max(s.origW, s.furiW, s.romW);
             s.isPartOfContinuousWord = false;
           } else {
             accText += s.text || "";
-            let currentSubWidth = ctx.measureText(accText).width;
+            const currentSubWidth = ctx.measureText(accText).width;
             s.origW = Math.max(0, currentSubWidth - previousSubWidth);
             previousSubWidth = currentSubWidth;
-
             s.blockWidth = s.origW;
             s.isPartOfContinuousWord = true;
-            if (index === 0) {
-              s.isContinuousWordStart = true;
-              s.continuousWordText = fullWordText;
-            }
           }
-        });
-      });
 
-      words.forEach((word) => {
-        let wordTotalWidth = word.reduce((sum, s) => sum + s.blockWidth, 0);
-
-        if (currentX + wordTotalWidth > logicalWidth * 0.95 && row.length > 0) {
-          currentX = 0;
-          row = [];
-          rows.push(row);
+          s.isContinuousWordStart = false;
+          s.continuousWordText = "";
+          wordTotalWidth += s.blockWidth;
         }
 
-        word.forEach((s) => {
+        words[i].width = wordTotalWidth;
+      }
+
+      const rows = [];
+      let currentRow = [];
+      let currentX = 0;
+      const maxWidth = logicalWidth * 0.95;
+
+      for (let i = 0; i < words.length; i++) {
+        const wordInfo = words[i];
+        const word = wordInfo.syllables;
+
+        if (currentX + wordInfo.width > maxWidth && currentRow.length > 0) {
+          rows.push(currentRow);
+          currentRow = [];
+          currentX = 0;
+        }
+
+        let activeContinuousStart = null;
+        let activeContinuousText = "";
+
+        for (let j = 0; j < word.length; j++) {
+          const s = word[j];
+
+          if (currentX + s.blockWidth > maxWidth && currentRow.length > 0) {
+            if (activeContinuousStart) {
+              activeContinuousStart.continuousWordText = activeContinuousText;
+              activeContinuousStart = null;
+              activeContinuousText = "";
+            }
+            rows.push(currentRow);
+            currentRow = [];
+            currentX = 0;
+          }
+
           s.layoutX = currentX;
           currentX += s.blockWidth;
-          row.push(s);
-        });
-      });
+          currentRow.push(s);
 
-      rows.forEach((r) => {
-        const rowWidth = r.reduce((sum, s) => sum + s.blockWidth, 0);
+          if (s.isPartOfContinuousWord) {
+            if (!activeContinuousStart) {
+              activeContinuousStart = s;
+              s.isContinuousWordStart = true;
+            }
+            activeContinuousText += s.text || "";
+          } else {
+            if (activeContinuousStart) {
+              activeContinuousStart.continuousWordText = activeContinuousText;
+              activeContinuousStart = null;
+              activeContinuousText = "";
+            }
+          }
+        }
+
+        if (activeContinuousStart) {
+          activeContinuousStart.continuousWordText = activeContinuousText;
+        }
+      }
+      if (currentRow.length > 0) rows.push(currentRow);
+
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        let rowWidth = 0;
+        let hasFurigana = false;
+        let hasRomaji = false;
+
+        for (let j = 0; j < r.length; j++) {
+          rowWidth += r[j].blockWidth;
+          if (r[j].furiW > 0 || r[j].furigana) hasFurigana = true;
+          if (r[j].romW > 0 || r[j].romanized) hasRomaji = true;
+        }
+
         const startX = (logicalWidth - rowWidth) / 2;
+        const extraTop = hasFurigana ? mainFontSize * 0.6 : 0;
+        const extraBottom = hasRomaji ? mainFontSize * 0.6 : 0;
 
-        r.forEach((s) => {
-          s.layoutX += startX;
-          s.layoutY = currentY;
-        });
-        currentY += lineSpacing;
-      });
+        if (hasFurigana) currentY += extraTop;
+
+        for (let j = 0; j < r.length; j++) {
+          r[j].layoutX += startX;
+          r[j].layoutY = currentY;
+        }
+
+        currentY += lineSpacing + extraBottom;
+      }
 
       currentY -= lineSpacing;
       currentY += paragraphGap;
-      this.renderableLines.push({ isNextLine, syllables: lineData });
+
+      this.renderableLines.push({ isNextLine, syllables: flatSyllables });
     };
 
     if (this.state.currentSongIsMIDI) {
@@ -1044,15 +1140,33 @@ class EncoreController {
       buildLineLayout(this.currentLrcLine2?.syllables || [], !isLine2Active);
     }
 
-    const fixedHeight = this.logicalHeight || 250;
-    const yOffset = Math.max(0, fixedHeight - currentY - mainFontSize * 0.5);
+    const baseHeight = Math.max(250, mainFontSize * 10);
+    const requiredHeight = Math.max(baseHeight, currentY + mainFontSize * 0.5);
+    const dpr = window.devicePixelRatio || 1;
+
+    if (Math.abs(this.logicalHeight - requiredHeight) > 1) {
+      this.logicalHeight = requiredHeight;
+      this.dom.lyricsCanvas.elm.height = requiredHeight * dpr;
+      this.dom.lyricsCanvas.styleJs({ height: `${requiredHeight}px` });
+
+      if (this.lyricsCtx) {
+        this.lyricsCtx.setTransform(1, 0, 0, 1, 0, 0);
+        this.lyricsCtx.scale(dpr, dpr);
+      }
+    }
+
+    const yOffset = Math.max(
+      0,
+      this.logicalHeight - currentY - mainFontSize * 0.5,
+    );
 
     if (this.renderableLines) {
-      this.renderableLines.forEach((line) => {
-        line.syllables.forEach((s) => {
-          s.layoutY += yOffset;
-        });
-      });
+      for (let i = 0; i < this.renderableLines.length; i++) {
+        const line = this.renderableLines[i];
+        for (let j = 0; j < line.syllables.length; j++) {
+          line.syllables[j].layoutY += yOffset;
+        }
+      }
     }
 
     this.requestCanvasCacheUpdate = true;
