@@ -1021,8 +1021,7 @@ class EncoreSetupController {
       micSource: null,
       trackSource: null,
       trackDelayNode: null,
-      lrcData: [],
-      midiLines: [],
+      calibrationLyrics: [],
     };
     this.renderView();
   }
@@ -1047,12 +1046,48 @@ class EncoreSetupController {
 
     const pbState = this.Forte.getPlaybackState();
     this.state.manualCalib.isMidi = pbState.isMidi;
-    this.state.manualCalib.lrcData = [];
-    this.state.manualCalib.midiLines = [];
+    this.state.manualCalib.calibrationLyrics = [];
+
     if (pbState.isMidi) {
-      let currentLineText = "";
-      let startIndex = 0;
-      let displayIndex = 0;
+      const midiInfo = pbState.midiInfo;
+      let ppqm = midiInfo.timeDivision || 480;
+
+      const getSecondsForTick = (targetTick, tempoChanges, ppqm) => {
+        if (targetTick <= 0) return 0;
+        let time = 0;
+        let currentTick = 0;
+        let currentBpm = 120;
+
+        if (tempoChanges && tempoChanges.length > 0) {
+          let chronologicalChanges = tempoChanges
+            .map((tc, index) => {
+              let tick = tc.ticks !== undefined ? tc.ticks : tc.tick;
+              let val = tc.tempo || tc.bpm || 120;
+              let bpm = val > 1000 ? Math.round(60000000 / val) : val;
+              if (bpm <= 0) bpm = 120;
+              return { tick, bpm, _originalIndex: index };
+            })
+            .sort((a, b) => {
+              if (a.tick !== b.tick) return a.tick - b.tick;
+              return b._originalIndex - a._originalIndex;
+            });
+
+          for (let tc of chronologicalChanges) {
+            if (tc.tick >= targetTick) break;
+            if (tc.tick > currentTick) {
+              let deltaTicks = tc.tick - currentTick;
+              time += (deltaTicks / ppqm) * (60 / currentBpm);
+              currentTick = tc.tick;
+            }
+            currentBpm = tc.bpm;
+          }
+        }
+        let remainingTicks = targetTick - currentTick;
+        if (remainingTicks > 0) {
+          time += (remainingTicks / ppqm) * (60 / currentBpm);
+        }
+        return time;
+      };
 
       let lyricsToParse = [...pbState.decodedLyrics];
       while (
@@ -1063,59 +1098,66 @@ class EncoreSetupController {
         lyricsToParse.shift();
       }
 
+      let offsetIndex = pbState.decodedLyrics.length - lyricsToParse.length;
+      let currentLineText = "";
+      let lineStartTime = null;
+
       for (let i = 0; i < lyricsToParse.length; i++) {
         const syllable = lyricsToParse[i];
         const clean = syllable.replace(/[\r\n\/\\]/g, "");
         const startsWithNewLine = /^[\r\n\/\\\\]/.test(syllable);
         const endsWithNewLine = /[\r\n\/\\\\]$/.test(syllable);
+        const tick = midiInfo.ticks[i + offsetIndex];
+        const time = getSecondsForTick(tick, midiInfo.tempoChanges, ppqm);
 
         if (startsWithNewLine && currentLineText.trim() !== "") {
-          this.state.manualCalib.midiLines.push({
+          this.state.manualCalib.calibrationLyrics.push({
+            time: lineStartTime,
             text: currentLineText.trim(),
-            startIndex,
-            endIndex: displayIndex - 1,
           });
           currentLineText = "";
-          startIndex = displayIndex;
+          lineStartTime = null;
         }
 
         if (clean) {
+          if (lineStartTime === null) lineStartTime = time;
           currentLineText += clean.replace(/\[.*?\]/g, "");
-          displayIndex++;
         }
 
         if (endsWithNewLine && currentLineText.trim() !== "") {
-          this.state.manualCalib.midiLines.push({
+          this.state.manualCalib.calibrationLyrics.push({
+            time: lineStartTime,
             text: currentLineText.trim(),
-            startIndex,
-            endIndex: displayIndex - 1,
           });
           currentLineText = "";
-          startIndex = displayIndex;
+          lineStartTime = null;
         }
       }
+
       if (currentLineText.trim() !== "") {
-        this.state.manualCalib.midiLines.push({
+        this.state.manualCalib.calibrationLyrics.push({
+          time: lineStartTime,
           text: currentLineText.trim(),
-          startIndex,
-          endIndex: displayIndex - 1,
         });
       }
     } else if (song.lrcPath) {
       const lrcText = await this.FsSvc.readFile(song.lrcPath);
-      this.state.manualCalib.lrcData = this.parseLrc(lrcText);
+      this.state.manualCalib.calibrationLyrics = this.parseLrc(lrcText);
     }
 
     let currentLineIdx = -1;
 
     this.boundCalibTimeUpdate = (e) => {
-      if (this.state.manualCalib.isMidi) return;
       const currentTime = e.detail.currentTime;
 
-      if (this.state.manualCalib.lrcData.length > 0) {
+      if (this.state.manualCalib.calibrationLyrics.length > 0) {
         let activeIdx = -1;
-        for (let i = this.state.manualCalib.lrcData.length - 1; i >= 0; i--) {
-          if (currentTime >= this.state.manualCalib.lrcData[i].time) {
+        for (
+          let i = this.state.manualCalib.calibrationLyrics.length - 1;
+          i >= 0;
+          i--
+        ) {
+          if (currentTime >= this.state.manualCalib.calibrationLyrics[i].time) {
             activeIdx = i;
             break;
           }
@@ -1125,12 +1167,12 @@ class EncoreSetupController {
           currentLineIdx = activeIdx;
           const activeLine =
             activeIdx >= 0
-              ? this.state.manualCalib.lrcData[activeIdx].text
+              ? this.state.manualCalib.calibrationLyrics[activeIdx].text
               : "Start singing!";
           const nextLine =
             activeIdx >= 0 &&
-            activeIdx + 1 < this.state.manualCalib.lrcData.length
-              ? this.state.manualCalib.lrcData[activeIdx + 1].text
+            activeIdx + 1 < this.state.manualCalib.calibrationLyrics.length
+              ? this.state.manualCalib.calibrationLyrics[activeIdx + 1].text
               : "";
 
           if (this.calibLyricLine1) this.calibLyricLine1.text(activeLine);
@@ -1139,47 +1181,17 @@ class EncoreSetupController {
       }
     };
 
-    this.boundCalibLyricEvent = (e) => {
-      if (!this.state.manualCalib.isMidi) return;
-      const idx = e.detail.index;
-
-      const lines = this.state.manualCalib.midiLines;
-      const activeIdx = lines.findIndex(
-        (l) => idx >= l.startIndex && idx <= l.endIndex,
-      );
-
-      if (activeIdx !== -1 && activeIdx !== currentLineIdx) {
-        currentLineIdx = activeIdx;
-        const activeLine = lines[activeIdx].text;
-        const nextLine =
-          activeIdx + 1 < lines.length ? lines[activeIdx + 1].text : "";
-
-        if (this.calibLyricLine1) this.calibLyricLine1.text(activeLine);
-        if (this.calibLyricLine2) this.calibLyricLine2.text(nextLine);
-      }
-    };
-
     document.addEventListener(
       "CherryTree.Forte.Playback.TimeUpdate",
       this.boundCalibTimeUpdate,
     );
-    document.addEventListener(
-      "CherryTree.Forte.Playback.LyricEvent",
-      this.boundCalibLyricEvent,
-    );
 
     if (this.calibLyricLine1) this.calibLyricLine1.text("Start singing!");
     if (this.calibLyricLine2) {
-      if (
-        this.state.manualCalib.isMidi &&
-        this.state.manualCalib.midiLines.length > 0
-      ) {
-        this.calibLyricLine2.text(this.state.manualCalib.midiLines[0].text);
-      } else if (
-        !this.state.manualCalib.isMidi &&
-        this.state.manualCalib.lrcData.length > 0
-      ) {
-        this.calibLyricLine2.text(this.state.manualCalib.lrcData[0].text);
+      if (this.state.manualCalib.calibrationLyrics.length > 0) {
+        this.calibLyricLine2.text(
+          this.state.manualCalib.calibrationLyrics[0].text,
+        );
       }
     }
 
@@ -1215,11 +1227,6 @@ class EncoreSetupController {
       document.removeEventListener(
         "CherryTree.Forte.Playback.TimeUpdate",
         this.boundCalibTimeUpdate,
-      );
-    if (this.boundCalibLyricEvent)
-      document.removeEventListener(
-        "CherryTree.Forte.Playback.LyricEvent",
-        this.boundCalibLyricEvent,
       );
 
     const p1 = new Promise((resolve) => {
@@ -1425,11 +1432,6 @@ class EncoreSetupController {
         document.removeEventListener(
           "CherryTree.Forte.Playback.TimeUpdate",
           this.boundCalibTimeUpdate,
-        );
-      if (this.boundCalibLyricEvent)
-        document.removeEventListener(
-          "CherryTree.Forte.Playback.LyricEvent",
-          this.boundCalibLyricEvent,
         );
 
       this.Forte.stopTrack();
