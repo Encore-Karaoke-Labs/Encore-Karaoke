@@ -311,6 +311,7 @@ const state = {
     micGainInRecording: 1.0,
     micMonitorNode: null,
     micMonitorVolume: 1.0,
+    enableMicMonitor: false,
   },
   ui: {
     pianoRollVisible: true,
@@ -1093,6 +1094,9 @@ const pkg = {
 
       state.effects.micMonitorNode.parameters.get("volume").value =
         config.audioConfig?.micMonitorVolume ?? 1.0;
+
+      state.effects.enableMicMonitor =
+        config.audioConfig?.enableMicMonitor ?? false;
 
       state.effects.micChainInput.connect(state.effects.micChainOutput);
 
@@ -2766,7 +2770,10 @@ const pkg = {
         try {
           lastNode.disconnect(micMonitorNode);
         } catch (e) {}
-        lastNode.connect(micMonitorNode);
+
+        if (state.effects.enableMicMonitor) {
+          lastNode.connect(micMonitorNode);
+        }
       }
     },
 
@@ -2781,6 +2788,24 @@ const pkg = {
     setPluginParameter: (pluginIndex, paramName, value) => {
       const plugin = state.effects.vocalChain[pluginIndex];
       if (plugin) plugin.setParameter(paramName, value);
+    },
+
+    /**
+     * Enables or disables real-time microphone monitoring.
+     *
+     * @param {boolean} enabled - True to enable, False to disable.
+     */
+    setMicMonitorEnabled: (enabled) => {
+      state.effects.enableMicMonitor = !!enabled;
+
+      if (window.config && typeof window.config.setItem === "function") {
+        window.config.setItem(
+          "audioConfig.enableMicMonitor",
+          state.effects.enableMicMonitor,
+        );
+      }
+
+      pkg.data.rebuildVocalChain();
     },
 
     /**
