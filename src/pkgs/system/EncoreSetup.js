@@ -1044,6 +1044,8 @@ class EncoreSetupController {
     fileUrl.searchParams.append("path", song.path);
     await this.Forte.loadTrack(fileUrl.href);
 
+    this.Forte.togglePianoRollVisibility(false);
+
     const pbState = this.Forte.getPlaybackState();
     this.state.manualCalib.isMidi = pbState.isMidi;
     this.state.manualCalib.calibrationLyrics = [];
