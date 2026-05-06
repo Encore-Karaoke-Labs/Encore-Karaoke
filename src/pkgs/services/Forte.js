@@ -309,6 +309,8 @@ const state = {
     vocalChainConfig: [],
     musicGainInRecording: 0.2,
     micGainInRecording: 1.0,
+    micMonitorNode: null,
+    micMonitorVolume: 1.0,
   },
   ui: {
     pianoRollVisible: true,
@@ -1040,11 +1042,15 @@ const pkg = {
 
     try {
       const config = await window.config.getAll();
-      const bufferSize = config.audioConfig?.bufferSize ?? 0.1;
+      const bufferSize = config.audioConfig?.bufferSize ?? 0.05;
+
       audioContext = new (window.AudioContext || window.webkitAudioContext)({
-        latencyHint: bufferSize,
+        latencyHint: "interactive",
         sampleRate: 44100,
       });
+
+      const monitorWorkletPath = "/libs/micMonitorProcessor.js";
+      await audioContext.audioWorklet.addModule(monitorWorkletPath);
 
       masterGain = audioContext.createGain();
       sfxGain = audioContext.createGain();
@@ -1077,6 +1083,17 @@ const pkg = {
 
       state.effects.micChainInput = audioContext.createGain();
       state.effects.micChainOutput = audioContext.createGain();
+
+      state.effects.micMonitorNode = new AudioWorkletNode(
+        audioContext,
+        "mic-monitor-processor",
+      );
+
+      state.effects.micMonitorNode.connect(audioContext.destination);
+
+      state.effects.micMonitorNode.parameters.get("volume").value =
+        config.audioConfig?.micMonitorVolume ?? 1.0;
+
       state.effects.micChainInput.connect(state.effects.micChainOutput);
 
       state.effects.micChainOutput.connect(state.recording.destinationNode);
@@ -2724,12 +2741,15 @@ const pkg = {
 
     /**
      * Bridges disparate nodes constructing one coherent graph modifying stream components.
+     * Updated to support branching the Vocal Chain output into the Real-Time Monitor.
      */
     rebuildVocalChain: () => {
       logVerbose("Rebuilding vocal chain", {
         chainLength: state.effects.vocalChain.length,
       });
-      const { micChainInput, micChainOutput, vocalChain } = state.effects;
+      const { micChainInput, micChainOutput, micMonitorNode, vocalChain } =
+        state.effects;
+
       micChainInput.disconnect();
 
       let lastNode = micChainInput;
@@ -2739,7 +2759,15 @@ const pkg = {
           lastNode = plugin.output;
         });
       }
+
       lastNode.connect(micChainOutput);
+
+      if (micMonitorNode) {
+        try {
+          lastNode.disconnect(micMonitorNode);
+        } catch (e) {}
+        lastNode.connect(micMonitorNode);
+      }
     },
 
     /**
@@ -2753,6 +2781,30 @@ const pkg = {
     setPluginParameter: (pluginIndex, paramName, value) => {
       const plugin = state.effects.vocalChain[pluginIndex];
       if (plugin) plugin.setParameter(paramName, value);
+    },
+
+    /**
+     * Instantly sets the real-time playback volume of the singer's voice.
+     *
+     * @param {number} level - Monitor mapping gain values from 0.0 to 2.0.
+     */
+    setMicMonitorVolume: (level) => {
+      const clamped = Math.max(0, Math.min(2, level));
+      state.effects.micMonitorVolume = clamped;
+
+      if (state.effects.micMonitorNode) {
+        const volumeParam =
+          state.effects.micMonitorNode.parameters.get("volume");
+        volumeParam.setTargetAtTime(clamped, audioContext.currentTime, 0.01);
+      }
+
+      if (saveVolumesTimeout) clearTimeout(saveVolumesTimeout);
+      saveVolumesTimeout = setTimeout(() => {
+        if (window.config && typeof window.config.setItem === "function") {
+          window.config.setItem("audioConfig.micMonitorVolume", clamped);
+          logVerbose("Saved mic monitor volume to disk.");
+        }
+      }, 300);
     },
 
     /**
@@ -2820,6 +2872,7 @@ const pkg = {
       return {
         micGain: state.effects.micGainInRecording,
         musicGain: state.effects.musicGainInRecording,
+        micMonitorVolume: state.effects.micMonitorVolume,
         chain: chainState,
         rawConfig: state.effects.vocalChainConfig || [],
       };
@@ -2842,6 +2895,8 @@ const pkg = {
       if (state.effects.micChainInput) state.effects.micChainInput.disconnect();
       if (state.effects.micChainOutput)
         state.effects.micChainOutput.disconnect();
+      if (state.effects.micMonitorNode)
+        state.effects.micMonitorNode.disconnect();
       state.effects.vocalChain.forEach((p) => p.disconnect());
       if (masterCompressor) masterCompressor.disconnect();
       if (state.recording.destinationNode)

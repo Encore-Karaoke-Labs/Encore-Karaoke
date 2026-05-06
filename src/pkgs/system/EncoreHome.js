@@ -272,6 +272,9 @@ class EncoreController {
         this.config.audioConfig.musicRecordingVolume,
       );
     }
+    if (this.config.audioConfig?.micMonitorVolume !== undefined) {
+      this.Forte.setMicMonitorVolume(this.config.audioConfig.micMonitorVolume);
+    }
     if (this.config.audioConfig?.micLatency) {
       await this.Forte.setLatency(this.config.audioConfig.micLatency);
     }
@@ -4137,8 +4140,12 @@ class EncoreController {
     else if (e.key === "ArrowDown") this.handleNav("down");
     else if (e.key === "ArrowLeft") this.handlePan("left");
     else if (e.key === "ArrowRight") this.handlePan("right");
-    else if (e.key === "-") this.handleVolume("down");
-    else if (e.key === "=") this.handleVolume("up");
+    else if (e.key === "-" && !e.shiftKey) this.handleVolume("down");
+    else if (e.key === "=" && !e.shiftKey) this.handleVolume("up");
+    else if (e.key === "_" || (e.key === "-" && e.shiftKey))
+      this.handleMicVolume("down");
+    else if (e.key === "+" || (e.key === "=" && e.shiftKey))
+      this.handleMicVolume("up");
     else if (e.key === "[" || e.key === "]") this.handleBracket(e.key);
     else if (e.key === ";") this.cycleDrumPreset("left");
     else if (e.key === "'") this.cycleDrumPreset("right");
@@ -4665,6 +4672,28 @@ class EncoreController {
     window.config.setItem(
       "audioConfig.mix.instrumental.volume",
       this.state.volume,
+    );
+  }
+
+  /**
+   * Translates mic volume commands into live monitor level shifts.
+   *
+   * @param {string} dir - Literal string "up" or "down".
+   */
+  handleMicVolume(dir) {
+    let currentVol = this.Forte.getVocalChainState().micMonitorVolume ?? 1.0;
+    let newVol = Math.max(
+      0,
+      Math.min(2.0, currentVol + (dir === "up" ? 0.05 : -0.05)),
+    );
+
+    this.Forte.setMicMonitorVolume(newVol);
+
+    const p = Math.round(newVol * 100);
+    this.infoBar.showTemp(
+      "MIC VOLUME",
+      `<div class="volume-display"><div class="volume-slider-container"><div class="volume-slider-fill" style="width: ${p / 2}%"></div></div><span class="volume-percentage">${p}%</span></div>`,
+      3000,
     );
   }
 
