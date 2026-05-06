@@ -71,19 +71,21 @@ _Note: For Multiplex tracks (where vocals are on one channel and instrumentals o
 
 Encore can be fully controlled via a standard keyboard, a connected USB Numpad, or the Encore Link mobile app.
 
-| Key            | Action                                               |
-| :------------- | :--------------------------------------------------- |
-| `0-9`          | Type song code to reserve/play                       |
-| `Enter`        | Confirm reservation / Play highlighted song          |
-| `Escape`       | Stop playback / Clear input / Go back                |
-| `Y`            | Open Search Menu (Local + YouTube)                   |
-| `M`            | Open Mixer (Adjust Mic & Music levels)               |
-| `R`            | Toggle recording (during playback) / View recordings |
-| `- / =`        | Adjust volume                                        |
-| `Up / Down`    | Pitch shift (Transpose) up/down                      |
-| `Left / Right` | Multiplex Pan (Toggle guide vocal on/off)            |
-| `[ / ]`        | Cycle Background Videos (BGVs) / Video Sync offset   |
-| `F2`           | **Enter Setup Mode** (While booting or in main menu) |
+| Key             | Action                                               |
+| :-------------- | :--------------------------------------------------- |
+| `0-9`           | Type song code to reserve/play                       |
+| `Enter`         | Confirm reservation / Play highlighted song          |
+| `Escape`        | Stop playback / Clear input / Go back                |
+| `Y`             | Open Search Menu (Local + YouTube)                   |
+| `M`             | Open Mixer (Adjust Mic & Music levels)               |
+| `R`             | Toggle recording (during playback) / View recordings |
+| `- / =`         | Adjust volume                                        |
+| `Shift + - / =` | Adjust mic monitoring volume                         |
+| `Up / Down`     | Pitch shift (Transpose) up/down                      |
+| `Left / Right`  | Multiplex pan (Toggle guide vocal on/off)            |
+| `' / "`         | Change drum presets                                  |
+| `[ / ]`         | Cycle background videos (BGVs) / Video sync offset   |
+| `F2`            | **Enter Setup Mode** (While booting or in main menu) |
 
 ---
 
@@ -104,7 +106,7 @@ Pressing **`F2`** while playback is stopped will switch Encore into **Setup Mode
 ### Installing
 
 > [!NOTE]
-> Currently, these installers are only available for Windows.
+> Currently, versions 1.0.0 to 1.3.1 are only available for Windows. Future versions (1.4.0+) support Linux.
 
 Ready-to-use installers are available on the [Releases](https://github.com/Encore-Karaoke-Labs/Encore-Karaoke/releases) page.
 
