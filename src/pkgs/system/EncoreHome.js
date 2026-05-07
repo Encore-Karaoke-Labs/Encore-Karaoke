@@ -3020,6 +3020,8 @@ class EncoreController {
       let offsetIndex = pbState.decodedLyrics.length - lyricsToParse.length;
 
       let currentDuetRole = "a";
+      let sunplusHashtagGroup = [];
+      let hasSunplusCountdowns = false;
 
       for (let i = 0; i < lyricsToParse.length; i++) {
         const syllableText = lyricsToParse[i];
@@ -3034,6 +3036,44 @@ class EncoreController {
         const endsWithNewLine = /[\r\n\/\\\\]$/.test(syllableText);
         let cleanText = syllableText.replace(/[\r\n\/\\]/g, "");
         let displayText = cleanText;
+
+        const sunplusMatch = displayText.match(/^@(m|w)/i);
+        if (sunplusMatch) {
+          const role = sunplusMatch[1].toLowerCase();
+          currentDuetRole = role === "w" ? "f" : "m";
+          displayText = displayText.substring(sunplusMatch[0].length);
+        }
+
+        let isSunplusCountdown = false;
+        if (displayText.trim() === "#") {
+          sunplusHashtagGroup.push(absoluteTime);
+          hasSunplusCountdowns = true;
+          continue;
+        }
+
+        if (sunplusHashtagGroup.length > 0) {
+          const len = sunplusHashtagGroup.length;
+          this.countdowns.push({
+            t3:
+              len >= 4
+                ? sunplusHashtagGroup[len - 4]
+                : len === 3
+                  ? sunplusHashtagGroup[0]
+                  : 0,
+            t2:
+              len >= 3
+                ? sunplusHashtagGroup[len - 3]
+                : len === 2
+                  ? sunplusHashtagGroup[0]
+                  : 0,
+            t1:
+              len >= 2
+                ? sunplusHashtagGroup[len - 2]
+                : sunplusHashtagGroup[len - 1],
+            t0: absoluteTime,
+          });
+          sunplusHashtagGroup = [];
+        }
 
         const markerMatch = displayText.match(/\[(m|f|m2|f2|a)\]/g);
         if (markerMatch) {
@@ -3073,10 +3113,14 @@ class EncoreController {
             absoluteTime: absoluteTime,
             durationTicks: 0,
             duetRole: currentDuetRole,
-            isHidden: displayText.length === 0,
+            isHidden: displayText.length === 0 || isSunplusCountdown,
           };
           allSyllables.push(syllable);
-          currentLineSyllables.push(syllable);
+
+          if (!isSunplusCountdown) {
+            currentLineSyllables.push(syllable);
+          }
+
           displayableSyllableIndex++;
         }
         if (endsWithNewLine && cleanText && currentLineSyllables.length > 0) {
@@ -3086,7 +3130,11 @@ class EncoreController {
       }
       if (currentLineSyllables.length > 0) lines.push(currentLineSyllables);
 
-      if (allSyllables.length > 0 && allSyllables[0].tick >= 8 * ppqm) {
+      if (
+        !hasSunplusCountdowns &&
+        allSyllables.length > 0 &&
+        allSyllables[0].tick >= 8 * ppqm
+      ) {
         let nTick = allSyllables[0].tick;
         this.countdowns.push({
           t3: getSecondsForTick(nTick - 3 * ppqm, midiInfo.tempoChanges, ppqm),
@@ -3125,25 +3173,26 @@ class EncoreController {
             start: getSecondsForTick(intStart, midiInfo.tempoChanges, ppqm),
             end: getSecondsForTick(intEnd, midiInfo.tempoChanges, ppqm),
           });
-
-          this.countdowns.push({
-            t3: getSecondsForTick(
-              next.tick - 3 * ppqm,
-              midiInfo.tempoChanges,
-              ppqm,
-            ),
-            t2: getSecondsForTick(
-              next.tick - 2 * ppqm,
-              midiInfo.tempoChanges,
-              ppqm,
-            ),
-            t1: getSecondsForTick(
-              next.tick - 1 * ppqm,
-              midiInfo.tempoChanges,
-              ppqm,
-            ),
-            t0: getSecondsForTick(next.tick, midiInfo.tempoChanges, ppqm),
-          });
+          if (!hasSunplusCountdowns) {
+            this.countdowns.push({
+              t3: getSecondsForTick(
+                next.tick - 3 * ppqm,
+                midiInfo.tempoChanges,
+                ppqm,
+              ),
+              t2: getSecondsForTick(
+                next.tick - 2 * ppqm,
+                midiInfo.tempoChanges,
+                ppqm,
+              ),
+              t1: getSecondsForTick(
+                next.tick - 1 * ppqm,
+                midiInfo.tempoChanges,
+                ppqm,
+              ),
+              t0: getSecondsForTick(next.tick, midiInfo.tempoChanges, ppqm),
+            });
+          }
         }
       }
       if (allSyllables.length > 0) {
