@@ -1643,6 +1643,10 @@ const pkg = {
                 );
               }
 
+              if (cleanText && cleanText == "SJMidiSrc-SJM Karaoke") {
+                logVerbose("This is a Sunplus karaoke file");
+              }
+
               if (
                 cleanText &&
                 !cleanText.startsWith("@") &&
