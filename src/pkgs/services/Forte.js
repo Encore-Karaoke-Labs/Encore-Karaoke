@@ -1647,10 +1647,16 @@ const pkg = {
                 logVerbose("This is a Sunplus karaoke file");
               }
 
+              const trimmedClean = cleanText.trim();
+              const isSunplusLyric =
+                trimmedClean === "#" ||
+                cleanText.startsWith("@m") ||
+                cleanText.startsWith("@w");
+
               if (
                 cleanText &&
-                !cleanText.startsWith("@") &&
-                !cleanText.startsWith("#")
+                (isSunplusLyric ||
+                  (!cleanText.startsWith("@") && !cleanText.startsWith("#")))
               ) {
                 let isVerifiedLyric = false;
 
@@ -1867,6 +1873,16 @@ const pkg = {
               .map((text) => text.replace(/[\/\\]/g, "\n"))
               .filter((text) => {
                 const clean = text.replace(/[\r\n\/\\]/g, "");
+                const trimmed = clean.trim();
+
+                // Sunplus compatibility
+                if (
+                  trimmed === "#" ||
+                  clean.startsWith("@m") ||
+                  clean.startsWith("@w")
+                )
+                  return true;
+
                 return !clean.startsWith("@") && !clean.startsWith("#");
               });
           } else {
