@@ -2136,6 +2136,7 @@ const pkg = {
       }
 
       if (state.playback.isMidi) {
+        state.playback.synthesizer.setMasterParameter("transposition", 0);
         if (state.playback.sequencer) {
           try {
             state.playback.sequencer.pause();
