@@ -1561,6 +1561,7 @@ const pkg = {
 
           state.playback.sequencer = new Sequencer(state.playback.synthesizer);
           state.playback.sequencer.loop = false;
+          state.playback.synthesizer.setMasterParameter("transposition", 0);
 
           bindSpessaEvent(
             state.playback.sequencer.eventHandler,
