@@ -32,6 +32,7 @@
     "cors": "^2.8.5",
     "electron-squirrel-startup": "^1.0.1",
     "express": "^4.19.2",
+    "fuse.js": "^7.3.0",
     "kuroshiro": "^1.2.0",
     "kuroshiro-analyzer-kuromoji": "^1.1.0",
     "localforage": "^1.10.0",
