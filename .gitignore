@@ -136,3 +136,6 @@ thumbnails/
 
 # esbuild output
 resources/
+
+# proof-of-concept web version, will ignore for now
+ozone-layer/
