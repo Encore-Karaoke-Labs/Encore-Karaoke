@@ -116,6 +116,11 @@ class EncoreController {
       pendingDeleteRec: null,
       recordingsData: [],
       highlightedRecordingIndex: 0,
+      isSessionActive: false,
+      sessionMode: "lounge", // 'lounge' | 'performance'
+      sessionRoomId: null,
+      isSessionHost: false,
+      lastPlayTrigger: null,
     };
 
     console.log("[Encore] Enable fanfare?", this.state.isScoreFanfareEnabled);
@@ -312,6 +317,78 @@ class EncoreController {
       lyricsCanvas: this.dom.lyricsCanvas,
       scoreDisplay: this.scoreHud.scoreDisplay,
       danmakuCanvas: this.dom.danmakuCanvas,
+    });
+
+    this.SessionsSvc = this.Root.Processes.getService("SessionsSvc").data;
+
+    document.addEventListener("CherryTree.Sessions.StateUpdate", (e) => {
+      const sState = e.detail;
+      const prevMode = this.state.sessionMode;
+      this.state.sessionMode = sState.mode;
+
+      if (sState.mode === "performance") {
+        this.stopLoungeBackground();
+
+        if (sState.playTrigger !== this.state.lastPlayTrigger) {
+          this.state.lastPlayTrigger = sState.playTrigger;
+
+          if (sState.singerId === this.SessionsSvc.peer.id) {
+            this.dom.sessionRemoteContainer.classOn("hidden");
+            this.dom.sessionRemoteVideo.elm.srcObject = null;
+
+            if (sState.nowPlaying) {
+              this.startPlayer(sState.nowPlaying);
+              setTimeout(() => {
+                const stream = this.recorder.getBroadcastStream();
+                if (stream) this.SessionsSvc.broadcastPerformance(stream);
+              }, 1000);
+            }
+          } else {
+            this.stopPlayer();
+            this.setMode("player");
+
+            this.dom.playerUi.classOn("hidden");
+            this.dom.bgvContainer.classOn("hidden");
+            this.dom.introCard.classOff("visible");
+            if (this.lyricsCtx) {
+              this.lyricsCtx.clearRect(
+                0,
+                0,
+                this.dom.lyricsCanvas.elm.width,
+                this.dom.lyricsCanvas.elm.height,
+              );
+            }
+
+            this.dom.sessionRemoteContainer.classOff("hidden");
+            this.infoBar.showTemp(
+              "PERFORMANCE",
+              `Watching ${sState.nowPlaying?.requesterNickname || "Singer"}'s Stream`,
+              5000,
+            );
+          }
+        }
+      } else if (sState.mode === "lounge" && prevMode !== "lounge") {
+        this.dom.sessionRemoteContainer.classOn("hidden");
+        this.dom.sessionRemoteVideo.elm.srcObject = null;
+        if (this.recorder) this.recorder.stopBroadcastStream();
+
+        this.setMode("menu");
+        this.startLoungeBackground();
+        this.infoBar.showTemp("SESSIONS", "Returned to Lounge.", 3000);
+      }
+    });
+
+    document.addEventListener("CherryTree.Sessions.RemoteStream", (e) => {
+      this.dom.sessionRemoteVideo.elm.srcObject = e.detail;
+      this.dom.sessionRemoteVideo.elm.volume = this.state.volume;
+    });
+
+    document.addEventListener("CherryTree.Sessions.LoungeStream", (e) => {
+      this.Forte.playRemoteStream(e.detail.id, e.detail.stream);
+    });
+
+    document.addEventListener("CherryTree.Sessions.ClearStreams", () => {
+      this.Forte.clearRemoteStreams();
     });
 
     window.addEventListener("keydown", this.boundKeydown);
@@ -799,6 +876,23 @@ class EncoreController {
     this.drawDanmakuFrame();
 
     this.buildRecordingsUI();
+
+    this.dom.sessionRemoteContainer = new Html("div")
+      .classOn("session-remote-container", "hidden")
+      .styleJs({ position: "absolute", inset: "0", zIndex: "1" })
+      .appendTo(this.wrapper);
+
+    this.dom.sessionRemoteVideo = new Html("video")
+      .attr({ autoplay: true, playsInline: true })
+      .styleJs({
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+        background: "#000",
+      })
+      .appendTo(this.dom.sessionRemoteContainer);
+
+    this.buildSessionsUI();
   }
 
   renderVirtualList() {
@@ -1849,6 +1943,217 @@ class EncoreController {
       this.infoBar.showTemp("ERROR", "Failed to delete recording.", 3000);
     }
     this.cancelDeletePrompt();
+  }
+
+  /**
+   * Generates the Sessions Modal UI elements.
+   */
+  buildSessionsUI() {
+    this.state.isSessionModalOpen = false;
+    this.state.sessionModalView = "select"; // 'select' | 'host' | 'join' | 'active'
+
+    this.dom.sessionModal = new Html("div")
+      .classOn("session-modal", "hidden")
+      .appendTo(this.wrapper);
+
+    this.dom.sessionModal.on("click", (e) => {
+      if (e.target === this.dom.sessionModal.elm)
+        this.toggleSessionModal(false);
+    });
+
+    this.dom.sessionBox = new Html("div")
+      .classOn("session-box")
+      .appendTo(this.dom.sessionModal);
+  }
+
+  /**
+   * Opens or closes the Sessions modal.
+   */
+  toggleSessionModal(forceState = null) {
+    const isOpening =
+      forceState !== null ? forceState : !this.state.isSessionModalOpen;
+    this.state.isSessionModalOpen = isOpening;
+
+    if (isOpening) {
+      this.dom.sessionModal.classOff("hidden");
+      this.renderSessionView(this.state.isSessionActive ? "active" : "select");
+    } else {
+      this.dom.sessionModal.classOn("hidden");
+    }
+  }
+
+  /**
+   * Renders the internal HTML of the Sessions modal depending on the current step.
+   */
+  renderSessionView(view) {
+    this.state.sessionModalView = view;
+    this.dom.sessionBox.clear();
+
+    if (view === "select") {
+      new Html("h2").text("ENCORE SESSIONS").appendTo(this.dom.sessionBox);
+      new Html("p")
+        .text("Sing with friends anywhere in the world.")
+        .appendTo(this.dom.sessionBox);
+
+      const btnRow = new Html("div")
+        .classOn("session-btn-row")
+        .styleJs({ flexDirection: "column" })
+        .appendTo(this.dom.sessionBox);
+
+      new Html("button")
+        .classOn("session-btn", "primary")
+        .text("HOST A SESSION")
+        .on("click", () => this.renderSessionView("host"))
+        .appendTo(btnRow);
+
+      new Html("button")
+        .classOn("session-btn")
+        .text("JOIN A SESSION")
+        .on("click", () => this.renderSessionView("join"))
+        .appendTo(btnRow);
+
+      new Html("button")
+        .classOn("session-btn", "danger")
+        .text("CANCEL")
+        .on("click", () => this.toggleSessionModal(false))
+        .appendTo(btnRow);
+    } else if (view === "host") {
+      new Html("h2").text("HOST SESSION").appendTo(this.dom.sessionBox);
+      new Html("p")
+        .text("Enter your nickname to create a room.")
+        .appendTo(this.dom.sessionBox);
+
+      const inputGroup = new Html("div")
+        .classOn("session-input-group")
+        .appendTo(this.dom.sessionBox);
+      const nickInput = new Html("input")
+        .classOn("session-input")
+        .attr({ placeholder: "Your Nickname", maxlength: 15 })
+        .appendTo(inputGroup);
+
+      const btnRow = new Html("div")
+        .classOn("session-btn-row")
+        .appendTo(this.dom.sessionBox);
+      new Html("button")
+        .classOn("session-btn")
+        .text("BACK")
+        .on("click", () => this.renderSessionView("select"))
+        .appendTo(btnRow);
+      new Html("button")
+        .classOn("session-btn", "primary")
+        .text("CREATE")
+        .on("click", async () => {
+          const nick = nickInput.getValue().trim() || "Host";
+          this.dom.sessionBox.clear();
+          new Html("h2").text("CREATING...").appendTo(this.dom.sessionBox);
+
+          try {
+            const roomId = await this.SessionsSvc.hostRoom(nick);
+            this.state.isSessionActive = true;
+            this.state.isSessionHost = true;
+            this.state.sessionRoomId = roomId;
+            this.state.sessionMode = "lounge";
+            this.renderSessionView("active");
+            this.startLoungeBackground();
+          } catch (e) {
+            this.infoBar.showTemp(
+              "SESSION ERROR",
+              "Failed to connect to signaling server.",
+              3000,
+            );
+            this.renderSessionView("select");
+          }
+        })
+        .appendTo(btnRow);
+
+      setTimeout(() => nickInput.elm.focus(), 100);
+    } else if (view === "join") {
+      new Html("h2").text("JOIN SESSION").appendTo(this.dom.sessionBox);
+
+      const inputGroup = new Html("div")
+        .classOn("session-input-group")
+        .appendTo(this.dom.sessionBox);
+      const roomInput = new Html("input")
+        .classOn("session-input")
+        .attr({ placeholder: "Room ID" })
+        .appendTo(inputGroup);
+      const nickInput = new Html("input")
+        .classOn("session-input")
+        .attr({ placeholder: "Your Nickname", maxlength: 15 })
+        .appendTo(inputGroup);
+
+      const btnRow = new Html("div")
+        .classOn("session-btn-row")
+        .appendTo(this.dom.sessionBox);
+      new Html("button")
+        .classOn("session-btn")
+        .text("BACK")
+        .on("click", () => this.renderSessionView("select"))
+        .appendTo(btnRow);
+      new Html("button")
+        .classOn("session-btn", "primary")
+        .text("JOIN")
+        .on("click", async () => {
+          const room = roomInput.getValue().trim();
+          const nick = nickInput.getValue().trim() || "Guest";
+          if (!room) return;
+
+          this.dom.sessionBox.clear();
+          new Html("h2").text("JOINING...").appendTo(this.dom.sessionBox);
+
+          try {
+            await this.SessionsSvc.joinRoom(room, nick);
+            this.state.isSessionActive = true;
+            this.state.isSessionHost = false;
+            this.state.sessionRoomId = room;
+            this.state.sessionMode = "lounge";
+            this.renderSessionView("active");
+            this.startLoungeBackground();
+          } catch (e) {
+            this.infoBar.showTemp(
+              "SESSION ERROR",
+              "Failed to join room. Check ID.",
+              3000,
+            );
+            this.renderSessionView("select");
+          }
+        })
+        .appendTo(btnRow);
+
+      setTimeout(() => roomInput.elm.focus(), 100);
+    } else if (view === "active") {
+      new Html("h2")
+        .text(this.state.isSessionHost ? "HOSTING SESSION" : "IN SESSION")
+        .appendTo(this.dom.sessionBox);
+      new Html("p")
+        .text("Share this Room ID with your friends:")
+        .appendTo(this.dom.sessionBox);
+
+      new Html("div")
+        .classOn("session-room-display")
+        .text(this.state.sessionRoomId)
+        .appendTo(this.dom.sessionBox);
+
+      const btnRow = new Html("div")
+        .classOn("session-btn-row")
+        .appendTo(this.dom.sessionBox);
+      new Html("button")
+        .classOn("session-btn")
+        .text("CLOSE MENU")
+        .on("click", () => this.toggleSessionModal(false))
+        .appendTo(btnRow);
+      new Html("button")
+        .classOn("session-btn", "danger")
+        .text("LEAVE")
+        .on("click", () => {
+          this.SessionsSvc.leaveRoom();
+          this.state.isSessionActive = false;
+          this.state.sessionRoomId = null;
+          this.stopLoungeBackground();
+          this.renderSessionView("select");
+        })
+        .appendTo(btnRow);
+    }
   }
 
   /**
@@ -3850,6 +4155,27 @@ class EncoreController {
    * Proceeds to queue the next song sequentially or return completely to idle.
    */
   transitionAfterSong() {
+    if (this.state.isSessionActive) {
+      if (
+        this.SessionsSvc.state.mode === "performance" &&
+        this.SessionsSvc.state.singerId === this.SessionsSvc.peer.id
+      ) {
+        this.recorder.stopBroadcastStream();
+
+        if (this.SessionsSvc.isHost) {
+          this.SessionsSvc.advanceQueue();
+        } else {
+          const hostConn = this.SessionsSvc.connections.get(
+            this.SessionsSvc.roomId,
+          );
+          if (hostConn && hostConn.open) {
+            hostConn.send({ type: "song_ended" });
+          }
+        }
+      }
+      return;
+    }
+
     if (this.state.reservationQueue.length > 0) {
       const next = this.state.reservationQueue.shift();
       this.infoBar.showDefault();
@@ -3866,7 +4192,6 @@ class EncoreController {
       }, 1500);
     }
   }
-
   /**
    * Manages the visual rendering and skip-blocking of the final performance ranking display.
    *
@@ -4093,6 +4418,26 @@ class EncoreController {
       if (e.key === "Escape") this.cancelDeletePrompt();
       else if (e.key === "Enter") this.confirmDeleteRecording();
       return;
+    }
+
+    if (this.state.isSessionModalOpen) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        this.toggleSessionModal(false);
+      }
+      return;
+    }
+
+    if (e.key.toLowerCase() === "s") {
+      if (
+        this.state.mode === "menu" &&
+        !this.state.isTypingNumber &&
+        !this.state.isSearchOverlayVisible
+      ) {
+        e.preventDefault();
+        this.toggleSessionModal();
+        return;
+      }
     }
 
     if (this.state.isPlayingRecording) {
@@ -4445,6 +4790,7 @@ class EncoreController {
       window.location.reload();
       return;
     }
+
     const isInputFocused = document.activeElement === this.dom.searchInput.elm;
     const isSearchActive =
       this.state.isSearchOverlayVisible ||
@@ -4481,24 +4827,54 @@ class EncoreController {
             this.toggleSearchOverlay(false);
           if (this.state.mode === "yt-search") this.setMode("menu");
 
-          this.startPlayer(song);
+          if (this.state.isSessionActive) {
+            this.SessionsSvc.requestSong(song);
+            this.infoBar.showTemp(
+              "SESSION QUEUE",
+              `Requested: ${song.title}`,
+              3000,
+            );
+          } else {
+            this.startPlayer(song);
+          }
         }
         return;
       }
 
-      if (this.state.reservationQueue.length)
-        this.startPlayer(this.state.reservationQueue.shift());
-      else {
+      if (this.state.isSessionActive) {
         let song = this.state.songNumber
           ? this.songMap.get(this.state.songNumber.padStart(5, "0"))
           : this.state.highlightedIndex >= 0
             ? this.songList[this.state.highlightedIndex]
             : null;
+
         if (song) {
+          this.SessionsSvc.requestSong(song);
+          this.infoBar.showTemp(
+            "SESSION QUEUE",
+            `Requested: ${song.title}`,
+            3000,
+          );
           this.state.songNumber = "";
           this.state.highlightedIndex = -1;
           this.state.isTypingNumber = false;
-          this.startPlayer(song);
+          this.updateMenuUI();
+        }
+      } else {
+        if (this.state.reservationQueue.length) {
+          this.startPlayer(this.state.reservationQueue.shift());
+        } else {
+          let song = this.state.songNumber
+            ? this.songMap.get(this.state.songNumber.padStart(5, "0"))
+            : this.state.highlightedIndex >= 0
+              ? this.songList[this.state.highlightedIndex]
+              : null;
+          if (song) {
+            this.state.songNumber = "";
+            this.state.highlightedIndex = -1;
+            this.state.isTypingNumber = false;
+            this.startPlayer(song);
+          }
         }
       }
     } else if (this.state.mode === "player") {
@@ -4516,25 +4892,32 @@ class EncoreController {
                   durationText: res.length?.simpleText,
                   isLive: res.isLive,
                 };
-          this.state.reservationQueue.push(song);
-          const codeSpan = song.code
-            ? `<span class="info-bar-code">${song.code}</span>`
-            : `<span class="info-bar-code is-youtube">YT</span>`;
 
-          const fmt = this.getFormatInfo(song);
-          const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
-
-          this.infoBar.showTemp(
-            "RESERVED",
-            `${codeSpan} ${fmtBadge} <span class="info-bar-title">${song.title}</span>`,
-            4000,
-          );
+          if (this.state.isSessionActive) {
+            this.SessionsSvc.requestSong(song);
+            this.infoBar.showTemp(
+              "SESSION QUEUE",
+              `Requested: ${song.title}`,
+              4000,
+            );
+          } else {
+            this.state.reservationQueue.push(song);
+            const codeSpan = song.code
+              ? `<span class="info-bar-code">${song.code}</span>`
+              : `<span class="info-bar-code is-youtube">YT</span>`;
+            const fmt = this.getFormatInfo(song);
+            const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
+            this.infoBar.showTemp(
+              "RESERVED",
+              `${codeSpan} ${fmtBadge} <span class="info-bar-title">${song.title}</span>`,
+              4000,
+            );
+          }
 
           this.state.highlightedSearchIndex = -1;
           this.dom.searchInput.elm.value = "";
           this.state.searchResults = [];
           this.renderSearchResults();
-
           this.toggleSearchOverlay(false);
         }
         return;
@@ -4543,8 +4926,17 @@ class EncoreController {
           this.state.reservationNumber.padStart(5, "0"),
         );
         if (song) {
-          this.state.reservationQueue.push(song);
-          this.infoBar.showDefault();
+          if (this.state.isSessionActive) {
+            this.SessionsSvc.requestSong(song);
+            this.infoBar.showTemp(
+              "SESSION QUEUE",
+              `Requested: ${song.title}`,
+              3000,
+            );
+          } else {
+            this.state.reservationQueue.push(song);
+            this.infoBar.showDefault();
+          }
         }
         this.state.reservationNumber = "";
       }
@@ -4569,7 +4961,102 @@ class EncoreController {
       this.state.searchResults = [];
       this.renderSearchResults();
 
-      this.startPlayer(song);
+      if (this.state.isSessionActive) {
+        this.SessionsSvc.requestSong(song);
+        this.infoBar.showTemp(
+          "SESSION QUEUE",
+          `Requested: ${song.title}`,
+          3000,
+        );
+      } else {
+        this.startPlayer(song);
+      }
+    }
+  }
+
+  /**
+   * Triggers the custom canvas background when idle in a session lounge.
+   */
+  startLoungeBackground() {
+    if (this.loungeRafId) return;
+    this.bgv.setCanvasOnlyMode(true);
+
+    const ctx = this.bgv.getCustomContext();
+    const canvas = this.bgv.getCustomCanvas();
+
+    this.dom.bgvContainer.classOff("hidden");
+
+    let time = 0;
+    const particles = Array.from({ length: 50 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      size: Math.random() * 4 + 1,
+      speedY: Math.random() * 0.5 + 0.1,
+      speedX: (Math.random() - 0.5) * 0.2,
+    }));
+
+    const draw = () => {
+      if (!this.state.isSessionActive || this.state.sessionMode !== "lounge") {
+        this.stopLoungeBackground();
+        return;
+      }
+
+      time += 0.02;
+      const w = canvas.width;
+      const h = canvas.height;
+
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+      bgGrad.addColorStop(0, "#0a0a14");
+      bgGrad.addColorStop(1, "#1a1a3a");
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(137, 207, 240, ${0.1 + i * 0.1})`;
+        for (let x = 0; x < w; x += 10) {
+          const y =
+            h / 2 +
+            Math.sin(x * 0.005 + time + i) * 100 * Math.sin(time * 0.5 + i);
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "rgba(255, 215, 0, 0.6)";
+      particles.forEach((p) => {
+        p.y -= p.speedY * 0.005;
+        p.x += p.speedX * 0.005;
+        if (p.y < 0) p.y = 1;
+        if (p.x < 0) p.x = 1;
+        if (p.x > 1) p.x = 0;
+
+        ctx.beginPath();
+        ctx.arc(p.x * w, p.y * h, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      this.loungeRafId = requestAnimationFrame(draw);
+    };
+
+    this.loungeRafId = requestAnimationFrame(draw);
+
+    this.dom.standbyText.text("LOUNGE MODE");
+  }
+
+  stopLoungeBackground() {
+    if (this.loungeRafId) {
+      cancelAnimationFrame(this.loungeRafId);
+      this.loungeRafId = null;
+    }
+    this.bgv.clearCustomGraphics();
+
+    this.bgv.setCanvasOnlyMode(false);
+
+    if (!this.state.isSessionActive) {
+      this.dom.standbyText.text("SELECT SONG");
     }
   }
 
@@ -4754,6 +5241,9 @@ class EncoreController {
       Math.min(1, this.state.volume + (dir === "up" ? 0.05 : -0.05)),
     );
     this.Forte.setTrackVolume(this.state.volume);
+    if (this.dom.sessionRemoteVideo) {
+      this.dom.sessionRemoteVideo.elm.volume = this.state.volume;
+    }
     if (this.state.currentSongIsYouTube) {
       let maxVolume = this.state.windowsVolume;
       try {

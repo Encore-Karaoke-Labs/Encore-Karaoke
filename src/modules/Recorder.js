@@ -488,6 +488,51 @@ export class RecorderModule {
   }
 
   /**
+   * Generates and returns a live MediaStream of the current performance (Video + Mixed Audio)
+   * @returns {MediaStream|null}
+   */
+  getBroadcastStream() {
+    if (!this.forteSvc || !this.bgvPlayer) return null;
+
+    this._initCanvas();
+
+    if (!this.animationFrameId) {
+      this.bgvCurrentOpacity = 1.0;
+      this.lyricOpacity = 1.0;
+      this.isRecording = true;
+      this.drawFrame();
+    }
+
+    try {
+      const mixAudioStream = this.forteSvc.getRecordingAudioStream();
+      const videoStream = this.canvas.captureStream(30);
+
+      const broadcastStream = new MediaStream([
+        videoStream.getVideoTracks()[0],
+        mixAudioStream.getAudioTracks()[0],
+      ]);
+
+      return broadcastStream;
+    } catch (e) {
+      console.error("[RECORDER] Failed to generate broadcast stream", e);
+      return null;
+    }
+  }
+
+  /**
+   * Stops a broadcast stream if we aren't simultaneously saving a recording.
+   */
+  stopBroadcastStream() {
+    if (!this.mediaRecorder) {
+      this.isRecording = false;
+      if (this.animationFrameId) {
+        cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
+      }
+    }
+  }
+
+  /**
    * Pre-renders metadata canvas with song title and artist.
    * @private
    */

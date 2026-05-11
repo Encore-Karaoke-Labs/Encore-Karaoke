@@ -1346,6 +1346,50 @@ const pkg = {
     },
 
     /**
+     * Attaches an incoming remote WebRTC audio stream to the Forte audio context.
+     * @param {string} peerId - Unique ID of the peer
+     * @param {MediaStream} stream - Remote audio stream
+     */
+    playRemoteStream: (peerId, stream) => {
+      if (!audioContext) return;
+      if (!state.playback.remoteSources)
+        state.playback.remoteSources = new Map();
+
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(masterGain);
+
+      state.playback.remoteSources.set(peerId, source);
+      logVerbose(`Started playing remote stream for ${peerId}`);
+    },
+
+    /**
+     * Disconnects a specific remote WebRTC audio stream.
+     */
+    stopRemoteStream: (peerId) => {
+      if (
+        state.playback.remoteSources &&
+        state.playback.remoteSources.has(peerId)
+      ) {
+        const source = state.playback.remoteSources.get(peerId);
+        source.disconnect();
+        state.playback.remoteSources.delete(peerId);
+        logVerbose(`Stopped remote stream for ${peerId}`);
+      }
+    },
+
+    /**
+     * Clears all incoming remote streams.
+     */
+    clearRemoteStreams: () => {
+      if (state.playback.remoteSources) {
+        for (let [id, source] of state.playback.remoteSources.entries()) {
+          source.disconnect();
+        }
+        state.playback.remoteSources.clear();
+      }
+    },
+
+    /**
      * Retrieves available hardware output devices mapping them to system identifiers.
      *
      * @returns {Promise<Array<{deviceId: string, label: string}>>} List of detected output pairs.

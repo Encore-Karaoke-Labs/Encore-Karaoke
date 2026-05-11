@@ -278,6 +278,7 @@ const pkg = {
     await Root.Core.pkg.run("services:UiLib", [], true);
     await Root.Core.pkg.run("services:Forte", [], true);
     await Root.Core.pkg.run("services:FsSvc", [], true);
+    await Root.Core.pkg.run("services:Sessions", [], true);
 
     async function checkServicesLoaded() {
       let curInterval = setInterval(() => {
@@ -285,9 +286,12 @@ const pkg = {
           Root.Processes.getService("UiLib").data;
           Root.Processes.getService("FsSvc").data;
           Root.Processes.getService("ForteSvc").data;
+          Root.Processes.getService("SessionsSvc").data;
           clearInterval(curInterval);
           doEverythingElse();
-        } catch (e) {}
+        } catch (e) {
+          console.error("One or more services are failing to load", e);
+        }
       }, 50);
     }
 

@@ -4023,3 +4023,146 @@ p + .flex-list button {
   z-index: 99990;
   pointer-events: none;
 }
+
+/* ==========================================================================
+   Encore Sessions UI
+   ========================================================================== */
+.session-modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  z-index: 65000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  font-family: "Rajdhani", sans-serif;
+  color: #fff;
+}
+
+.session-modal.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.session-box {
+  background: rgba(15, 15, 25, 0.95);
+  border: 2px solid #89cff0;
+  border-radius: 12px;
+  padding: 3rem;
+  width: 90%;
+  max-width: 500px;
+  text-align: center;
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.session-box h2 {
+  color: #ffd700;
+  margin: 0;
+  font-size: 3rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.session-box p {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 1rem 0;
+}
+
+.session-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.session-input {
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(137, 207, 240, 0.4);
+  color: #fff;
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 1.5rem;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.session-input:focus {
+  border-color: #ffd700;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+}
+
+.session-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.session-btn-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.session-btn {
+  background: rgba(137, 207, 240, 0.15);
+  border: 2px solid #89cff0;
+  color: #89cff0;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-size: 1.4rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1;
+}
+
+.session-btn:hover {
+  background: #89cff0;
+  color: #000;
+}
+
+.session-btn.primary {
+  background: rgba(255, 215, 0, 0.15);
+  border-color: #ffd700;
+  color: #ffd700;
+}
+
+.session-btn.primary:hover {
+  background: #ffd700;
+  color: #000;
+}
+
+.session-btn.danger {
+  background: rgba(255, 85, 85, 0.15);
+  border-color: #ff5555;
+  color: #ff5555;
+}
+
+.session-btn.danger:hover {
+  background: #ff5555;
+  color: #fff;
+}
+
+.session-room-display {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  font-size: 2rem;
+  color: #89cff0;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  margin: 1rem 0;
+  user-select: all; /* Allow copying */
+}
