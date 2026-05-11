@@ -269,7 +269,17 @@ server.get("/user-bgv-list", async (req, res) => {
     if (!fs.existsSync(userBGVDir)) return res.json([]);
 
     const files = await fs.promises.readdir(userBGVDir);
-    const videoExts = [".mp4", ".mkv", ".webm", ".avi", ".mov"];
+    const videoExts = [
+      ".mp4",
+      ".mkv",
+      ".webm",
+      ".avi",
+      ".mov",
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".webp",
+    ];
 
     const videos = files
       .filter((f) => videoExts.includes(path.extname(f).toLowerCase()))
