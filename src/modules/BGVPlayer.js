@@ -11,6 +11,10 @@ export class BGVModule {
    */
   constructor() {
     this.videoElement = null;
+    this.customCanvas = null;
+    this.customCtx = null;
+    this.resizeObserver = null;
+    this.canvasOnlyMode = false;
     this.playlist = [];
     this.currentIndex = 0;
     this.container = null;
@@ -20,9 +24,7 @@ export class BGVModule {
     this.activeManualPlayer = null;
     this.PORT = 9864;
     this.transitionTimeout = null;
-    console.log(
-      "[BGV] BGV Player initialized (Single Buffer / Performance Mode).",
-    );
+    console.log("[BGV] BGV Player initialized.");
   }
 
   /**
@@ -71,6 +73,34 @@ export class BGVModule {
       console.warn("[BGV] Video error, skipping:", e);
       this.playNext();
     };
+
+    this.customCanvas = new Html("canvas")
+      .styleJs({
+        position: "absolute",
+        top: "0",
+        left: "0",
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        zIndex: "10",
+      })
+      .appendTo(this.container).elm;
+
+    this.customCtx = this.customCanvas.getContext("2d", { alpha: true });
+
+    this.resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        const dpr = window.devicePixelRatio || 1;
+        this.customCanvas.width = width * dpr;
+        this.customCanvas.height = height * dpr;
+        if (this.customCtx) {
+          this.customCtx.setTransform(1, 0, 0, 1, 0, 0);
+          this.customCtx.scale(dpr, dpr);
+        }
+      }
+    });
+    this.resizeObserver.observe(this.container.elm);
   }
 
   /**
@@ -164,7 +194,8 @@ export class BGVModule {
    * Start playback of the current playlist
    */
   start() {
-    if (this.isManualMode || this.playlist.length === 0) return;
+    if (this.isManualMode || this.playlist.length === 0 || this.canvasOnlyMode)
+      return;
     this._playUrl(this.playlist[this.currentIndex]);
   }
 
@@ -172,8 +203,8 @@ export class BGVModule {
    * Advance to the next video in playlist with fade transition
    */
   playNext() {
-    if (this.isManualMode || this.playlist.length === 0) return;
-
+    if (this.isManualMode || this.playlist.length === 0 || this.canvasOnlyMode)
+      return;
     this.currentIndex = (this.currentIndex + 1) % this.playlist.length;
 
     this.videoElement.style.opacity = "0";
@@ -217,6 +248,10 @@ export class BGVModule {
     this.activeManualPlayer = this.videoElement;
     this.videoElement.onended = null;
 
+    if (this.canvasOnlyMode) {
+      this.videoElement.style.display = "";
+    }
+
     this.videoElement.style.opacity = "0";
     this.videoElement.src = url;
     this.videoElement.load();
@@ -243,6 +278,60 @@ export class BGVModule {
     this.videoElement.onended = () => this.playNext();
 
     this.start();
+  }
+
+  /**
+   * Returns the 2D rendering context of the custom BGV overlay
+   * @returns {CanvasRenderingContext2D}
+   */
+  getCustomContext() {
+    return this.customCtx;
+  }
+
+  /**
+   * Returns the custom BGV canvas element
+   * @returns {HTMLCanvasElement}
+   */
+  getCustomCanvas() {
+    return this.customCanvas;
+  }
+
+  /**
+   * Clears the custom overlay graphics
+   */
+  clearCustomGraphics() {
+    if (!this.customCtx || !this.customCanvas) return;
+    const rect = this.container.elm.getBoundingClientRect();
+    this.customCtx.clearRect(0, 0, rect.width, rect.height);
+  }
+
+  /**
+   * Toggles Canvas-Only Mode. Disables the video element to save CPU/GPU resources.
+   * @param {boolean} enabled - True to disable video and rely only on customCanvas.
+   */
+  setCanvasOnlyMode(enabled) {
+    this.canvasOnlyMode = enabled;
+
+    if (enabled) {
+      if (this.videoElement) {
+        this.videoElement.pause();
+        this.videoElement.removeAttribute("src");
+        this.videoElement.load();
+
+        this.videoElement.style.display = "none";
+        this.videoElement.style.opacity = "0";
+      }
+      if (this.transitionTimeout) clearTimeout(this.transitionTimeout);
+
+      console.log("[BGV] Switched to Canvas-Only Mode. Video engine disabled.");
+    } else {
+      if (this.videoElement) {
+        this.videoElement.style.display = "";
+      }
+
+      console.log("[BGV] Restored Video Mode.");
+      this.start();
+    }
   }
 
   /**

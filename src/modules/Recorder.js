@@ -557,20 +557,31 @@ export class RecorderModule {
     }
 
     let targetBgvOpacity = 0;
-    if (sourceVideo) {
-      // Direct style property read is faster than getComputedStyle
+
+    if (this.bgvPlayer && this.bgvPlayer.canvasOnlyMode) {
+      targetBgvOpacity = 1;
+    } else if (sourceVideo) {
       targetBgvOpacity = sourceVideo.style.opacity
         ? parseFloat(sourceVideo.style.opacity)
         : 1;
     }
+
     this.bgvCurrentOpacity +=
       (targetBgvOpacity - this.bgvCurrentOpacity) * 0.15;
 
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, w, h);
 
+    this.bgvCtx.fillStyle = "black";
+    this.bgvCtx.fillRect(0, 0, w, h);
+
     if (sourceVideo && sourceVideo.readyState >= 2 && !sourceVideo.paused) {
       this.bgvCtx.drawImage(sourceVideo, 0, 0, w, h);
+    }
+
+    const customCanvas = this.bgvPlayer.customCanvas;
+    if (customCanvas && customCanvas.width > 0 && customCanvas.height > 0) {
+      this.bgvCtx.drawImage(customCanvas, 0, 0, w, h);
     }
 
     if (this.bgvCurrentOpacity > 0.01) {
