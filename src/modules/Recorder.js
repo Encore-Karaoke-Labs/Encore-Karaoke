@@ -561,9 +561,17 @@ export class RecorderModule {
     if (this.bgvPlayer && this.bgvPlayer.canvasOnlyMode) {
       targetBgvOpacity = 1;
     } else if (sourceVideo) {
-      targetBgvOpacity = sourceVideo.style.opacity
+      const vidOpacity = sourceVideo.style.opacity
         ? parseFloat(sourceVideo.style.opacity)
         : 1;
+
+      const imgCanvas = this.bgvPlayer.imageCanvas;
+      const imgOpacity =
+        imgCanvas && imgCanvas.style.opacity
+          ? parseFloat(imgCanvas.style.opacity)
+          : 0;
+
+      targetBgvOpacity = Math.max(vidOpacity, imgOpacity);
     }
 
     this.bgvCurrentOpacity +=
@@ -577,6 +585,11 @@ export class RecorderModule {
 
     if (sourceVideo && sourceVideo.readyState >= 2 && !sourceVideo.paused) {
       this.bgvCtx.drawImage(sourceVideo, 0, 0, w, h);
+    }
+
+    const imageCanvas = this.bgvPlayer.imageCanvas;
+    if (imageCanvas && parseFloat(imageCanvas.style.opacity || "0") > 0.01) {
+      this.bgvCtx.drawImage(imageCanvas, 0, 0, w, h);
     }
 
     const customCanvas = this.bgvPlayer.customCanvas;

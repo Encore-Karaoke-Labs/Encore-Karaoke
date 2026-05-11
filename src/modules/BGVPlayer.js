@@ -15,6 +15,16 @@ export class BGVModule {
     this.customCtx = null;
     this.resizeObserver = null;
     this.canvasOnlyMode = false;
+
+    this.imageCanvas = null;
+    this.imageCtx = null;
+    this.imageRafId = null;
+    this.imageTimeout = null;
+    this.IMAGE_DURATION = 15000;
+    this.CROSSFADE_DURATION = 1500;
+    this.currentImageState = null;
+    this.prevImageState = null;
+
     this.playlist = [];
     this.currentIndex = 0;
     this.container = null;
@@ -74,6 +84,23 @@ export class BGVModule {
       this.playNext();
     };
 
+    this.imageCanvas = new Html("canvas")
+      .styleJs({
+        position: "absolute",
+        top: "0",
+        left: "0",
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        opacity: "0",
+        transition: "opacity 0.5s ease-in-out",
+        willChange: "opacity",
+        zIndex: "5",
+      })
+      .appendTo(this.container).elm;
+
+    this.imageCtx = this.imageCanvas.getContext("2d", { alpha: false });
+
     this.customCanvas = new Html("canvas")
       .styleJs({
         position: "absolute",
@@ -92,11 +119,23 @@ export class BGVModule {
       for (let entry of entries) {
         const { width, height } = entry.contentRect;
         const dpr = window.devicePixelRatio || 1;
+
         this.customCanvas.width = width * dpr;
         this.customCanvas.height = height * dpr;
         if (this.customCtx) {
           this.customCtx.setTransform(1, 0, 0, 1, 0, 0);
           this.customCtx.scale(dpr, dpr);
+        }
+
+        this.imageCanvas.width = width * dpr;
+        this.imageCanvas.height = height * dpr;
+        if (this.imageCtx) {
+          this.imageCtx.setTransform(1, 0, 0, 1, 0, 0);
+          this.imageCtx.scale(dpr, dpr);
+
+          if (this.currentImage) {
+            this._drawImageCover(this.currentImage);
+          }
         }
       }
     });
@@ -191,6 +230,145 @@ export class BGVModule {
   }
 
   /**
+   * Generates random Pan and Zoom parameters for the Ken Burns effect
+   * @private
+   */
+  _generateKenBurns(img, now) {
+    const types = [
+      "zoomIn",
+      "zoomOut",
+      "panLeft",
+      "panRight",
+      "panUp",
+      "panDown",
+    ];
+    const type = types[Math.floor(Math.random() * types.length)];
+
+    let startScale = 1.0,
+      endScale = 1.0;
+    let startPanX = 0,
+      endPanX = 0;
+    let startPanY = 0,
+      endPanY = 0;
+
+    const scaleAmount = 1.15;
+    const panAmount = 0.05;
+
+    switch (type) {
+      case "zoomIn":
+        startScale = 1.0;
+        endScale = scaleAmount;
+        break;
+      case "zoomOut":
+        startScale = scaleAmount;
+        endScale = 1.0;
+        break;
+      case "panLeft":
+        startScale = scaleAmount;
+        endScale = scaleAmount;
+        startPanX = panAmount;
+        endPanX = -panAmount;
+        break;
+      case "panRight":
+        startScale = scaleAmount;
+        endScale = scaleAmount;
+        startPanX = -panAmount;
+        endPanX = panAmount;
+        break;
+      case "panUp":
+        startScale = scaleAmount;
+        endScale = scaleAmount;
+        startPanY = panAmount;
+        endPanY = -panAmount;
+        break;
+      case "panDown":
+        startScale = scaleAmount;
+        endScale = scaleAmount;
+        startPanY = -panAmount;
+        endPanY = panAmount;
+        break;
+    }
+
+    return {
+      img,
+      startTime: now,
+      startScale,
+      endScale,
+      startPanX,
+      endPanX,
+      startPanY,
+      endPanY,
+    };
+  }
+
+  /**
+   * The animation loop that handles Crossfades and Ken Burns motion
+   * @private
+   */
+  _renderImageFrame(now) {
+    if (!this.imageCtx || !this.imageCanvas) return;
+    if (this.canvasOnlyMode) return;
+
+    this.imageRafId = requestAnimationFrame((t) => this._renderImageFrame(t));
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = this.imageCanvas.width / dpr;
+    const h = this.imageCanvas.height / dpr;
+
+    this.imageCtx.clearRect(0, 0, w, h);
+
+    const drawState = (state, opacity) => {
+      if (!state || !state.img) return;
+
+      const elapsed = Math.max(0, now - state.startTime);
+      const progress = Math.min(1.0, elapsed / this.IMAGE_DURATION);
+
+      const currentScale =
+        state.startScale + (state.endScale - state.startScale) * progress;
+      const currentPanX =
+        state.startPanX + (state.endPanX - state.startPanX) * progress;
+      const currentPanY =
+        state.startPanY + (state.endPanY - state.startPanY) * progress;
+
+      const imgRatio = state.img.width / state.img.height;
+      const canvasRatio = w / h;
+
+      let drawW = w;
+      let drawH = h;
+      if (imgRatio > canvasRatio) drawW = h * imgRatio;
+      else drawH = w / imgRatio;
+
+      this.imageCtx.save();
+      this.imageCtx.globalAlpha = opacity;
+
+      this.imageCtx.translate(w / 2, h / 2);
+      this.imageCtx.scale(currentScale, currentScale);
+      this.imageCtx.translate(currentPanX * w, currentPanY * h);
+      this.imageCtx.drawImage(state.img, -drawW / 2, -drawH / 2, drawW, drawH);
+
+      this.imageCtx.restore();
+    };
+
+    let currentOpacity = 1.0;
+    if (this.currentImageState) {
+      const elapsed = now - this.currentImageState.startTime;
+      if (elapsed < this.CROSSFADE_DURATION) {
+        currentOpacity = elapsed / this.CROSSFADE_DURATION;
+      }
+    }
+
+    if (this.prevImageState && currentOpacity < 1.0) {
+      drawState(this.prevImageState, 1.0);
+    } else if (currentOpacity >= 1.0) {
+      this.prevImageState = null;
+    }
+
+    if (this.currentImageState) {
+      drawState(this.currentImageState, currentOpacity);
+    }
+  }
+
+  /**
    * Start playback of the current playlist
    */
   start() {
@@ -217,27 +395,70 @@ export class BGVModule {
   }
 
   /**
-   * Internal method to load and play a video URL
+   * Internal method to load and play a media URL
    * @private
-   * @param {string} url - The video URL to play
+   * @param {string} url - The media URL to play
    */
   _playUrl(url) {
-    const v = this.videoElement;
+    const isImage = url.match(/\.(jpeg|jpg|gif|png|webp|bmp)(\?.*)?$/i) != null;
 
-    const onCanPlay = () => {
-      v.play()
-        .then(() => {
-          v.style.opacity = "1";
-        })
-        .catch((e) => console.error("[BGV] Play failed", e));
-      v.removeEventListener("canplay", onCanPlay);
-    };
+    if (this.transitionTimeout) clearTimeout(this.transitionTimeout);
+    if (this.imageTimeout) clearTimeout(this.imageTimeout);
 
-    v.addEventListener("canplay", onCanPlay);
-    v.src = url;
-    v.load();
+    if (isImage) {
+      this.videoElement.style.opacity = "0";
+      if (!this.videoElement.paused) this.videoElement.pause();
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const now = performance.now();
+        this.prevImageState = this.currentImageState;
+        this.currentImageState = this._generateKenBurns(img, now);
+
+        this.imageCanvas.style.opacity = "1";
+
+        if (!this.imageRafId) {
+          this.imageRafId = requestAnimationFrame((t) =>
+            this._renderImageFrame(t),
+          );
+        }
+
+        this.imageTimeout = setTimeout(
+          () => this.playNext(),
+          this.IMAGE_DURATION,
+        );
+      };
+      img.onerror = (e) => {
+        console.warn("[BGV] Image load error, skipping:", e);
+        this.playNext();
+      };
+      img.src = url;
+    } else {
+      if (this.imageCanvas) this.imageCanvas.style.opacity = "0";
+
+      setTimeout(() => {
+        if (this.imageRafId) cancelAnimationFrame(this.imageRafId);
+        this.imageRafId = null;
+        this.currentImageState = null;
+        this.prevImageState = null;
+      }, 500);
+
+      const v = this.videoElement;
+      const onCanPlay = () => {
+        v.play()
+          .then(() => {
+            v.style.opacity = "1";
+          })
+          .catch((e) => console.error("[BGV] Play failed", e));
+        v.removeEventListener("canplay", onCanPlay);
+      };
+
+      v.addEventListener("canplay", onCanPlay);
+      v.src = url;
+      v.load();
+    }
   }
-
   /**
    * Play a single video without interrupting the auto-playlist
    * @param {string} url - The video URL to play
@@ -317,19 +538,31 @@ export class BGVModule {
         this.videoElement.pause();
         this.videoElement.removeAttribute("src");
         this.videoElement.load();
-
         this.videoElement.style.display = "none";
         this.videoElement.style.opacity = "0";
       }
       if (this.transitionTimeout) clearTimeout(this.transitionTimeout);
 
-      console.log("[BGV] Switched to Canvas-Only Mode. Video engine disabled.");
-    } else {
-      if (this.videoElement) {
-        this.videoElement.style.display = "";
+      if (this.imageTimeout) clearTimeout(this.imageTimeout);
+      if (this.imageCanvas) {
+        this.imageCanvas.style.display = "none";
+        this.imageCanvas.style.opacity = "0";
       }
+      this.currentImage = null;
 
-      console.log("[BGV] Restored Video Mode.");
+      if (this.imageRafId) cancelAnimationFrame(this.imageRafId);
+      this.imageRafId = null;
+      this.currentImageState = null;
+      this.prevImageState = null;
+
+      console.log(
+        "[BGV] Switched to Canvas-Only Mode. Media engines disabled.",
+      );
+    } else {
+      if (this.videoElement) this.videoElement.style.display = "";
+      if (this.imageCanvas) this.imageCanvas.style.display = "";
+
+      console.log("[BGV] Restored Media Mode.");
       this.start();
     }
   }
@@ -345,5 +578,9 @@ export class BGVModule {
       this.videoElement.style.opacity = "0";
     }
     if (this.transitionTimeout) clearTimeout(this.transitionTimeout);
+
+    if (this.imageTimeout) clearTimeout(this.imageTimeout);
+    if (this.imageCanvas) this.imageCanvas.style.opacity = "0";
+    this.currentImage = null;
   }
 }

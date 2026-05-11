@@ -1097,7 +1097,20 @@ app.whenReady().then(() => {
       defaultPath: folderPath,
       properties: ["openFile", "multiSelections"],
       filters: [
-        { name: "Videos", extensions: ["mp4", "mkv", "webm", "avi", "mov"] },
+        {
+          name: "Videos and Images",
+          extensions: [
+            "mp4",
+            "mkv",
+            "webm",
+            "avi",
+            "mov",
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+          ],
+        },
       ],
     });
 
