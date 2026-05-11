@@ -38,6 +38,7 @@
     "localforage": "^1.10.0",
     "loudness": "^0.4.2",
     "mime-types": "^2.1.35",
+    "peerjs": "^1.5.5",
     "pitchy": "^4.1.0",
     "qrcode": "^1.5.3",
     "socket.io": "^4.7.5",
