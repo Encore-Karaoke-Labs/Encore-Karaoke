@@ -408,7 +408,15 @@ class EncoreController {
           navigator.mediaSession.metadata = null;
         }
       }
-      if (!this.infoBar.isTempVisible) {
+      if (this.infoBar.isTempVisible) {
+        if (this._deferredQueueUpdate) clearInterval(this._deferredQueueUpdate);
+        this._deferredQueueUpdate = setInterval(() => {
+          if (!this.infoBar.isTempVisible) {
+            clearInterval(this._deferredQueueUpdate);
+            this.infoBar.showDefault();
+          }
+        }, 250);
+      } else {
         this.infoBar.showDefault();
       }
     });
@@ -4981,6 +4989,7 @@ class EncoreController {
         if (song) {
           if (this.state.isSessionActive) {
             this.SessionsSvc.requestSong(song);
+
             const codeSpan = song.code
               ? `<span class="info-bar-code">${song.code}</span>`
               : `<span class="info-bar-code is-youtube">YT</span>`;
