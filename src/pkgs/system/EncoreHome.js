@@ -338,6 +338,7 @@ class EncoreController {
 
             if (sState.nowPlaying) {
               this.startPlayer(sState.nowPlaying);
+
               setTimeout(() => {
                 const stream = this.recorder.getBroadcastStream();
                 if (stream) this.SessionsSvc.broadcastPerformance(stream);
@@ -359,6 +360,23 @@ class EncoreController {
               );
             }
 
+            if (sState.nowPlaying) {
+              const singerName =
+                sState.nowPlaying.requesterNickname || "Singer";
+
+              window.desktopIntegration.ipc.send("setRPC", {
+                details: sState.nowPlaying.title,
+                state: `${sState.nowPlaying.artist} (Singer: ${singerName})`,
+              });
+
+              if ("mediaSession" in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                  title: sState.nowPlaying.title,
+                  artist: `${sState.nowPlaying.artist} (Singer: ${singerName})`,
+                });
+              }
+            }
+
             this.dom.sessionRemoteContainer.classOff("hidden");
             this.infoBar.showTemp(
               "PERFORMANCE",
@@ -375,6 +393,15 @@ class EncoreController {
         this.setMode("menu");
         this.startLoungeBackground();
         this.infoBar.showTemp("SESSIONS", "Returned to Lounge.", 3000);
+
+        window.desktopIntegration.ipc.send("setRPC", {
+          details: `Browsing ${this.songList.length} Songs...`,
+          state: `Session Lounge`,
+        });
+
+        if ("mediaSession" in navigator) {
+          navigator.mediaSession.metadata = null;
+        }
       }
     });
 
