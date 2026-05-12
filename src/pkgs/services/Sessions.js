@@ -226,7 +226,7 @@ const pkg = {
       if (this.state.mode === "lounge") {
         const forteSvc = pkg.root.Processes.getService("ForteSvc").data;
         for (let p of this.state.participants) {
-          if (p.id !== this.peer.id) {
+          if (p.id !== this.peer.id && this.peer.id > p.id) {
             const call = this.peer.call(p.id, forteSvc.getMicAudioStream());
             this.mediaCalls.set(p.id, call);
             call.on("stream", (stream) => {
