@@ -5053,7 +5053,9 @@ class EncoreController {
     }
     this.bgv.clearCustomGraphics();
 
-    this.bgv.setCanvasOnlyMode(false);
+    if (this.bgv.canvasOnlyMode) {
+      this.bgv.setCanvasOnlyMode(false);
+    }
 
     if (!this.state.isSessionActive) {
       this.dom.standbyText.text("SELECT SONG");
