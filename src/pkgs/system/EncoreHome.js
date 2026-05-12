@@ -381,6 +381,27 @@ class EncoreController {
                   artist: `${sState.nowPlaying.artist} (Singer: ${singerName})`,
                 });
               }
+
+              const timeSinceStart = sState.playTrigger
+                ? Math.abs(Date.now() - sState.playTrigger)
+                : 99999;
+
+              if (timeSinceStart < 8000) {
+                this.dom.introTitle.text(
+                  this.truncateTitleIfNeeded(sState.nowPlaying.title),
+                );
+                this.dom.introArtist.text(sState.nowPlaying.artist);
+
+                this.dom.introMeta.text(`Singer: ${singerName}`);
+
+                this.dom.introCard.classOn("visible");
+
+                setTimeout(() => {
+                  if (this.state.mode === "player") {
+                    this.dom.introCard.classOff("visible");
+                  }
+                }, 3500);
+              }
             }
 
             this.dom.sessionRemoteContainer.classOff("hidden");
