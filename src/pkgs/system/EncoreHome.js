@@ -335,14 +335,6 @@ class EncoreController {
       if (sState.mode === "performance") {
         this.stopLoungeBackground();
 
-        if (
-          this.state.mode === "player" &&
-          sState.singerId !== this.SessionsSvc.peer.id
-        ) {
-          this.stopPlayer();
-          this.setMode("menu");
-        }
-
         if (sState.playTrigger !== this.state.lastPlayTrigger) {
           this.state.lastPlayTrigger = sState.playTrigger;
 
@@ -403,6 +395,8 @@ class EncoreController {
         this.dom.sessionRemoteContainer.classOn("hidden");
         this.dom.sessionRemoteVideo.elm.srcObject = null;
         if (this.recorder) this.recorder.stopBroadcastStream();
+
+        this.state.isTransitioning = false;
 
         this.setMode("menu");
         this.startLoungeBackground();
@@ -2820,6 +2814,8 @@ class EncoreController {
     this._menuUpdateRafId = requestAnimationFrame(() => {
       this._menuUpdateRafId = null;
 
+      if (this.state.mode !== "menu") return;
+
       const currentPreventScroll = this._pendingPreventScroll;
 
       const isIdling =
@@ -4434,6 +4430,9 @@ class EncoreController {
           }
         }
       }
+      setTimeout(() => {
+        this.state.isTransitioning = false;
+      }, 1500);
       return;
     }
 
@@ -5353,9 +5352,8 @@ class EncoreController {
       this.dom.standbyText.text("SELECT SONG");
     }
 
-    if (this.state.mode !== "menu") {
-      this.dom.standbyScreen.classOn("hidden");
-    }
+    this.dom.standbyScreen.classOn("hidden").styleJs({ opacity: "" });
+    this.dom.standbyBumper.classOn("hidden").styleJs({ opacity: "" });
   }
 
   /**
