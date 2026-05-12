@@ -68,6 +68,7 @@ class EncoreController {
     this.Ui = Root.Processes.getService("UiLib").data;
     this.FsSvc = Root.Processes.getService("FsSvc").data;
     this.Forte = Root.Processes.getService("ForteSvc").data;
+    this.Identity = Root.Processes.getService("IdentitySvc").data;
     this.config = config;
 
     this.songList = [];
@@ -334,6 +335,14 @@ class EncoreController {
       if (sState.mode === "performance") {
         this.stopLoungeBackground();
 
+        if (
+          this.state.mode === "player" &&
+          sState.singerId !== this.SessionsSvc.peer.id
+        ) {
+          this.stopPlayer();
+          this.setMode("menu");
+        }
+
         if (sState.playTrigger !== this.state.lastPlayTrigger) {
           this.state.lastPlayTrigger = sState.playTrigger;
 
@@ -468,6 +477,40 @@ class EncoreController {
         details: `Browsing ${this.songList.length} Songs...`,
         state: `Main Menu`,
       });
+    });
+
+    document.addEventListener("CherryTree.Sessions.Kicked", () => {
+      this.SessionsSvc.leaveRoom();
+      this.state.isSessionActive = false;
+      this.state.sessionRoomId = null;
+      this.stopLoungeBackground();
+      if (this.recorder) this.recorder.stopBroadcastStream();
+      this.stopPlayer();
+      this.dom.sessionRemoteContainer.classOn("hidden");
+      if (this.dom.sessionRemoteVideo && this.dom.sessionRemoteVideo.elm) {
+        this.dom.sessionRemoteVideo.elm.srcObject = null;
+      }
+      this.dom.bgvContainer.classOff("hidden");
+      this.bgv.start();
+
+      this.setMode("menu");
+      this.infoBar.showTemp(
+        "KICKED",
+        "You were kicked from the session.",
+        5000,
+      );
+      if (this.state.isSessionModalOpen) this.renderSessionView("select");
+    });
+
+    document.addEventListener("CherryTree.Sessions.ForceStop", () => {
+      if (this.state.mode === "player") {
+        this.stopPlayer();
+        this.infoBar.showTemp(
+          "SKIPPED",
+          "The host skipped the current performance.",
+          4000,
+        );
+      }
     });
 
     window.addEventListener("keydown", this.boundKeydown);
@@ -2099,15 +2142,49 @@ class EncoreController {
     } else if (view === "host") {
       new Html("h2").text("HOST SESSION").appendTo(this.dom.sessionBox);
       new Html("p")
-        .text("Enter your nickname to create a room.")
+        .text("Enter your nickname and avatar to create a room.")
         .appendTo(this.dom.sessionBox);
 
       const inputGroup = new Html("div")
         .classOn("session-input-group")
         .appendTo(this.dom.sessionBox);
+      const profile = this.Identity.getProfile();
+
+      const avatarBtn = new Html("button")
+        .classOn("session-btn")
+        .text(profile.avatar ? "Change Avatar" : "Upload Avatar")
+        .appendTo(inputGroup);
+
+      avatarBtn.on("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = "image/png, image/jpeg, image/webp";
+        fileInput.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            try {
+              const b64 = await this.Identity.processAvatarFile(file);
+              await this.Identity.updateProfile(profile.nickname, b64);
+              avatarBtn.text("Avatar Selected!");
+            } catch (err) {
+              this.infoBar.showTemp(
+                "AVATAR ERROR",
+                "Failed to process image.",
+                3000,
+              );
+            }
+          }
+        };
+        fileInput.click();
+      });
+
       const nickInput = new Html("input")
         .classOn("session-input")
-        .attr({ placeholder: "Your Nickname", maxlength: 15 })
+        .attr({
+          placeholder: "Your Nickname",
+          maxlength: 15,
+          value: profile.nickname,
+        })
         .appendTo(inputGroup);
 
       const btnRow = new Html("div")
@@ -2122,12 +2199,21 @@ class EncoreController {
         .classOn("session-btn", "primary")
         .text("CREATE")
         .on("click", async () => {
-          const nick = nickInput.getValue().trim() || "Host";
+          await this.Identity.updateProfile(nickInput.getValue());
+
           this.dom.sessionBox.clear();
           new Html("h2").text("CREATING...").appendTo(this.dom.sessionBox);
 
           try {
-            const roomId = await this.SessionsSvc.hostRoom(nick);
+            const updatedProfile = this.Identity.getProfile();
+            const collisionFn = this.Identity.resolveCollision.bind(
+              this.Identity,
+            );
+
+            const roomId = await this.SessionsSvc.hostRoom(
+              updatedProfile,
+              collisionFn,
+            );
             this.state.isSessionActive = true;
             this.state.isSessionHost = true;
             this.state.sessionRoomId = roomId;
@@ -2156,9 +2242,43 @@ class EncoreController {
         .classOn("session-input")
         .attr({ placeholder: "Room ID" })
         .appendTo(inputGroup);
+
+      const profile = this.Identity.getProfile();
+      const avatarBtn = new Html("button")
+        .classOn("session-btn")
+        .text(profile.avatar ? "Change Avatar" : "Upload Avatar")
+        .appendTo(inputGroup);
+
+      avatarBtn.on("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = "image/png, image/jpeg, image/webp";
+        fileInput.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            try {
+              const b64 = await this.Identity.processAvatarFile(file);
+              await this.Identity.updateProfile(profile.nickname, b64);
+              avatarBtn.text("Avatar Selected!");
+            } catch (err) {
+              this.infoBar.showTemp(
+                "AVATAR ERROR",
+                "Failed to process image.",
+                3000,
+              );
+            }
+          }
+        };
+        fileInput.click();
+      });
+
       const nickInput = new Html("input")
         .classOn("session-input")
-        .attr({ placeholder: "Your Nickname", maxlength: 15 })
+        .attr({
+          placeholder: "Your Nickname",
+          maxlength: 15,
+          value: profile.nickname,
+        })
         .appendTo(inputGroup);
 
       const btnRow = new Html("div")
@@ -2174,14 +2294,16 @@ class EncoreController {
         .text("JOIN")
         .on("click", async () => {
           const room = roomInput.getValue().trim();
-          const nick = nickInput.getValue().trim() || "Guest";
           if (!room) return;
+
+          await this.Identity.updateProfile(nickInput.getValue());
 
           this.dom.sessionBox.clear();
           new Html("h2").text("JOINING...").appendTo(this.dom.sessionBox);
 
           try {
-            await this.SessionsSvc.joinRoom(room, nick);
+            const updatedProfile = this.Identity.getProfile();
+            await this.SessionsSvc.joinRoom(room, updatedProfile);
             this.state.isSessionActive = true;
             this.state.isSessionHost = false;
             this.state.sessionRoomId = room;
@@ -2213,9 +2335,82 @@ class EncoreController {
         .text(this.state.sessionRoomId)
         .appendTo(this.dom.sessionBox);
 
+      const partList = new Html("div")
+        .styleJs({
+          marginTop: "1rem",
+          maxHeight: "200px",
+          overflowY: "auto",
+          background: "rgba(0,0,0,0.5)",
+          borderRadius: "8px",
+          padding: "1rem",
+        })
+        .appendTo(this.dom.sessionBox);
+
+      this.SessionsSvc.state.participants.forEach((p) => {
+        const row = new Html("div")
+          .styleJs({
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "0.5rem",
+          })
+          .appendTo(partList);
+
+        const infoWrapper = new Html("div")
+          .styleJs({ display: "flex", alignItems: "center", gap: "10px" })
+          .appendTo(row);
+
+        const avatar = new Html("img")
+          .styleJs({
+            width: "32px",
+            height: "32px",
+            borderRadius: "50%",
+            background: "#444",
+            objectFit: "cover",
+          })
+          .appendTo(infoWrapper);
+        if (p.avatar) avatar.attr({ src: p.avatar });
+
+        new Html("span")
+          .text(`${p.nickname} ${p.isHost ? "(Host)" : ""}`)
+          .appendTo(infoWrapper);
+
+        if (this.state.isSessionHost && !p.isHost) {
+          new Html("button")
+            .text("KICK")
+            .classOn("session-btn")
+            .styleJs({
+              padding: "4px 8px",
+              fontSize: "0.8rem",
+              width: "auto",
+              backgroundColor: "#ff5555",
+            })
+            .on("click", () => {
+              this.SessionsSvc.kickParticipant(p.id);
+              setTimeout(() => this.renderSessionView("active"), 200);
+            })
+            .appendTo(row);
+        }
+      });
+
       const btnRow = new Html("div")
         .classOn("session-btn-row")
         .appendTo(this.dom.sessionBox);
+
+      if (
+        this.state.isSessionHost &&
+        this.SessionsSvc.state.mode === "performance"
+      ) {
+        new Html("button")
+          .classOn("session-btn", "primary")
+          .text("SKIP SONG")
+          .on("click", () => {
+            this.SessionsSvc.skipCurrentSong();
+            this.toggleSessionModal(false);
+          })
+          .appendTo(btnRow);
+      }
+
       new Html("button")
         .classOn("session-btn")
         .text("CLOSE MENU")
@@ -2426,29 +2621,6 @@ class EncoreController {
     }
 
     this.danmakuRafId = requestAnimationFrame(() => this.drawDanmakuFrame());
-  }
-
-  /**
-   * Determines an available unique nickname by appending a numerical counter if necessary.
-   *
-   * @param {string} desiredName - The requested username.
-   * @param {string} deviceId - The requesting device's persistent identifier.
-   * @returns {string} An active session-unique username.
-   */
-  generateUniqueNickname(desiredName, deviceId) {
-    let baseName = desiredName.trim().substring(0, 15) || "Singer";
-    let finalName = baseName;
-    let counter = 1;
-
-    const otherNames = Object.entries(this.state.deviceRegistry)
-      .filter(([id, _]) => id !== deviceId)
-      .map(([_, data]) => data.nickname.toLowerCase());
-
-    while (otherNames.includes(finalName.toLowerCase())) {
-      finalName = `${baseName} ${counter}`;
-      counter++;
-    }
-    return finalName;
   }
 
   /**
@@ -5503,7 +5675,14 @@ class EncoreController {
 
       if (d.type === "set_nickname") {
         const deviceId = d.deviceId || cmd.identity;
-        const uniqueName = this.generateUniqueNickname(d.value, deviceId);
+        const existingNames = Object.entries(this.state.deviceRegistry)
+          .filter(([id, _]) => id !== deviceId)
+          .map(([_, data]) => data.nickname);
+
+        const uniqueName = this.Identity.resolveCollision(
+          d.value,
+          existingNames,
+        );
 
         this.state.deviceRegistry[deviceId] = { nickname: uniqueName };
         this.state.activeSockets[cmd.identity] = deviceId;

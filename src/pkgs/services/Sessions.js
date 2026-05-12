@@ -10,6 +10,7 @@ const pkg = {
     console.log("[SESSIONS] Sessions Service started.");
   },
   end: async function () {
+    console.log("[SESSIONS] Sessions Service shutting down.");
     if (this.data && typeof this.data.leaveRoom === "function") {
       this.data.leaveRoom();
     }
@@ -89,13 +90,16 @@ const pkg = {
       });
     },
 
-    hostRoom: async function (nickname) {
+    hostRoom: async function (profile, collisionResolverFn) {
       this.isHost = true;
-      const myId = await this.initPeer(nickname);
+      this.collisionResolver = collisionResolverFn;
+
+      const myId = await this.initPeer(profile.nickname);
       this.roomId = myId;
       this.state.participants.push({
         id: myId,
-        nickname: nickname,
+        nickname: profile.nickname,
+        avatar: profile.avatar,
         isHost: true,
       });
       this.broadcastState();
@@ -103,12 +107,12 @@ const pkg = {
       return myId;
     },
 
-    joinRoom: async function (roomId, nickname) {
+    joinRoom: async function (roomId, profile) {
       this.isHost = false;
-      const myId = await this.initPeer(nickname);
+      const myId = await this.initPeer(profile.nickname);
       this.roomId = roomId;
 
-      const conn = this.peer.connect(roomId, { metadata: { nickname } });
+      const conn = this.peer.connect(roomId, { metadata: { profile } });
       this.setupConnection(conn);
 
       return new Promise((resolve) => conn.on("open", () => resolve(myId)));
@@ -118,9 +122,22 @@ const pkg = {
       conn.on("open", () => {
         this.connections.set(conn.peer, conn);
         if (this.isHost) {
+          const incomingProfile = conn.metadata.profile || {
+            nickname: conn.metadata.nickname || "Guest",
+          };
+          const existingNames = this.state.participants.map((p) => p.nickname);
+
+          let uniqueName = incomingProfile.nickname || "Guest";
+
+          // Use injected resolver if available
+          if (typeof this.collisionResolver === "function") {
+            uniqueName = this.collisionResolver(uniqueName, existingNames);
+          }
+
           this.state.participants.push({
             id: conn.peer,
-            nickname: conn.metadata.nickname,
+            nickname: uniqueName,
+            avatar: incomingProfile.avatar || null,
             isHost: false,
           });
           this.broadcastState();
@@ -151,10 +168,13 @@ const pkg = {
           );
           this.handleMediaRouting();
         } else if (data.type === "reserve_song" && this.isHost) {
+          const requesterNickname = conn.metadata.profile
+            ? conn.metadata.profile.nickname
+            : conn.metadata.nickname;
           this.state.queue.push({
             ...data.song,
             requesterId: conn.peer,
-            requesterNickname: conn.metadata.nickname,
+            requesterNickname: requesterNickname || "Guest",
           });
           if (this.state.mode === "lounge") {
             this.advanceQueue();
@@ -162,7 +182,24 @@ const pkg = {
             this.broadcastState();
           }
         } else if (data.type === "song_ended" && this.isHost) {
-          this.advanceQueue();
+          if (
+            this.state.mode === "performance" &&
+            this.state.singerId === conn.peer
+          ) {
+            this.advanceQueue();
+          }
+        } else if (data.type === "kicked") {
+          if (!this.isHost && conn.peer === this.roomId) {
+            document.dispatchEvent(
+              new CustomEvent("CherryTree.Sessions.Kicked"),
+            );
+          }
+        } else if (data.type === "force_stop") {
+          if (!this.isHost && conn.peer === this.roomId) {
+            document.dispatchEvent(
+              new CustomEvent("CherryTree.Sessions.ForceStop"),
+            );
+          }
         }
       });
 
@@ -217,6 +254,27 @@ const pkg = {
           this.broadcastState();
           this.handleMediaRouting(true);
         }
+      }
+    },
+
+    kickParticipant: function (peerId) {
+      if (!this.isHost) return;
+      const conn = this.connections.get(peerId);
+      if (conn && conn.open) {
+        conn.send({ type: "kicked" });
+        setTimeout(() => this.handlePeerDisconnect(peerId), 500);
+      } else {
+        this.handlePeerDisconnect(peerId);
+      }
+    },
+
+    skipCurrentSong: function () {
+      if (!this.isHost) return;
+      if (this.state.mode === "performance") {
+        for (let conn of this.connections.values()) {
+          if (conn.open) conn.send({ type: "force_stop" });
+        }
+        this.advanceQueue();
       }
     },
 

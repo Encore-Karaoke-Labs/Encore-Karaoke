@@ -278,6 +278,7 @@ const pkg = {
     await Root.Core.pkg.run("services:UiLib", [], true);
     await Root.Core.pkg.run("services:Forte", [], true);
     await Root.Core.pkg.run("services:FsSvc", [], true);
+    await Root.Core.pkg.run("services:Identity", [], true);
     await Root.Core.pkg.run("services:Sessions", [], true);
 
     async function checkServicesLoaded() {
@@ -286,6 +287,7 @@ const pkg = {
           Root.Processes.getService("UiLib").data;
           Root.Processes.getService("FsSvc").data;
           Root.Processes.getService("ForteSvc").data;
+          Root.Processes.getService("IdentitySvc").data;
           Root.Processes.getService("SessionsSvc").data;
           clearInterval(curInterval);
           doEverythingElse();
