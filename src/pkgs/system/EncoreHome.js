@@ -465,8 +465,9 @@ class EncoreController {
     document.addEventListener("CherryTree.Sessions.HostDisconnected", () => {
       this.state.isSessionActive = false;
       this.state.sessionRoomId = null;
-      this.stopLoungeBackground();
 
+      this.stopLoungeBackground();
+      this.Forte.clearRemoteStreams();
       if (this.recorder) this.recorder.stopBroadcastStream();
 
       this.stopPlayer();

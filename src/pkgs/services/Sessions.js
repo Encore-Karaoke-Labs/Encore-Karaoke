@@ -385,22 +385,39 @@ const pkg = {
       this.handleMediaRouting();
     },
 
-    leaveRoom: function () {
-      this.isDisconnecting = true;
-      if (this.peer) this.peer.destroy();
-      this.peer = null;
+    resetState: function () {
       this.roomId = null;
       this.isHost = false;
       this.connections.clear();
       this.mediaCalls.clear();
-      this.state.queue = [];
-      this.state.participants = [];
       this.currentPerformanceStream = null;
       this._lastRoutedMode = null;
       this._lastPlayTrigger = null;
+      this.isDisconnecting = false;
+      this.collisionResolver = null;
+
+      this.state = {
+        mode: "lounge",
+        singerId: null,
+        nowPlaying: null,
+        playTrigger: null,
+        queue: [],
+        participants: [],
+      };
+
+      console.log("[SESSIONS] Service state has been reset to default.");
       document.dispatchEvent(
         new CustomEvent("CherryTree.Sessions.ClearStreams"),
       );
+    },
+
+    leaveRoom: function () {
+      this.isDisconnecting = true;
+      if (this.peer) {
+        this.peer.destroy();
+        this.peer = null;
+      }
+      this.resetState();
     },
   },
 };
