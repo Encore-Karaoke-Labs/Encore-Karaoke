@@ -21,7 +21,6 @@ const pkg = {
     nickname: "Guest",
     connections: new Map(),
     mediaCalls: new Map(),
-
     _lastRoutedMode: null,
 
     state: {
@@ -34,6 +33,19 @@ const pkg = {
     },
 
     peerOptions: { debug: 1 },
+
+    enhanceSDP: function (sdp) {
+      let newSdp = sdp;
+      newSdp = newSdp.replace(
+        /useinbandfec=1/g,
+        "useinbandfec=1; stereo=1; sprop-stereo=1; cbr=1; maxaveragebitrate=510000",
+      );
+      newSdp = newSdp.replace(
+        /a=mid:video\r\n/g,
+        "a=mid:video\r\nb=AS:4000\r\n",
+      );
+      return newSdp;
+    },
 
     initPeer: function (nickname) {
       this.nickname = nickname;
@@ -50,7 +62,9 @@ const pkg = {
             this.state.mode === "performance" &&
             call.peer === this.state.singerId
           ) {
-            call.answer();
+            call.answer(undefined, {
+              sdpTransform: (sdp) => this.enhanceSDP(sdp),
+            });
             call.on("stream", (remoteStream) => {
               document.dispatchEvent(
                 new CustomEvent("CherryTree.Sessions.RemoteStream", {
@@ -230,7 +244,9 @@ const pkg = {
     broadcastPerformance: function (mediaStream) {
       for (let p of this.state.participants) {
         if (p.id !== this.peer.id) {
-          const call = this.peer.call(p.id, mediaStream);
+          const call = this.peer.call(p.id, mediaStream, {
+            sdpTransform: (sdp) => this.enhanceSDP(sdp),
+          });
           this.mediaCalls.set(p.id, call);
         }
       }
