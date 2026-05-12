@@ -5352,6 +5352,10 @@ class EncoreController {
     if (!this.state.isSessionActive) {
       this.dom.standbyText.text("SELECT SONG");
     }
+
+    if (this.state.mode !== "menu") {
+      this.dom.standbyScreen.classOn("hidden");
+    }
   }
 
   /**

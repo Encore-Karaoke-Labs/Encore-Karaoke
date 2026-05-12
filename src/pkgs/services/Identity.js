@@ -60,18 +60,22 @@ const pkg = {
           img.onload = () => {
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d");
-            const SIZE = 128;
 
+            const SIZE = 64;
             canvas.width = SIZE;
             canvas.height = SIZE;
 
-            // Cover fit calculation
             const scale = Math.max(SIZE / img.width, SIZE / img.height);
-            const x = (SIZE / scale - img.width) / 2;
-            const y = (SIZE / scale - img.height) / 2;
+            const w = img.width * scale;
+            const h = img.height * scale;
+            const x = (SIZE - w) / 2;
+            const y = (SIZE - h) / 2;
 
-            ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-            resolve(canvas.toDataURL("image/jpeg", 0.7)); // Compress to 70% JPEG
+            ctx.fillStyle = "#333";
+            ctx.fillRect(0, 0, SIZE, SIZE);
+            ctx.drawImage(img, x, y, w, h);
+
+            resolve(canvas.toDataURL("image/jpeg", 0.6));
           };
           img.onerror = reject;
           img.src = e.target.result;
