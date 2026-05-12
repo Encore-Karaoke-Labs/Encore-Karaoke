@@ -1352,8 +1352,19 @@ const pkg = {
      */
     playRemoteStream: (peerId, stream) => {
       if (!audioContext) return;
+      pkg.data.stopRemoteStream(peerId);
+
       if (!state.playback.remoteSources)
         state.playback.remoteSources = new Map();
+      if (!state.playback.remoteAudioElements)
+        state.playback.remoteAudioElements = new Map();
+
+      // thanks chromium
+      const audioEl = new Audio();
+      audioEl.autoplay = true;
+      audioEl.muted = true;
+      audioEl.srcObject = stream;
+      state.playback.remoteAudioElements.set(peerId, audioEl);
 
       const source = audioContext.createMediaStreamSource(stream);
       source.connect(masterGain);
@@ -1375,6 +1386,16 @@ const pkg = {
         state.playback.remoteSources.delete(peerId);
         logVerbose(`Stopped remote stream for ${peerId}`);
       }
+
+      if (
+        state.playback.remoteAudioElements &&
+        state.playback.remoteAudioElements.has(peerId)
+      ) {
+        const audioEl = state.playback.remoteAudioElements.get(peerId);
+        audioEl.pause();
+        audioEl.srcObject = null;
+        state.playback.remoteAudioElements.delete(peerId);
+      }
     },
 
     /**
@@ -1386,6 +1407,14 @@ const pkg = {
           source.disconnect();
         }
         state.playback.remoteSources.clear();
+      }
+
+      if (state.playback.remoteAudioElements) {
+        for (let audioEl of state.playback.remoteAudioElements.values()) {
+          audioEl.pause();
+          audioEl.srcObject = null;
+        }
+        state.playback.remoteAudioElements.clear();
       }
     },
 
