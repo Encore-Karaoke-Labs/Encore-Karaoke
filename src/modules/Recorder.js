@@ -507,8 +507,13 @@ export class RecorderModule {
       const mixAudioStream = this.forteSvc.getRecordingAudioStream();
       const videoStream = this.canvas.captureStream(30);
 
+      const videoTrack = videoStream.getVideoTracks()[0];
+      if ("contentHint" in videoTrack) {
+        videoTrack.contentHint = "detail";
+      }
+
       const broadcastStream = new MediaStream([
-        videoStream.getVideoTracks()[0],
+        videoTrack,
         mixAudioStream.getAudioTracks()[0],
       ]);
 
