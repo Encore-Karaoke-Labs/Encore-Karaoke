@@ -434,6 +434,34 @@ class EncoreController {
       this.Forte.clearRemoteStreams();
     });
 
+    document.addEventListener("CherryTree.Sessions.PeerDisconnected", (e) => {
+      this.Forte.stopRemoteStream(e.detail);
+    });
+
+    document.addEventListener("CherryTree.Sessions.HostDisconnected", () => {
+      this.state.isSessionActive = false;
+      this.state.sessionRoomId = null;
+      this.stopLoungeBackground();
+
+      if (this.recorder) this.recorder.stopBroadcastStream();
+
+      this.setMode("menu");
+      this.infoBar.showTemp(
+        "SESSION ENDED",
+        "The host has disconnected from the room.",
+        5000,
+      );
+
+      if (this.state.isSessionModalOpen) {
+        this.renderSessionView("select");
+      }
+
+      window.desktopIntegration.ipc.send("setRPC", {
+        details: `Browsing ${this.songList.length} Songs...`,
+        state: `Main Menu`,
+      });
+    });
+
     window.addEventListener("keydown", this.boundKeydown);
     document.addEventListener(
       "CherryTree.Forte.Playback.Update",

@@ -125,6 +125,19 @@ const pkg = {
           this.broadcastState();
           this.handleMediaRouting(true);
         }
+
+        if (conn.peerConnection) {
+          conn.peerConnection.oniceconnectionstatechange = () => {
+            const state = conn.peerConnection.iceConnectionState;
+            if (
+              state === "disconnected" ||
+              state === "failed" ||
+              state === "closed"
+            ) {
+              this.handlePeerDisconnect(conn.peer);
+            }
+          };
+        }
       });
 
       conn.on("data", (data) => {
@@ -152,15 +165,57 @@ const pkg = {
         }
       });
 
-      conn.on("close", () => {
-        this.connections.delete(conn.peer);
-        if (this.isHost) {
-          this.state.participants = this.state.participants.filter(
-            (p) => p.id !== conn.peer,
+      conn.on("close", () => this.handlePeerDisconnect(conn.peer));
+      conn.on("error", () => this.handlePeerDisconnect(conn.peer));
+    },
+
+    handlePeerDisconnect: function (peerId) {
+      if (!this.connections.has(peerId)) return;
+
+      console.log(`[SESSIONS] Peer disconnected: ${peerId}`);
+
+      const conn = this.connections.get(peerId);
+      if (conn) conn.close();
+      this.connections.delete(peerId);
+
+      if (this.mediaCalls.has(peerId)) {
+        this.mediaCalls.get(peerId).close();
+        this.mediaCalls.delete(peerId);
+      }
+
+      document.dispatchEvent(
+        new CustomEvent("CherryTree.Sessions.PeerDisconnected", {
+          detail: peerId,
+        }),
+      );
+
+      if (!this.isHost && peerId === this.roomId) {
+        this.leaveRoom();
+        document.dispatchEvent(
+          new CustomEvent("CherryTree.Sessions.HostDisconnected"),
+        );
+      } else if (this.isHost) {
+        this.state.participants = this.state.participants.filter(
+          (p) => p.id !== peerId,
+        );
+
+        this.state.queue = this.state.queue.filter(
+          (song) => song.requesterId !== peerId,
+        );
+
+        if (
+          this.state.mode === "performance" &&
+          this.state.singerId === peerId
+        ) {
+          console.log(
+            "[SESSIONS] Singer disconnected during performance. Skipping to next.",
           );
+          this.advanceQueue();
+        } else {
           this.broadcastState();
+          this.handleMediaRouting(true);
         }
-      });
+      }
     },
 
     advanceQueue: function () {
