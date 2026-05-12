@@ -2398,8 +2398,9 @@ class EncoreController {
             .styleJs({
               padding: "4px 8px",
               fontSize: "0.8rem",
-              width: "auto",
               backgroundColor: "#ff5555",
+              maxWidth: 0,
+              color: "white",
             })
             .on("click", () => {
               this.SessionsSvc.kickParticipant(p.id);
