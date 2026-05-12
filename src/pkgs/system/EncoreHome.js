@@ -407,7 +407,7 @@ class EncoreController {
             this.dom.sessionRemoteContainer.classOff("hidden");
             this.infoBar.showTemp(
               "PERFORMANCE",
-              `Watching ${sState.nowPlaying?.requesterNickname || "Singer"}'s Stream`,
+              `Everybody give a round of applause to ${sState.nowPlaying?.requesterNickname || "Singer"}!`,
               5000,
             );
           }
