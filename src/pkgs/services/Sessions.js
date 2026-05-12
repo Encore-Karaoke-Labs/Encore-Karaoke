@@ -124,7 +124,7 @@ const pkg = {
             isHost: false,
           });
           this.broadcastState();
-          this.handleMediaRouting(true);
+          this.handleMediaRouting();
         }
 
         if (conn.peerConnection) {
@@ -234,7 +234,7 @@ const pkg = {
         this.state.singerId = null;
       }
       this.broadcastState();
-      this.handleMediaRouting(true);
+      this.handleMediaRouting();
     },
 
     broadcastState: function () {
@@ -265,48 +265,66 @@ const pkg = {
       }
     },
 
-    handleMediaRouting: function (forceRebuild = false) {
-      if (
-        !forceRebuild &&
-        this._lastRoutedMode === this.state.mode &&
-        this.state.mode === "performance"
-      )
-        return;
-      this._lastRoutedMode = this.state.mode;
+    handleMediaRouting: function () {
+      const modeChanged = this._lastRoutedMode !== this.state.mode;
+      const playTriggerChanged =
+        this._lastPlayTrigger !== this.state.playTrigger;
 
-      for (let call of this.mediaCalls.values()) call.close();
-      this.mediaCalls.clear();
-      document.dispatchEvent(
-        new CustomEvent("CherryTree.Sessions.ClearStreams"),
-      );
+      this._lastRoutedMode = this.state.mode;
+      this._lastPlayTrigger = this.state.playTrigger;
+
+      if (modeChanged || playTriggerChanged) {
+        for (let call of this.mediaCalls.values()) call.close();
+        this.mediaCalls.clear();
+        document.dispatchEvent(
+          new CustomEvent("CherryTree.Sessions.ClearStreams"),
+        );
+      }
 
       if (this.state.mode === "lounge") {
         const forteSvc = pkg.root.Processes.getService("ForteSvc").data;
         for (let p of this.state.participants) {
           if (p.id !== this.peer.id && this.peer.id > p.id) {
-            const call = this.peer.call(p.id, forteSvc.getMicAudioStream());
-            this.mediaCalls.set(p.id, call);
-            call.on("stream", (stream) => {
-              document.dispatchEvent(
-                new CustomEvent("CherryTree.Sessions.LoungeStream", {
-                  detail: { id: p.id, stream },
-                }),
-              );
-            });
+            if (!this.mediaCalls.has(p.id)) {
+              const call = this.peer.call(p.id, forteSvc.getMicAudioStream());
+              this.mediaCalls.set(p.id, call);
+              call.on("stream", (stream) => {
+                document.dispatchEvent(
+                  new CustomEvent("CherryTree.Sessions.LoungeStream", {
+                    detail: { id: p.id, stream },
+                  }),
+                );
+              });
+            }
           }
+        }
+      } else if (this.state.mode === "performance") {
+        if (
+          this.state.singerId === this.peer.id &&
+          this.currentPerformanceStream
+        ) {
+          for (let p of this.state.participants) {
+            if (p.id !== this.peer.id && !this.mediaCalls.has(p.id)) {
+              const call = this.peer.call(p.id, this.currentPerformanceStream, {
+                sdpTransform: (sdp) => this.enhanceSDP(sdp),
+              });
+              this.mediaCalls.set(p.id, call);
+            }
+          }
+        }
+      }
+
+      for (let peerId of this.mediaCalls.keys()) {
+        if (!this.state.participants.find((p) => p.id === peerId)) {
+          this.mediaCalls.get(peerId).close();
+          this.mediaCalls.delete(peerId);
         }
       }
     },
 
     broadcastPerformance: function (mediaStream) {
-      for (let p of this.state.participants) {
-        if (p.id !== this.peer.id) {
-          const call = this.peer.call(p.id, mediaStream, {
-            sdpTransform: (sdp) => this.enhanceSDP(sdp),
-          });
-          this.mediaCalls.set(p.id, call);
-        }
-      }
+      this.currentPerformanceStream = mediaStream;
+      this.handleMediaRouting();
     },
 
     leaveRoom: function () {
@@ -319,6 +337,9 @@ const pkg = {
       this.mediaCalls.clear();
       this.state.queue = [];
       this.state.participants = [];
+      this.currentPerformanceStream = null;
+      this._lastRoutedMode = null;
+      this._lastPlayTrigger = null;
       document.dispatchEvent(
         new CustomEvent("CherryTree.Sessions.ClearStreams"),
       );
