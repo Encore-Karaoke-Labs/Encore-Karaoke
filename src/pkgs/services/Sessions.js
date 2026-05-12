@@ -48,6 +48,7 @@ const pkg = {
     },
 
     initPeer: function (nickname) {
+      this.isDisconnecting = false;
       this.nickname = nickname;
       return new Promise((resolve, reject) => {
         this.peer = new Peer(this.peerOptions);
@@ -170,6 +171,7 @@ const pkg = {
     },
 
     handlePeerDisconnect: function (peerId) {
+      if (this.isDisconnecting) return;
       if (!this.connections.has(peerId)) return;
 
       console.log(`[SESSIONS] Peer disconnected: ${peerId}`);
@@ -308,6 +310,7 @@ const pkg = {
     },
 
     leaveRoom: function () {
+      this.isDisconnecting = true;
       if (this.peer) this.peer.destroy();
       this.peer = null;
       this.roomId = null;
