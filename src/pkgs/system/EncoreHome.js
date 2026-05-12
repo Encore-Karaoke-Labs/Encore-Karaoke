@@ -445,6 +445,14 @@ class EncoreController {
 
       if (this.recorder) this.recorder.stopBroadcastStream();
 
+      this.stopPlayer();
+      this.dom.sessionRemoteContainer.classOn("hidden");
+      if (this.dom.sessionRemoteVideo && this.dom.sessionRemoteVideo.elm) {
+        this.dom.sessionRemoteVideo.elm.srcObject = null;
+      }
+      this.dom.bgvContainer.classOff("hidden");
+      this.bgv.start();
+
       this.setMode("menu");
       this.infoBar.showTemp(
         "SESSION ENDED",
@@ -2221,6 +2229,16 @@ class EncoreController {
           this.state.isSessionActive = false;
           this.state.sessionRoomId = null;
           this.stopLoungeBackground();
+
+          if (this.recorder) this.recorder.stopBroadcastStream();
+
+          this.stopPlayer();
+          this.dom.sessionRemoteContainer.classOn("hidden");
+          this.dom.sessionRemoteVideo.elm.srcObject = null;
+          this.dom.bgvContainer.classOff("hidden");
+          this.bgv.start();
+
+          this.setMode("menu");
           this.renderSessionView("select");
         })
         .appendTo(btnRow);
