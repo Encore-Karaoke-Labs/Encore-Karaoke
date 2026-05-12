@@ -160,7 +160,9 @@ class EncoreController {
         songMap: this.songMap,
       }),
       () =>
-        this.recorder && this.recorder.isRecording
+        this.recorder &&
+        this.recorder.isRecording &&
+        this.recorder.mediaRecorder
           ? `REC <span style="color: #ff5555">●</span> ${this.recorder.getRecordingTimeString()}`
           : false,
       (s) => this.getFormatInfo(s),
