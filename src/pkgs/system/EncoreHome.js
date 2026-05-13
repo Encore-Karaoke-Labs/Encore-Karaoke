@@ -332,6 +332,10 @@ class EncoreController {
       const prevMode = this.state.sessionMode;
       this.state.sessionMode = sState.mode;
 
+      if (this.state.isSessionActive) {
+        this.dom.sessionChatContainer.classOff("hidden");
+      }
+
       if (sState.mode === "performance") {
         this.stopLoungeBackground();
 
@@ -472,6 +476,10 @@ class EncoreController {
 
       this.stopPlayer();
       this.dom.sessionRemoteContainer.classOn("hidden");
+      if (this.dom.sessionChatContainer) {
+        this.dom.sessionChatContainer.classOn("hidden");
+        this.dom.sessionChatMessages.clear();
+      }
       if (this.dom.sessionRemoteVideo && this.dom.sessionRemoteVideo.elm) {
         this.dom.sessionRemoteVideo.elm.srcObject = null;
       }
@@ -503,6 +511,10 @@ class EncoreController {
       if (this.recorder) this.recorder.stopBroadcastStream();
       this.stopPlayer();
       this.dom.sessionRemoteContainer.classOn("hidden");
+      if (this.dom.sessionChatContainer) {
+        this.dom.sessionChatContainer.classOn("hidden");
+        this.dom.sessionChatMessages.clear();
+      }
       if (this.dom.sessionRemoteVideo && this.dom.sessionRemoteVideo.elm) {
         this.dom.sessionRemoteVideo.elm.srcObject = null;
       }
@@ -526,6 +538,45 @@ class EncoreController {
           "The host skipped the current performance.",
           4000,
         );
+      }
+    });
+
+    document.addEventListener("CherryTree.Sessions.ChatHistorySync", (e) => {
+      if (this.dom.sessionChatMessages) {
+        this.dom.sessionChatMessages.clear();
+        e.detail.forEach((msg) => this.appendChatMessage(msg.sender, msg.text));
+      }
+    });
+
+    document.addEventListener("CherryTree.Sessions.Chat", (e) => {
+      const data = e.detail;
+      this.appendChatMessage(data.sender, data.text);
+
+      const msgObj = {
+        id: Date.now(),
+        sender: data.sender,
+        text: data.text,
+        time: Date.now(),
+      };
+      this.state.chatHistory.push(msgObj);
+      if (this.state.chatHistory.length > 100) this.state.chatHistory.shift();
+      this.socket.emit("broadcastData", { type: "new_chat", message: msgObj });
+    });
+
+    document.addEventListener("CherryTree.Sessions.Cheer", (e) => {
+      const data = e.detail;
+
+      const isAudience =
+        this.state.isSessionActive &&
+        this.SessionsSvc.state.mode === "performance" &&
+        this.SessionsSvc.state.singerId !== this.SessionsSvc.peer.id;
+
+      if (!isAudience) {
+        this.state.cheerQueue.push({
+          nickname: data.sender,
+          message: data.text,
+        });
+        this.processCheerQueue();
       }
     });
 
@@ -1031,6 +1082,7 @@ class EncoreController {
       .appendTo(this.dom.sessionRemoteContainer);
 
     this.buildSessionsUI();
+    this.buildSessionChatUI();
   }
 
   renderVirtualList() {
@@ -2083,6 +2135,151 @@ class EncoreController {
     this.cancelDeletePrompt();
   }
 
+  buildSessionChatUI() {
+    this.dom.sessionChatContainer = new Html("div")
+      .classOn("session-chat-container", "hidden")
+      .appendTo(this.wrapper);
+    this.dom.sessionChatMessages = new Html("div")
+      .classOn("session-chat-messages")
+      .appendTo(this.dom.sessionChatContainer);
+    this.dom.sessionChatInputContainer = new Html("div")
+      .classOn("session-chat-input-container")
+      .appendTo(this.dom.sessionChatContainer);
+    this.dom.sessionChatMode = new Html("div")
+      .classOn("session-chat-mode", "mode-chat")
+      .text("CHAT")
+      .appendTo(this.dom.sessionChatInputContainer);
+    this.dom.sessionChatInput = new Html("input")
+      .classOn("session-chat-input")
+      .attr({
+        type: "text",
+        placeholder: "`'T' to chat, 'C' to cheer (Tab to toggle)`",
+      })
+      .appendTo(this.dom.sessionChatInputContainer);
+
+    this.state.chatInputMode = "chat";
+
+    this.dom.sessionChatInput.on("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") {
+        e.preventDefault();
+        this.submitSessionChat();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        this.dom.sessionChatInput.elm.blur();
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        this.state.chatInputMode =
+          this.state.chatInputMode === "chat" ? "cheer" : "chat";
+        this.dom.sessionChatMode.text(
+          this.state.chatInputMode === "chat" ? "CHAT" : "CHEER",
+        );
+        this.dom.sessionChatMode.elm.className = `session-chat-mode mode-${this.state.chatInputMode}`;
+      }
+    });
+
+    this.dom.sessionChatInput.on("focus", () =>
+      this.dom.sessionChatContainer.classOn("focused"),
+    );
+    this.dom.sessionChatInput.on("blur", () => {
+      this.dom.sessionChatContainer.classOff("focused");
+      this.dom.sessionChatInput.elm.value = "";
+    });
+  }
+
+  submitSessionChat() {
+    const val = this.dom.sessionChatInput.getValue().trim();
+    if (!val) {
+      this.dom.sessionChatInput.elm.blur();
+      return;
+    }
+
+    const myPeerId = this.SessionsSvc.peer.id;
+    const me = this.SessionsSvc.state.participants.find(
+      (p) => p.id === myPeerId,
+    );
+    const sender = me
+      ? me.nickname
+      : this.Identity.getProfile().nickname || "Singer";
+
+    if (this.state.chatInputMode === "cheer") {
+      this.SessionsSvc.broadcastCheer(sender, val.substring(0, 50));
+    } else {
+      this.SessionsSvc.broadcastChat(sender, val.substring(0, 200));
+    }
+
+    this.dom.sessionChatInput.elm.value = "";
+    this.dom.sessionChatInput.elm.blur();
+  }
+
+  appendChatMessage(sender, text) {
+    const myPeerId =
+      this.SessionsSvc && this.SessionsSvc.peer
+        ? this.SessionsSvc.peer.id
+        : null;
+    const me =
+      this.SessionsSvc && this.SessionsSvc.state
+        ? this.SessionsSvc.state.participants.find((p) => p.id === myPeerId)
+        : null;
+    const myName = me
+      ? me.nickname
+      : this.Identity.getProfile().nickname || "Singer";
+
+    let avatarUrl = "";
+    if (this.SessionsSvc && this.SessionsSvc.state) {
+      const p = this.SessionsSvc.state.participants.find(
+        (part) => part.nickname === sender,
+      );
+      if (p && p.avatar) avatarUrl = p.avatar;
+    }
+    if (!avatarUrl && sender === myName) {
+      avatarUrl = this.Identity.getProfile().avatar || "";
+    }
+
+    const isMe = sender === myName;
+
+    const msgWrapper = new Html("div")
+      .classOn("chat-message-wrapper")
+      .appendTo(this.dom.sessionChatMessages);
+
+    if (isMe) msgWrapper.classOn("is-me");
+
+    if (!isMe) {
+      if (avatarUrl) {
+        new Html("img")
+          .classOn("chat-avatar")
+          .attr({ src: avatarUrl })
+          .appendTo(msgWrapper);
+      } else {
+        new Html("div").classOn("chat-avatar", "fallback").appendTo(msgWrapper);
+      }
+    }
+
+    const msgEl = new Html("div").classOn("chat-message").appendTo(msgWrapper);
+
+    if (isMe) msgEl.classOn("is-me");
+
+    new Html("span")
+      .classOn("chat-sender")
+      .text(sender + ": ")
+      .appendTo(msgEl);
+    new Html("span").classOn("chat-text").text(text).appendTo(msgEl);
+
+    if (isMe) {
+      if (avatarUrl) {
+        new Html("img")
+          .classOn("chat-avatar")
+          .attr({ src: avatarUrl })
+          .appendTo(msgWrapper);
+      } else {
+        new Html("div").classOn("chat-avatar", "fallback").appendTo(msgWrapper);
+      }
+    }
+
+    const container = this.dom.sessionChatMessages.elm;
+    container.scrollTop = container.scrollHeight;
+  }
+
   /**
    * Generates the Sessions Modal UI elements.
    */
@@ -2234,6 +2431,8 @@ class EncoreController {
             this.state.isSessionHost = true;
             this.state.sessionRoomId = roomId;
             this.state.sessionMode = "lounge";
+            if (this.dom.sessionChatContainer)
+              this.dom.sessionChatContainer.classOff("hidden");
             this.renderSessionView("active");
             this.startLoungeBackground();
           } catch (e) {
@@ -2324,6 +2523,8 @@ class EncoreController {
             this.state.isSessionHost = false;
             this.state.sessionRoomId = room;
             this.state.sessionMode = "lounge";
+            if (this.dom.sessionChatContainer)
+              this.dom.sessionChatContainer.classOff("hidden");
             this.renderSessionView("active");
             this.startLoungeBackground();
           } catch (e) {
@@ -2446,6 +2647,10 @@ class EncoreController {
 
           this.stopPlayer();
           this.dom.sessionRemoteContainer.classOn("hidden");
+          if (this.dom.sessionChatContainer) {
+            this.dom.sessionChatContainer.classOn("hidden");
+            this.dom.sessionChatMessages.clear();
+          }
           this.dom.sessionRemoteVideo.elm.srcObject = null;
           this.dom.bgvContainer.classOff("hidden");
           this.bgv.start();
@@ -4696,6 +4901,36 @@ class EncoreController {
       return;
     }
 
+    if (
+      this.dom.sessionChatInput &&
+      document.activeElement === this.dom.sessionChatInput.elm
+    ) {
+      return;
+    }
+
+    if (
+      this.state.isSessionActive &&
+      !this.state.isSearchOverlayVisible &&
+      !this.state.isPromptingSetup &&
+      !this.state.isSessionModalOpen
+    ) {
+      if (e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        this.state.chatInputMode = "chat";
+        this.dom.sessionChatMode.text("CHAT").elm.className =
+          "session-chat-mode mode-chat";
+        this.dom.sessionChatInput.elm.focus();
+        return;
+      } else if (e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        this.state.chatInputMode = "cheer";
+        this.dom.sessionChatMode.text("CHEER").elm.className =
+          "session-chat-mode mode-cheer";
+        this.dom.sessionChatInput.elm.focus();
+        return;
+      }
+    }
+
     if (this.state.isDeletePromptOpen) {
       e.preventDefault();
       if (e.key === "Escape") this.cancelDeletePrompt();
@@ -5737,17 +5972,19 @@ class EncoreController {
           text: d.value.substring(0, 200),
           time: Date.now(),
         };
-
         this.state.chatHistory.push(msgObj);
         if (this.state.chatHistory.length > 100) this.state.chatHistory.shift();
 
         this.state.typingUsers.delete(cmd.identity);
-
         this.socket.emit("broadcastData", {
           type: "new_chat",
           message: msgObj,
         });
         this.broadcastSocialState();
+
+        if (this.state.isSessionActive) {
+          this.SessionsSvc.broadcastChat(sender, d.value.substring(0, 200));
+        }
         return;
       }
 
@@ -5758,11 +5995,22 @@ class EncoreController {
             ? this.state.deviceRegistry[deviceId].nickname
             : "Guest";
 
-        this.state.cheerQueue.push({
-          nickname: sender,
-          message: d.value.substring(0, 50),
-        });
-        this.processCheerQueue();
+        const isAudience =
+          this.state.isSessionActive &&
+          this.SessionsSvc.state.mode === "performance" &&
+          this.SessionsSvc.state.singerId !== this.SessionsSvc.peer.id;
+
+        if (!isAudience) {
+          this.state.cheerQueue.push({
+            nickname: sender,
+            message: d.value.substring(0, 50),
+          });
+          this.processCheerQueue();
+        }
+
+        if (this.state.isSessionActive) {
+          this.SessionsSvc.broadcastCheer(sender, d.value.substring(0, 50));
+        }
         return;
       }
 

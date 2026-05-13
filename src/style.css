@@ -4166,3 +4166,147 @@ p + .flex-list button {
   margin: 1rem 0;
   user-select: all; /* Allow copying */
 }
+
+.session-chat-container {
+  position: absolute;
+  bottom: 3.5rem;
+  right: 2rem;
+  left: auto;
+  width: 350px;
+  height: 350px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  z-index: 50000;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.session-chat-container.hidden {
+  opacity: 0;
+}
+
+.session-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  margin-bottom: 0.8rem;
+  mask-image: linear-gradient(to bottom, transparent, black 15%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%);
+  padding-top: 2rem;
+  pointer-events: auto;
+
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.session-chat-messages::-webkit-scrollbar {
+  width: 4px;
+}
+.session-chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.chat-message-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.chat-message-wrapper.is-me {
+  justify-content: flex-end;
+}
+
+.chat-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #444;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.chat-message {
+  background: rgba(10, 10, 20, 0.7);
+  backdrop-filter: blur(5px);
+  padding: 0.5rem 0.8rem;
+  border-radius: 8px;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1.1rem;
+  color: white;
+  max-width: calc(100% - 32px);
+  word-wrap: break-word;
+  border-left: 3px solid #89cff0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.chat-message.is-me {
+  border-left: none;
+  border-right: 3px solid #ffd700;
+  text-align: right;
+}
+
+.chat-message.is-me .chat-sender {
+  display: none;
+}
+
+.session-chat-input-container {
+  display: flex;
+  background: rgba(10, 10, 20, 0.85);
+  border: 1px solid rgba(137, 207, 240, 0.4);
+  border-radius: 8px;
+  overflow: hidden;
+  pointer-events: auto;
+  opacity: 0.4;
+  transition:
+    opacity 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  backdrop-filter: blur(8px);
+
+  flex-shrink: 0;
+}
+
+.session-chat-container.focused .session-chat-input-container {
+  opacity: 1;
+  border-color: #89cff0;
+  box-shadow: 0 0 15px rgba(137, 207, 240, 0.4);
+}
+
+.session-chat-mode {
+  padding: 0.6rem 1rem;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 800;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #89cff0;
+  color: #000;
+  letter-spacing: 0.05em;
+  transition: background-color 0.2s ease;
+}
+
+.session-chat-mode.mode-cheer {
+  background: #ffd700;
+}
+
+.session-chat-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: white;
+  padding: 0.6rem 1rem;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1rem;
+  outline: none;
+}
+
+.session-chat-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}

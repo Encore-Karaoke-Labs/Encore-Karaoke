@@ -160,12 +160,27 @@ const pkg = {
 
       conn.on("data", (data) => {
         if (data.type === "state_sync") {
+          const prevChatLength = this.state.chatHistory
+            ? this.state.chatHistory.length
+            : 0;
           this.state = data.state;
+
           document.dispatchEvent(
             new CustomEvent("CherryTree.Sessions.StateUpdate", {
               detail: this.state,
             }),
           );
+
+          if (
+            this.state.chatHistory &&
+            this.state.chatHistory.length > prevChatLength
+          ) {
+            document.dispatchEvent(
+              new CustomEvent("CherryTree.Sessions.ChatHistorySync", {
+                detail: this.state.chatHistory,
+              }),
+            );
+          }
           this.handleMediaRouting();
         } else if (data.type === "reserve_song" && this.isHost) {
           const requesterNickname = conn.metadata.profile
@@ -199,6 +214,19 @@ const pkg = {
             document.dispatchEvent(
               new CustomEvent("CherryTree.Sessions.ForceStop"),
             );
+          }
+        } else if (data.type === "chat_message" || data.type === "cheer") {
+          document.dispatchEvent(
+            new CustomEvent(
+              `CherryTree.Sessions.${data.type === "chat_message" ? "Chat" : "Cheer"}`,
+              { detail: data },
+            ),
+          );
+
+          if (this.isHost) {
+            for (let c of this.connections.values()) {
+              if (c.open && c.peer !== conn.peer) c.send(data);
+            }
           }
         }
       });
@@ -307,6 +335,43 @@ const pkg = {
       }
     },
 
+    broadcastChat: function (sender, text) {
+      const data = { type: "chat_message", sender, text };
+
+      if (!this.state.chatHistory) this.state.chatHistory = [];
+      this.state.chatHistory.push(data);
+      if (this.state.chatHistory.length > 100) this.state.chatHistory.shift();
+
+      document.dispatchEvent(
+        new CustomEvent("CherryTree.Sessions.Chat", { detail: data }),
+      );
+
+      if (this.isHost) {
+        for (let conn of this.connections.values()) {
+          if (conn.open) conn.send(data);
+        }
+      } else {
+        const hostConn = this.connections.get(this.roomId);
+        if (hostConn && hostConn.open) hostConn.send(data);
+      }
+    },
+
+    broadcastCheer: function (sender, text) {
+      const data = { type: "cheer", sender, text };
+      document.dispatchEvent(
+        new CustomEvent("CherryTree.Sessions.Cheer", { detail: data }),
+      );
+
+      if (this.isHost) {
+        for (let conn of this.connections.values()) {
+          if (conn.open) conn.send(data);
+        }
+      } else {
+        const hostConn = this.connections.get(this.roomId);
+        if (hostConn && hostConn.open) hostConn.send(data);
+      }
+    },
+
     requestSong: function (song) {
       if (this.isHost) {
         this.state.queue.push({
@@ -403,6 +468,7 @@ const pkg = {
         playTrigger: null,
         queue: [],
         participants: [],
+        chatHistory: [],
       };
 
       console.log("[SESSIONS] Service state has been reset to default.");
