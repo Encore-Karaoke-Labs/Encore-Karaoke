@@ -1177,18 +1177,7 @@ class EncoreController {
 
         item.on("click", () => {
           if (this.state.isSessionActive) {
-            this.SessionsSvc.requestSong(song);
-            const codeSpan = song.code
-              ? `<span class="info-bar-code">${song.code}</span>`
-              : `<span class="info-bar-code is-youtube">YT</span>`;
-            const fmt = this.getFormatInfo(song);
-            const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
-
-            this.infoBar.showTemp(
-              "RESERVED",
-              `${codeSpan} ${fmtBadge} <span class="info-bar-title">${song.title}</span>`,
-              4000,
-            );
+            this.reserveSongInSession(song);
           } else {
             this.startPlayer(song);
           }
@@ -2376,6 +2365,31 @@ class EncoreController {
     } else {
       this.dom.sessionModal.classOn("hidden");
     }
+  }
+
+  /**
+   * Reserves a song in the active session and shows confirmation.
+   */
+  reserveSongInSession(song) {
+    this.SessionsSvc.requestSong(song);
+    this.showReservationNotification(song);
+  }
+
+  /**
+   * Displays the reservation notification for a song.
+   */
+  showReservationNotification(song) {
+    const codeSpan = song.code
+      ? `<span class="info-bar-code">${song.code}</span>`
+      : `<span class="info-bar-code is-youtube">YT</span>`;
+    const fmt = this.getFormatInfo(song);
+    const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
+
+    this.infoBar.showTemp(
+      "RESERVED",
+      `${codeSpan} ${fmtBadge} <span class="info-bar-title">${song.title}</span>`,
+      4000,
+    );
   }
 
   /**
@@ -5491,18 +5505,7 @@ class EncoreController {
           if (this.state.mode === "yt-search") this.setMode("menu");
 
           if (this.state.isSessionActive) {
-            this.SessionsSvc.requestSong(song);
-            const codeSpan = song.code
-              ? `<span class="info-bar-code">${song.code}</span>`
-              : `<span class="info-bar-code is-youtube">YT</span>`;
-            const fmt = this.getFormatInfo(song);
-            const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
-
-            this.infoBar.showTemp(
-              "RESERVED",
-              `${codeSpan} ${fmtBadge} <span class="info-bar-title">${song.title}</span>`,
-              4000,
-            );
+            this.reserveSongInSession(song);
           } else {
             this.startPlayer(song);
           }
@@ -5518,18 +5521,7 @@ class EncoreController {
             : null;
 
         if (song) {
-          this.SessionsSvc.requestSong(song);
-          const codeSpan = song.code
-            ? `<span class="info-bar-code">${song.code}</span>`
-            : `<span class="info-bar-code is-youtube">YT</span>`;
-          const fmt = this.getFormatInfo(song);
-          const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
-
-          this.infoBar.showTemp(
-            "RESERVED",
-            `${codeSpan} ${fmtBadge} <span class="info-bar-title">${song.title}</span>`,
-            4000,
-          );
+          this.reserveSongInSession(song);
           this.state.songNumber = "";
           this.state.highlightedIndex = -1;
           this.state.isTypingNumber = false;
@@ -5569,30 +5561,10 @@ class EncoreController {
                 };
 
           if (this.state.isSessionActive) {
-            this.SessionsSvc.requestSong(song);
-            const codeSpan = song.code
-              ? `<span class="info-bar-code">${song.code}</span>`
-              : `<span class="info-bar-code is-youtube">YT</span>`;
-            const fmt = this.getFormatInfo(song);
-            const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
-
-            this.infoBar.showTemp(
-              "RESERVED",
-              `${codeSpan} ${fmtBadge} <span class="info-bar-title">${song.title}</span>`,
-              4000,
-            );
+            this.reserveSongInSession(song);
           } else {
             this.state.reservationQueue.push(song);
-            const codeSpan = song.code
-              ? `<span class="info-bar-code">${song.code}</span>`
-              : `<span class="info-bar-code is-youtube">YT</span>`;
-            const fmt = this.getFormatInfo(song);
-            const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
-            this.infoBar.showTemp(
-              "RESERVED",
-              `${codeSpan} ${fmtBadge} <span class="info-bar-title">${song.title}</span>`,
-              4000,
-            );
+            this.showReservationNotification(song);
           }
 
           this.state.highlightedSearchIndex = -1;
@@ -5608,19 +5580,7 @@ class EncoreController {
         );
         if (song) {
           if (this.state.isSessionActive) {
-            this.SessionsSvc.requestSong(song);
-
-            const codeSpan = song.code
-              ? `<span class="info-bar-code">${song.code}</span>`
-              : `<span class="info-bar-code is-youtube">YT</span>`;
-            const fmt = this.getFormatInfo(song);
-            const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
-
-            this.infoBar.showTemp(
-              "RESERVED",
-              `${codeSpan} ${fmtBadge} <span class="info-bar-title">${song.title}</span>`,
-              4000,
-            );
+            this.reserveSongInSession(song);
           } else {
             this.state.reservationQueue.push(song);
             this.infoBar.showDefault();
@@ -5650,18 +5610,7 @@ class EncoreController {
       this.renderSearchResults();
 
       if (this.state.isSessionActive) {
-        this.SessionsSvc.requestSong(song);
-        const codeSpan = song.code
-          ? `<span class="info-bar-code">${song.code}</span>`
-          : `<span class="info-bar-code is-youtube">YT</span>`;
-        const fmt = this.getFormatInfo(song);
-        const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
-
-        this.infoBar.showTemp(
-          "RESERVED",
-          `${codeSpan} ${fmtBadge} <span class="info-bar-title">${song.title}</span>`,
-          4000,
-        );
+        this.reserveSongInSession(song);
       } else {
         this.startPlayer(song);
       }
