@@ -205,6 +205,7 @@ class EncoreController {
     }
 
     this.requestCanvasCacheUpdate = false;
+    this.ytSearchAbortController = null;
   }
 
   /**
@@ -3096,6 +3097,11 @@ class EncoreController {
 
     if (this.state.isSearchOverlayVisible) this.toggleSearchOverlay(false);
 
+    if (newMode !== "yt-search" && this.ytSearchAbortController) {
+      this.ytSearchAbortController.abort();
+      this.ytSearchAbortController = null;
+    }
+
     if (newMode === "menu") {
       this.state.showSongList = false;
       this.dom.overlay.classOff("hidden");
@@ -3471,9 +3477,15 @@ class EncoreController {
       return;
     }
 
+    if (this.ytSearchAbortController) {
+      this.ytSearchAbortController.abort();
+    }
+    this.ytSearchAbortController = new AbortController();
+
     try {
       const res = await fetch(
         `http://127.0.0.1:${this.state.actualPort}/yt-search?q=${encodeURIComponent(rawQuery)}`,
+        { signal: this.ytSearchAbortController.signal },
       );
       const data = await res.json();
       const ytItems = (data.items || [])
@@ -3483,7 +3495,11 @@ class EncoreController {
       this.state.searchResults = [...localResults, ...ytItems];
       this.renderSearchResults();
     } catch (e) {
-      console.error("YT Search failed", e);
+      if (e.name === "AbortError") {
+        console.log("[Encore] YT Search aborted");
+      } else {
+        console.error("[Encore] YT Search failed", e);
+      }
     } finally {
       this.state.isSearching = false;
     }
