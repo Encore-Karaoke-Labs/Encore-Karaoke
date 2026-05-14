@@ -6137,8 +6137,26 @@ class EncoreController {
           this.handlePan("right");
           break;
         case "toggle_recording":
-          if (this.state.mode === "player" && !this.state.currentSongIsYouTube)
-            this.recorder.toggle();
+          if (
+            this.state.mode === "player" &&
+            !this.state.currentSongIsYouTube
+          ) {
+            if (this.state.isSessionActive) {
+              this.infoBar.showTemp(
+                "RECORDING",
+                "Disabled during an active Session.",
+                4000,
+              );
+              generateDialog(
+                new Html("div")
+                  .classOn("temp-dialog-text")
+                  .text("NOT AVAILABLE"),
+                2000,
+              );
+            } else {
+              this.recorder.toggle();
+            }
+          }
           break;
         case "toggle_bgv":
           if (!this.state.currentSongIsMV) {
