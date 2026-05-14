@@ -6198,6 +6198,13 @@ class EncoreController {
 
         case "client_yt_search":
           (async () => {
+            if (this.state.isSessionActive) {
+              this.socket.emit("sendData", {
+                identity: cmd.identity,
+                data: { type: "yt_search_results", results: [] },
+              });
+              return;
+            }
             try {
               const query = d.value;
               const res = await fetch(
