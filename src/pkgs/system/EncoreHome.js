@@ -3389,6 +3389,11 @@ class EncoreController {
     this.state.searchResults = [...localResults];
     this.renderSearchResults();
 
+    if (this.state.isSessionActive) {
+      this.state.isSearching = false;
+      return;
+    }
+
     try {
       const res = await fetch(
         `http://127.0.0.1:${this.state.actualPort}/yt-search?q=${encodeURIComponent(rawQuery)}`,
