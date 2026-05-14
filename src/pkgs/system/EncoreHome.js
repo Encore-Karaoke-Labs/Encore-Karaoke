@@ -2153,7 +2153,7 @@ class EncoreController {
       .classOn("session-chat-input")
       .attr({
         type: "text",
-        placeholder: "`'T' to chat, 'C' to cheer (Tab to toggle)`",
+        placeholder: "'T' to chat, 'C' to cheer",
       })
       .appendTo(this.dom.sessionChatInputContainer);
 
@@ -2296,9 +2296,19 @@ class EncoreController {
         this.toggleSessionModal(false);
     });
 
+    // Outer container matching the Mixer's sizing logic
     this.dom.sessionBox = new Html("div")
       .classOn("session-box")
       .appendTo(this.dom.sessionModal);
+
+    // Separated header and content area for a cleaner layout
+    this.dom.sessionHeader = new Html("div")
+      .classOn("session-header")
+      .appendTo(this.dom.sessionBox);
+
+    this.dom.sessionContentArea = new Html("div")
+      .classOn("session-content-area")
+      .appendTo(this.dom.sessionBox);
   }
 
   /**
@@ -2322,18 +2332,19 @@ class EncoreController {
    */
   renderSessionView(view) {
     this.state.sessionModalView = view;
-    this.dom.sessionBox.clear();
+    this.dom.sessionHeader.clear();
+    this.dom.sessionContentArea.clear();
 
     if (view === "select") {
-      new Html("h2").text("ENCORE SESSIONS").appendTo(this.dom.sessionBox);
+      new Html("h1").text("ENCORE SESSIONS").appendTo(this.dom.sessionHeader);
       new Html("p")
         .text("Sing with friends anywhere in the world.")
-        .appendTo(this.dom.sessionBox);
+        .appendTo(this.dom.sessionHeader);
 
       const btnRow = new Html("div")
         .classOn("session-btn-row")
-        .styleJs({ flexDirection: "column" })
-        .appendTo(this.dom.sessionBox);
+        .styleJs({ flexDirection: "column", width: "100%", maxWidth: "400px" })
+        .appendTo(this.dom.sessionContentArea);
 
       new Html("button")
         .classOn("session-btn", "primary")
@@ -2352,21 +2363,46 @@ class EncoreController {
         .text("CANCEL")
         .on("click", () => this.toggleSessionModal(false))
         .appendTo(btnRow);
-    } else if (view === "host") {
-      new Html("h2").text("HOST SESSION").appendTo(this.dom.sessionBox);
+    } else if (view === "host" || view === "join") {
+      const isHost = view === "host";
+
+      new Html("h1")
+        .text(isHost ? "HOST SESSION" : "JOIN SESSION")
+        .appendTo(this.dom.sessionHeader);
       new Html("p")
-        .text("Enter your nickname and avatar to create a room.")
-        .appendTo(this.dom.sessionBox);
+        .text(
+          isHost
+            ? "Configure your profile and create a virtual karaoke room."
+            : "Enter a Room ID and configure your profile to join.",
+        )
+        .appendTo(this.dom.sessionHeader);
 
-      const inputGroup = new Html("div")
-        .classOn("session-input-group")
-        .appendTo(this.dom.sessionBox);
       const profile = this.Identity.getProfile();
+
+      const formLayout = new Html("div")
+        .classOn("session-form-layout")
+        .appendTo(this.dom.sessionContentArea);
+
+      // --- Left Column: Avatar Preview ---
+      const avatarCol = new Html("div")
+        .classOn("session-avatar-col")
+        .appendTo(formLayout);
+
+      const avatarImgWrapper = new Html("div")
+        .classOn("session-avatar-wrapper")
+        .appendTo(avatarCol);
+      const avatarPreview = new Html("img")
+        .classOn("session-avatar-preview")
+        .appendTo(avatarImgWrapper);
+
+      if (profile.avatar) {
+        avatarPreview.attr({ src: profile.avatar });
+      }
 
       const avatarBtn = new Html("button")
         .classOn("session-btn")
         .text(profile.avatar ? "Change Avatar" : "Upload Avatar")
-        .appendTo(inputGroup);
+        .appendTo(avatarCol);
 
       avatarBtn.on("click", () => {
         const fileInput = document.createElement("input");
@@ -2378,6 +2414,7 @@ class EncoreController {
             try {
               const b64 = await this.Identity.processAvatarFile(file);
               await this.Identity.updateProfile(profile.nickname, b64);
+              avatarPreview.attr({ src: b64 });
               avatarBtn.text("Avatar Selected!");
             } catch (err) {
               this.infoBar.showTemp(
@@ -2391,6 +2428,19 @@ class EncoreController {
         fileInput.click();
       });
 
+      // --- Right Column: Inputs ---
+      const inputCol = new Html("div")
+        .classOn("session-input-col")
+        .appendTo(formLayout);
+
+      let roomInput = null;
+      if (!isHost) {
+        roomInput = new Html("input")
+          .classOn("session-input")
+          .attr({ placeholder: "Room ID" })
+          .appendTo(inputCol);
+      }
+
       const nickInput = new Html("input")
         .classOn("session-input")
         .attr({
@@ -2398,130 +2448,55 @@ class EncoreController {
           maxlength: 15,
           value: profile.nickname,
         })
-        .appendTo(inputGroup);
+        .appendTo(inputCol);
 
       const btnRow = new Html("div")
         .classOn("session-btn-row")
-        .appendTo(this.dom.sessionBox);
+        .styleJs({ width: "100%", marginTop: "1rem" })
+        .appendTo(inputCol);
+
       new Html("button")
         .classOn("session-btn")
         .text("BACK")
         .on("click", () => this.renderSessionView("select"))
         .appendTo(btnRow);
+
       new Html("button")
         .classOn("session-btn", "primary")
-        .text("CREATE")
+        .text(isHost ? "CREATE" : "JOIN")
         .on("click", async () => {
-          await this.Identity.updateProfile(nickInput.getValue());
+          if (!isHost && !roomInput.getValue().trim()) return;
 
-          this.dom.sessionBox.clear();
-          new Html("h2").text("CREATING...").appendTo(this.dom.sessionBox);
+          await this.Identity.updateProfile(nickInput.getValue());
+          this.dom.sessionContentArea.clear();
+
+          new Html("h2")
+            .text(isHost ? "CREATING..." : "JOINING...")
+            .styleJs({ fontSize: "2rem", color: "#ffd700" })
+            .appendTo(this.dom.sessionContentArea);
 
           try {
             const updatedProfile = this.Identity.getProfile();
-            const collisionFn = this.Identity.resolveCollision.bind(
-              this.Identity,
-            );
 
-            const roomId = await this.SessionsSvc.hostRoom(
-              updatedProfile,
-              collisionFn,
-            );
-            this.state.isSessionActive = true;
-            this.state.isSessionHost = true;
-            this.state.sessionRoomId = roomId;
-            this.state.sessionMode = "lounge";
-            if (this.dom.sessionChatContainer)
-              this.dom.sessionChatContainer.classOff("hidden");
-            this.renderSessionView("active");
-            this.startLoungeBackground();
-          } catch (e) {
-            this.infoBar.showTemp(
-              "SESSION ERROR",
-              "Failed to connect to signaling server.",
-              3000,
-            );
-            this.renderSessionView("select");
-          }
-        })
-        .appendTo(btnRow);
-
-      setTimeout(() => nickInput.elm.focus(), 100);
-    } else if (view === "join") {
-      new Html("h2").text("JOIN SESSION").appendTo(this.dom.sessionBox);
-
-      const inputGroup = new Html("div")
-        .classOn("session-input-group")
-        .appendTo(this.dom.sessionBox);
-      const roomInput = new Html("input")
-        .classOn("session-input")
-        .attr({ placeholder: "Room ID" })
-        .appendTo(inputGroup);
-
-      const profile = this.Identity.getProfile();
-      const avatarBtn = new Html("button")
-        .classOn("session-btn")
-        .text(profile.avatar ? "Change Avatar" : "Upload Avatar")
-        .appendTo(inputGroup);
-
-      avatarBtn.on("click", () => {
-        const fileInput = document.createElement("input");
-        fileInput.type = "file";
-        fileInput.accept = "image/png, image/jpeg, image/webp";
-        fileInput.onchange = async (e) => {
-          const file = e.target.files[0];
-          if (file) {
-            try {
-              const b64 = await this.Identity.processAvatarFile(file);
-              await this.Identity.updateProfile(profile.nickname, b64);
-              avatarBtn.text("Avatar Selected!");
-            } catch (err) {
-              this.infoBar.showTemp(
-                "AVATAR ERROR",
-                "Failed to process image.",
-                3000,
+            if (isHost) {
+              const collisionFn = this.Identity.resolveCollision.bind(
+                this.Identity,
               );
+              const roomId = await this.SessionsSvc.hostRoom(
+                updatedProfile,
+                collisionFn,
+              );
+              this.state.isSessionActive = true;
+              this.state.isSessionHost = true;
+              this.state.sessionRoomId = roomId;
+            } else {
+              const room = roomInput.getValue().trim();
+              await this.SessionsSvc.joinRoom(room, updatedProfile);
+              this.state.isSessionActive = true;
+              this.state.isSessionHost = false;
+              this.state.sessionRoomId = room;
             }
-          }
-        };
-        fileInput.click();
-      });
 
-      const nickInput = new Html("input")
-        .classOn("session-input")
-        .attr({
-          placeholder: "Your Nickname",
-          maxlength: 15,
-          value: profile.nickname,
-        })
-        .appendTo(inputGroup);
-
-      const btnRow = new Html("div")
-        .classOn("session-btn-row")
-        .appendTo(this.dom.sessionBox);
-      new Html("button")
-        .classOn("session-btn")
-        .text("BACK")
-        .on("click", () => this.renderSessionView("select"))
-        .appendTo(btnRow);
-      new Html("button")
-        .classOn("session-btn", "primary")
-        .text("JOIN")
-        .on("click", async () => {
-          const room = roomInput.getValue().trim();
-          if (!room) return;
-
-          await this.Identity.updateProfile(nickInput.getValue());
-
-          this.dom.sessionBox.clear();
-          new Html("h2").text("JOINING...").appendTo(this.dom.sessionBox);
-
-          try {
-            const updatedProfile = this.Identity.getProfile();
-            await this.SessionsSvc.joinRoom(room, updatedProfile);
-            this.state.isSessionActive = true;
-            this.state.isSessionHost = false;
-            this.state.sessionRoomId = room;
             this.state.sessionMode = "lounge";
             if (this.dom.sessionChatContainer)
               this.dom.sessionChatContainer.classOff("hidden");
@@ -2530,7 +2505,9 @@ class EncoreController {
           } catch (e) {
             this.infoBar.showTemp(
               "SESSION ERROR",
-              "Failed to join room. Check ID.",
+              isHost
+                ? "Failed to connect to signaling server."
+                : "Failed to join room. Check ID.",
               3000,
             );
             this.renderSessionView("select");
@@ -2538,71 +2515,57 @@ class EncoreController {
         })
         .appendTo(btnRow);
 
-      setTimeout(() => roomInput.elm.focus(), 100);
+      setTimeout(() => {
+        if (!isHost) roomInput.elm.focus();
+        else nickInput.elm.focus();
+      }, 100);
     } else if (view === "active") {
-      new Html("h2")
+      new Html("h1")
         .text(this.state.isSessionHost ? "HOSTING SESSION" : "IN SESSION")
-        .appendTo(this.dom.sessionBox);
+        .appendTo(this.dom.sessionHeader);
       new Html("p")
         .text("Share this Room ID with your friends:")
-        .appendTo(this.dom.sessionBox);
+        .appendTo(this.dom.sessionHeader);
+
+      const layout = new Html("div")
+        .classOn("session-active-layout")
+        .appendTo(this.dom.sessionContentArea);
 
       new Html("div")
         .classOn("session-room-display")
         .text(this.state.sessionRoomId)
-        .appendTo(this.dom.sessionBox);
+        .appendTo(layout);
 
       const partList = new Html("div")
-        .styleJs({
-          marginTop: "1rem",
-          maxHeight: "200px",
-          overflowY: "auto",
-          background: "rgba(0,0,0,0.5)",
-          borderRadius: "8px",
-          padding: "1rem",
-        })
-        .appendTo(this.dom.sessionBox);
+        .classOn("session-participants-list")
+        .appendTo(layout);
 
       this.SessionsSvc.state.participants.forEach((p) => {
         const row = new Html("div")
-          .styleJs({
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: "0.5rem",
-          })
+          .classOn("session-participant-row")
           .appendTo(partList);
-
         const infoWrapper = new Html("div")
-          .styleJs({ display: "flex", alignItems: "center", gap: "10px" })
+          .styleJs({ display: "flex", alignItems: "center", gap: "15px" })
           .appendTo(row);
 
         const avatar = new Html("img")
-          .styleJs({
-            width: "32px",
-            height: "32px",
-            borderRadius: "50%",
-            background: "#444",
-            objectFit: "cover",
-          })
+          .classOn("session-participant-avatar")
           .appendTo(infoWrapper);
-        if (p.avatar) avatar.attr({ src: p.avatar });
+        if (p.avatar) {
+          avatar.attr({ src: p.avatar });
+        } else {
+          avatar.styleJs({ background: "#444" });
+        }
 
         new Html("span")
           .text(`${p.nickname} ${p.isHost ? "(Host)" : ""}`)
+          .styleJs({ fontSize: "1.2rem", fontWeight: "600" })
           .appendTo(infoWrapper);
 
         if (this.state.isSessionHost && !p.isHost) {
           new Html("button")
             .text("KICK")
-            .classOn("session-btn")
-            .styleJs({
-              padding: "4px 8px",
-              fontSize: "0.8rem",
-              backgroundColor: "#ff5555",
-              maxWidth: 0,
-              color: "white",
-            })
+            .classOn("session-btn", "danger", "session-kick-btn")
             .on("click", () => {
               this.SessionsSvc.kickParticipant(p.id);
               setTimeout(() => this.renderSessionView("active"), 200);
@@ -2613,7 +2576,8 @@ class EncoreController {
 
       const btnRow = new Html("div")
         .classOn("session-btn-row")
-        .appendTo(this.dom.sessionBox);
+        .styleJs({ marginTop: "auto", width: "100%" })
+        .appendTo(layout);
 
       if (
         this.state.isSessionHost &&
@@ -2634,6 +2598,7 @@ class EncoreController {
         .text("CLOSE MENU")
         .on("click", () => this.toggleSessionModal(false))
         .appendTo(btnRow);
+
       new Html("button")
         .classOn("session-btn", "danger")
         .text("LEAVE")
@@ -2644,14 +2609,16 @@ class EncoreController {
           this.stopLoungeBackground();
 
           if (this.recorder) this.recorder.stopBroadcastStream();
-
           this.stopPlayer();
+
           this.dom.sessionRemoteContainer.classOn("hidden");
           if (this.dom.sessionChatContainer) {
             this.dom.sessionChatContainer.classOn("hidden");
             this.dom.sessionChatMessages.clear();
           }
-          this.dom.sessionRemoteVideo.elm.srcObject = null;
+          if (this.dom.sessionRemoteVideo && this.dom.sessionRemoteVideo.elm) {
+            this.dom.sessionRemoteVideo.elm.srcObject = null;
+          }
           this.dom.bgvContainer.classOff("hidden");
           this.bgv.start();
 
