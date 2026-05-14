@@ -946,6 +946,11 @@ class EncoreController {
       .text("Mixer (M)")
       .on("click", () => this.mixer.toggle())
       .appendTo(this.dom.bottomActions);
+    new Html("div")
+      .classOn("action-button")
+      .text("Sessions (S)")
+      .on("click", () => this.toggleSessionModal())
+      .appendTo(this.dom.bottomActions);
 
     this.buildQR();
     const vi = this.versionInformation || {
