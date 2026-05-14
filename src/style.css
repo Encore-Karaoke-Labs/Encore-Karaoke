@@ -4092,7 +4092,74 @@ p + .flex-list button {
   overflow-y: auto;
 }
 
-/* Setup / Create / Join Form */
+.session-tile-container {
+  display: flex;
+  gap: 2.5rem;
+  justify-content: center;
+  align-items: stretch;
+  width: 100%;
+  max-width: 800px;
+}
+
+@media (max-width: 768px) {
+  .session-tile-container {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+}
+
+.session-tile {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid rgba(137, 207, 240, 0.2);
+  border-radius: 16px;
+  padding: 3rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.session-tile:hover {
+  background: rgba(137, 207, 240, 0.1);
+  border-color: #89cff0;
+  transform: translateY(-8px) scale(1.02);
+  box-shadow:
+    0 15px 30px rgba(0, 0, 0, 0.5),
+    inset 0 0 20px rgba(137, 207, 240, 0.15);
+}
+
+.session-tile-icon {
+  color: #89cff0;
+  margin-bottom: 1.5rem;
+  transition:
+    transform 0.3s ease,
+    color 0.3s ease;
+}
+
+.session-tile:hover .session-tile-icon {
+  transform: scale(1.15);
+  color: #ffd700;
+}
+
+.session-tile-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.05em;
+}
+
+.session-tile-desc {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.4;
+}
+
 .session-form-layout {
   display: flex;
   width: 100%;
@@ -4172,7 +4239,6 @@ p + .flex-list button {
   justify-content: center;
 }
 
-/* Active Session Room (Lounge Menu) */
 .session-active-layout {
   display: flex;
   flex-direction: row;
@@ -4244,7 +4310,6 @@ p + .flex-list button {
   flex: none !important;
 }
 
-/* Menu Leaderboard Column */
 .leaderboard-col {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 215, 0, 0.2);
@@ -4337,7 +4402,6 @@ p + .flex-list button {
   color: #89cff0;
 }
 
-/* Reusable buttons */
 .session-btn {
   background: rgba(137, 207, 240, 0.15);
   border: 2px solid #89cff0;

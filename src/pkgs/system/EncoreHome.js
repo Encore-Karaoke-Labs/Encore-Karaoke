@@ -425,7 +425,6 @@ class EncoreController {
 
         this.setMode("menu");
         this.startLoungeBackground();
-        this.infoBar.showTemp("SESSIONS", "Returned to Lounge.", 3000);
 
         window.desktopIntegration.ipc.send("setRPC", {
           details: `Browsing ${this.songList.length} Songs...`,
@@ -2360,21 +2359,52 @@ class EncoreController {
         .text("Sing with friends anywhere in the world.")
         .appendTo(this.dom.sessionHeader);
 
-      const btnRow = new Html("div")
-        .classOn("session-btn-row")
-        .styleJs({ flexDirection: "column", width: "100%", maxWidth: "400px" })
+      const tileContainer = new Html("div")
+        .classOn("session-tile-container")
         .appendTo(this.dom.sessionContentArea);
 
-      new Html("button")
-        .classOn("session-btn", "primary")
-        .text("HOST A SESSION")
+      const hostTile = new Html("div")
+        .classOn("session-tile")
         .on("click", () => this.renderSessionView("host"))
-        .appendTo(btnRow);
-      new Html("button")
-        .classOn("session-btn")
-        .text("JOIN A SESSION")
+        .appendTo(tileContainer);
+      new Html("div")
+        .classOn("session-tile-icon")
+        .html(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+        )
+        .appendTo(hostTile);
+      new Html("div")
+        .classOn("session-tile-title")
+        .text("HOST A SESSION")
+        .appendTo(hostTile);
+      new Html("div")
+        .classOn("session-tile-desc")
+        .text("Create a room and invite others")
+        .appendTo(hostTile);
+
+      const joinTile = new Html("div")
+        .classOn("session-tile")
         .on("click", () => this.renderSessionView("join"))
-        .appendTo(btnRow);
+        .appendTo(tileContainer);
+      new Html("div")
+        .classOn("session-tile-icon")
+        .html(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>`,
+        )
+        .appendTo(joinTile);
+      new Html("div")
+        .classOn("session-tile-title")
+        .text("JOIN A SESSION")
+        .appendTo(joinTile);
+      new Html("div")
+        .classOn("session-tile-desc")
+        .text("Enter a Room ID to start singing")
+        .appendTo(joinTile);
+
+      const btnRow = new Html("div")
+        .classOn("session-btn-row")
+        .styleJs({ marginTop: "2.5rem" })
+        .appendTo(this.dom.sessionContentArea);
       new Html("button")
         .classOn("session-btn", "danger")
         .text("CANCEL")
