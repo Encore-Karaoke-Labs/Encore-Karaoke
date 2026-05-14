@@ -1909,6 +1909,64 @@ const pkg = {
                   if (n.midiNote > maxPitch) maxPitch = n.midiNote;
                 });
 
+                // --- NEW BLIP DETECTION & LEGATO LOGIC ---
+                monoNotes.sort((a, b) => a.startTime - b.startTime);
+
+                let shortNoteCount = 0;
+                for (const note of monoNotes) {
+                  if (note.duration <= 0.2) shortNoteCount++;
+                }
+
+                const isBlipTrack =
+                  monoNotes.length > 0 &&
+                  shortNoteCount / monoNotes.length > 0.5;
+
+                if (isBlipTrack) {
+                  logVerbose(
+                    `Applying legato processing (${Math.round((shortNoteCount / monoNotes.length) * 100)}% notes are too short to score).`,
+                  );
+
+                  for (let i = 0; i < monoNotes.length; i++) {
+                    const currentNote = monoNotes[i];
+                    const nextNote = monoNotes[i + 1];
+
+                    if (nextNote) {
+                      const timeToNext =
+                        nextNote.startTime - currentNote.startTime;
+
+                      if (timeToNext > 0 && timeToNext < 2.5) {
+                        currentNote.duration = Math.max(
+                          currentNote.duration,
+                          timeToNext - 0.05,
+                        );
+                      } else if (timeToNext >= 2.5) {
+                        currentNote.duration = Math.max(
+                          currentNote.duration,
+                          0.75,
+                        );
+                      }
+                    } else {
+                      currentNote.duration = Math.max(
+                        currentNote.duration,
+                        1.0,
+                      );
+                    }
+                  }
+                } else {
+                  for (let i = 0; i < monoNotes.length; i++) {
+                    const currentNote = monoNotes[i];
+                    if (currentNote.duration < 0.2) {
+                      const timeToNext = monoNotes[i + 1]
+                        ? monoNotes[i + 1].startTime - currentNote.startTime
+                        : 1.0;
+                      currentNote.duration = Math.max(
+                        currentNote.duration,
+                        Math.min(0.2, timeToNext - 0.01),
+                      );
+                    }
+                  }
+                }
+
                 state.playback.guideNotes = monoNotes;
 
                 state.playback.guideRange = {
