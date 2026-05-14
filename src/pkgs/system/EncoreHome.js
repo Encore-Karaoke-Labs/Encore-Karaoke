@@ -1175,7 +1175,24 @@ class EncoreController {
           .text(song.artist)
           .appendTo(item);
 
-        item.on("click", () => this.startPlayer(song));
+        item.on("click", () => {
+          if (this.state.isSessionActive) {
+            this.SessionsSvc.requestSong(song);
+            const codeSpan = song.code
+              ? `<span class="info-bar-code">${song.code}</span>`
+              : `<span class="info-bar-code is-youtube">YT</span>`;
+            const fmt = this.getFormatInfo(song);
+            const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
+
+            this.infoBar.showTemp(
+              "RESERVED",
+              `${codeSpan} ${fmtBadge} <span class="info-bar-title">${song.title}</span>`,
+              4000,
+            );
+          } else {
+            this.startPlayer(song);
+          }
+        });
         if (i === this.state.highlightedIndex) item.classOn("highlighted");
 
         item.appendTo(this.dom.listInner);
