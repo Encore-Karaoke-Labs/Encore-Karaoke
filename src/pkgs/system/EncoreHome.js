@@ -4967,9 +4967,15 @@ class EncoreController {
       return;
     }
 
+    const isSearchInputFocused =
+      this.dom.searchInput &&
+      document.activeElement === this.dom.searchInput.elm;
+
     if (
       this.state.isSessionActive &&
       !this.state.isSearchOverlayVisible &&
+      this.state.mode !== "yt-search" &&
+      !isSearchInputFocused &&
       !this.state.isPromptingSetup &&
       !this.state.isSessionModalOpen
     ) {
