@@ -4047,7 +4047,7 @@ p + .flex-list button {
   pointer-events: none;
 }
 
-/* Container styled like the Mixer UI */
+/* Wide Modal Box */
 .session-box {
   background: rgba(10, 10, 20, 0.85);
   border: 1px solid rgba(137, 207, 240, 0.4);
@@ -4073,6 +4073,7 @@ p + .flex-list button {
   font-size: 2.2rem;
   letter-spacing: 0.1em;
   color: #89cff0;
+  text-transform: uppercase;
 }
 
 .session-header p {
@@ -4091,7 +4092,7 @@ p + .flex-list button {
   overflow-y: auto;
 }
 
-/* Split-column Form layout */
+/* Setup / Create / Join Form */
 .session-form-layout {
   display: flex;
   width: 100%;
@@ -4165,24 +4166,34 @@ p + .flex-list button {
   box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
 }
 
-.session-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
-}
-
 .session-btn-row {
   display: flex;
   gap: 1rem;
   justify-content: center;
 }
 
-/* Active Session Views */
+/* Active Session Room (Lounge Menu) */
 .session-active-layout {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   width: 100%;
-  max-width: 600px;
+  max-width: 900px;
   height: 100%;
+  gap: 3rem;
+}
+
+@media (max-width: 768px) {
+  .session-active-layout {
+    flex-direction: column;
+  }
+}
+
+.session-active-col {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   gap: 1rem;
+  height: 100%;
 }
 
 .session-room-display {
@@ -4233,6 +4244,100 @@ p + .flex-list button {
   flex: none !important;
 }
 
+/* Menu Leaderboard Column */
+.leaderboard-col {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 215, 0, 0.2);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.session-leaderboard-title {
+  font-family: "Rajdhani", sans-serif;
+  margin: 0 0 1rem 0;
+  color: #ffd700;
+  font-size: 1.8rem;
+  border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+  padding-bottom: 0.5rem;
+  text-align: center;
+  letter-spacing: 0.1em;
+}
+
+.session-leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.session-leaderboard-empty {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 1.2rem;
+  padding: 2rem 0;
+  font-style: italic;
+}
+
+.session-leaderboard-row {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 215, 0, 0.05);
+  border-radius: 6px;
+  border-left: 3px solid #ffd700;
+}
+
+.session-leaderboard-row .lb-rank {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #ffd700;
+  width: 40px;
+}
+
+.session-leaderboard-row .lb-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.session-leaderboard-row .lb-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-left: 0.5rem;
+}
+
+.session-leaderboard-row .lb-name {
+  font-size: 1.3rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.session-leaderboard-row .lb-song {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-leaderboard-row .lb-score {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #89cff0;
+}
+
+/* Reusable buttons */
 .session-btn {
   background: rgba(137, 207, 240, 0.15);
   border: 2px solid #89cff0;
@@ -4250,27 +4355,167 @@ p + .flex-list button {
   background: #89cff0;
   color: #000;
 }
-
 .session-btn.primary {
   background: rgba(255, 215, 0, 0.15);
   border-color: #ffd700;
   color: #ffd700;
 }
-
 .session-btn.primary:hover {
   background: #ffd700;
   color: #000;
 }
-
 .session-btn.danger {
   background: rgba(255, 85, 85, 0.15);
   border-color: #ff5555;
   color: #ff5555;
 }
-
 .session-btn.danger:hover {
   background: #ff5555;
   color: #fff;
+}
+
+.score-title-text {
+  transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.score-main-group {
+  transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-origin: center center;
+}
+
+.post-song-screen-overlay.show-leaderboard .score-main-group {
+  transform: translateX(-22vw) scale(0.75);
+  margin-bottom: 0;
+}
+.post-song-screen-overlay.show-leaderboard .score-title-text {
+  transform: translateX(-22vw) scale(0.85);
+}
+
+.score-session-leaderboard {
+  font-family: "Rajdhani", sans-serif;
+  position: absolute;
+  right: 5vw;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 42vw;
+  max-width: 800px;
+  gap: 1rem;
+  background: linear-gradient(
+    145deg,
+    rgba(20, 20, 40, 0.9),
+    rgba(10, 10, 20, 0.95)
+  );
+  border: 1px solid rgba(137, 207, 240, 0.4);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.8),
+    inset 0 0 20px rgba(137, 207, 240, 0.1);
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+  transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.score-session-leaderboard.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(100px);
+}
+
+.score-session-leaderboard h3 {
+  margin: 0;
+  color: #ffd700;
+  font-size: 2rem;
+  letter-spacing: 0.15em;
+  text-align: center;
+  border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+  padding-bottom: 0.5rem;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+  width: 100%;
+}
+
+.score-lb-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  width: 100%;
+}
+
+.score-lb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 1.5rem;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.score-lb-row.is-current-singer {
+  background: rgba(255, 215, 0, 0.15);
+  border: 2px solid #ffd700;
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+  z-index: 2;
+}
+
+.score-lb-rank {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ffd700;
+  width: 45px;
+}
+
+.score-lb-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  margin-right: 1.5rem;
+}
+
+.score-lb-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.score-lb-name {
+  font-size: 1.3rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.score-lb-song {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.score-lb-row.is-current-singer .score-lb-name {
+  color: #ffd700;
+}
+.score-lb-row.is-current-singer .score-lb-song {
+  color: rgba(255, 215, 0, 0.7);
+}
+
+.score-lb-score {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #89cff0;
+  text-shadow: 0 0 10px rgba(137, 207, 240, 0.4);
 }
 
 .session-chat-container {

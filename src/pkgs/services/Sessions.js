@@ -31,6 +31,7 @@ const pkg = {
       playTrigger: null,
       queue: [],
       participants: [],
+      leaderboard: [],
     },
 
     peerOptions: { debug: 1 },
@@ -129,7 +130,6 @@ const pkg = {
 
           let uniqueName = incomingProfile.nickname || "Guest";
 
-          // Use injected resolver if available
           if (typeof this.collisionResolver === "function") {
             uniqueName = this.collisionResolver(uniqueName, existingNames);
           }
@@ -213,6 +213,33 @@ const pkg = {
           if (!this.isHost && conn.peer === this.roomId) {
             document.dispatchEvent(
               new CustomEvent("CherryTree.Sessions.ForceStop"),
+            );
+          }
+        } else if (data.type === "submit_score") {
+          if (this.isHost) {
+            this.state.leaderboard.push(data.entry);
+            this.state.leaderboard.sort((a, b) => b.score - a.score);
+            if (this.state.leaderboard.length > 20)
+              this.state.leaderboard.length = 20;
+
+            this.broadcastState();
+
+            const scoreEvent = { type: "remote_score", entry: data.entry };
+            for (let c of this.connections.values()) {
+              if (c.open) c.send(scoreEvent);
+            }
+            document.dispatchEvent(
+              new CustomEvent("CherryTree.Sessions.RemoteScore", {
+                detail: scoreEvent,
+              }),
+            );
+          }
+        } else if (data.type === "remote_score") {
+          if (!this.isHost) {
+            document.dispatchEvent(
+              new CustomEvent("CherryTree.Sessions.RemoteScore", {
+                detail: data,
+              }),
             );
           }
         } else if (data.type === "chat_message" || data.type === "cheer") {
@@ -388,6 +415,40 @@ const pkg = {
       }
     },
 
+    submitScore: function (score, songTitle) {
+      const p = this.state.participants.find(
+        (part) => part.id === this.peer.id,
+      );
+
+      const entry = {
+        id: Date.now() + Math.random().toString(36).substr(2, 9),
+        singerName: p ? p.nickname : "Singer",
+        avatar: p ? p.avatar : null,
+        songTitle: songTitle || "Unknown Song",
+        score: score,
+      };
+
+      if (this.isHost) {
+        this.state.leaderboard.push(entry);
+        this.state.leaderboard.sort((a, b) => b.score - a.score);
+        if (this.state.leaderboard.length > 20)
+          this.state.leaderboard.length = 20;
+
+        this.broadcastState();
+
+        const scoreEvent = { type: "remote_score", entry: entry };
+        for (let c of this.connections.values()) {
+          if (c.open) c.send(scoreEvent);
+        }
+      } else {
+        const hostConn = this.connections.get(this.roomId);
+        if (hostConn && hostConn.open) {
+          hostConn.send({ type: "submit_score", entry });
+        }
+      }
+      return entry.id;
+    },
+
     handleMediaRouting: function () {
       const modeChanged = this._lastRoutedMode !== this.state.mode;
       const playTriggerChanged =
@@ -469,6 +530,7 @@ const pkg = {
         queue: [],
         participants: [],
         chatHistory: [],
+        leaderboard: [],
       };
 
       console.log("[SESSIONS] Service state has been reset to default.");

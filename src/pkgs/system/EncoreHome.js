@@ -449,6 +449,23 @@ class EncoreController {
       }
     });
 
+    document.addEventListener("CherryTree.Sessions.RemoteScore", async (e) => {
+      if (
+        this.state.isSessionActive &&
+        this.SessionsSvc.state.mode === "performance" &&
+        this.SessionsSvc.state.singerId !== this.SessionsSvc.peer.id
+      ) {
+        const mockScoreData = { finalScore: e.detail.entry.score };
+        this.state.remoteScoreEntry = e.detail.entry;
+        this.state.currentScoreEntryId = e.detail.entry.id;
+
+        await this.showPostSongScreen(mockScoreData);
+
+        this.state.remoteScoreEntry = null;
+        this.state.currentScoreEntryId = null;
+      }
+    });
+
     document.addEventListener("CherryTree.Sessions.RemoteStream", (e) => {
       this.dom.sessionRemoteVideo.elm.srcObject = e.detail;
       this.dom.sessionRemoteVideo.elm.volume = this.state.volume;
@@ -1731,7 +1748,7 @@ class EncoreController {
       .classOn("post-song-screen-overlay")
       .appendTo(this.wrapper);
 
-    new Html("div")
+    this.dom.scoreTitleText = new Html("div")
       .classOn("score-title-text")
       .text("YOUR SCORE")
       .appendTo(this.dom.postSongScreen);
@@ -1747,6 +1764,10 @@ class EncoreController {
       .classOn("rank-display-text")
       .text("")
       .appendTo(mainGroup);
+
+    this.dom.scoreSessionLeaderboard = new Html("div")
+      .classOn("score-session-leaderboard", "hidden")
+      .appendTo(this.dom.postSongScreen);
 
     new Html("div")
       .classOn("score-skip-hint")
@@ -2296,12 +2317,10 @@ class EncoreController {
         this.toggleSessionModal(false);
     });
 
-    // Outer container matching the Mixer's sizing logic
     this.dom.sessionBox = new Html("div")
       .classOn("session-box")
       .appendTo(this.dom.sessionModal);
 
-    // Separated header and content area for a cleaner layout
     this.dom.sessionHeader = new Html("div")
       .classOn("session-header")
       .appendTo(this.dom.sessionBox);
@@ -2351,13 +2370,11 @@ class EncoreController {
         .text("HOST A SESSION")
         .on("click", () => this.renderSessionView("host"))
         .appendTo(btnRow);
-
       new Html("button")
         .classOn("session-btn")
         .text("JOIN A SESSION")
         .on("click", () => this.renderSessionView("join"))
         .appendTo(btnRow);
-
       new Html("button")
         .classOn("session-btn", "danger")
         .text("CANCEL")
@@ -2365,29 +2382,25 @@ class EncoreController {
         .appendTo(btnRow);
     } else if (view === "host" || view === "join") {
       const isHost = view === "host";
-
       new Html("h1")
         .text(isHost ? "HOST SESSION" : "JOIN SESSION")
         .appendTo(this.dom.sessionHeader);
       new Html("p")
         .text(
           isHost
-            ? "Configure your profile and create a virtual karaoke room."
-            : "Enter a Room ID and configure your profile to join.",
+            ? "Configure your profile and create a virtual room."
+            : "Enter a Room ID and configure your profile.",
         )
         .appendTo(this.dom.sessionHeader);
 
       const profile = this.Identity.getProfile();
-
       const formLayout = new Html("div")
         .classOn("session-form-layout")
         .appendTo(this.dom.sessionContentArea);
 
-      // --- Left Column: Avatar Preview ---
       const avatarCol = new Html("div")
         .classOn("session-avatar-col")
         .appendTo(formLayout);
-
       const avatarImgWrapper = new Html("div")
         .classOn("session-avatar-wrapper")
         .appendTo(avatarCol);
@@ -2395,15 +2408,12 @@ class EncoreController {
         .classOn("session-avatar-preview")
         .appendTo(avatarImgWrapper);
 
-      if (profile.avatar) {
-        avatarPreview.attr({ src: profile.avatar });
-      }
+      if (profile.avatar) avatarPreview.attr({ src: profile.avatar });
 
       const avatarBtn = new Html("button")
         .classOn("session-btn")
         .text(profile.avatar ? "Change Avatar" : "Upload Avatar")
         .appendTo(avatarCol);
-
       avatarBtn.on("click", () => {
         const fileInput = document.createElement("input");
         fileInput.type = "file";
@@ -2428,18 +2438,16 @@ class EncoreController {
         fileInput.click();
       });
 
-      // --- Right Column: Inputs ---
       const inputCol = new Html("div")
         .classOn("session-input-col")
         .appendTo(formLayout);
 
       let roomInput = null;
-      if (!isHost) {
+      if (!isHost)
         roomInput = new Html("input")
           .classOn("session-input")
           .attr({ placeholder: "Room ID" })
           .appendTo(inputCol);
-      }
 
       const nickInput = new Html("input")
         .classOn("session-input")
@@ -2454,22 +2462,18 @@ class EncoreController {
         .classOn("session-btn-row")
         .styleJs({ width: "100%", marginTop: "1rem" })
         .appendTo(inputCol);
-
       new Html("button")
         .classOn("session-btn")
         .text("BACK")
         .on("click", () => this.renderSessionView("select"))
         .appendTo(btnRow);
-
       new Html("button")
         .classOn("session-btn", "primary")
         .text(isHost ? "CREATE" : "JOIN")
         .on("click", async () => {
           if (!isHost && !roomInput.getValue().trim()) return;
-
           await this.Identity.updateProfile(nickInput.getValue());
           this.dom.sessionContentArea.clear();
-
           new Html("h2")
             .text(isHost ? "CREATING..." : "JOINING...")
             .styleJs({ fontSize: "2rem", color: "#ffd700" })
@@ -2477,7 +2481,6 @@ class EncoreController {
 
           try {
             const updatedProfile = this.Identity.getProfile();
-
             if (isHost) {
               const collisionFn = this.Identity.resolveCollision.bind(
                 this.Identity,
@@ -2496,7 +2499,6 @@ class EncoreController {
               this.state.isSessionHost = false;
               this.state.sessionRoomId = room;
             }
-
             this.state.sessionMode = "lounge";
             if (this.dom.sessionChatContainer)
               this.dom.sessionChatContainer.classOff("hidden");
@@ -2531,15 +2533,17 @@ class EncoreController {
         .classOn("session-active-layout")
         .appendTo(this.dom.sessionContentArea);
 
+      const leftCol = new Html("div")
+        .classOn("session-active-col")
+        .appendTo(layout);
       new Html("div")
         .classOn("session-room-display")
         .text(this.state.sessionRoomId)
-        .appendTo(layout);
+        .appendTo(leftCol);
 
       const partList = new Html("div")
         .classOn("session-participants-list")
-        .appendTo(layout);
-
+        .appendTo(leftCol);
       this.SessionsSvc.state.participants.forEach((p) => {
         const row = new Html("div")
           .classOn("session-participant-row")
@@ -2551,11 +2555,8 @@ class EncoreController {
         const avatar = new Html("img")
           .classOn("session-participant-avatar")
           .appendTo(infoWrapper);
-        if (p.avatar) {
-          avatar.attr({ src: p.avatar });
-        } else {
-          avatar.styleJs({ background: "#444" });
-        }
+        if (p.avatar) avatar.attr({ src: p.avatar });
+        else avatar.styleJs({ background: "#444" });
 
         new Html("span")
           .text(`${p.nickname} ${p.isHost ? "(Host)" : ""}`)
@@ -2574,11 +2575,59 @@ class EncoreController {
         }
       });
 
+      const rightCol = new Html("div")
+        .classOn("session-active-col", "leaderboard-col")
+        .appendTo(layout);
+      new Html("h2")
+        .classOn("session-leaderboard-title")
+        .text("TOP PERFORMANCES")
+        .appendTo(rightCol);
+      const leaderboardList = new Html("div")
+        .classOn("session-leaderboard-list")
+        .appendTo(rightCol);
+
+      const topScores = this.SessionsSvc.state.leaderboard || [];
+
+      if (topScores.length === 0) {
+        new Html("div")
+          .classOn("session-leaderboard-empty")
+          .text("No scores yet. Sing a song to get on the board!")
+          .appendTo(leaderboardList);
+      } else {
+        topScores.slice(0, 10).forEach((entry, index) => {
+          const row = new Html("div")
+            .classOn("session-leaderboard-row")
+            .appendTo(leaderboardList);
+          new Html("div")
+            .classOn("lb-rank")
+            .text(`#${index + 1}`)
+            .appendTo(row);
+
+          const avatar = new Html("img").classOn("lb-avatar").appendTo(row);
+          if (entry.avatar) avatar.attr({ src: entry.avatar });
+          else avatar.styleJs({ background: "#444" });
+
+          const details = new Html("div").classOn("lb-details").appendTo(row);
+          new Html("div")
+            .classOn("lb-name")
+            .text(entry.singerName)
+            .appendTo(details);
+          new Html("div")
+            .classOn("lb-song")
+            .text(entry.songTitle)
+            .appendTo(details);
+
+          new Html("div")
+            .classOn("lb-score")
+            .text(Math.floor(entry.score))
+            .appendTo(row);
+        });
+      }
+
       const btnRow = new Html("div")
         .classOn("session-btn-row")
         .styleJs({ marginTop: "auto", width: "100%" })
-        .appendTo(layout);
-
+        .appendTo(leftCol);
       if (
         this.state.isSessionHost &&
         this.SessionsSvc.state.mode === "performance"
@@ -2592,13 +2641,11 @@ class EncoreController {
           })
           .appendTo(btnRow);
       }
-
       new Html("button")
         .classOn("session-btn")
         .text("CLOSE MENU")
         .on("click", () => this.toggleSessionModal(false))
         .appendTo(btnRow);
-
       new Html("button")
         .classOn("session-btn", "danger")
         .text("LEAVE")
@@ -2607,21 +2654,17 @@ class EncoreController {
           this.state.isSessionActive = false;
           this.state.sessionRoomId = null;
           this.stopLoungeBackground();
-
           if (this.recorder) this.recorder.stopBroadcastStream();
           this.stopPlayer();
-
           this.dom.sessionRemoteContainer.classOn("hidden");
           if (this.dom.sessionChatContainer) {
             this.dom.sessionChatContainer.classOn("hidden");
             this.dom.sessionChatMessages.clear();
           }
-          if (this.dom.sessionRemoteVideo && this.dom.sessionRemoteVideo.elm) {
+          if (this.dom.sessionRemoteVideo && this.dom.sessionRemoteVideo.elm)
             this.dom.sessionRemoteVideo.elm.srcObject = null;
-          }
           this.dom.bgvContainer.classOff("hidden");
           this.bgv.start();
-
           this.setMode("menu");
           this.renderSessionView("select");
         })
@@ -4596,7 +4639,22 @@ class EncoreController {
 
       if (wasLocalAudio) {
         const finalScore = this.Forte.getPlaybackState().score;
+
+        if (
+          this.state.isSessionActive &&
+          this.SessionsSvc.state.mode === "performance" &&
+          this.SessionsSvc.state.singerId === this.SessionsSvc.peer.id
+        ) {
+          const songTitle =
+            this.SessionsSvc.state.nowPlaying?.title || "Unknown Song";
+          this.state.currentScoreEntryId = this.SessionsSvc.submitScore(
+            finalScore.finalScore,
+            songTitle,
+          );
+        }
+
         await this.showPostSongScreen(finalScore);
+        this.state.currentScoreEntryId = null;
       }
       this.transitionAfterSong();
     }
@@ -4655,47 +4713,94 @@ class EncoreController {
    */
   async showPostSongScreen(scoreData) {
     this.state.isScoreScreenActive = true;
+    this.dom.postSongScreen.classOff("show-leaderboard");
+
+    if (this.state.isSessionActive) {
+      const singerName = this.state.remoteScoreEntry
+        ? this.state.remoteScoreEntry.singerName
+        : this.Identity.getProfile().nickname;
+      this.dom.scoreTitleText.text(`${singerName.toUpperCase()}'S SCORE`);
+
+      this.dom.scoreSessionLeaderboard.clear();
+      this.dom.scoreSessionLeaderboard.classOn("hidden");
+
+      new Html("h3")
+        .text("TOP PERFORMANCES")
+        .appendTo(this.dom.scoreSessionLeaderboard);
+      const lbGrid = new Html("div")
+        .classOn("score-lb-grid")
+        .appendTo(this.dom.scoreSessionLeaderboard);
+
+      const topScores = this.SessionsSvc.state.leaderboard || [];
+
+      topScores.slice(0, 5).forEach((entry, index) => {
+        const row = new Html("div").classOn("score-lb-row").appendTo(lbGrid);
+
+        if (entry.id === this.state.currentScoreEntryId)
+          row.classOn("is-current-singer");
+
+        new Html("span")
+          .classOn("score-lb-rank")
+          .text(`#${index + 1}`)
+          .appendTo(row);
+
+        const avatar = new Html("img").classOn("score-lb-avatar").appendTo(row);
+        if (entry.avatar) avatar.attr({ src: entry.avatar });
+        else avatar.styleJs({ background: "#444" });
+
+        const details = new Html("div")
+          .classOn("score-lb-details")
+          .appendTo(row);
+        new Html("span")
+          .classOn("score-lb-name")
+          .text(entry.singerName)
+          .appendTo(details);
+        new Html("span")
+          .classOn("score-lb-song")
+          .text(entry.songTitle)
+          .appendTo(details);
+
+        new Html("span")
+          .classOn("score-lb-score")
+          .text(Math.floor(entry.score))
+          .appendTo(row);
+      });
+    } else {
+      this.dom.scoreTitleText.text("YOUR SCORE");
+      this.dom.scoreSessionLeaderboard.classOn("hidden");
+    }
 
     this.dom.rankDisplay
       .text("")
       .styleJs({ transform: "scale(0.8)", opacity: "0", color: "#fff" });
     this.dom.finalScoreDisplay.text("0");
-
     this.dom.postSongScreen.styleJs({ opacity: "1", pointerEvents: "all" });
 
     const s = Math.floor(scoreData.finalScore);
     let rank = "Good";
     let rankColor = "#aed581";
     if (s == 100) {
-      // Wow! You're THE Star of the show!
       rank = "HOW DID YOU PULL THAT OFF";
       rankColor = "#00e676";
     } else if (s >= 98) {
-      // Bravo! Keep singing!
       rank = "WHAT";
       rankColor = "#00e676";
     } else if (s >= 90) {
-      // Wow, you're an awesome singer!
       rank = "EXCELLENT";
       rankColor = "#29b6f6";
     } else if (s >= 80) {
-      // Great singing!
       rank = "GREAT";
       rankColor = "#ffee58";
     } else if (s >= 60) {
-      // Nice job!
       rank = "GOOD";
       rankColor = "#ffca28";
     } else if (s >= 50) {
-      // You're getting there!
       rank = "DECENT";
       rankColor = "#ffca28";
     } else if (s >= 20) {
-      // Not bad!
       rank = "NICE TRY";
       rankColor = "#ffca28";
     } else {
-      // Practice makes perfect!
       rank = "yikes";
       rankColor = "#ef5350";
     }
@@ -4703,20 +4808,13 @@ class EncoreController {
     const playAudioSequence = async () => {
       await new Promise((r) => setTimeout(r, 1000));
       if (this.state.scoreSkipped) return;
-
       let fanfareUrl = "/assets/audio/fanfare-2.mid";
+      if (s == 100) fanfareUrl = "/assets/audio/fanfare-4.mid";
+      else if (s >= 70) fanfareUrl = "/assets/audio/fanfare-3.mid";
+      else if (s >= 20) fanfareUrl = "/assets/audio/fanfare.mid";
 
-      if (s == 100) {
-        fanfareUrl = "/assets/audio/fanfare-4.mid";
-      } else if (s >= 70) {
-        fanfareUrl = "/assets/audio/fanfare-3.mid";
-      } else if (s >= 20) {
-        fanfareUrl = "/assets/audio/fanfare.mid";
-      }
-
-      let fanfareFinished;
       if (this.state.isScoreFanfareEnabled) {
-        fanfareFinished = await this.Forte.playSfx(fanfareUrl, 0.5);
+        const fanfareFinished = await this.Forte.playSfx(fanfareUrl, 0.5);
         if (!fanfareFinished || this.state.scoreSkipped) return;
       } else {
         await new Promise((r) => setTimeout(r, 4000));
@@ -4726,7 +4824,6 @@ class EncoreController {
       if (this.state.isScoreNarrationEnabled) {
         const narrations =
           this.libraryInfo?.manifest?.additionalContents?.scoreNarrations;
-
         if (narrations && Array.isArray(narrations)) {
           const match = narrations.find((n) => s >= n.min && s <= n.max);
           if (match && match.file) {
@@ -4741,18 +4838,11 @@ class EncoreController {
             playedNarration = true;
           }
         }
-
         if (!playedNarration) {
           let defaultNarrationUrl = "/assets/audio/scores/0.wav";
-
-          if (s >= 70) {
-            defaultNarrationUrl = "/assets/audio/scores/70.wav";
-          } else if (s >= 50) {
-            defaultNarrationUrl = "/assets/audio/scores/50.wav";
-          } else if (s >= 20) {
-            defaultNarrationUrl = "/assets/audio/scores/20.wav";
-          }
-
+          if (s >= 70) defaultNarrationUrl = "/assets/audio/scores/70.wav";
+          else if (s >= 50) defaultNarrationUrl = "/assets/audio/scores/50.wav";
+          else if (s >= 20) defaultNarrationUrl = "/assets/audio/scores/20.wav";
           await this.Forte.playSfx(defaultNarrationUrl);
         }
       } else {
@@ -4769,10 +4859,7 @@ class EncoreController {
           const now = performance.now();
           const p = Math.min((now - start) / dur, 1);
           const ease = 1 - Math.pow(1 - p, 3);
-
-          const curScore = s * ease;
-          this.dom.finalScoreDisplay.text(Math.floor(curScore));
-
+          this.dom.finalScoreDisplay.text(Math.floor(s * ease));
           if (p < 1) requestAnimationFrame(tick);
           else r();
         };
@@ -4786,10 +4873,7 @@ class EncoreController {
         s >= 70
       ) {
         window.confetti({
-          position: {
-            x: window.innerWidth / 2,
-            y: window.innerHeight / 2,
-          },
+          position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
           count: 67,
           fade: true,
         });
@@ -4802,6 +4886,14 @@ class EncoreController {
         color: rankColor,
         transition: "all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
       });
+
+      if (this.state.isSessionActive) {
+        setTimeout(() => {
+          if (this.state.scoreSkipped) return;
+          this.dom.postSongScreen.classOn("show-leaderboard");
+          this.dom.scoreSessionLeaderboard.classOff("hidden");
+        }, 1500);
+      }
     };
 
     await Promise.race([
