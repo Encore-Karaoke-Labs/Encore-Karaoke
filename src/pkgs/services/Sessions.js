@@ -16,6 +16,10 @@ const pkg = {
     }
   },
   data: {
+    // Increment this ONLY when network structures, event behaviors,
+    // or state payloads change in a way that breaks compatibility.
+    PROTOCOL_VERSION: 1,
+
     peer: null,
     roomId: null,
     isHost: false,
@@ -113,7 +117,9 @@ const pkg = {
       const myId = await this.initPeer(profile.nickname);
       this.roomId = roomId;
 
-      const conn = this.peer.connect(roomId, { metadata: { profile } });
+      const conn = this.peer.connect(roomId, {
+        metadata: { profile, protocolVersion: this.PROTOCOL_VERSION },
+      });
       this.setupConnection(conn);
 
       return new Promise((resolve) => conn.on("open", () => resolve(myId)));
@@ -121,6 +127,18 @@ const pkg = {
 
     setupConnection: function (conn) {
       conn.on("open", () => {
+        if (this.isHost) {
+          const incomingProtocol = conn.metadata?.protocolVersion || 0;
+          if (incomingProtocol !== this.PROTOCOL_VERSION) {
+            console.warn(
+              `[SESSIONS] Rejected peer ${conn.peer} due to protocol mismatch. Expected ${this.PROTOCOL_VERSION}, got ${incomingProtocol}`,
+            );
+            conn.send({ type: "kicked", reason: "version_mismatch" });
+            setTimeout(() => conn.close(), 500);
+            return;
+          }
+        }
+
         this.connections.set(conn.peer, conn);
         if (this.isHost) {
           const incomingProfile = conn.metadata.profile || {
@@ -160,6 +178,19 @@ const pkg = {
 
       conn.on("data", (data) => {
         if (data.type === "state_sync") {
+          if (!this.isHost && data.protocolVersion !== this.PROTOCOL_VERSION) {
+            console.warn(
+              `[SESSIONS] Protocol mismatch with host. Expected ${this.PROTOCOL_VERSION}, got ${data.protocolVersion}`,
+            );
+            this.leaveRoom();
+            document.dispatchEvent(
+              new CustomEvent("CherryTree.Sessions.Kicked", {
+                detail: "version_mismatch",
+              }),
+            );
+            return;
+          }
+
           const prevChatLength = this.state.chatHistory
             ? this.state.chatHistory.length
             : 0;
@@ -206,7 +237,9 @@ const pkg = {
         } else if (data.type === "kicked") {
           if (!this.isHost && conn.peer === this.roomId) {
             document.dispatchEvent(
-              new CustomEvent("CherryTree.Sessions.Kicked"),
+              new CustomEvent("CherryTree.Sessions.Kicked", {
+                detail: data.reason,
+              }),
             );
           }
         } else if (data.type === "force_stop") {
@@ -316,7 +349,7 @@ const pkg = {
       if (!this.isHost) return;
       const conn = this.connections.get(peerId);
       if (conn && conn.open) {
-        conn.send({ type: "kicked" });
+        conn.send({ type: "kicked", reason: "manual" });
         setTimeout(() => this.handlePeerDisconnect(peerId), 500);
       } else {
         this.handlePeerDisconnect(peerId);
@@ -358,7 +391,12 @@ const pkg = {
         }),
       );
       for (let conn of this.connections.values()) {
-        if (conn.open) conn.send({ type: "state_sync", state: this.state });
+        if (conn.open)
+          conn.send({
+            type: "state_sync",
+            state: this.state,
+            protocolVersion: this.PROTOCOL_VERSION,
+          });
       }
     },
 

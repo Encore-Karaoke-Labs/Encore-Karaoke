@@ -519,7 +519,8 @@ class EncoreController {
       });
     });
 
-    document.addEventListener("CherryTree.Sessions.Kicked", () => {
+    document.addEventListener("CherryTree.Sessions.Kicked", (e) => {
+      const reason = e.detail;
       this.SessionsSvc.leaveRoom();
       this.state.isSessionActive = false;
       this.state.sessionRoomId = null;
@@ -538,11 +539,21 @@ class EncoreController {
       this.bgv.start();
 
       this.setMode("menu");
-      this.infoBar.showTemp(
-        "KICKED",
-        "You were kicked from the session.",
-        5000,
-      );
+
+      if (reason === "version_mismatch") {
+        this.infoBar.showTemp(
+          "SESSIONS",
+          "Session protocol mismatch. Please ensure both you and the host are on the latest update.",
+          6000,
+        );
+      } else {
+        this.infoBar.showTemp(
+          "KICKED",
+          "You were kicked from the session.",
+          5000,
+        );
+      }
+
       if (this.state.isSessionModalOpen) this.renderSessionView("select");
     });
 
