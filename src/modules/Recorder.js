@@ -225,7 +225,7 @@ export class RecorderModule {
     this.lyricGradient.addColorStop(1, "rgba(0,0,0,0.9)");
 
     const cx = w / 2;
-    const cy = h * 0.52;
+    const cy = h * 0.35;
     const radius = h * 0.08;
     this.countdownGradient = this.oCtx.createRadialGradient(
       cx,
@@ -767,7 +767,7 @@ export class RecorderModule {
       if (countdownEl && countdownEl.classList.contains("visible")) {
         const text = countdownEl.textContent;
         const cx = w / 2;
-        const cy = h * 0.52;
+        const cy = h * 0.35;
         const radius = h * 0.08;
 
         ctx.beginPath();
