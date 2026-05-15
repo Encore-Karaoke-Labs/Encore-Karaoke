@@ -415,13 +415,34 @@ function updateScore(currentTime) {
     }
 
     isCorrectPitch = false;
-    if (isGuideNoteActive && isSinging) {
-      let normalizedMicMidi = midiMicPitch;
-      while (normalizedMicMidi < targetMidiPitch - 6) normalizedMicMidi += 12;
-      while (normalizedMicMidi > targetMidiPitch + 6) normalizedMicMidi -= 12;
+    if (isSinging) {
+      let referencePitch = targetMidiPitch;
 
-      if (Math.abs(normalizedMicMidi - targetMidiPitch) < 0.7) {
-        isCorrectPitch = true;
+      if (!isGuideNoteActive) {
+        if (hasGuideNotes) {
+          const nextNote = state.playback.guideNotes.find(
+            (n) => n.startTime >= currentTime,
+          );
+          if (nextNote) referencePitch = nextNote.pitch;
+        }
+
+        if (referencePitch === 0) {
+          const minMidi = state.playback.guideRange?.min ?? 42;
+          const maxMidi = state.playback.guideRange?.max ?? 90;
+          referencePitch = (minMidi + maxMidi) / 2;
+        }
+      }
+
+      let normalizedMicMidi = midiMicPitch;
+      while (normalizedMicMidi < referencePitch - 6) normalizedMicMidi += 12;
+      while (normalizedMicMidi > referencePitch + 6) normalizedMicMidi -= 12;
+
+      state.scoring.currentMicMidi = normalizedMicMidi;
+
+      if (isGuideNoteActive) {
+        if (Math.abs(normalizedMicMidi - targetMidiPitch) < 0.7) {
+          isCorrectPitch = true;
+        }
       }
     }
 
@@ -512,7 +533,7 @@ function updateScore(currentTime) {
               (interval) => (votedRoot + interval) % 12,
             );
             console.log(
-              `[FORTE SVC] 🎵 Initial Key Locked: ${votedKey} (${maxVotes}/6 votes)`,
+              `[FORTE SVC] Initial Key Locked: ${votedKey} (${maxVotes}/6 votes)`,
             );
           } else if (
             state.scoring.currentKeyName !== votedKey &&
@@ -527,7 +548,7 @@ function updateScore(currentTime) {
               (interval) => (votedRoot + interval) % 12,
             );
             console.log(
-              `[FORTE SVC] 🎵 Key Modulation Confirmed: ${votedKey} (${maxVotes}/6 votes)`,
+              `[FORTE SVC] Key Modulation Confirmed: ${votedKey} (${maxVotes}/6 votes)`,
             );
           }
         }
@@ -1842,7 +1863,7 @@ const pkg = {
                 const validChannels = [mainChannel];
 
                 logVerbose(
-                  `🎵 Primary Vocal Guide on Channel ${mainChannel.index + 1} (Score: ${mainChannel.score.toFixed(2)}, Match: ${(mainChannel.matchRatio * 100).toFixed(1)}%)`,
+                  `Primary Vocal Guide on Channel ${mainChannel.index + 1} (Score: ${mainChannel.score.toFixed(2)}, Match: ${(mainChannel.matchRatio * 100).toFixed(1)}%)`,
                 );
 
                 for (let i = 1; i < candidateChannels.length; i++) {
@@ -1870,7 +1891,7 @@ const pkg = {
 
                   if (overlapRatio < 0.2) {
                     logVerbose(
-                      `🔗 Merging Channel ${candidate.index + 1} as split melody (Overlap: ${(overlapRatio * 100).toFixed(1)}%)`,
+                      `Merging Channel ${candidate.index + 1} as split melody (Overlap: ${(overlapRatio * 100).toFixed(1)}%)`,
                     );
                     validChannels.push(candidate);
                   }
