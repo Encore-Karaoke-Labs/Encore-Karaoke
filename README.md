@@ -18,6 +18,10 @@
 - **Real-Time Scoring**
   - Powered by our custom **Forte Audio Engine** (Web Audio API), Encore actively listens to your microphone.
   - Features live pitch tracking, real-time key-modulation detection, and a visual piano roll overlay so you know exactly when to hit those high notes (only in Multiplex tracks).
+- **Encore Sessions (Virtual Karaoke Rooms)**
+  - Sing with friends and family across the world with Encore Sessions! Perfect for OFWs, LDRs, or remote karaoke hangouts with friends!
+  - Queue, Cheer, and Chat in the room just like a real karaoke box.
+  - Have fun with a sprinkle of competition with a score leaderboard!
 - **Encore Link (Mobile Remote Control)**
   - No more passing a bulky songbook around! Just scan the QR code on the screen to connect your smartphone.
   - No additional app installs needed! Encore Link works straight in your web browser. (Chromium-based browsers (e.g., Chrome, Edge) and Firefox)
