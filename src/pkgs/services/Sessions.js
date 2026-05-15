@@ -504,6 +504,12 @@ const pkg = {
         if (hostConn && hostConn.open) {
           hostConn.send({ type: "submit_score", entry });
         }
+
+        this.state.leaderboard.push(entry);
+        this.state.leaderboard.sort((a, b) => b.score - a.score);
+        if (this.state.leaderboard.length > 20) {
+          this.state.leaderboard.length = 20;
+        }
       }
       return entry.id;
     },
