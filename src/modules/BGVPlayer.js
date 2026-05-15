@@ -34,6 +34,8 @@ export class BGVModule {
     this.activeManualPlayer = null;
     this.PORT = 9864;
     this.transitionTimeout = null;
+    this.imageCleanupTimeout = null;
+    this.currentLoadId = null;
     console.log("[BGV] BGV Player initialized.");
   }
 
@@ -402,8 +404,12 @@ export class BGVModule {
   _playUrl(url) {
     const isImage = url.match(/\.(jpeg|jpg|gif|png|webp|bmp)(\?.*)?$/i) != null;
 
+    this.currentLoadId = Date.now();
+    const loadId = this.currentLoadId;
+
     if (this.transitionTimeout) clearTimeout(this.transitionTimeout);
     if (this.imageTimeout) clearTimeout(this.imageTimeout);
+    if (this.imageCleanupTimeout) clearTimeout(this.imageCleanupTimeout);
 
     if (isImage) {
       this.videoElement.style.opacity = "0";
@@ -412,6 +418,8 @@ export class BGVModule {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => {
+        if (this.currentLoadId !== loadId) return;
+
         const now = performance.now();
         this.prevImageState = this.currentImageState;
         this.currentImageState = this._generateKenBurns(img, now);
@@ -430,6 +438,7 @@ export class BGVModule {
         );
       };
       img.onerror = (e) => {
+        if (this.currentLoadId !== loadId) return;
         console.warn("[BGV] Image load error, skipping:", e);
         this.playNext();
       };
@@ -437,7 +446,7 @@ export class BGVModule {
     } else {
       if (this.imageCanvas) this.imageCanvas.style.opacity = "0";
 
-      setTimeout(() => {
+      this.imageCleanupTimeout = setTimeout(() => {
         if (this.imageRafId) cancelAnimationFrame(this.imageRafId);
         this.imageRafId = null;
         this.currentImageState = null;
@@ -446,6 +455,11 @@ export class BGVModule {
 
       const v = this.videoElement;
       const onCanPlay = () => {
+        if (this.currentLoadId !== loadId) {
+          v.removeEventListener("canplay", onCanPlay);
+          return;
+        }
+
         v.play()
           .then(() => {
             v.style.opacity = "1";
@@ -470,10 +484,14 @@ export class BGVModule {
     this.activeManualPlayer = this.videoElement;
     this.videoElement.onended = null;
 
+    this.currentLoadId = Date.now();
+    const loadId = this.currentLoadId;
+
     if (this.imageTimeout) clearTimeout(this.imageTimeout);
+    if (this.imageCleanupTimeout) clearTimeout(this.imageCleanupTimeout);
     if (this.imageCanvas) this.imageCanvas.style.opacity = "0";
 
-    setTimeout(() => {
+    this.imageCleanupTimeout = setTimeout(() => {
       if (this.imageRafId) cancelAnimationFrame(this.imageRafId);
       this.imageRafId = null;
       this.currentImageState = null;
@@ -490,7 +508,9 @@ export class BGVModule {
 
     await new Promise((resolve) => {
       const onCanPlay = () => {
-        this.videoElement.style.opacity = "1";
+        if (this.currentLoadId === loadId) {
+          this.videoElement.style.opacity = "1";
+        }
         this.videoElement.removeEventListener("canplay", onCanPlay);
         resolve();
       };
@@ -592,6 +612,7 @@ export class BGVModule {
 
     if (this.imageTimeout) clearTimeout(this.imageTimeout);
     if (this.imageCanvas) this.imageCanvas.style.opacity = "0";
+    if (this.imageCleanupTimeout) clearTimeout(this.imageCleanupTimeout);
 
     if (this.imageRafId) {
       cancelAnimationFrame(this.imageRafId);
