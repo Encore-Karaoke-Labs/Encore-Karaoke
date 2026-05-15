@@ -30,10 +30,27 @@ jobs:
       - name: Install node dependencies
         run: |
           npm i
+          # Explicitly install esbuild to avoid conflicts
+          npm install --save-dev esbuild@0.28.0
 
       - name: Build binaries
         run: |
-          npm run make
+          npm run make 2>&1 | tee build.log
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "Build failed!"
+            cat build.log
+            exit 1
+          fi
+
+      - name: Verify build output
+        run: |
+          echo "Checking for build output..."
+          ls -la ./out/
+          if [ ! -d "./out/Encore Karaoke-linux-x64" ]; then
+            echo "ERROR: Expected output directory not found!"
+            find ./out -type d
+            exit 1
+          fi
 
       - name: Package binaries
         run: |
