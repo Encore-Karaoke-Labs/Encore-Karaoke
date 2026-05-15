@@ -441,7 +441,11 @@ export class RecorderModule {
     this.musicRecorder.start();
 
     this.isRecording = true;
-    this.drawFrame();
+
+    if (!this.animationFrameId) {
+      this.drawFrame();
+    }
+
     this.infoBar.showDefault();
   }
 
@@ -503,6 +507,10 @@ export class RecorderModule {
       this.drawFrame();
     }
 
+    if (this.broadcastStream) {
+      this.broadcastStream.getTracks().forEach((track) => track.stop());
+    }
+
     try {
       const mixAudioStream = this.forteSvc.getRecordingAudioStream();
       const videoStream = this.canvas.captureStream(30);
@@ -512,12 +520,11 @@ export class RecorderModule {
         videoTrack.contentHint = "detail";
       }
 
-      const broadcastStream = new MediaStream([
-        videoTrack,
-        mixAudioStream.getAudioTracks()[0],
-      ]);
+      const audioTrack = mixAudioStream.getAudioTracks()[0].clone();
 
-      return broadcastStream;
+      this.broadcastStream = new MediaStream([videoTrack, audioTrack]);
+
+      return this.broadcastStream;
     } catch (e) {
       console.error("[RECORDER] Failed to generate broadcast stream", e);
       return null;
@@ -534,6 +541,11 @@ export class RecorderModule {
         cancelAnimationFrame(this.animationFrameId);
         this.animationFrameId = null;
       }
+    }
+
+    if (this.broadcastStream) {
+      this.broadcastStream.getTracks().forEach((track) => track.stop());
+      this.broadcastStream = null;
     }
   }
 
