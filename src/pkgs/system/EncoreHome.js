@@ -122,6 +122,7 @@ class EncoreController {
       sessionRoomId: null,
       isSessionHost: false,
       lastPlayTrigger: null,
+      knownParticipants: [],
     };
 
     console.log("[Encore] Enable fanfare?", this.state.isScoreFanfareEnabled);
@@ -332,6 +333,43 @@ class EncoreController {
       const sState = e.detail;
       const prevMode = this.state.sessionMode;
       this.state.sessionMode = sState.mode;
+
+      const newParticipants = sState.participants || [];
+      const oldParticipants = this.state.knownParticipants || [];
+      const myId = this.SessionsSvc.peer.id;
+
+      const joined = newParticipants.filter(
+        (np) =>
+          np.id !== myId && !oldParticipants.find((op) => op.id === np.id),
+      );
+      const left = oldParticipants.filter(
+        (op) =>
+          op.id !== myId && !newParticipants.find((np) => np.id === op.id),
+      );
+
+      joined.forEach((p) => {
+        const avatarHtml = p.avatar
+          ? `<img src="${p.avatar}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 8px; border: 1px solid rgba(255,255,255,0.3);">`
+          : `<div style="width: 28px; height: 28px; border-radius: 50%; background: #444; display: inline-block; vertical-align: middle; margin-right: 8px; border: 1px solid rgba(255,255,255,0.3);"></div>`;
+        this.infoBar.showTemp(
+          "SESSION",
+          `${avatarHtml} <span style="font-weight: 700; color: #ffd700;">${p.nickname}</span> joined the room.`,
+          4000,
+        );
+      });
+
+      left.forEach((p) => {
+        const avatarHtml = p.avatar
+          ? `<img src="${p.avatar}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 8px; border: 1px solid rgba(255,255,255,0.3);">`
+          : `<div style="width: 28px; height: 28px; border-radius: 50%; background: #444; display: inline-block; vertical-align: middle; margin-right: 8px; border: 1px solid rgba(255,255,255,0.3);"></div>`;
+        this.infoBar.showTemp(
+          "SESSION",
+          `${avatarHtml} <span style="font-weight: 700; color: #ffd700;">${p.nickname}</span> left the room.`,
+          4000,
+        );
+      });
+
+      this.state.knownParticipants = [...newParticipants];
 
       if (
         this.state.isSessionModalOpen &&
