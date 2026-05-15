@@ -4261,17 +4261,71 @@ p + .flex-list button {
   height: 100%;
 }
 
-.session-room-display {
-  background: rgba(0, 0, 0, 0.5);
-  padding: 1.5rem;
+.session-room-compact {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.8rem 1.2rem;
   border-radius: 8px;
-  border: 1px dashed rgba(255, 255, 255, 0.3);
-  font-size: 2.5rem;
-  text-align: center;
-  color: #89cff0;
+  border: 1px solid rgba(137, 207, 240, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-shrink: 0; /* Prevent it from squishing */
+}
+
+.room-code-text {
+  font-size: 1.6rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  user-select: all;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.2em;
+  font-family: "Rajdhani", sans-serif;
+  transition: color 0.2s ease;
+  line-height: 1.1;
+}
+
+.room-code-text.revealed {
+  color: #89cff0;
+}
+
+.room-action-btns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.room-action-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  cursor: var(--cursor-pointer), pointer;
+  transition: all 0.2s ease;
+  min-width: unset;
+  height: auto;
+}
+
+.room-action-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.room-action-btn.copy-btn {
+  background: rgba(137, 207, 240, 0.15);
+  color: #89cff0;
+  border: 1px solid rgba(137, 207, 240, 0.3);
+}
+
+.room-action-btn.copy-btn:hover {
+  background: rgba(137, 207, 240, 0.3);
+}
+
+.room-action-btn.copy-btn.success {
+  background: rgba(255, 215, 0, 0.15);
+  color: #ffd700;
+  border-color: rgba(255, 215, 0, 0.4);
 }
 
 .session-participants-list {
@@ -4584,7 +4638,7 @@ p + .flex-list button {
 .session-chat-container {
   position: absolute;
   bottom: 3.5rem;
-  right: 2rem;
+  right: 0;
   left: auto;
   width: 350px;
   height: 350px;
@@ -4593,11 +4647,60 @@ p + .flex-list button {
   justify-content: flex-end;
   z-index: 50000;
   pointer-events: none;
-  transition: opacity 0.3s ease;
+
+  transform: translateX(100%);
+  transition:
+    transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1),
+    opacity 0.3s ease;
 }
 
 .session-chat-container.hidden {
   opacity: 0;
+}
+
+.session-chat-container::before {
+  content: "⟨ CHAT";
+  position: absolute;
+  left: -80px;
+  bottom: 0;
+  width: 80px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 20, 0.85);
+  border: 1px solid rgba(137, 207, 240, 0.4);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  color: #89cff0;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  pointer-events: auto;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s ease;
+}
+
+.session-chat-container:hover::before {
+  color: #ffd700;
+  background: rgba(20, 20, 30, 0.95);
+  border-color: #ffd700;
+}
+
+.session-chat-container:hover,
+.session-chat-container:focus-within,
+.session-chat-container.focused {
+  transform: translateX(-2rem);
+}
+
+.session-chat-container:hover::before,
+.session-chat-container:focus-within::before,
+.session-chat-container.focused::before {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .session-chat-messages {
@@ -4704,6 +4807,10 @@ p + .flex-list button {
   color: #000;
   letter-spacing: 0.05em;
   transition: background-color 0.2s ease;
+}
+
+.session-chat-mode:hover {
+  filter: brightness(1.1);
 }
 
 .session-chat-mode.mode-cheer {

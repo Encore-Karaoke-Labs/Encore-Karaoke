@@ -2191,12 +2191,23 @@ class EncoreController {
     this.dom.sessionChatMode = new Html("div")
       .classOn("session-chat-mode", "mode-chat")
       .text("CHAT")
-      .appendTo(this.dom.sessionChatInputContainer);
+      .appendTo(this.dom.sessionChatInputContainer)
+      .on("click", (e) => {
+        e.stopPropagation();
+        this.state.chatInputMode =
+          this.state.chatInputMode === "chat" ? "cheer" : "chat";
+        this.dom.sessionChatMode.text(
+          this.state.chatInputMode === "chat" ? "CHAT" : "CHEER",
+        );
+        this.dom.sessionChatMode.elm.className = `session-chat-mode mode-${this.state.chatInputMode}`;
+
+        this.dom.sessionChatInput.elm.focus();
+      });
     this.dom.sessionChatInput = new Html("input")
       .classOn("session-chat-input")
       .attr({
         type: "text",
-        placeholder: "'T' to chat, 'C' to cheer",
+        placeholder: "Press'Tab' to cheer/chat",
       })
       .appendTo(this.dom.sessionChatInputContainer);
 
@@ -2232,6 +2243,7 @@ class EncoreController {
 
   submitSessionChat() {
     const val = this.dom.sessionChatInput.getValue().trim();
+
     if (!val) {
       this.dom.sessionChatInput.elm.blur();
       return;
@@ -2247,12 +2259,12 @@ class EncoreController {
 
     if (this.state.chatInputMode === "cheer") {
       this.SessionsSvc.broadcastCheer(sender, val.substring(0, 50));
+      this.dom.sessionChatInput.elm.value = "";
+      this.dom.sessionChatInput.elm.blur();
     } else {
       this.SessionsSvc.broadcastChat(sender, val.substring(0, 200));
+      this.dom.sessionChatInput.elm.value = "";
     }
-
-    this.dom.sessionChatInput.elm.value = "";
-    this.dom.sessionChatInput.elm.blur();
   }
 
   appendChatMessage(sender, text) {
@@ -2614,10 +2626,65 @@ class EncoreController {
       const leftCol = new Html("div")
         .classOn("session-active-col")
         .appendTo(layout);
-      new Html("div")
-        .classOn("session-room-display")
-        .text(this.state.sessionRoomId)
+
+      const roomDisplayWrapper = new Html("div")
+        .classOn("session-room-compact")
         .appendTo(leftCol);
+
+      const codeContainer = new Html("div")
+        .styleJs({ display: "flex", flexDirection: "column" })
+        .appendTo(roomDisplayWrapper);
+
+      new Html("span")
+        .text("ROOM ID")
+        .styleJs({
+          fontSize: "0.85rem",
+          color: "rgba(255,255,255,0.5)",
+          letterSpacing: "0.1em",
+          fontWeight: "700",
+        })
+        .appendTo(codeContainer);
+
+      const roomText = new Html("span")
+        .classOn("room-code-text")
+        .text("••••••••••••")
+        .appendTo(codeContainer);
+
+      const actionBtns = new Html("div")
+        .classOn("room-action-btns")
+        .appendTo(roomDisplayWrapper);
+
+      let isRevealed = false;
+      const revealBtn = new Html("button")
+        .classOn("room-action-btn")
+        .text("SHOW")
+        .on("click", () => {
+          isRevealed = !isRevealed;
+          roomText.text(isRevealed ? this.state.sessionRoomId : "••••••••••••");
+          revealBtn.text(isRevealed ? "HIDE" : "SHOW");
+          roomText[isRevealed ? "classOn" : "classOff"]("revealed");
+        })
+        .appendTo(actionBtns);
+
+      const copyBtn = new Html("button")
+        .classOn("room-action-btn", "copy-btn")
+        .text("COPY")
+        .on("click", () => {
+          navigator.clipboard
+            .writeText(this.state.sessionRoomId)
+            .then(() => {
+              copyBtn.text("COPIED!");
+              copyBtn.classOn("success");
+              setTimeout(() => {
+                copyBtn.text("COPY");
+                copyBtn.classOff("success");
+              }, 2000);
+            })
+            .catch(() => {
+              this.infoBar.showTemp("ERROR", "Failed to copy", 3000);
+            });
+        })
+        .appendTo(actionBtns);
 
       const partList = new Html("div")
         .classOn("session-participants-list")
@@ -5701,8 +5768,6 @@ class EncoreController {
     };
 
     this.loungeRafId = requestAnimationFrame(draw);
-
-    this.dom.standbyText.text("LOUNGE MODE");
   }
 
   stopLoungeBackground() {
