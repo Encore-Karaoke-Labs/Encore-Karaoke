@@ -4662,11 +4662,11 @@ p + .flex-list button {
 }
 
 .session-chat-container::before {
-  content: "⟨ CHAT";
+  content: "⟨ CHAT (T)";
   position: absolute;
-  left: -80px;
+  left: -100px;
   bottom: 0;
-  width: 80px;
+  width: 100px;
   height: 45px;
   display: flex;
   align-items: center;
