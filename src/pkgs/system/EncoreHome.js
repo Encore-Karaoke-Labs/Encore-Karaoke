@@ -333,6 +333,13 @@ class EncoreController {
       const prevMode = this.state.sessionMode;
       this.state.sessionMode = sState.mode;
 
+      if (
+        this.state.isSessionModalOpen &&
+        this.state.sessionModalView === "active"
+      ) {
+        this.renderSessionView("active");
+      }
+
       if (this.state.isSessionActive) {
         this.dom.sessionChatContainer.classOff("hidden");
       }
