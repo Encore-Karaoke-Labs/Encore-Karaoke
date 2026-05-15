@@ -4427,6 +4427,7 @@ p + .flex-list button {
   flex-direction: column;
   overflow: hidden;
   margin-left: 0.5rem;
+  min-width: 0;
 }
 
 .session-leaderboard-row .lb-name {
@@ -4447,6 +4448,7 @@ p + .flex-list button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 15rem;
 }
 
 .session-leaderboard-row .lb-score {
@@ -4600,6 +4602,7 @@ p + .flex-list button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
 }
 
 .score-lb-name {
