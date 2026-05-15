@@ -40,7 +40,7 @@ const buildOS = esbuild.build({
   minify: !isDev,
   sourcemap: isDev,
   target: ["es2022"],
-  logLevel: "info",
+  logLevel: "debug",
 });
 
 const windowEntryPoints = [];
