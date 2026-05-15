@@ -466,6 +466,14 @@ class EncoreController {
       }
     });
 
+    document.addEventListener("CherryTree.Sessions.SkipScore", () => {
+      if (this.state.isScoreScreenActive && this.state.scoreSkipResolver) {
+        this.Forte.stopSfx();
+        this.state.scoreSkipped = true;
+        this.state.scoreSkipResolver();
+      }
+    });
+
     document.addEventListener("CherryTree.Sessions.RemoteStream", (e) => {
       this.dom.sessionRemoteVideo.elm.srcObject = e.detail;
       this.dom.sessionRemoteVideo.elm.volume = this.state.volume;
@@ -5254,6 +5262,9 @@ class EncoreController {
           this.Forte.stopSfx();
           this.state.scoreSkipped = true;
           this.state.scoreSkipResolver();
+          if (this.state.isSessionActive) {
+            this.SessionsSvc.broadcastSkipScore();
+          }
         }
         e.preventDefault();
       }

@@ -275,6 +275,15 @@ const pkg = {
               }),
             );
           }
+        } else if (data.type === "skip_score") {
+          document.dispatchEvent(
+            new CustomEvent("CherryTree.Sessions.SkipScore"),
+          );
+          if (this.isHost) {
+            for (let c of this.connections.values()) {
+              if (c.open && c.peer !== conn.peer) c.send(data);
+            }
+          }
         } else if (data.type === "chat_message" || data.type === "cheer") {
           document.dispatchEvent(
             new CustomEvent(
@@ -437,6 +446,18 @@ const pkg = {
       }
     },
 
+    broadcastSkipScore: function () {
+      const data = { type: "skip_score" };
+      if (this.isHost) {
+        for (let conn of this.connections.values()) {
+          if (conn.open) conn.send(data);
+        }
+      } else {
+        const hostConn = this.connections.get(this.roomId);
+        if (hostConn && hostConn.open) hostConn.send(data);
+      }
+    },
+
     requestSong: function (song) {
       if (this.isHost) {
         this.state.queue.push({
@@ -501,6 +522,7 @@ const pkg = {
         document.dispatchEvent(
           new CustomEvent("CherryTree.Sessions.ClearStreams"),
         );
+        this.currentPerformanceStream = null;
       }
 
       if (this.state.mode === "lounge") {
