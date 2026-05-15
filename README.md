@@ -83,6 +83,9 @@ Encore can be fully controlled via a standard keyboard, a connected USB Numpad, 
 | `Y`             | Open Search Menu (Local + YouTube)                   |
 | `M`             | Open Mixer (Adjust Mic & Music levels)               |
 | `R`             | Toggle recording (during playback) / View recordings |
+| `S`             | Open Encore Sessions menu                            |
+| `T`             | Chat (In a session)                                  |
+| `C`             | Cheer (In a session)                                 |
 | `- / =`         | Adjust volume                                        |
 | `Shift + - / =` | Adjust mic monitoring volume                         |
 | `Up / Down`     | Pitch shift (Transpose) up/down                      |
