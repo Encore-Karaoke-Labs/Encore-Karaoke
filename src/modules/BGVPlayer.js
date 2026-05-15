@@ -459,6 +459,7 @@ export class BGVModule {
       v.load();
     }
   }
+
   /**
    * Play a single video without interrupting the auto-playlist
    * @param {string} url - The video URL to play
@@ -468,6 +469,16 @@ export class BGVModule {
     this.isManualMode = true;
     this.activeManualPlayer = this.videoElement;
     this.videoElement.onended = null;
+
+    if (this.imageTimeout) clearTimeout(this.imageTimeout);
+    if (this.imageCanvas) this.imageCanvas.style.opacity = "0";
+
+    setTimeout(() => {
+      if (this.imageRafId) cancelAnimationFrame(this.imageRafId);
+      this.imageRafId = null;
+      this.currentImageState = null;
+      this.prevImageState = null;
+    }, 500);
 
     if (this.canvasOnlyMode) {
       this.videoElement.style.display = "";
@@ -581,6 +592,12 @@ export class BGVModule {
 
     if (this.imageTimeout) clearTimeout(this.imageTimeout);
     if (this.imageCanvas) this.imageCanvas.style.opacity = "0";
-    this.currentImage = null;
+
+    if (this.imageRafId) {
+      cancelAnimationFrame(this.imageRafId);
+      this.imageRafId = null;
+    }
+    this.currentImageState = null;
+    this.prevImageState = null;
   }
 }
