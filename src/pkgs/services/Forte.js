@@ -1656,10 +1656,31 @@ const pkg = {
           logVerbose("Midi", parsedMidi);
           logVerbose("Notes", parsedMidi.getNoteTimes());
 
+          let primaryLyricTrackEvents = [];
+          let highestLyricScore = 0;
+
           parsedMidi.tracks.forEach((midiTrack) => {
-            midiTrack.events.forEach((event) => {
-              logVerbose(event.ticks);
+            let trackLyricScore = 0;
+
+            const trackTextEvents = midiTrack.events.filter(
+              (e) =>
+                e.statusByte === midiMessageTypes.text ||
+                e.statusByte === midiMessageTypes.lyric,
+            );
+
+            trackTextEvents.forEach((e) => {
+              if (!e.data || e.data.length === 0) return;
+
+              const firstChar = String.fromCharCode(e.data[0]);
+              if (firstChar !== "@" && firstChar !== "#") {
+                trackLyricScore++;
+              }
             });
+
+            if (trackLyricScore > highestLyricScore) {
+              highestLyricScore = trackLyricScore;
+              primaryLyricTrackEvents = trackTextEvents;
+            }
           });
 
           state.playback.sequencer = new Sequencer(state.playback.synthesizer);
@@ -1790,7 +1811,8 @@ const pkg = {
           );
 
           state.playback.sequencer.loadNewSongList([parsedMidi]);
-          const rawLyrics = parsedMidi.lyrics || [];
+          const rawLyrics = highestLyricScore > 0 ? primaryLyricTrackEvents : (parsedMidi.lyrics || []);
+          rawLyrics.sort((a, b) => a.ticks - b.ticks);
 
           state.playback.midiInfo = {
             ticks: rawLyrics
