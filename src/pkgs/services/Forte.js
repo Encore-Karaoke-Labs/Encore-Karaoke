@@ -1662,10 +1662,11 @@ const pkg = {
           parsedMidi.tracks.forEach((midiTrack) => {
             let trackLyricScore = 0;
 
-            const trackTextEvents = midiTrack.events.filter(
-              (e) =>
-                e.statusByte === midiMessageTypes.text ||
-                e.statusByte === midiMessageTypes.lyric,
+            const isKar = parsedMidi.isKaraokeFile;
+            
+            const trackTextEvents = midiTrack.events.filter((e) =>
+              e.statusByte === midiMessageTypes.lyric ||
+              (isKar && e.statusByte === midiMessageTypes.text)
             );
 
             trackTextEvents.forEach((e) => {
@@ -1838,10 +1839,19 @@ const pkg = {
           state.playback.decodedLyrics = [];
 
           rawTrackEvents.forEach((message) => {
-            if (!message.data) return;
+            if (!message.data) return;  
+            if (!parsedMidi.isKaraokeFile && message.statusByte === midiMessageTypes.text) return;
+            
             const text = decoder.decode(message.data);
             const clean = text.replace(/[\r\n\/\\]/g, "");
             const trimmed = clean.trim();
+
+            if (message.ticks < 480 && trimmed.length > 45) {
+              const firstChar = trimmed.charAt(0);
+              if (firstChar !== '{' && firstChar !== '[' && firstChar !== '<' && firstChar !== '@') {
+                return; 
+              }
+            }
 
             let isLyric = false;
             if (
