@@ -2914,7 +2914,6 @@ p + .flex-list button {
   padding: 2rem 5rem;
   border-radius: 20px;
   box-shadow: 0 0 40px rgba(137, 207, 240, 0.3);
-  backdrop-filter: blur(10px);
   z-index: 100;
   opacity: 0;
   pointer-events: none;
