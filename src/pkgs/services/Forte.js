@@ -1811,8 +1811,54 @@ const pkg = {
           );
 
           state.playback.sequencer.loadNewSongList([parsedMidi]);
-          const rawLyrics = highestLyricScore > 0 ? primaryLyricTrackEvents : (parsedMidi.lyrics || []);
-          rawLyrics.sort((a, b) => a.ticks - b.ticks);
+
+          let rawTrackEvents =
+            highestLyricScore > 0
+              ? primaryLyricTrackEvents
+              : parsedMidi.lyrics || [];
+          rawTrackEvents.sort((a, b) => a.ticks - b.ticks);
+
+          const totalLength = rawTrackEvents.reduce(
+            (acc, val) => acc + (val.data ? val.data.byteLength : 0),
+            0,
+          );
+          const combinedBuffer = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const msg of rawTrackEvents) {
+            if (msg.data) {
+              combinedBuffer.set(msg.data, offset);
+              offset += msg.data.byteLength;
+            }
+          }
+          state.playback.lyricsEncoding =
+            totalLength > 0 ? detectEncoding(combinedBuffer) : "utf-8";
+          const decoder = new TextDecoder(state.playback.lyricsEncoding);
+
+          const rawLyrics = [];
+          state.playback.decodedLyrics = [];
+
+          rawTrackEvents.forEach((message) => {
+            if (!message.data) return;
+            const text = decoder.decode(message.data);
+            const clean = text.replace(/[\r\n\/\\]/g, "");
+            const trimmed = clean.trim();
+
+            let isLyric = false;
+            if (
+              trimmed === "#" ||
+              clean.startsWith("@m") ||
+              clean.startsWith("@w")
+            ) {
+              isLyric = true;
+            } else if (!clean.startsWith("@") && !clean.startsWith("#")) {
+              isLyric = true;
+            }
+
+            if (isLyric) {
+              rawLyrics.push(message);
+              state.playback.decodedLyrics.push(text.replace(/[\/\\]/g, "\n"));
+            }
+          });
 
           state.playback.midiInfo = {
             ticks: rawLyrics
@@ -1961,7 +2007,6 @@ const pkg = {
                   if (n.midiNote > maxPitch) maxPitch = n.midiNote;
                 });
 
-                // --- NEW BLIP DETECTION & LEGATO LOGIC ---
                 monoNotes.sort((a, b) => a.startTime - b.startTime);
 
                 let shortNoteCount = 0;
@@ -2027,50 +2072,10 @@ const pkg = {
                 };
               } else {
                 logVerbose(
-                  "⚠️ No clear vocal guide track found. Falling back to Key-Aware Scoring.",
+                  "No clear vocal guide track found. Falling back to Key-Aware Scoring.",
                 );
               }
             }
-          }
-
-          if (rawLyrics.length > 0) {
-            const totalLength = rawLyrics.reduce(
-              (acc, val) => acc + (val.data ? val.data.byteLength : 0),
-              0,
-            );
-            const combinedBuffer = new Uint8Array(totalLength);
-            let offset = 0;
-            for (const message of rawLyrics) {
-              if (message.data) {
-                combinedBuffer.set(message.data, offset);
-                offset += message.data.byteLength;
-              }
-            }
-
-            state.playback.lyricsEncoding = detectEncoding(combinedBuffer);
-            const decoder = new TextDecoder(state.playback.lyricsEncoding);
-
-            state.playback.decodedLyrics = rawLyrics
-              .map((message) =>
-                message.data ? decoder.decode(message.data) : "",
-              )
-              .map((text) => text.replace(/[\/\\]/g, "\n"))
-              .filter((text) => {
-                const clean = text.replace(/[\r\n\/\\]/g, "");
-                const trimmed = clean.trim();
-
-                // Sunplus compatibility
-                if (
-                  trimmed === "#" ||
-                  clean.startsWith("@m") ||
-                  clean.startsWith("@w")
-                )
-                  return true;
-
-                return !clean.startsWith("@") && !clean.startsWith("#");
-              });
-          } else {
-            state.playback.lyricsEncoding = "utf-8";
           }
 
           state.playback.buffer = null;
