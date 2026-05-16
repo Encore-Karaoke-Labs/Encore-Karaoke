@@ -1,5 +1,5 @@
 import { WorkletSynthesizer as Synthetizer, Sequencer } from "spessasynth_lib";
-import { BasicMIDI, midiControllers } from "spessasynth_core";
+import { BasicMIDI, midiControllers, midiMessageTypes } from "spessasynth_core";
 import { PitchDetector } from "pitchy";
 
 console.log(midiControllers);
@@ -1651,7 +1651,16 @@ const pkg = {
             throw e;
           }
 
+          let tracks = {};
+
+          logVerbose("Midi", parsedMidi);
           logVerbose("Notes", parsedMidi.getNoteTimes());
+
+          parsedMidi.tracks.forEach((midiTrack) => {
+            midiTrack.events.forEach((event) => {
+              logVerbose(event.ticks);
+            });
+          });
 
           state.playback.sequencer = new Sequencer(state.playback.synthesizer);
           state.playback.sequencer.loop = false;
