@@ -2615,6 +2615,12 @@ const pkg = {
       dispatchPlaybackUpdate();
     },
 
+    setGuideTrackVolume: (volume) => {
+      validChannels.forEach((c) => {
+        pkg.data.setChannelVolume(c.index, volume);
+      });
+    },
+
     setChannelVolume: (channelNumber, volume) => {
       if (!state.playback.synthesizer) {
         console.error("[FORTE SVC] Synthesizer not initialized");
