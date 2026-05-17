@@ -193,6 +193,15 @@ class EncoreController {
     this.drums = this.Forte.getAvailableDrumPresets();
     this.currentDrumPresetIndex = 0;
 
+    this.guideMelodyLevels = [
+      { label: "OFF", value: 0 },
+      { label: "SOFT", value: 45 },
+      { label: "NORMAL", value: 90 },
+      { label: "STRONG", value: 127 },
+    ];
+
+    this.currentGuideMelodyIndex = 2;
+
     this.lineCaches = [];
     for (let i = 0; i < 2; i++) {
       const dim = document.createElement("canvas");
@@ -3767,6 +3776,7 @@ class EncoreController {
     this.cleanupPlayerEvents();
     this.lastCompletedSyllableIndex = -1;
     this.currentDrumPresetIndex = -1;
+    this.currentGuideMelodyIndex = 2;
 
     this.dom.countdownDisplay.classOff("visible").text("");
     this.countdownTargetTime = null;
@@ -5409,7 +5419,45 @@ class EncoreController {
     else if (e.key === "[" || e.key === "]") this.handleBracket(e.key);
     else if (e.key === ";") this.cycleDrumPreset("left");
     else if (e.key === "'") this.cycleDrumPreset("right");
+    else if (e.key.toLowerCase() === "g") this.cycleGuideMelody();
     else if (e.key.toLowerCase() === "y") this.handleYKey();
+  }
+
+  /**
+   * Cycles the guide melody volume between Off, Soft, Normal, and Strong.
+   */
+  cycleGuideMelody() {
+    if (this.state.mode !== "player") return;
+
+    const pbState = this.Forte.getPlaybackState();
+
+    if (!this.state.currentSongIsMIDI || !pbState.hasGuideNotes) {
+      this.infoBar.showTemp("MELODY", "Not available for this format.", 3000);
+      if (typeof generateDialog === "function") {
+        generateDialog(
+          new Html("div").classOn("temp-dialog-text").text("NOT AVAILABLE"),
+          2000,
+        );
+      }
+      return;
+    }
+
+    this.currentGuideMelodyIndex =
+      (this.currentGuideMelodyIndex + 1) % this.guideMelodyLevels.length;
+    const level = this.guideMelodyLevels[this.currentGuideMelodyIndex];
+
+    this.Forte.setGuideTrackVolume(level.value);
+
+    const html = `
+      <div class="volume-display" style="display: flex; align-items: center; width: 100%; gap: 1rem;">
+        <div style="font-weight: 700; color: #ffd700; width: 75px; text-align: left;">${level.label}</div>
+        <div class="volume-slider-container" style="flex-grow: 1; height: 12px; background-color: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; overflow: hidden;">
+          <div class="volume-slider-fill" style="height: 100%; background-color: #ffd700; border-radius: 6px; transition: width 0.1s linear; width: ${(level.value / 127) * 100}%"></div>
+        </div>
+      </div>
+    `;
+
+    this.infoBar.showTemp("MELODY", html, 3000);
   }
 
   /**
@@ -6012,7 +6060,7 @@ class EncoreController {
           ? `◀ ${Math.abs(Math.round(pan * 100))}% INST`
           : `VOC ${Math.round(pan * 100)}% ▶`;
     }
-    this.infoBar.showTemp("VOCAL BALANCE", txt, 3000);
+    this.infoBar.showTemp("BALANCE", txt, 3000);
   }
 
   /**
