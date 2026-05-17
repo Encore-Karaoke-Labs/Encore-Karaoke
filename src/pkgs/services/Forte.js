@@ -274,6 +274,7 @@ const state = {
     isMultiplexed: false,
     decodedLyrics: [],
     guideNotes: [],
+    guideChannels: [],
     lyricsEncoding: "utf-8",
     isAnalyzing: false,
     startTime: 0,
@@ -2123,6 +2124,8 @@ const pkg = {
                   }
                 }
 
+                state.playback.guideChannels = validChannels;
+
                 let combinedNotes = [];
                 validChannels.forEach((c) => {
                   combinedNotes.push(...c.notes);
@@ -2616,7 +2619,7 @@ const pkg = {
     },
 
     setGuideTrackVolume: (volume) => {
-      validChannels.forEach((c) => {
+      state.playback.guideChannels.forEach((c) => {
         pkg.data.setChannelVolume(c.index, volume);
       });
     },
