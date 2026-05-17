@@ -382,7 +382,7 @@ function updateScore(currentTime) {
           currentTime >= n.startTime && currentTime < n.startTime + n.duration,
       );
       if (currentNote) {
-        targetMidiPitch = currentNote.pitch;
+        targetMidiPitch = currentNote.pitch + state.playback.transpose;
         isGuideNoteActive = true;
       }
     } else {
@@ -423,7 +423,7 @@ function updateScore(currentTime) {
           const nextNote = state.playback.guideNotes.find(
             (n) => n.startTime >= currentTime,
           );
-          if (nextNote) referencePitch = nextNote.pitch;
+          if (nextNote) referencePitch = nextNote.pitch + state.playback.transpose;
         }
 
         if (referencePitch === 0) {
@@ -480,7 +480,8 @@ function updateScore(currentTime) {
           state.scoring.rollingChroma[i] *= 0.85;
         }
         for (const note of state.scoring.activeMidiNotes) {
-          state.scoring.rollingChroma[note % 12] += 0.15;
+          const transposedNote = note + state.playback.transpose;
+          state.scoring.rollingChroma[(transposedNote % 12 + 12) % 12] += 0.15;
         }
       } else if (state.scoring.meydaAnalyzer && typeof Meyda !== "undefined") {
         const features = state.scoring.meydaAnalyzer.get("chroma");
@@ -741,8 +742,8 @@ function drawPianoRoll(currentTime) {
 
   const playheadX = (adjustedTime - pageAdjustedStartTime) * PIXELS_PER_SECOND;
 
-  const minMidi = state.playback.guideRange?.min ?? 42;
-  const maxMidi = state.playback.guideRange?.max ?? 90;
+  const minMidi = (state.playback.guideRange?.min ?? 42) + state.playback.transpose;
+  const maxMidi = (state.playback.guideRange?.max ?? 90) + state.playback.transpose;
   const rangeDiff = Math.max(1, maxMidi - minMidi);
   const NOTE_HEIGHT = 16;
 
@@ -760,7 +761,7 @@ function drawPianoRoll(currentTime) {
 
     const startX = (note.startTime - pageRealStartTime) * PIXELS_PER_SECOND;
     const noteWidth = Math.max(note.duration * PIXELS_PER_SECOND, 8);
-    const y = pitchToY(note.pitch);
+    const y = pitchToY(note.pitch + state.playback.transpose);
 
     if (!isFinite(startX) || !isFinite(y) || !isFinite(noteWidth)) continue;
 
@@ -2436,6 +2437,18 @@ const pkg = {
      */
     setTranspose: (semitones) => {
       const clamped = Math.max(-24, Math.min(24, Math.round(semitones)));
+      const transposeDelta = clamped - state.playback.transpose;
+      
+      if (transposeDelta !== 0) {
+        state.scoring.rollingChroma.fill(0);
+        state.scoring.keyHistory = [];
+        if (state.scoring.allowedPitchClasses.length > 0) {
+          state.scoring.allowedPitchClasses = state.scoring.allowedPitchClasses.map(
+            (pc) => (pc + transposeDelta + 24) % 12
+          );
+        }
+      }
+
       if (
         !state.playback.isMidi &&
         state.playback.status === "playing" &&
