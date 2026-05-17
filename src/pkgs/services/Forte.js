@@ -2615,6 +2615,49 @@ const pkg = {
       dispatchPlaybackUpdate();
     },
 
+    setChannelVolume: (channelNumber, volume) => {
+      if (!state.playback.synthesizer) {
+        console.error("[FORTE SVC] Synthesizer not initialized");
+        return false;
+      }
+
+      if (channelNumber < 0 || channelNumber > 15) {
+        throw new Error(`Invalid MIDI channel: ${channel}. Must be 0-15.`);
+      }
+
+      if (volume < 0 || volume > 127) {
+        throw new Error(`Invalid volume level: ${volume}. Must be 0-127.`);
+      }
+      try {
+        state.playback.synthesizer.lockController(
+          channelNumber,
+          0xffffffff, // ALL_CHANNELS_OR_DIFFERENT_ACTION constant
+          false,
+        );
+
+        state.playback.synthesizer.controllerChange(
+          channelNumber,
+          7, // CC#7 = Volume Change
+          Math.floor(volume),
+        );
+
+        state.playback.synthesizer.lockController(
+          channelNumber,
+          0xffffffff,
+          true,
+        );
+
+        logVerbose(
+          `Switched volume to ${Math.floor((volume / 127) * 100)}% (${volume}/127) on channel ${channelNumber + 1}`,
+        );
+      } catch (e) {
+        console.error(
+          `[FORTE SVC] Failed to change volume on channel ${channelNumber + 1}:`,
+          e,
+        );
+      }
+    },
+
     /**
      * Changes the drum kit preset on a specific channel
      * @param {number} channelNumber - The MIDI channel (0-15)
@@ -2678,7 +2721,7 @@ const pkg = {
         return true;
       } catch (e) {
         console.error(
-          `[FORTE SVC] Failed to switch drum preset on channel ${channelNumber}:`,
+          `[FORTE SVC] Failed to switch drum preset on channel ${channelNumber + 1}:`,
           e,
         );
         return false;
