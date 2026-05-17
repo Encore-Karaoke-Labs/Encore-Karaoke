@@ -233,6 +233,7 @@ const state = {
   scoring: {
     enabled: false,
     userInputEnabled: true,
+    micPitchHistory: [],
     micStream: null,
     micSourceNode: null,
     micHighpassNode: null,
@@ -353,12 +354,21 @@ function updateScore(currentTime) {
 
   const isValidPitch = micPitch >= MIN_VOCAL_HZ && micPitch <= MAX_VOCAL_HZ;
 
-  const isSinging =
+  const isSingingStrict =
     micClarity > MIC_CLARITY_THRESHOLD && isValidPitch && rms > RMS_NOISE_GATE;
-  let midiMicPitch = isSinging ? 12 * Math.log2(micPitch / 440) + 69 : 0;
 
-  state.scoring.isSinging = isSinging;
-  state.scoring.currentMicMidi = midiMicPitch;
+  if (isSingingStrict) {
+    state.scoring.singingGraceFrames = 8;
+    state.scoring.rawMicMidi = 12 * Math.log2(micPitch / 440) + 69;
+  } else if (state.scoring.singingGraceFrames > 0) {
+    state.scoring.singingGraceFrames--;
+  } else {
+    state.scoring.rawMicMidi = 0;
+  }
+
+  const isVisuallySinging = state.scoring.singingGraceFrames > 0;
+  state.scoring.isSinging = isSingingStrict;
+  state.scoring.currentMicMidi = state.scoring.rawMicMidi;
 
   const isKeyAwareSinging =
     micClarity > KEY_AWARE_CLARITY && isValidPitch && rms > KEY_AWARE_RMS_GATE;
@@ -415,7 +425,9 @@ function updateScore(currentTime) {
     }
 
     isCorrectPitch = false;
-    if (isSinging) {
+    state.scoring.currentMicMidi = 0;
+
+    if (isVisuallySinging) {
       let referencePitch = targetMidiPitch;
 
       if (!isGuideNoteActive) {
@@ -423,28 +435,54 @@ function updateScore(currentTime) {
           const nextNote = state.playback.guideNotes.find(
             (n) => n.startTime >= currentTime,
           );
-          if (nextNote) referencePitch = nextNote.pitch + state.playback.transpose;
+          if (nextNote)
+            referencePitch = nextNote.pitch + state.playback.transpose;
         }
 
         if (referencePitch === 0) {
-          const minMidi = state.playback.guideRange?.min ?? 42;
-          const maxMidi = state.playback.guideRange?.max ?? 90;
+          const minMidi =
+            (state.playback.guideRange?.min ?? 42) + state.playback.transpose;
+          const maxMidi =
+            (state.playback.guideRange?.max ?? 90) + state.playback.transpose;
           referencePitch = (minMidi + maxMidi) / 2;
         }
       }
 
-      let normalizedMicMidi = midiMicPitch;
-      while (normalizedMicMidi < referencePitch - 6) normalizedMicMidi += 12;
-      while (normalizedMicMidi > referencePitch + 6) normalizedMicMidi -= 12;
+      if (
+        state.scoring.currentOctaveOffset === undefined ||
+        !state.scoring.wasVisuallySinging
+      ) {
+        state.scoring.currentOctaveOffset =
+          Math.round((referencePitch - state.scoring.rawMicMidi) / 12) * 12;
+      }
 
-      state.scoring.currentMicMidi = normalizedMicMidi;
+      let normalizedMicMidi =
+        state.scoring.rawMicMidi + state.scoring.currentOctaveOffset;
 
-      if (isGuideNoteActive) {
-        if (Math.abs(normalizedMicMidi - targetMidiPitch) < 0.7) {
+      if (Math.abs(normalizedMicMidi - referencePitch) > 7) {
+        state.scoring.currentOctaveOffset =
+          Math.round((referencePitch - state.scoring.rawMicMidi) / 12) * 12;
+        normalizedMicMidi =
+          state.scoring.rawMicMidi + state.scoring.currentOctaveOffset;
+      }
+
+      if (!state.scoring.wasVisuallySinging) {
+        state.scoring.smoothedMicMidi = normalizedMicMidi;
+      } else {
+        state.scoring.smoothedMicMidi +=
+          (normalizedMicMidi - state.scoring.smoothedMicMidi) * 0.4;
+      }
+
+      state.scoring.currentMicMidi = state.scoring.smoothedMicMidi;
+
+      if (isGuideNoteActive && isSingingStrict) {
+        if (Math.abs(state.scoring.currentMicMidi - targetMidiPitch) < 0.8) {
           isCorrectPitch = true;
         }
       }
     }
+
+    state.scoring.wasVisuallySinging = isVisuallySinging;
 
     if (isCorrectPitch && !state.scoring.hasHitCurrentNote) {
       state.scoring.hasHitCurrentNote = true;
@@ -481,7 +519,8 @@ function updateScore(currentTime) {
         }
         for (const note of state.scoring.activeMidiNotes) {
           const transposedNote = note + state.playback.transpose;
-          state.scoring.rollingChroma[(transposedNote % 12 + 12) % 12] += 0.15;
+          state.scoring.rollingChroma[((transposedNote % 12) + 12) % 12] +=
+            0.15;
         }
       } else if (state.scoring.meydaAnalyzer && typeof Meyda !== "undefined") {
         const features = state.scoring.meydaAnalyzer.get("chroma");
@@ -581,6 +620,19 @@ function updateScore(currentTime) {
     state.scoring.finalScore = state.scoring.details.accuracy;
   }
 
+  state.scoring.micPitchHistory.push({
+    time: currentTime,
+    pitch: state.scoring.currentMicMidi,
+    isSinging: isVisuallySinging,
+  });
+
+  while (
+    state.scoring.micPitchHistory.length > 0 &&
+    state.scoring.micPitchHistory[0].time < currentTime - 10
+  ) {
+    state.scoring.micPitchHistory.shift();
+  }
+
   if (
     pianoRollContainer &&
     pianoRollContainer.elm.classList.contains("visible")
@@ -594,7 +646,7 @@ function updateScore(currentTime) {
       if (currentNote) {
         if (isCorrectPitch) {
           currentNote.hitStatus = "hit";
-        } else if (isSinging) {
+        } else if (isSingingStrict) {
           currentNote.hitStatus = "miss";
         }
       }
@@ -742,8 +794,10 @@ function drawPianoRoll(currentTime) {
 
   const playheadX = (adjustedTime - pageAdjustedStartTime) * PIXELS_PER_SECOND;
 
-  const minMidi = (state.playback.guideRange?.min ?? 42) + state.playback.transpose;
-  const maxMidi = (state.playback.guideRange?.max ?? 90) + state.playback.transpose;
+  const minMidi =
+    (state.playback.guideRange?.min ?? 42) + state.playback.transpose;
+  const maxMidi =
+    (state.playback.guideRange?.max ?? 90) + state.playback.transpose;
   const rangeDiff = Math.max(1, maxMidi - minMidi);
   const NOTE_HEIGHT = 16;
 
@@ -861,6 +915,80 @@ function drawPianoRoll(currentTime) {
     ctx.shadowBlur = 15;
     ctx.fillRect(playheadX - 1, 0, 2, height);
     ctx.shadowBlur = 0;
+  }
+
+  if (
+    state.scoring.micPitchHistory &&
+    state.scoring.micPitchHistory.length > 0 &&
+    playheadX >= 0
+  ) {
+    const activeSegments = [];
+    let currentSegment = [];
+
+    for (let i = 0; i < state.scoring.micPitchHistory.length; i++) {
+      const pt = state.scoring.micPitchHistory[i];
+
+      if (pt.time < pageRealStartTime - 1.0) continue;
+      if (pt.time > pageRealEndTime + 1.0) break;
+
+      if (pt.isSinging && pt.pitch > 0) {
+        if (currentSegment.length > 0) {
+          const prevPt = currentSegment[currentSegment.length - 1];
+          if (pt.time - prevPt.time > 0.15) {
+            activeSegments.push(currentSegment);
+            currentSegment = [];
+          }
+        }
+        currentSegment.push({ time: pt.time, pitch: pt.pitch });
+      } else {
+        if (currentSegment.length > 0) {
+          activeSegments.push(currentSegment);
+          currentSegment = [];
+        }
+      }
+    }
+    if (currentSegment.length > 0) activeSegments.push(currentSegment);
+
+    if (activeSegments.length > 0) {
+      ctx.beginPath();
+      ctx.lineWidth = 5;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "rgba(137, 207, 240, 0.6)";
+      ctx.shadowColor = "#38bdf8";
+      ctx.shadowBlur = 8;
+
+      for (const segment of activeSegments) {
+        if (segment.length === 1) {
+          const ptX = (segment[0].time - pageRealStartTime) * PIXELS_PER_SECOND;
+          const ptY = pitchToY(segment[0].pitch);
+          ctx.moveTo(ptX, ptY);
+          ctx.lineTo(ptX + 1, ptY);
+          continue;
+        }
+
+        const getScreenPt = (idx) => ({
+          x: (segment[idx].time - pageRealStartTime) * PIXELS_PER_SECOND,
+          y: pitchToY(segment[idx].pitch),
+        });
+
+        const startPt = getScreenPt(0);
+        ctx.moveTo(startPt.x, startPt.y);
+
+        for (let i = 0; i < segment.length - 1; i++) {
+          const p0 = getScreenPt(i);
+          const p1 = getScreenPt(i + 1);
+          const midX = (p0.x + p1.x) / 2;
+          const midY = (p0.y + p1.y) / 2;
+          ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
+        }
+
+        const lastPt = getScreenPt(segment.length - 1);
+        ctx.lineTo(lastPt.x, lastPt.y);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
   }
 
   if (
@@ -1664,10 +1792,11 @@ const pkg = {
             let trackLyricScore = 0;
 
             const isKar = parsedMidi.isKaraokeFile;
-            
-            const trackTextEvents = midiTrack.events.filter((e) =>
-              e.statusByte === midiMessageTypes.lyric ||
-              (isKar && e.statusByte === midiMessageTypes.text)
+
+            const trackTextEvents = midiTrack.events.filter(
+              (e) =>
+                e.statusByte === midiMessageTypes.lyric ||
+                (isKar && e.statusByte === midiMessageTypes.text),
             );
 
             trackTextEvents.forEach((e) => {
@@ -1840,17 +1969,26 @@ const pkg = {
           state.playback.decodedLyrics = [];
 
           rawTrackEvents.forEach((message) => {
-            if (!message.data) return;  
-            if (!parsedMidi.isKaraokeFile && message.statusByte === midiMessageTypes.text) return;
-            
+            if (!message.data) return;
+            if (
+              !parsedMidi.isKaraokeFile &&
+              message.statusByte === midiMessageTypes.text
+            )
+              return;
+
             const text = decoder.decode(message.data);
             const clean = text.replace(/[\r\n\/\\]/g, "");
             const trimmed = clean.trim();
 
             if (message.ticks < 480 && trimmed.length > 45) {
               const firstChar = trimmed.charAt(0);
-              if (firstChar !== '{' && firstChar !== '[' && firstChar !== '<' && firstChar !== '@') {
-                return; 
+              if (
+                firstChar !== "{" &&
+                firstChar !== "[" &&
+                firstChar !== "<" &&
+                firstChar !== "@"
+              ) {
+                return;
               }
             }
 
@@ -2139,6 +2277,11 @@ const pkg = {
         finalScore: 0,
         totalScorableNotes: 0,
         notesHit: 0,
+        micPitchHistory: [],
+        singingGraceFrames: 0,
+        smoothedMicMidi: 0,
+        currentOctaveOffset: 0,
+        wasVisuallySinging: false,
         isVocalGuideNoteActive: false,
         hasHitCurrentNote: false,
         totalFramesSinging: 0,
@@ -2438,14 +2581,15 @@ const pkg = {
     setTranspose: (semitones) => {
       const clamped = Math.max(-24, Math.min(24, Math.round(semitones)));
       const transposeDelta = clamped - state.playback.transpose;
-      
+
       if (transposeDelta !== 0) {
         state.scoring.rollingChroma.fill(0);
         state.scoring.keyHistory = [];
         if (state.scoring.allowedPitchClasses.length > 0) {
-          state.scoring.allowedPitchClasses = state.scoring.allowedPitchClasses.map(
-            (pc) => (pc + transposeDelta + 24) % 12
-          );
+          state.scoring.allowedPitchClasses =
+            state.scoring.allowedPitchClasses.map(
+              (pc) => (pc + transposeDelta + 24) % 12,
+            );
         }
       }
 
