@@ -2664,6 +2664,49 @@ const pkg = {
       }
     },
 
+    setChannelExpression: (channelNumber, expression) => {
+      if (!state.playback.synthesizer) {
+        console.error("[FORTE SVC] Synthesizer not initialized");
+        return false;
+      }
+
+      if (channelNumber < 0 || channelNumber > 15) {
+        throw new Error(`Invalid MIDI channel: ${channel}. Must be 0-15.`);
+      }
+
+      if (expression < 0 || expression > 127) {
+        throw new Error(`Invalid volume level: ${expression}. Must be 0-127.`);
+      }
+      try {
+        state.playback.synthesizer.lockController(
+          channelNumber,
+          0xffffffff, // ALL_CHANNELS_OR_DIFFERENT_ACTION constant
+          false,
+        );
+
+        state.playback.synthesizer.controllerChange(
+          channelNumber,
+          11, // CC#11 = Expression Controller
+          Math.floor(expression),
+        );
+
+        state.playback.synthesizer.lockController(
+          channelNumber,
+          0xffffffff,
+          true,
+        );
+
+        logVerbose(
+          `Switched expression to ${Math.floor((expression / 127) * 100)}% (${expression}/127) on channel ${channelNumber + 1}`,
+        );
+      } catch (e) {
+        console.error(
+          `[FORTE SVC] Failed to change expression on channel ${channelNumber + 1}:`,
+          e,
+        );
+      }
+    },
+
     /**
      * Changes the drum kit preset on a specific channel
      * @param {number} channelNumber - The MIDI channel (0-15)
