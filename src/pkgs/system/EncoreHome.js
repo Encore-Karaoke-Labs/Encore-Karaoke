@@ -4243,14 +4243,30 @@ class EncoreController {
         }
         cur.endTime = Math.min(cur.endTime, cur.absoluteTime + 1.5);
 
-        if (gapTicks >= 8 * ppqm) {
+        if (gapTicks >= 8 * ppqm && cur.lineIndex !== next.lineIndex) {
           let intStart = cur.tick + 2 * ppqm;
           let intEnd = next.tick - 4 * ppqm;
 
-          this.interludes.push({
-            start: getSecondsForTick(intStart, midiInfo.tempoChanges, ppqm),
-            end: getSecondsForTick(intEnd, midiInfo.tempoChanges, ppqm),
-          });
+          let calculatedStart = getSecondsForTick(
+            intStart,
+            midiInfo.tempoChanges,
+            ppqm,
+          );
+          let calculatedEnd = getSecondsForTick(
+            intEnd,
+            midiInfo.tempoChanges,
+            ppqm,
+          );
+
+          calculatedStart = Math.max(cur.endTime + 0.1, calculatedStart);
+
+          if (calculatedStart < calculatedEnd) {
+            this.interludes.push({
+              start: calculatedStart,
+              end: calculatedEnd,
+            });
+          }
+
           if (!hasSunplusCountdowns) {
             this.countdowns.push({
               t3: getSecondsForTick(
