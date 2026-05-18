@@ -221,6 +221,7 @@ const MIN_FRAMES_FOR_FULL_SCORE = 900;
 const MIN_VOCAL_HZ = 75;
 const MAX_VOCAL_HZ = 1200;
 
+let guideVolumeSwitchTimeout = null;
 let saveVocalChainTimeout = null;
 let guideAnalyserBuffer = null;
 let saveVolumesTimeout = null;
@@ -2125,6 +2126,9 @@ const pkg = {
                 }
 
                 state.playback.guideChannels = validChannels;
+                document.dispatchEvent(
+                  new CustomEvent("CherryTree.Forte.GuideFound"),
+                );
 
                 let combinedNotes = [];
                 validChannels.forEach((c) => {
@@ -2619,9 +2623,42 @@ const pkg = {
     },
 
     setGuideTrackVolume: (volume) => {
-      state.playback.guideChannels.forEach((c) => {
-        pkg.data.setChannelVolume(c.index, volume);
-      });
+      const switchFunction = () => {
+        clearTimeout(guideVolumeSwitchTimeout);
+        guideVolumeSwitchTimeout = setTimeout(() => {
+          if (state.playback.guideChannels.length > 0) {
+            state.playback.guideChannels.forEach((c) => {
+              pkg.data.setChannelVolume(c.index, volume);
+            });
+          } else {
+            document.addEventListener(
+              "CherryTree.Forte.GuideFound",
+              () => {
+                state.playback.guideChannels.forEach((c) => {
+                  pkg.data.setChannelVolume(c.index, volume);
+                });
+              },
+              { once: true },
+            );
+          }
+        }, 50);
+      };
+
+      if (state.playback.status === "playing") {
+        switchFunction();
+        return;
+      }
+
+      document.removeEventListener(
+        "CherryTree.Forte.Playback.Update",
+        switchFunction,
+      );
+
+      document.addEventListener(
+        "CherryTree.Forte.Playback.Update",
+        switchFunction,
+        { once: true },
+      );
     },
 
     setChannelVolume: (channelNumber, volume) => {
