@@ -238,7 +238,7 @@ const pkg = {
         },
         begin: () => {
           startupSound.volume =
-            config.audioConfig?.mix.instrumental.volume ?? 1;
+            config.audioConfig?.mix?.instrumental?.volume ?? 1;
           startupSound.play();
         },
       });
