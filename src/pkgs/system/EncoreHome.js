@@ -84,7 +84,7 @@ class EncoreController {
       reservationQueue: [],
       knownRemotes: {},
       windowsVolume: 1,
-      volume: config.audioConfig?.mix.instrumental.volume ?? 1,
+      volume: config.audioConfig?.mix?.instrumental?.volume ?? 1,
       videoSyncOffset: config.videoConfig?.syncOffset || 0,
       searchResults: [],
       highlightedSearchIndex: -1,
