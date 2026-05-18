@@ -1,10 +1,17 @@
 const fs = require("fs");
 const path = require("path");
 
-// A minimal default state for a new installation or after a reset.
-// The app's setup flow is responsible for populating the rest.
 const DEFAULT_CONFIG = {
   setupComplete: false,
+  audioConfig: {
+    mix: {
+      instrumental: { volume: 1, outputDevice: "default" },
+      scoring: { inputDevice: "default" },
+    },
+  },
+  videoConfig: {
+    syncOffset: 0,
+  },
 };
 
 class ConfigManager {
@@ -19,13 +26,9 @@ class ConfigManager {
    * @param {string} userDataPath - The path provided by Electron's app.getPath("userData").
    */
   init(userDataPath) {
-    // CRITICAL: Use a new filename to avoid overwriting the old config system.
-    // This ensures full backwards compatibility.
     this.configPath = path.join(userDataPath, "encore-settings.json");
     this.load();
   }
-
-  // --- Private Helpers for Dot Notation (No changes needed here) ---
 
   _getValueByPath(obj, path) {
     const keys = path.split(".");
@@ -53,8 +56,6 @@ class ConfigManager {
    * is missing or corrupted.
    */
   load() {
-    // If the config file doesn't exist, we don't need to do anything.
-    // The constructor has already loaded the safe, minimal default.
     if (!fs.existsSync(this.configPath)) {
       console.log(
         `[CONFIG] No settings file found at "${this.configPath}". Using default configuration.`,
@@ -66,7 +67,6 @@ class ConfigManager {
     try {
       const fileData = fs.readFileSync(this.configPath, "utf8");
 
-      // If the file is empty, also use defaults.
       if (!fileData.trim()) {
         console.warn(
           `[CONFIG] Settings file is empty. Using default configuration.`,
@@ -77,23 +77,17 @@ class ConfigManager {
 
       const parsedData = JSON.parse(fileData);
 
-      // Merge the loaded data on top of the defaults. This provides forward-compatibility:
-      // if you add new keys to DEFAULT_CONFIG in a future update, users with old
-      // config files will get the new keys without losing their existing settings.
       this.data = Object.assign(
         JSON.parse(JSON.stringify(DEFAULT_CONFIG)),
         parsedData,
       );
       console.log("[CONFIG] Successfully loaded settings from file.");
     } catch (error) {
-      // If the file is corrupted or unreadable, we catch the error, log it,
-      // and revert to the safe default state. This prevents the app from crashing.
       console.error(
         `[CONFIG] Error reading or parsing "${this.configPath}". Backing up corrupted file and using defaults.`,
         error,
       );
 
-      // As a safety measure, let's back up the bad config file.
       fs.renameSync(
         this.configPath,
         `${this.configPath}.corrupted-${Date.now()}`,
@@ -119,8 +113,6 @@ class ConfigManager {
       );
     }
   }
-
-  // --- Public API (localStorage-like) ---
 
   getItem(key) {
     return this._getValueByPath(this.data, key);
