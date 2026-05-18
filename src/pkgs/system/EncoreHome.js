@@ -5466,7 +5466,7 @@ class EncoreController {
 
     const html = `
       <div class="volume-display" style="display: flex; align-items: center; width: 100%; gap: 1rem;">
-        <div style="font-weight: 700; color: #ffd700; width: 75px; text-align: left;">${level.label}</div>
+        <div style="font-weight: 700; color: #ffd700; width: 85px; text-align: left;">${level.label}</div>
         <div class="volume-slider-container" style="flex-grow: 1; height: 12px; background-color: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; overflow: hidden;">
           <div class="volume-slider-fill" style="height: 100%; background-color: #ffd700; border-radius: 6px; transition: width 0.1s linear; width: ${(level.value / 127) * 100}%"></div>
         </div>
