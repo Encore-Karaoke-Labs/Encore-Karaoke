@@ -1,0 +1,101 @@
+export const state = {
+  scoring: {
+    enabled: false,
+    userInputEnabled: true,
+    micPitchHistory: [],
+    micStream: null,
+    micSourceNode: null,
+    micHighpassNode: null,
+    micLowpassNode: null,
+    micAnalyser: null,
+    vocalGuideAnalyser: null,
+    pitchDetector: null,
+    guideVocalDelayNode: null,
+    finalScore: 0,
+    details: {
+      accuracy: 0,
+    },
+    measuredLatencyS: 0.5,
+    totalScorableNotes: 0,
+    notesHit: 0,
+    isVocalGuideNoteActive: false,
+    hasHitCurrentNote: false,
+    micDevices: [],
+    currentMicDeviceId: "default",
+    musicAnalyser: null,
+    meydaAnalyzer: null,
+    totalFramesSinging: 0,
+    framesInKey: 0,
+    rollingChroma: new Array(12).fill(0),
+    currentKeyName: null,
+    allowedPitchClasses: [],
+    keyHistory: [],
+    frameCount: 0,
+    activeMidiNotes: new Set(),
+  },
+  playback: {
+    status: "stopped",
+    buffer: null,
+    synthesizer: null,
+    midiGain: null,
+    sequencer: null,
+    isMidi: false,
+    isMultiplexed: false,
+    decodedLyrics: [],
+    guideNotes: [],
+    guideChannels: [],
+    lyricsEncoding: "utf-8",
+    isAnalyzing: false,
+    startTime: 0,
+    pauseTime: 0,
+    devices: [],
+    currentDeviceId: "default",
+    transpose: 0,
+    multiplexPan: -1,
+    leftPannerGain: null,
+    rightPannerGain: null,
+    volume: 1,
+    sfxVolume: 1,
+    smoothedTime: 0,
+    lastFrameTime: 0,
+    guideRange: { min: 42, max: 90 },
+    midiInfo: {
+      ticks: [],
+      timeDivision: 480,
+      tempoChanges: [],
+      initialBpm: 120,
+      keyRange: { min: 0, max: 127 },
+    },
+  },
+  recording: {
+    destinationNode: null,
+    audioStream: null,
+    trackDelayNode: null,
+    musicRecordingGainNode: null,
+  },
+  effects: {
+    micChainInput: null,
+    micChainOutput: null,
+    vocalChain: [],
+    vocalChainConfig: [],
+    musicGainInRecording: 0.2,
+    micGainInRecording: 1.0,
+    micMonitorNode: null,
+    micMonitorVolume: 1.0,
+    enableMicMonitor: false,
+  },
+  ui: {
+    pianoRollVisible: true,
+  },
+  verbose: true,
+};
+
+export function logVerbose(message, ...args) {
+  if (!state.verbose) return;
+  console.log(`[FORTE SVC] ${message}`, ...args);
+}
+
+export function logVerboseWarn(message, ...args) {
+  if (!state.verbose) return;
+  console.warn(`[FORTE SVC] ${message}`, ...args);
+}
