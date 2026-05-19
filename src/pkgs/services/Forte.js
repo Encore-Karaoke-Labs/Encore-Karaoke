@@ -1702,7 +1702,7 @@ const pkg = {
 
         if (state.playback.transpose !== 0) {
           state.playback.synthesizer.setSystemParameter(
-            "transposition",
+            "keyShift",
             state.playback.transpose,
           );
         }
@@ -1822,7 +1822,7 @@ const pkg = {
 
           state.playback.sequencer = new Sequencer(state.playback.synthesizer);
           state.playback.sequencer.loop = false;
-          state.playback.synthesizer.setSystemParameter("transposition", 0);
+          state.playback.synthesizer.setSystemParameter("keyShift", 0);
 
           bindSpessaEvent(
             state.playback.sequencer.eventHandler,
@@ -2489,7 +2489,7 @@ const pkg = {
       }
 
       if (state.playback.isMidi) {
-        state.playback.synthesizer.setSystemParameter("transposition", 0);
+        state.playback.synthesizer.setSystemParameter("keyShift", 0);
         if (state.playback.sequencer) {
           try {
             state.playback.sequencer.pause();
@@ -2616,7 +2616,7 @@ const pkg = {
       }
       state.playback.transpose = clamped;
       if (state.playback.isMidi && state.playback.synthesizer) {
-        state.playback.synthesizer.setSystemParameter("transposition", clamped);
+        state.playback.synthesizer.setSystemParameter("keyShift", clamped);
       } else if (!state.playback.isMidi && sourceNode) {
         sourceNode.playbackRate.setValueAtTime(
           Math.pow(2, clamped / 12),
