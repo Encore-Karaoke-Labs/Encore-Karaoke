@@ -133,8 +133,15 @@ Ready-to-use installers are available on the [Releases](https://github.com/Encor
    ```
 
 3. **Run the app:**
+
    ```bash
    npm run start
+   ```
+
+4. **Build the app on your platform:**
+
+   ```bash
+   npm run make
    ```
 
 _To run in full-screen Kiosk mode (which disables Windows Explorer to replicate a true arcade machine), pass the `--kiosk` flag._
