@@ -1,5 +1,9 @@
 import { WorkletSynthesizer as Synthetizer, Sequencer } from "spessasynth_lib";
-import { BasicMIDI, midiControllers, midiMessageTypes } from "spessasynth_core";
+import {
+  BasicMIDI,
+  MIDIControllers as midiControllers,
+  MIDIMessageTypes as midiMessageTypes,
+} from "spessasynth_core";
 import { PitchDetector } from "pitchy";
 
 console.log(midiControllers);
@@ -1697,7 +1701,7 @@ const pkg = {
         logVerbose("Preset list", state.playback.synthesizer.presetList);
 
         if (state.playback.transpose !== 0) {
-          state.playback.synthesizer.setMasterParameter(
+          state.playback.synthesizer.setSystemParameter(
             "transposition",
             state.playback.transpose,
           );
@@ -1818,7 +1822,7 @@ const pkg = {
 
           state.playback.sequencer = new Sequencer(state.playback.synthesizer);
           state.playback.sequencer.loop = false;
-          state.playback.synthesizer.setMasterParameter("transposition", 0);
+          state.playback.synthesizer.setSystemParameter("transposition", 0);
 
           bindSpessaEvent(
             state.playback.sequencer.eventHandler,
@@ -2485,7 +2489,7 @@ const pkg = {
       }
 
       if (state.playback.isMidi) {
-        state.playback.synthesizer.setMasterParameter("transposition", 0);
+        state.playback.synthesizer.setSystemParameter("transposition", 0);
         if (state.playback.sequencer) {
           try {
             state.playback.sequencer.pause();
@@ -2612,7 +2616,7 @@ const pkg = {
       }
       state.playback.transpose = clamped;
       if (state.playback.isMidi && state.playback.synthesizer) {
-        state.playback.synthesizer.setMasterParameter("transposition", clamped);
+        state.playback.synthesizer.setSystemParameter("transposition", clamped);
       } else if (!state.playback.isMidi && sourceNode) {
         sourceNode.playbackRate.setValueAtTime(
           Math.pow(2, clamped / 12),
@@ -2675,8 +2679,10 @@ const pkg = {
         throw new Error(`Invalid volume level: ${volume}. Must be 0-127.`);
       }
       try {
-        state.playback.synthesizer.lockController(
-          channelNumber,
+        let midiChannel =
+          state.playback.synthesizer.midiChannels[channelNumber];
+
+        midiChannel.lockController(
           0xffffffff, // ALL_CHANNELS_OR_DIFFERENT_ACTION constant
           false,
         );
@@ -2687,11 +2693,7 @@ const pkg = {
           Math.floor(volume),
         );
 
-        state.playback.synthesizer.lockController(
-          channelNumber,
-          0xffffffff,
-          true,
-        );
+        midiChannel.lockController(0xffffffff, true);
 
         logVerbose(
           `Switched volume to ${Math.floor((volume / 127) * 100)}% (${volume}/127) on channel ${channelNumber + 1}`,
@@ -2718,8 +2720,10 @@ const pkg = {
         throw new Error(`Invalid volume level: ${expression}. Must be 0-127.`);
       }
       try {
-        state.playback.synthesizer.lockController(
-          channelNumber,
+        let midiChannel =
+          state.playback.synthesizer.midiChannels[channelNumber];
+
+        midiChannel.lockController(
           0xffffffff, // ALL_CHANNELS_OR_DIFFERENT_ACTION constant
           false,
         );
@@ -2730,11 +2734,7 @@ const pkg = {
           Math.floor(expression),
         );
 
-        state.playback.synthesizer.lockController(
-          channelNumber,
-          0xffffffff,
-          true,
-        );
+        midiChannel.lockController(0xffffffff, true);
 
         logVerbose(
           `Switched expression to ${Math.floor((expression / 127) * 100)}% (${expression}/127) on channel ${channelNumber + 1}`,
@@ -2773,8 +2773,10 @@ const pkg = {
           bankLSB: drumPreset.bankLSB,
         });
 
-        state.playback.synthesizer.lockController(
-          channelNumber,
+        let midiChannel =
+          state.playback.synthesizer.midiChannels[channelNumber];
+
+        midiChannel.lockController(
           0xffffffff, // ALL_CHANNELS_OR_DIFFERENT_ACTION constant
           false,
         );
@@ -2797,11 +2799,7 @@ const pkg = {
           drumPreset.program,
         );
 
-        state.playback.synthesizer.lockController(
-          channelNumber,
-          0xffffffff,
-          true,
-        );
+        midiChannel.lockController(0xffffffff, true);
 
         logVerbose(
           `Drum preset switched successfully on channel ${channelNumber + 1}`,
