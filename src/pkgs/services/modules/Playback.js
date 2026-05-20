@@ -724,6 +724,17 @@ export class FortePlayback {
                   continue;
                 if (penalizedInstruments.includes(candidate.program)) continue;
 
+                const minimumMatches = Math.max(
+                  2,
+                  Math.floor(lyricTimes.length * 0.03),
+                );
+                const rawMatches = Math.round(
+                  candidate.matchRatio * lyricTimes.length,
+                );
+                if (rawMatches < minimumMatches) {
+                  continue;
+                }
+
                 let overlapCount = 0;
                 for (const cNote of candidate.notes) {
                   const cEnd = cNote.start + cNote.length;
