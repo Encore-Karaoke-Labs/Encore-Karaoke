@@ -2,6 +2,7 @@ import { Sequencer } from "spessasynth_lib";
 import {
   BasicMIDI,
   MIDIMessageTypes as midiMessageTypes,
+  MIDIControllers as midiControllers,
 } from "spessasynth_core";
 import { PitchDetector } from "pitchy";
 import { logVerbose } from "../core/State.js";
@@ -1213,7 +1214,8 @@ export class FortePlayback {
       const snapshot = await this.state.playback.synthesizer.getSnapshot();
       for (const ch of this.state.playback.guideChannels) {
         const channelSnapshot = snapshot.midiChannels?.[ch.index];
-        const expressionValue = channelSnapshot.midiControllers[11];
+        const expressionValue =
+          channelSnapshot.midiControllers[midiControllers.expression];
         const actualExpression = expressionValue >> 7;
         if (actualExpression < 1) {
           this.synthesizer.setChannelExpression(ch.index, 127);
