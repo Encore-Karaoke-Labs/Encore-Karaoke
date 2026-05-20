@@ -922,6 +922,15 @@ export default class InputManager {
 
       this.ctx.modules.infoBar.showTemp("BGV", html, 3000);
 
+      try {
+        window.config.setItem(
+          "videoConfig.defaultBgvCategory",
+          bgv.selectedCategory,
+        );
+      } catch (e) {
+        console.error("[Encore] Failed to save BGV category config:", e);
+      }
+
       setTimeout(() => {
         const carousel = document.querySelector(".bgv-carousel");
         const activeCat = carousel?.querySelector(".bgv-item.selected");

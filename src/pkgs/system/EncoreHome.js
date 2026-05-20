@@ -303,6 +303,34 @@ class EncoreController {
       });
     }
 
+    try {
+      const savedCategory = this.config.videoConfig?.defaultBgvCategory;
+
+      if (savedCategory) {
+        const validCategories = [
+          "Auto",
+          "Off",
+          ...this.bgv.categories.map((c) => c.BGV_CATEGORY),
+        ];
+
+        if (validCategories.includes(savedCategory)) {
+          this.bgv.selectedCategory = savedCategory;
+          console.log(`[Encore] Restored BGV category: ${savedCategory}`);
+        } else {
+          console.warn(
+            `[Encore] Saved BGV category '${savedCategory}' not found in current library. Defaulting to 'Auto'.`,
+          );
+          this.bgv.selectedCategory = "Auto";
+        }
+      }
+    } catch (e) {
+      console.error(
+        "[Encore] Failed to load BGV category from config. Defaulting to 'Auto'.",
+        e,
+      );
+      this.bgv.selectedCategory = "Auto";
+    }
+
     this.ui.startBumperCycle();
     await this.bgv.updatePlaylistForCategory();
 
