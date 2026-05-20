@@ -175,6 +175,12 @@ export class BGVModule {
    * Update playlist based on selected category
    */
   async updatePlaylistForCategory() {
+    if (this.selectedCategory === "Off") {
+      this.playlist = [];
+      this.stop();
+      return;
+    }
+
     const assetBaseUrl = `http://127.0.0.1:${this.PORT}/assets/video/bgv/`;
     this.playlist = [];
     let allVideos = [];
@@ -220,6 +226,7 @@ export class BGVModule {
   cycleCategory(direction) {
     if (this.isManualMode) return;
     const allCategoryNames = [
+      "Off",
       "Auto",
       ...this.categories.map((c) => c.BGV_CATEGORY),
     ];
@@ -374,6 +381,10 @@ export class BGVModule {
    * Start playback of the current playlist
    */
   start() {
+    if (this.selectedCategory === "Off") {
+      this.stop();
+      return;
+    }
     if (this.isManualMode || this.playlist.length === 0 || this.canvasOnlyMode)
       return;
     this._playUrl(this.playlist[this.currentIndex]);
@@ -383,6 +394,10 @@ export class BGVModule {
    * Advance to the next video in playlist with fade transition
    */
   playNext() {
+    if (this.selectedCategory === "Off") {
+      this.stop();
+      return;
+    }
     if (this.isManualMode || this.playlist.length === 0 || this.canvasOnlyMode)
       return;
     this.currentIndex = (this.currentIndex + 1) % this.playlist.length;
@@ -509,7 +524,11 @@ export class BGVModule {
     await new Promise((resolve) => {
       const onCanPlay = () => {
         if (this.currentLoadId === loadId) {
-          this.videoElement.style.opacity = "1";
+          if (this.selectedCategory === "Off") {
+            this.videoElement.style.opacity = "0";
+          } else {
+            this.videoElement.style.opacity = "1";
+          }
         }
         this.videoElement.removeEventListener("canplay", onCanPlay);
         resolve();

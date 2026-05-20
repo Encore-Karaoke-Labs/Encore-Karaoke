@@ -908,7 +908,11 @@ export default class InputManager {
       window.config.setItem("videoConfig.syncOffset", state.videoSyncOffset);
     } else {
       bgv.cycleCategory(key === "[" ? -1 : 1);
-      const cats = ["Auto", ...bgv.categories.map((c) => c.BGV_CATEGORY)];
+      const cats = [
+        "Off",
+        "Auto",
+        ...bgv.categories.map((c) => c.BGV_CATEGORY),
+      ];
 
       const html = `
         <div class="bgv-carousel" style="opacity: 0; transition: opacity 0.2s ease-out;">

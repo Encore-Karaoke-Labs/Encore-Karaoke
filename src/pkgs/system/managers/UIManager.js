@@ -1120,6 +1120,13 @@ export default class UIManager {
         this.stopLoungeBackground();
         return;
       }
+
+      if (this.ctx.modules.bgv.selectedCategory === "Off") {
+        this.ctx.modules.bgv.clearCustomGraphics();
+        this.loungeRafId = requestAnimationFrame(draw);
+        return;
+      }
+
       time += 0.02;
       const w = canvas.width,
         h = canvas.height;
