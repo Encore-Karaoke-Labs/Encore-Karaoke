@@ -1209,39 +1209,46 @@ export class FortePlayback {
    * @param {number} volume - Volume mapping value (0-127).
    */
   setGuideTrackVolume(volume) {
-    const switchFunction = () => {
+    const applyVolumeToGuide = async () => {
+      const snapshot = await this.state.playback.synthesizer.getSnapshot();
+      for (const ch of this.state.playback.guideChannels) {
+        const channelSnapshot = snapshot.midiChannels?.[ch.index];
+        const expressionValue = channelSnapshot.midiControllers[11];
+        const actualExpression = expressionValue >> 7;
+        if (actualExpression < 1) {
+          this.synthesizer.setChannelExpression(ch.index, 127);
+        }
+        this.synthesizer.setChannelVolume(ch.index, volume);
+      }
+    };
+
+    const scheduleApply = () => {
       clearTimeout(this.guideVolumeSwitchTimeout);
       this.guideVolumeSwitchTimeout = setTimeout(() => {
-        if (this.state.playback.guideChannels.length > 0) {
-          this.state.playback.guideChannels.forEach((c) => {
-            this.synthesizer.setChannelVolume(c.index, volume);
-          });
-        } else {
+        if (this.state.playback.guideChannels.length < 1) {
           document.addEventListener(
             "CherryTree.Forte.GuideFound",
-            () => {
-              this.state.playback.guideChannels.forEach((c) => {
-                this.synthesizer.setChannelVolume(c.index, volume);
-              });
-            },
+            applyVolumeToGuide,
             { once: true },
           );
+          return;
         }
+        applyVolumeToGuide();
       }, 50);
     };
 
     if (this.state.playback.status === "playing") {
-      switchFunction();
+      scheduleApply();
       return;
     }
 
     document.removeEventListener(
       "CherryTree.Forte.Playback.Update",
-      switchFunction,
+      scheduleApply,
     );
     document.addEventListener(
       "CherryTree.Forte.Playback.Update",
-      switchFunction,
+      scheduleApply,
       { once: true },
     );
   }
