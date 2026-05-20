@@ -1,4 +1,9 @@
 import { WorkletSynthesizer as Synthetizer } from "spessasynth_lib";
+import {
+  BasicMIDI,
+  MIDIMessageTypes as midiMessageTypes,
+  MIDIControllers as midiControllers,
+} from "spessasynth_core";
 import { logVerbose, logVerboseWarn } from "../core/State.js";
 
 /**
@@ -152,7 +157,7 @@ export class ForteSynthesizer {
 
       this.state.playback.synthesizer.controllerChange(
         channelNumber,
-        7, // CC#7 = Volume Change
+        midiControllers.mainVolume,
         Math.floor(volume),
       );
 
@@ -199,7 +204,7 @@ export class ForteSynthesizer {
 
       this.state.playback.synthesizer.controllerChange(
         channelNumber,
-        11, // CC#11 = Expression Controller
+        midiControllers.expression,
         Math.floor(expression),
       );
 
@@ -250,12 +255,12 @@ export class ForteSynthesizer {
       if (!drumPreset.isGMGSDrum) {
         this.state.playback.synthesizer.controllerChange(
           channelNumber,
-          0, // CC#0 = Bank Select MSB
+          midiControllers.bankSelect,
           drumPreset.bankMSB,
         );
         this.state.playback.synthesizer.controllerChange(
           channelNumber,
-          32, // CC#32 = Bank Select LSB
+          midiControllers.bankSelectLSB,
           drumPreset.bankLSB,
         );
       }
