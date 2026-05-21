@@ -92,7 +92,7 @@ export const state = {
 
 export function logVerbose(message, ...args) {
   if (!state.verbose) return;
-  console.log(`[FORTE SVC] ${message}`, ...args);
+  console.debug(`[FORTE SVC] ${message}`, ...args);
 }
 
 export function logVerboseWarn(message, ...args) {
