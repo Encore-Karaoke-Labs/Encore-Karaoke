@@ -395,6 +395,7 @@ export default class SetupManager {
             set: (v) => {
               this.ctx.config.audioConfig ??= {};
               this.ctx.config.audioConfig.enableScoreFanfare = v;
+              this.ctx.state.isScoreFanfareEnabled = v;
               window.config.setItem("audioConfig.enableScoreFanfare", v);
             },
           },
@@ -411,6 +412,7 @@ export default class SetupManager {
             set: (v) => {
               this.ctx.config.audioConfig ??= {};
               this.ctx.config.audioConfig.enableScoreNarration = v;
+              this.ctx.state.isScoreNarrationEnabled = v;
               window.config.setItem("audioConfig.enableScoreNarration", v);
             },
           },
