@@ -173,13 +173,13 @@ export default class SetupManager {
 
   buildSettingsMap() {
     this.DASHBOARD_TILES = [
-      { id: "library", label: "Library & Storage", icon: "📁" },
-      { id: "sync", label: "Network Sync", icon: "🌐" },
-      { id: "audio", label: "Sound Settings", icon: "🔊" },
-      { id: "mic", label: "Microphone Settings", icon: "🎤" },
-      { id: "video", label: "Video Settings", icon: "📺" },
-      { id: "security", label: "User Security", icon: "🔒" },
-      { id: "exit", label: "Exit Setup", icon: "❌" },
+      { id: "library", label: "Library & Storage", icon: "folder" },
+      { id: "sync", label: "Network Sync", icon: "cloud-download" },
+      { id: "audio", label: "Sound Settings", icon: "volume-high" },
+      { id: "mic", label: "Microphone Settings", icon: "mic" },
+      { id: "video", label: "Video Settings", icon: "tv" },
+      { id: "security", label: "User Security", icon: "lock-closed" },
+      { id: "exit", label: "Exit Setup", icon: "log-out" },
     ];
 
     const micOptions = this.micDevices.map((d) => ({
@@ -1777,8 +1777,11 @@ export default class SetupManager {
           marginRight: "1.5rem",
           width: "40px",
           textAlign: "center",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         })
-        .text(tile.icon)
+        .html(`<ion-icon name="${tile.icon}"></ion-icon>`)
         .appendTo(tileEl);
 
       new Html("div")

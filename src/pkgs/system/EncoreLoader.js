@@ -1,5 +1,6 @@
 import Html from "../../libs/html.js";
 import NetworkingUtility from "../../libs/networkingUtility.js";
+import { defineCustomElements } from "ionicons/loader";
 
 let wrapper, Ui, Pid, Sfx;
 let root;
@@ -212,6 +213,12 @@ const pkg = {
    */
   async startLoadingSequence() {
     let fsSvc = root.Processes.getService("FsSvc").data;
+
+    statusP.text("Loading components");
+
+    defineCustomElements(window, {
+      resourcesUrl: "/assets/img/icons/",
+    });
 
     try {
       const config = await window.config.getAll();
