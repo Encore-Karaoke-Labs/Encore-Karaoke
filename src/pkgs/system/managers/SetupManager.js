@@ -619,30 +619,29 @@ export default class SetupManager {
     }
 
     if (this.setupState.view === "dashboard") {
-      const cols = 3;
+      const cols = 2;
       const total = this.DASHBOARD_TILES.length;
-      if (e.key === "ArrowRight")
-        this.setupState.dashboardIndex =
-          (this.setupState.dashboardIndex + 1) % total;
-      if (e.key === "ArrowLeft")
-        this.setupState.dashboardIndex =
-          (this.setupState.dashboardIndex - 1 + total) % total;
-      if (e.key === "ArrowDown")
-        this.setupState.dashboardIndex = Math.min(
-          total - 1,
-          this.setupState.dashboardIndex + cols,
-        );
-      if (e.key === "ArrowUp")
-        this.setupState.dashboardIndex = Math.max(
-          0,
-          this.setupState.dashboardIndex - cols,
-        );
-      if (e.key === "Enter") {
+      let idx = this.setupState.dashboardIndex;
+
+      if (e.key === "ArrowRight") {
+        if (idx % cols < cols - 1 && idx + 1 < total) idx++;
+      } else if (e.key === "ArrowLeft") {
+        if (idx % cols > 0) idx--;
+      } else if (e.key === "ArrowDown") {
+        if (idx + cols < total) idx += cols;
+        else if (idx < total - 1) idx = total - 1;
+      } else if (e.key === "ArrowUp") {
+        if (idx - cols >= 0) idx -= cols;
+      } else if (e.key === "Enter") {
         const selected = this.DASHBOARD_TILES[this.setupState.dashboardIndex];
         this.executeAction(selected.id);
         return;
       }
-      this.renderView();
+
+      if (idx !== this.setupState.dashboardIndex) {
+        this.setupState.dashboardIndex = idx;
+        this.renderView();
+      }
       return;
     }
 
@@ -1747,18 +1746,44 @@ export default class SetupManager {
       .appendTo(container);
     const grid = new Html("div")
       .classOn("setup-grid")
-      .styleJs({ margin: "0 auto", paddingBottom: "2rem" })
+      .styleJs({
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "1rem",
+        width: "90%",
+        maxWidth: "1000px",
+        margin: "0 auto",
+        padding: "2rem 0",
+      })
       .appendTo(scrollWrapper);
 
     this.DASHBOARD_TILES.forEach((tile, idx) => {
-      const tileEl = new Html("div").classOn("setup-tile").appendTo(grid);
+      const tileEl = new Html("div")
+        .classOn("setup-tile")
+        .styleJs({
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          padding: "1.5rem 2rem",
+          textAlign: "left",
+        })
+        .appendTo(grid);
       if (idx === this.setupState.dashboardIndex) tileEl.classOn("active");
+
       new Html("div")
         .classOn("setup-tile-icon")
+        .styleJs({
+          fontSize: "2rem",
+          marginRight: "1.5rem",
+          width: "40px",
+          textAlign: "center",
+        })
         .text(tile.icon)
         .appendTo(tileEl);
+
       new Html("div")
         .classOn("setup-tile-label")
+        .styleJs({ fontSize: "1.5rem", fontWeight: "600", flex: "1" })
         .text(tile.label)
         .appendTo(tileEl);
     });
@@ -1767,7 +1792,7 @@ export default class SetupManager {
       if (scrollWrapper.elm) {
         const activeTile = document.querySelector(".setup-tile.active");
         if (activeTile) {
-          if (this.setupState.dashboardIndex < 3)
+          if (this.setupState.dashboardIndex < 2)
             scrollWrapper.elm.scrollTop = 0;
           else
             activeTile.scrollIntoView({ block: "nearest", behavior: "auto" });
