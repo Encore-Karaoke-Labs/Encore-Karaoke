@@ -13,10 +13,6 @@ const pkg = {
     document.body.style.backgroundColor = "#080810";
     document.body.style.margin = "0";
 
-    let shouldBootSetup =
-      sessionStorage.getItem("encore_boot_setup") === "true";
-    sessionStorage.removeItem("encore_boot_setup");
-
     let columns = Math.floor(window.innerWidth / 50);
     let rows = Math.floor(window.innerHeight / 50);
 
@@ -38,14 +34,6 @@ const pkg = {
         backgroundColor: "#080810",
       })
       .appendTo("body");
-
-    const f2BootListener = (e) => {
-      if (e.key === "F2") {
-        shouldBootSetup = true;
-        window.removeEventListener("keydown", f2BootListener);
-      }
-    };
-    window.addEventListener("keydown", f2BootListener);
 
     const tilesCanvas = new Html("canvas")
       .styleJs({
@@ -125,23 +113,6 @@ const pkg = {
       )
       .appendTo(wrapper);
 
-    const setupText = new Html("div")
-      .styleJs({
-        position: "absolute",
-        bottom: "50px",
-        left: "50%",
-        transform: "translateX(-50%)",
-        color: "white",
-        mixBlendMode: "difference",
-        fontSize: "1.5rem",
-        fontFamily: "Rajdhani, sans-serif",
-        textAlign: "center",
-        opacity: 0,
-        zIndex: 10,
-      })
-      .text("Press F2 to go into Setup")
-      .appendTo(wrapper);
-
     const warningScreen = new Html("div")
       .styleJs({
         position: "absolute",
@@ -215,14 +186,6 @@ const pkg = {
     function checkReadyToAnimate() {
       if (audioLoaded && warningDone && !hasStarted) {
         hasStarted = true;
-
-        anime({
-          targets: setupText.elm,
-          opacity: 1,
-          duration: 500,
-          easing: "linear",
-        });
-
         beginAnimation();
       }
     }
@@ -301,20 +264,7 @@ const pkg = {
       let tvName = "Encore Karaoke";
       Root.Security.setSecureVariable("TV_NAME", tvName);
 
-      window.removeEventListener("keydown", f2BootListener);
-
-      anime({
-        targets: setupText.elm,
-        opacity: [1, 0],
-        duration: 200,
-        easing: "linear",
-      });
-
-      if (shouldBootSetup) {
-        await Root.Core.pkg.run("system:EncoreSetup", [], true);
-      } else {
-        await Root.Core.pkg.run("system:EncoreLoader", [], true);
-      }
+      await Root.Core.pkg.run("system:EncoreLoader", [], true);
 
       let mvT;
       window.addEventListener("mousemove", (e) => {

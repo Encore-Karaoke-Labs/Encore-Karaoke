@@ -175,11 +175,6 @@ const pkg = {
       return false;
     }
 
-    if (this.f2Handler) {
-      document.removeEventListener("keydown", this.f2Handler);
-      this.f2Handler = null;
-    }
-
     const libInfo = fsSvc.getLibraryInfo();
     const config = await window.config.getAll();
 
@@ -211,34 +206,12 @@ const pkg = {
   },
 
   /**
-   * Orchestrates the initial boot logic, handling library detection, setup redirects, and loading sequences.
+   * Orchestrates the initial boot logic, handling library detection and loading sequences.
    *
    * @returns {Promise<void>}
    */
   async startLoadingSequence() {
     let fsSvc = root.Processes.getService("FsSvc").data;
-
-    if (window.setupRequested) {
-      window.setupRequested = false;
-      statusP.text("Entering System Setup...");
-      setTimeout(() => {
-        this.end();
-        root.Core.pkg.run("system:EncoreSetup", []);
-      }, 500);
-      return;
-    }
-
-    this.f2Handler = (e) => {
-      if (e.key === "F2" && !this.aborted) {
-        this.aborted = true;
-        document.removeEventListener("keydown", this.f2Handler);
-        statusP.text("Entering System Setup...");
-
-        sessionStorage.setItem("encore_boot_setup", "true");
-        setTimeout(() => window.location.reload(), 500);
-      }
-    };
-    document.addEventListener("keydown", this.f2Handler);
 
     try {
       const config = await window.config.getAll();
@@ -475,7 +448,6 @@ const pkg = {
     Ui.init(Pid, "horizontal", []);
   },
   end: async function () {
-    if (this.f2Handler) document.removeEventListener("keydown", this.f2Handler);
     Ui.cleanup(Pid);
     await Ui.transition("fadeOut", wrapper, 500);
     wrapper.cleanup();
