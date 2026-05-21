@@ -1364,7 +1364,7 @@ p + .flex-list button {
   border-radius: 12px;
   padding: 2rem;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: 1rem;
   transition: all 0.2s ease;
@@ -1379,6 +1379,7 @@ p + .flex-list button {
 }
 
 .setup-tile-icon {
+  color: #89cff0;
   font-size: 4rem;
   filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.5));
 }
