@@ -1,6 +1,31 @@
 import Html from "../../../libs/html.js";
 
 /**
+ * Joins path parts with a given separator, normalizing leading and trailing slashes.
+ *
+ * @author anneb (Modified by community)
+ * @license CC BY-SA 4.0
+ * @see https://stackoverflow.com/a
+ *
+ * @param {string[]} parts - The path segments to join.
+ * @param {string} [sep="/"] - The separator to use.
+ * @returns {string} The normalized joined path.
+ */
+function pathJoin(parts, sep) {
+  const separator = sep || "/";
+  parts = parts.map((part, index) => {
+    if (index) {
+      part = part.replace(new RegExp("^" + separator), "");
+    }
+    if (index !== parts.length - 1) {
+      part = part.replace(new RegExp(separator + "$"), "");
+    }
+    return part;
+  });
+  return parts.join(separator);
+}
+
+/**
  * Controller for the Encore Setup environment embedded inside Encore Home.
  * Handles system configuration, including audio/video settings, library selection, and security.
  */
@@ -333,10 +358,29 @@ export default class SetupManager {
               { value: true, label: "Yes" },
             ],
             get: () => this.ctx.config.audioConfig?.useLibraryFont ?? true,
-            set: (v) => {
+            set: async (v) => {
               this.ctx.config.audioConfig ??= {};
               this.ctx.config.audioConfig.useLibraryFont = v;
               window.config.setItem("audioConfig.useLibraryFont", v);
+
+              let soundFontUrl = "/libs/soundfonts/SAM2695.sf2";
+              if (
+                v == true &&
+                this.currentManifest?.additionalContents?.soundFont
+              ) {
+                const url = new URL(
+                  `http://127.0.0.1:${this.ctx.state.actualPort}/getFile`,
+                );
+                const soundFontPath = pathJoin([
+                  this.ctx.config.libraryPath,
+                  this.currentManifest.additionalContents.soundFont,
+                ]);
+                url.searchParams.append("path", soundFontPath);
+                soundFontUrl = url.href;
+              }
+              this.showToast("LOADING SOUNDFONT...", "info");
+              await this.ctx.services.Forte.loadSoundFont(soundFontUrl);
+              this.showToast("LOADED SUCCESSFULLY", "success");
             },
           },
           {
