@@ -33,6 +33,13 @@ export default class LibraryManager {
       this.ctx.state.songList.map((s) => [s.code, s]),
     );
 
+    if (window.desktopIntegration) {
+      window.desktopIntegration.ipc.send("setRPC", {
+        details: `Browsing ${this.ctx.state.songList.length} Songs...`,
+        state: `Main Menu`,
+      });
+    }
+
     this.buildSearchIndex();
   }
 

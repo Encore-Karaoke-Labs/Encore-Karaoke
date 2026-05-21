@@ -1,9 +1,9 @@
 import Html from "../../../libs/html.js";
 
+/**
+ * @param {Object} context - The shared context
+ */
 export default class InputManager {
-  /**
-   * @param {Object} context - The shared context
-   */
   constructor(context) {
     this.ctx = context;
 
@@ -54,7 +54,6 @@ export default class InputManager {
       !state.isSearchOverlayVisible &&
       state.mode !== "yt-search" &&
       !isSearchInputFocused &&
-      !state.isPromptingSetup &&
       !state.isSessionModalOpen
     ) {
       if (e.key.toLowerCase() === "t") {
@@ -72,6 +71,29 @@ export default class InputManager {
         dom.sessionChatInput.elm.focus();
         return;
       }
+    }
+
+    if (e.key === "F2") {
+      e.preventDefault();
+      if (state.mode === "player" && state.lastPlaybackStatus === "playing") {
+        modules.infoBar.showTemp(
+          "SETUP",
+          "Please stop playback to enter Setup.",
+          3000,
+        );
+        return;
+      }
+      if (state.mode === "setup") {
+        this.ctx.root.setup.exitSetup();
+      } else {
+        ui.setMode("setup");
+      }
+      return;
+    }
+
+    if (state.mode === "setup") {
+      this.ctx.root.setup.handleKeyDown(e);
+      return;
     }
 
     if (state.isDeletePromptOpen) {
@@ -172,28 +194,6 @@ export default class InputManager {
         e.preventDefault();
       }
       return;
-    }
-
-    if (e.key === "F2") {
-      e.preventDefault();
-      if (state.mode === "player" && state.lastPlaybackStatus === "playing") {
-        modules.infoBar.showTemp(
-          "ACCESS DENIED",
-          "Please stop playback to enter Setup.",
-          3000,
-        );
-        return;
-      }
-      if (!state.isPromptingSetup) {
-        state.isPromptingSetup = true;
-        dom.newSongScreen.classOn("hidden");
-        dom.standbyScreen.classOff("hidden");
-        dom.standbyBumper.classOn("hidden");
-        dom.standbyText.classOff("hidden").text("REBOOT TO SETUP? PRESS ENTER");
-        dom.mainContent.classOn("hidden");
-        dom.songListContainer.classOn("hidden");
-        return;
-      }
     }
 
     if (isSearchInputFocused) {
@@ -502,17 +502,6 @@ export default class InputManager {
     const dom = this.ctx.dom;
     const root = this.ctx.root;
 
-    if (state.isPromptingSetup) {
-      state.isPromptingSetup = false;
-      window.desktopIntegration.ipc.send("setRPC", {
-        details: "Rebooting...",
-        state: "",
-      });
-      sessionStorage.setItem("encore_boot_setup", "true");
-      window.location.reload();
-      return;
-    }
-
     const isInputFocused = document.activeElement === dom.searchInput.elm;
     const isSearchActive =
       state.isSearchOverlayVisible ||
@@ -661,13 +650,6 @@ export default class InputManager {
 
     if (state.isTransitioning) return;
 
-    if (state.isPromptingSetup) {
-      state.isPromptingSetup = false;
-      dom.standbyText.text("SELECT SONG");
-      ui.updateMenuUI();
-      return;
-    }
-
     if (state.isSearchOverlayVisible) {
       ui.toggleSearchOverlay(false);
       return;
@@ -733,7 +715,6 @@ export default class InputManager {
 
     if (isSearchActive) {
       const change = dir === "down" ? 1 : -1;
-
       if (isInputFocused) {
         if (change > 0 && state.searchResults.length > 0) {
           dom.searchInput.elm.blur();
@@ -773,24 +754,13 @@ export default class InputManager {
 
       let left = 50;
       let width = 0;
-      if (next > 0) {
-        width = (next / 24) * 50;
-      } else if (next < 0) {
+      if (next > 0) width = (next / 24) * 50;
+      else if (next < 0) {
         width = (Math.abs(next) / 24) * 50;
         left = 50 - width;
       }
 
-      const html = `
-        <div class="transpose-display">
-          <div class="transpose-min">-24</div>
-          <div class="transpose-slider-container">
-            <div class="transpose-slider-center-line"></div>
-            <div class="transpose-slider-fill" style="left: ${left}%; width: ${width}%;"></div>
-          </div>
-          <div class="transpose-max">+24</div>
-          <span class="transpose-value">${(next > 0 ? "+" : "") + next} st</span>
-        </div>
-      `;
+      const html = `<div class="transpose-display"><div class="transpose-min">-24</div><div class="transpose-slider-container"><div class="transpose-slider-center-line"></div><div class="transpose-slider-fill" style="left: ${left}%; width: ${width}%;"></div></div><div class="transpose-max">+24</div><span class="transpose-value">${(next > 0 ? "+" : "") + next} st</span></div>`;
       this.ctx.modules.infoBar.showTemp("TRANSPOSE", html, 3000);
     }
   }
@@ -845,16 +815,13 @@ export default class InputManager {
     );
     this.ctx.services.Forte.setTrackVolume(state.volume);
 
-    if (this.ctx.dom.sessionRemoteVideo) {
+    if (this.ctx.dom.sessionRemoteVideo)
       this.ctx.dom.sessionRemoteVideo.elm.volume = state.volume;
-    }
 
     if (state.currentSongIsYouTube) {
       try {
         window.volume.setVolume(state.volume * state.windowsVolume);
-      } catch (e) {
-        console.log("[Encore] Failed to set volume");
-      }
+      } catch (e) {}
     }
 
     const p = Math.round(state.volume * 100);
@@ -878,9 +845,7 @@ export default class InputManager {
       0,
       Math.min(2.0, currentVol + (dir === "up" ? 0.05 : -0.05)),
     );
-
     this.ctx.services.Forte.setMicMonitorVolume(newVol);
-
     const p = Math.round(newVol * 100);
     this.ctx.modules.infoBar.showTemp(
       "MIC VOLUME",
@@ -913,23 +878,15 @@ export default class InputManager {
         "Auto",
         ...bgv.categories.map((c) => c.BGV_CATEGORY),
       ];
-
-      const html = `
-        <div class="bgv-carousel" style="opacity: 0; transition: opacity 0.2s ease-out;">
-          ${cats.map((c) => `<div class="bgv-item ${c === bgv.selectedCategory ? "selected" : ""}"><span>${c}</span></div>`).join("")}
-        </div>
-      `;
+      const html = `<div class="bgv-carousel" style="opacity: 0; transition: opacity 0.2s ease-out;">${cats.map((c) => `<div class="bgv-item ${c === bgv.selectedCategory ? "selected" : ""}"><span>${c}</span></div>`).join("")}</div>`;
 
       this.ctx.modules.infoBar.showTemp("BGV", html, 3000);
-
       try {
         window.config.setItem(
           "videoConfig.defaultBgvCategory",
           bgv.selectedCategory,
         );
-      } catch (e) {
-        console.error("[Encore] Failed to save BGV category config:", e);
-      }
+      } catch (e) {}
 
       setTimeout(() => {
         const carousel = document.querySelector(".bgv-carousel");

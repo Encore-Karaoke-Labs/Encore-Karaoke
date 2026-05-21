@@ -30,6 +30,30 @@ export default class UIManager {
     this.buildSessionsUI();
     this.buildSessionChatUI();
     this.buildQR();
+    this.buildSetupUI();
+  }
+
+  buildSetupUI() {
+    const dom = this.ctx.dom;
+    dom.setupScreen = new Html("div")
+      .classOn("setup-screen-wrapper", "hidden")
+      .styleJs({
+        background: "linear-gradient(135deg, #05050A 0%, #1A1A2E 100%)",
+        color: "white",
+        fontFamily: "'Rajdhani', sans-serif",
+        position: "absolute",
+        inset: "0",
+        zIndex: "1000",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      })
+      .appendTo(this.ctx.wrapper);
+
+    dom.setupContainer = new Html("div")
+      .classOn("setup-container")
+      .appendTo(dom.setupScreen);
   }
 
   buildUI() {
@@ -172,7 +196,6 @@ export default class UIManager {
       .on("click", () => this.ctx.root.sessions.toggleSessionModal())
       .appendTo(dom.bottomActions);
 
-    // Version Badge
     const vi = this.ctx.root.versionInformation || {
       channel: "Unknown",
       number: "0.0.0",
@@ -239,8 +262,6 @@ export default class UIManager {
     dom.lyricsCanvas = new Html("canvas")
       .classOn("lyrics-render-surface")
       .appendTo(bottom);
-
-    // Danmaku
     dom.danmakuCanvas = new Html("canvas")
       .classOn("danmaku-surface")
       .appendTo(wrapper);
@@ -503,7 +524,6 @@ export default class UIManager {
       .classOn("session-chat-input")
       .attr({ type: "text", placeholder: "Press 'Tab' to cheer/chat" })
       .appendTo(dom.sessionChatInputContainer);
-
     this.ctx.state.chatInputMode = "chat";
 
     dom.sessionChatInput.on("keydown", (e) => {
@@ -546,7 +566,6 @@ export default class UIManager {
     counterBadge.html(
       `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>`,
     );
-
     dom.qrConnectedCount = new Html("span").text("0").appendTo(counterBadge);
 
     const imgWrapper = new Html("div")
@@ -590,11 +609,13 @@ export default class UIManager {
       "mode-player",
       "mode-yt-search",
       "mode-player-youtube",
+      "mode-setup",
     );
     wrapper.classOn(`mode-${newMode}`);
 
     dom.overlay.classOn("hidden");
     dom.playerUi.classOn("hidden");
+    if (dom.setupScreen) dom.setupScreen.classOn("hidden");
 
     if (state.isSearchOverlayVisible) this.toggleSearchOverlay(false);
 
@@ -606,7 +627,10 @@ export default class UIManager {
       this.ctx.root.library.ytSearchAbortController = null;
     }
 
-    if (newMode === "menu") {
+    if (newMode === "setup") {
+      dom.setupScreen.classOff("hidden");
+      this.ctx.root.setup.open();
+    } else if (newMode === "menu") {
       state.showSongList = false;
       dom.overlay.classOff("hidden");
       dom.searchInput.elm.blur();
@@ -639,10 +663,7 @@ export default class UIManager {
 
       const currentPreventScroll = this._pendingPreventScroll;
       const isIdling =
-        !state.showSongList &&
-        !state.isTypingNumber &&
-        state.mode === "menu" &&
-        !state.isPromptingSetup;
+        !state.showSongList && !state.isTypingNumber && state.mode === "menu";
 
       if (isIdling) {
         if (this.idleState === "newsong") {
@@ -738,15 +759,13 @@ export default class UIManager {
           const headerSafeZone = 40;
           const bottomPadding = 24;
 
-          if (actualItemTop < viewTop + headerSafeZone) {
+          if (actualItemTop < viewTop + headerSafeZone)
             container.scrollTop = actualItemTop - headerSafeZone;
-          } else if (actualItemBottom > viewBottom - bottomPadding) {
+          else if (actualItemBottom > viewBottom - bottomPadding)
             container.scrollTop =
               actualItemBottom - container.clientHeight + bottomPadding;
-          }
         }
 
-        // Ensures the virtual container height is sufficient
         dom.listInner.styleJs({
           height: `${state.songList.length * this.ITEM_HEIGHT}px`,
         });
@@ -820,11 +839,9 @@ export default class UIManager {
           .appendTo(item);
 
         item.on("click", () => {
-          if (state.isSessionActive) {
+          if (state.isSessionActive)
             this.ctx.root.sessions.reserveSongInSession(song);
-          } else {
-            this.ctx.root.playback.startPlayer(song);
-          }
+          else this.ctx.root.playback.startPlayer(song);
         });
         if (i === state.highlightedIndex) item.classOn("highlighted");
 
@@ -907,23 +924,21 @@ export default class UIManager {
           .appendTo(titleRow);
         new Html("span").text(res.title).appendTo(titleRow);
 
-        if (res.displayRomaTitle) {
+        if (res.displayRomaTitle)
           new Html("span")
             .text(` (${res.displayRomaTitle})`)
             .styleJs({ color: "#aaa", fontSize: "0.9em", marginLeft: "0.5rem" })
             .appendTo(titleRow);
-        }
 
         const artistRow = new Html("div")
           .classOn("search-channel")
           .appendTo(info);
         new Html("span").text(res.artist).appendTo(artistRow);
-        if (res.displayRomaArtist) {
+        if (res.displayRomaArtist)
           new Html("span")
             .text(` (${res.displayRomaArtist})`)
             .styleJs({ color: "#aaa", fontSize: "0.9em", marginLeft: "0.5rem" })
             .appendTo(artistRow);
-        }
       } else {
         const thumb = new Html("div")
           .classOn("search-thumbnail-wrapper")
@@ -964,9 +979,8 @@ export default class UIManager {
       }
     });
 
-    if (state.highlightedSearchIndex >= state.searchResults.length) {
+    if (state.highlightedSearchIndex >= state.searchResults.length)
       state.highlightedSearchIndex = -1;
-    }
     this.updateSearchHighlight();
   }
 
@@ -989,7 +1003,6 @@ export default class UIManager {
 
     const bumperPaths = libraryInfo?.manifest?.additionalContents?.bumperImages;
     if (bumperPaths && bumperPaths.length > 0) {
-      // Small pathJoin helper replacement
       const joinPath = (p1, p2) =>
         p1.replace(/\/$/, "") + "/" + p2.replace(/^\//, "");
       this.bumperImages = bumperPaths.map((p) => joinPath(libraryInfo.path, p));
@@ -1035,10 +1048,7 @@ export default class UIManager {
         const state = this.ctx.state;
         const dom = this.ctx.dom;
         const isIdling =
-          !state.showSongList &&
-          !state.isTypingNumber &&
-          state.mode === "menu" &&
-          !state.isPromptingSetup;
+          !state.showSongList && !state.isTypingNumber && state.mode === "menu";
 
         if (currentItem.type === "newsong") {
           dom.newSongList.clear();
