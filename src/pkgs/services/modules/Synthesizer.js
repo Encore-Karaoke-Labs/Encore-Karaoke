@@ -150,10 +150,7 @@ export class ForteSynthesizer {
       let midiChannel =
         this.state.playback.synthesizer.midiChannels[channelNumber];
 
-      midiChannel.lockController(
-        0xffffffff, // ALL_CHANNELS_OR_DIFFERENT_ACTION constant
-        false,
-      );
+      midiChannel.setSystemParameter("presetLock", false);
 
       this.state.playback.synthesizer.controllerChange(
         channelNumber,
@@ -161,7 +158,7 @@ export class ForteSynthesizer {
         Math.floor(volume),
       );
 
-      midiChannel.lockController(0xffffffff, true);
+      midiChannel.setSystemParameter("presetLock", true);
 
       logVerbose(
         `Switched volume to ${Math.floor((volume / 127) * 100)}% (${volume}/127) on channel ${channelNumber + 1}`,
@@ -200,7 +197,7 @@ export class ForteSynthesizer {
       let midiChannel =
         this.state.playback.synthesizer.midiChannels[channelNumber];
 
-      midiChannel.lockController(0xffffffff, false);
+      midiChannel.setSystemParameter("presetLock", false);
 
       this.state.playback.synthesizer.controllerChange(
         channelNumber,
@@ -208,7 +205,7 @@ export class ForteSynthesizer {
         Math.floor(expression),
       );
 
-      midiChannel.lockController(0xffffffff, true);
+      midiChannel.setSystemParameter("presetLock", true);
 
       logVerbose(
         `Switched expression to ${Math.floor((expression / 127) * 100)}% (${expression}/127) on channel ${channelNumber + 1}`,
@@ -250,7 +247,7 @@ export class ForteSynthesizer {
       let midiChannel =
         this.state.playback.synthesizer.midiChannels[channelNumber];
 
-      midiChannel.lockController(0xffffffff, false);
+      midiChannel.setSystemParameter("presetLock", false);
 
       if (!drumPreset.isGMGSDrum) {
         this.state.playback.synthesizer.controllerChange(
@@ -270,7 +267,7 @@ export class ForteSynthesizer {
         drumPreset.program,
       );
 
-      midiChannel.lockController(0xffffffff, true);
+      midiChannel.setSystemParameter("presetLock", true);
 
       logVerbose(
         `Drum preset switched successfully on channel ${channelNumber + 1}`,
