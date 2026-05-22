@@ -20,6 +20,7 @@ export class ForteSFX {
     this.sfxSequencer = null;
     this.sfxResolve = null;
     this.sfxMidiOriginalVolume = null;
+    this.currentSfxMidi = null;
   }
 
   /**
@@ -88,6 +89,12 @@ export class ForteSFX {
           if (!this.state.playback.synthesizer || !this.state.playback.midiGain)
             return resolve(false);
 
+          logVerbose("Unlocking channels");
+          this.synthesizer.unlockAllChannels();
+
+          logVerbose("Resetting synth just in case");
+          this.synthesizer.reset();
+
           this.sfxMidiOriginalVolume = this.state.playback.midiGain.gain.value;
           const sfxTargetVolume =
             this.state.playback.volume *
@@ -103,13 +110,12 @@ export class ForteSFX {
           this.sfxSequencer = new Sequencer(this.state.playback.synthesizer);
           this.sfxSequencer.loop = false;
 
-          let sfxMidiData;
           try {
-            sfxMidiData = BasicMIDI.fromArrayBuffer(cached.buffer);
+            this.currentSfxMidi = BasicMIDI.fromArrayBuffer(cached.buffer);
           } catch (e) {
-            sfxMidiData = { binary: cached.buffer };
+            this.currentSfxMidi = { binary: cached.buffer };
           }
-          this.sfxSequencer.loadNewSongList([sfxMidiData]);
+          this.sfxSequencer.loadNewSongList([this.currentSfxMidi]);
           this.sfxSequencer.play();
 
           bindSpessaEvent(
@@ -128,6 +134,27 @@ export class ForteSFX {
                 );
                 this.sfxMidiOriginalVolume = null;
               }
+
+              logVerbose("Unlocking channels");
+              this.synthesizer.unlockAllChannels();
+
+              logVerbose("Resetting synth just in case");
+              this.synthesizer.reset();
+
+              if (
+                this.currentSfxMidi &&
+                typeof this.currentSfxMidi.flush === "function"
+              ) {
+                try {
+                  logVerbose("Flushing current midi sound effect");
+                  this.currentSfxMidi.flush();
+                } catch (e) {
+                  console.warn("[FORTE SVC] Failed to flush MIDI data:", e);
+                }
+              }
+
+              this.currentSfxMidi = null;
+
               if (this.sfxResolve) {
                 this.sfxResolve(true);
                 this.sfxResolve = null;
@@ -190,6 +217,24 @@ export class ForteSFX {
         );
         this.sfxMidiOriginalVolume = null;
       }
+    }
+
+    if (
+      this.currentSfxMidi &&
+      typeof this.currentSfxMidi.flush === "function"
+    ) {
+      logVerbose("Unlocking channels");
+      this.synthesizer.unlockAllChannels();
+
+      logVerbose("Resetting synth just in case");
+      this.synthesizer.reset();
+      try {
+        logVerbose("Flushing current midi sound effect");
+        this.currentSfxMidi.flush();
+      } catch (e) {
+        console.warn("[FORTE SVC] Failed to flush MIDI data:", e);
+      }
+      this.currentSfxMidi = null;
     }
 
     if (this.sfxResolve) {
