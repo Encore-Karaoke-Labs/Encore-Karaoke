@@ -4122,13 +4122,15 @@ p + .flex-list button {
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
-.session-tile:hover {
+.session-tile:hover,
+.session-tile:focus {
   background: rgba(137, 207, 240, 0.1);
   border-color: #89cff0;
   transform: translateY(-8px) scale(1.02);
   box-shadow:
     0 15px 30px rgba(0, 0, 0, 0.5),
     inset 0 0 20px rgba(137, 207, 240, 0.15);
+  outline: none;
 }
 
 .session-tile-icon {
@@ -4139,7 +4141,8 @@ p + .flex-list button {
     color 0.3s ease;
 }
 
-.session-tile:hover .session-tile-icon {
+.session-tile:hover .session-tile-icon,
+.session-tile:focus .session-tile-icon {
   transform: scale(1.15);
   color: #ffd700;
 }
@@ -4470,27 +4473,33 @@ p + .flex-list button {
   flex: 1;
 }
 
-.session-btn:hover {
+.session-btn:hover,
+.session-btn:focus {
   background: #89cff0;
   color: #000;
+  outline: none;
 }
 .session-btn.primary {
   background: rgba(255, 215, 0, 0.15);
   border-color: #ffd700;
   color: #ffd700;
 }
-.session-btn.primary:hover {
+.session-btn.primary:hover,
+.session-btn.primary:focus {
   background: #ffd700;
   color: #000;
+  outline: none;
 }
 .session-btn.danger {
   background: rgba(255, 85, 85, 0.15);
   border-color: #ff5555;
   color: #ff5555;
 }
-.session-btn.danger:hover {
+.session-btn.danger:hover,
+.session-btn.danger:focus {
   background: #ff5555;
   color: #fff;
+  outline: none;
 }
 
 .score-title-text {

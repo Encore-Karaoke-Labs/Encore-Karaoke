@@ -104,10 +104,7 @@ export default class InputManager {
     }
 
     if (state.isSessionModalOpen) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        sessions.toggleSessionModal(false);
-      }
+      sessions.handleKeyDown(e);
       return;
     }
 

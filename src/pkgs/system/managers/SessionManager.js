@@ -465,6 +465,7 @@ export default class SessionManager {
 
       const hostTile = new Html("div")
         .classOn("session-tile")
+        .attr({ tabindex: "0" })
         .on("click", () => this.renderSessionView("host"))
         .appendTo(tileContainer);
       new Html("div")
@@ -486,6 +487,7 @@ export default class SessionManager {
 
       const joinTile = new Html("div")
         .classOn("session-tile")
+        .attr({ tabindex: "0" })
         .on("click", () => this.renderSessionView("join"))
         .appendTo(tileContainer);
       new Html("div")
@@ -652,8 +654,22 @@ export default class SessionManager {
         .appendTo(btnRow);
 
       setTimeout(() => {
-        if (!isHost) roomInput.elm.focus();
-        else nickInput.elm.focus();
+        const modalEl = dom.sessionContentArea.elm;
+        if (view === "select") {
+          const firstTile = modalEl.querySelector(".session-tile");
+          if (firstTile) firstTile.focus();
+        } else if (view === "host") {
+          const nickInp = modalEl.querySelector(
+            'input[placeholder="Your Nickname"]',
+          );
+          if (nickInp) nickInp.focus();
+        } else if (view === "join") {
+          const roomInp = modalEl.querySelector('input[placeholder="Room ID"]');
+          if (roomInp) roomInp.focus();
+        } else if (view === "active") {
+          const firstBtn = modalEl.querySelector("button");
+          if (firstBtn) firstBtn.focus();
+        }
       }, 100);
     } else if (view === "active") {
       new Html("h1")
@@ -934,6 +950,68 @@ export default class SessionManager {
 
     const container = this.ctx.dom.sessionChatMessages.elm;
     container.scrollTop = container.scrollHeight;
+  }
+
+  handleKeyDown(e) {
+    const dom = this.ctx.dom;
+    const state = this.ctx.state;
+
+    // Handle Back/Close
+    if (e.key === "Escape") {
+      e.preventDefault();
+      // If we are configuring a host/join and haven't joined yet, go back to select
+      if (
+        (state.sessionModalView === "host" ||
+          state.sessionModalView === "join") &&
+        !state.isSessionActive
+      ) {
+        this.renderSessionView("select");
+      } else {
+        this.toggleSessionModal(false);
+      }
+      return;
+    }
+
+    const modalEl = dom.sessionContentArea.elm;
+    const focusables = Array.from(
+      modalEl.querySelectorAll("button, input, .session-tile"),
+    );
+    if (!focusables.length) return;
+
+    const activeEl = document.activeElement;
+    const currentIndex = focusables.indexOf(activeEl);
+    const isInput = activeEl && activeEl.tagName === "INPUT";
+
+    if (e.key === "Enter") {
+      if (activeEl && activeEl.classList.contains("session-tile")) {
+        e.preventDefault();
+        activeEl.click();
+      } else if (isInput) {
+        e.preventDefault();
+        const primaryBtn = modalEl.querySelector(".session-btn.primary");
+        if (primaryBtn) primaryBtn.click();
+      }
+      return;
+    }
+
+    if (isInput && ["ArrowLeft", "ArrowRight"].includes(e.key)) {
+      return;
+    }
+
+    if (["ArrowDown", "ArrowRight", "Tab"].includes(e.key)) {
+      e.preventDefault();
+      let nextIndex = currentIndex + 1;
+      if (nextIndex >= focusables.length) nextIndex = 0;
+      focusables[nextIndex].focus();
+    } else if (
+      ["ArrowUp", "ArrowLeft"].includes(e.key) ||
+      (e.key === "Tab" && e.shiftKey)
+    ) {
+      e.preventDefault();
+      let nextIndex = currentIndex - 1;
+      if (nextIndex < 0) nextIndex = focusables.length - 1;
+      focusables[nextIndex].focus();
+    }
   }
 
   destroy() {
