@@ -17,6 +17,21 @@ export default class InputManager {
       { label: "STRONG", value: 127 },
     ];
     this.currentGuideMelodyIndex = 2;
+    this.lastNavSfxTime = 0;
+  }
+
+  /**
+   * Plays a navigation sound effect.
+   * @param {string} sfxName - The name of the wav file (without extension)
+   */
+  playNavSfx(sfxName) {
+    if (this.ctx.state.isNavSfxEnabled === false) return;
+
+    const now = Date.now();
+    if (now - this.lastNavSfxTime < 80) return;
+
+    this.lastNavSfxTime = now;
+    this.ctx.services.Forte.playSfx(`/assets/audio/${sfxName}.wav`);
   }
 
   /**
@@ -154,8 +169,8 @@ export default class InputManager {
         const newIdx = Math.max(0, state.highlightedRecordingIndex - 1);
         if (state.mode !== "player") {
           if (newIdx === state.highlightedRecordingIndex)
-            this.ctx.services.Forte.playSfx("/assets/audio/out_of_bounds.wav");
-          else this.ctx.services.Forte.playSfx("/assets/audio/nav.wav");
+            this.playNavSfx("out_of_bounds");
+          else this.playNavSfx("nav");
         }
         state.highlightedRecordingIndex = newIdx;
         recordings.updateRecordingsHighlight();
@@ -166,8 +181,8 @@ export default class InputManager {
         );
         if (state.mode !== "player") {
           if (newIdx === state.highlightedRecordingIndex)
-            this.ctx.services.Forte.playSfx("/assets/audio/out_of_bounds.wav");
-          else this.ctx.services.Forte.playSfx("/assets/audio/nav.wav");
+            this.playNavSfx("out_of_bounds");
+          else this.playNavSfx("nav");
         }
         state.highlightedRecordingIndex = newIdx;
         recordings.updateRecordingsHighlight();
@@ -721,13 +736,13 @@ export default class InputManager {
 
     if (isSearchActive) {
       const change = dir === "down" ? 1 : -1;
-      let sfxToPlay = "nav.wav";
+      let sfxToPlay = "nav";
       if (isInputFocused) {
         if (change > 0 && state.searchResults.length > 0) {
           dom.searchInput.elm.blur();
           state.highlightedSearchIndex = 0;
         } else {
-          sfxToPlay = "out_of_bounds.wav";
+          sfxToPlay = "out_of_bounds";
         }
       } else {
         if (change < 0 && state.highlightedSearchIndex <= 0) {
@@ -743,12 +758,12 @@ export default class InputManager {
             ),
           );
           if (prevIdx === state.highlightedSearchIndex) {
-            sfxToPlay = "out_of_bounds.wav";
+            sfxToPlay = "out_of_bounds";
           }
         }
       }
       if (state.mode !== "player") {
-        this.ctx.services.Forte.playSfx(`/assets/audio/${sfxToPlay}`);
+        this.playNavSfx(sfxToPlay);
       }
       this.ctx.root.ui.updateSearchHighlight();
     } else if (state.mode === "menu") {
@@ -758,9 +773,9 @@ export default class InputManager {
       let idx = state.highlightedIndex + change;
       const newIdx = Math.max(0, Math.min(state.songList.length - 1, idx));
       if (newIdx === state.highlightedIndex) {
-        this.ctx.services.Forte.playSfx("/assets/audio/out_of_bounds.wav");
+        this.playNavSfx("out_of_bounds");
       } else {
-        this.ctx.services.Forte.playSfx("/assets/audio/nav.wav");
+        this.playNavSfx("nav");
       }
       state.highlightedIndex = newIdx;
       this.ctx.root.ui.updateMenuUI();

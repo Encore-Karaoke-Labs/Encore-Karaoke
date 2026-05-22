@@ -30,6 +30,21 @@ export default class SessionManager {
     this.handleChatHistorySync = this.handleChatHistorySync.bind(this);
     this.handleChat = this.handleChat.bind(this);
     this.handleCheer = this.handleCheer.bind(this);
+    this.lastNavSfxTime = 0;
+  }
+
+  /**
+   * Plays a navigation sound effect.
+   * @param {string} sfxName - The name of the wav file (without extension)
+   */
+  playNavSfx(sfxName) {
+    if (this.ctx.state.isNavSfxEnabled === false) return;
+
+    const now = Date.now();
+    if (now - this.lastNavSfxTime < 80) return;
+
+    this.lastNavSfxTime = now;
+    this.ctx.services.Forte.playSfx(`/assets/audio/${sfxName}.wav`);
   }
 
   /**
@@ -1007,7 +1022,7 @@ export default class SessionManager {
 
     if (["ArrowDown", "ArrowRight", "Tab"].includes(e.key)) {
       e.preventDefault();
-      this.ctx.services.Forte.playSfx("/assets/audio/nav.wav");
+      this.playNavSfx("nav");
       let nextIndex = currentIndex + 1;
       if (nextIndex >= focusables.length) nextIndex = 0;
       focusables[nextIndex].focus();
@@ -1016,7 +1031,7 @@ export default class SessionManager {
       (e.key === "Tab" && e.shiftKey)
     ) {
       e.preventDefault();
-      this.ctx.services.Forte.playSfx("/assets/audio/nav.wav");
+      this.playNavSfx("nav");
       let nextIndex = currentIndex - 1;
       if (nextIndex < 0) nextIndex = focusables.length - 1;
       focusables[nextIndex].focus();
