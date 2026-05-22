@@ -349,6 +349,7 @@ export default class SessionManager {
 
     state.isSessionActive = false;
     state.sessionRoomId = null;
+    state.knownParticipants = [];
 
     root.ui.stopLoungeBackground();
     this.ctx.services.Forte.clearRemoteStreams();
