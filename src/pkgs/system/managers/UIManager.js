@@ -759,11 +759,14 @@ export default class UIManager {
           const headerSafeZone = 40;
           const bottomPadding = 24;
 
-          if (actualItemTop < viewTop + headerSafeZone)
+          if (state.highlightedIndex === 0) {
+            container.scrollTop = 0;
+          } else if (actualItemTop < viewTop + headerSafeZone) {
             container.scrollTop = actualItemTop - headerSafeZone;
-          else if (actualItemBottom > viewBottom - bottomPadding)
+          } else if (actualItemBottom > viewBottom - bottomPadding) {
             container.scrollTop =
               actualItemBottom - container.clientHeight + bottomPadding;
+          }
         }
 
         dom.listInner.styleJs({
