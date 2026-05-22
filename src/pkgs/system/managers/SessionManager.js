@@ -328,6 +328,10 @@ export default class SessionManager {
     const dom = this.ctx.dom;
     const root = this.ctx.root;
 
+    if (state.isSessionActive) {
+      this.ctx.services.Forte.playSfx("/assets/audio/session_end.wav");
+    }
+
     state.isSessionActive = false;
     state.sessionRoomId = null;
 
@@ -635,6 +639,9 @@ export default class SessionManager {
               state.isSessionHost = false;
               state.sessionRoomId = room;
             }
+
+            this.ctx.services.Forte.playSfx("/assets/audio/session_start.wav");
+
             state.sessionMode = "lounge";
             if (dom.sessionChatContainer)
               dom.sessionChatContainer.classOff("hidden");
@@ -1000,6 +1007,7 @@ export default class SessionManager {
 
     if (["ArrowDown", "ArrowRight", "Tab"].includes(e.key)) {
       e.preventDefault();
+      this.ctx.services.Forte.playSfx("/assets/audio/nav.wav");
       let nextIndex = currentIndex + 1;
       if (nextIndex >= focusables.length) nextIndex = 0;
       focusables[nextIndex].focus();
@@ -1008,6 +1016,7 @@ export default class SessionManager {
       (e.key === "Tab" && e.shiftKey)
     ) {
       e.preventDefault();
+      this.ctx.services.Forte.playSfx("/assets/audio/nav.wav");
       let nextIndex = currentIndex - 1;
       if (nextIndex < 0) nextIndex = focusables.length - 1;
       focusables[nextIndex].focus();

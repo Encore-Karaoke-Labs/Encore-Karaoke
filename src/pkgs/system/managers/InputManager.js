@@ -151,16 +151,25 @@ export default class InputManager {
       if (e.key === "Escape" || e.key === "Backspace") {
         recordings.toggleRecordingsList(false);
       } else if (e.key === "ArrowUp") {
-        state.highlightedRecordingIndex = Math.max(
-          0,
-          state.highlightedRecordingIndex - 1,
-        );
+        const newIdx = Math.max(0, state.highlightedRecordingIndex - 1);
+        if (state.mode !== "player") {
+          if (newIdx === state.highlightedRecordingIndex)
+            this.ctx.services.Forte.playSfx("/assets/audio/out_of_bounds.wav");
+          else this.ctx.services.Forte.playSfx("/assets/audio/nav.wav");
+        }
+        state.highlightedRecordingIndex = newIdx;
         recordings.updateRecordingsHighlight();
       } else if (e.key === "ArrowDown") {
-        state.highlightedRecordingIndex = Math.min(
+        const newIdx = Math.min(
           state.recordingsData.length - 1,
           state.highlightedRecordingIndex + 1,
         );
+        if (state.mode !== "player") {
+          if (newIdx === state.highlightedRecordingIndex)
+            this.ctx.services.Forte.playSfx("/assets/audio/out_of_bounds.wav");
+          else this.ctx.services.Forte.playSfx("/assets/audio/nav.wav");
+        }
+        state.highlightedRecordingIndex = newIdx;
         recordings.updateRecordingsHighlight();
       } else if (e.key === "Enter") {
         const rec = state.recordingsData[state.highlightedRecordingIndex];
@@ -712,16 +721,20 @@ export default class InputManager {
 
     if (isSearchActive) {
       const change = dir === "down" ? 1 : -1;
+      let sfxToPlay = "nav.wav";
       if (isInputFocused) {
         if (change > 0 && state.searchResults.length > 0) {
           dom.searchInput.elm.blur();
           state.highlightedSearchIndex = 0;
+        } else {
+          sfxToPlay = "out_of_bounds.wav";
         }
       } else {
         if (change < 0 && state.highlightedSearchIndex <= 0) {
           state.highlightedSearchIndex = -1;
           dom.searchInput.elm.focus();
         } else {
+          const prevIdx = state.highlightedSearchIndex;
           state.highlightedSearchIndex = Math.max(
             0,
             Math.min(
@@ -729,7 +742,13 @@ export default class InputManager {
               state.highlightedSearchIndex + change,
             ),
           );
+          if (prevIdx === state.highlightedSearchIndex) {
+            sfxToPlay = "out_of_bounds.wav";
+          }
         }
+      }
+      if (state.mode !== "player") {
+        this.ctx.services.Forte.playSfx(`/assets/audio/${sfxToPlay}`);
       }
       this.ctx.root.ui.updateSearchHighlight();
     } else if (state.mode === "menu") {
@@ -737,10 +756,13 @@ export default class InputManager {
       state.songNumber = "";
       state.isTypingNumber = false;
       let idx = state.highlightedIndex + change;
-      state.highlightedIndex = Math.max(
-        0,
-        Math.min(state.songList.length - 1, idx),
-      );
+      const newIdx = Math.max(0, Math.min(state.songList.length - 1, idx));
+      if (newIdx === state.highlightedIndex) {
+        this.ctx.services.Forte.playSfx("/assets/audio/out_of_bounds.wav");
+      } else {
+        this.ctx.services.Forte.playSfx("/assets/audio/nav.wav");
+      }
+      state.highlightedIndex = newIdx;
       this.ctx.root.ui.updateMenuUI();
     } else if (state.mode === "player") {
       if (state.currentSongIsYouTube) return;
