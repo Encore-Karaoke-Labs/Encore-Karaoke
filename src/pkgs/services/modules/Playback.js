@@ -1116,11 +1116,15 @@ export class FortePlayback {
         } catch (e) {}
       }
 
+      logVerbose("Unlocking channels");
+      this.synthesizer.unlockAllChannels();
+
       if (
         this.state.playback.currentMidi &&
         typeof this.state.playback.currentMidi.flush === "function"
       ) {
         try {
+          logVerbose("Flushing current midi track");
           this.state.playback.currentMidi.flush();
         } catch (e) {
           console.warn("[FORTE SVC] Failed to flush MIDI data:", e);

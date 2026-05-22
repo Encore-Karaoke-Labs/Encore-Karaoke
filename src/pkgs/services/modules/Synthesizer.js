@@ -337,6 +337,34 @@ export class ForteSynthesizer {
   }
 
   /**
+   * Resets the preset locks on all 16 MIDI channels.
+   * This ensures the next track can properly assign its own instruments and volumes.
+   */
+  unlockAllChannels() {
+    if (
+      !this.state.playback.synthesizer ||
+      !this.state.playback.synthesizer.midiChannels
+    ) {
+      return;
+    }
+
+    try {
+      for (let i = 0; i < 16; i++) {
+        let midiChannel = this.state.playback.synthesizer.midiChannels[i];
+        if (
+          midiChannel &&
+          typeof midiChannel.setSystemParameter === "function"
+        ) {
+          midiChannel.setSystemParameter("presetLock", false);
+        }
+      }
+      logVerbose("Successfully unlocked all MIDI channel presets.");
+    } catch (e) {
+      console.error("[FORTE SVC] Failed to reset channel preset locks:", e);
+    }
+  }
+
+  /**
    * Destroys synthesizer resources.
    */
   cleanup() {
