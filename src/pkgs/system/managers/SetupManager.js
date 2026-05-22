@@ -384,6 +384,22 @@ export default class SetupManager {
             },
           },
           {
+            id: "enable_nav_sfx",
+            label: "Enable Navigation Sounds",
+            type: "select",
+            options: [
+              { value: false, label: "No" },
+              { value: true, label: "Yes" },
+            ],
+            get: () => this.ctx.config.audioConfig?.enableNavSfx ?? true,
+            set: (v) => {
+              this.ctx.config.audioConfig ??= {};
+              this.ctx.config.audioConfig.enableNavSfx = v;
+              this.ctx.state.isNavSfxEnabled = v;
+              window.config.setItem("audioConfig.enableNavSfx", v);
+            },
+          },
+          {
             id: "enable_score_fanfare",
             label: "Enable Score Fanfare",
             type: "select",
