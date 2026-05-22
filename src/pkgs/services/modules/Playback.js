@@ -1119,6 +1119,9 @@ export class FortePlayback {
       logVerbose("Unlocking channels");
       this.synthesizer.unlockAllChannels();
 
+      logVerbose("Resetting synth just in case");
+      this.synthesizer.reset();
+
       if (
         this.state.playback.currentMidi &&
         typeof this.state.playback.currentMidi.flush === "function"

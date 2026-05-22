@@ -365,6 +365,13 @@ export class ForteSynthesizer {
   }
 
   /**
+   * Resets the synthesizer
+   */
+  reset() {
+    this.state.playback.synthesizer.reset();
+  }
+
+  /**
    * Destroys synthesizer resources.
    */
   cleanup() {
