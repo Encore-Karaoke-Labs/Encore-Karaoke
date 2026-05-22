@@ -139,6 +139,10 @@ class EncoreController {
     this.context.wrapper.classOn("loading");
     this.services.Forte.setPianoRollContainer(this.context.wrapper);
 
+    if (this.config.audioConfig?.micLatency) {
+      await this.services.Forte.setLatency(this.config.audioConfig.micLatency);
+    }
+
     this.state.actualPort = await NetworkingUtility.getPort();
     try {
       this.state.windowsVolume = await window.volume.getVolume();

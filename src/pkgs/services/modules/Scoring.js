@@ -481,6 +481,7 @@ export class ForteScoring {
       0,
       Math.min(1, latencySeconds),
     );
+    logVerbose(`Latency set to ${latencySeconds * 1000}ms`);
   }
 
   /**
