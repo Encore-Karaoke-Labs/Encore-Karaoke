@@ -349,6 +349,7 @@ export class FortePlayback {
         let parsedMidi;
         try {
           parsedMidi = BasicMIDI.fromArrayBuffer(arrayBuffer);
+          this.state.playback.currentMidi = parsedMidi;
         } catch (e) {
           console.error("[FORTE SVC] BasicMIDI parsing failed:", e);
           throw e;
@@ -1113,6 +1114,17 @@ export class FortePlayback {
         try {
           this.state.playback.sequencer.currentTime = 0;
         } catch (e) {}
+      }
+
+      if (
+        this.state.playback.currentMidi &&
+        typeof this.state.playback.currentMidi.flush === "function"
+      ) {
+        try {
+          this.state.playback.currentMidi.flush();
+        } catch (e) {
+          console.warn("[FORTE SVC] Failed to flush MIDI data:", e);
+        }
       }
     } else {
       if (this.sourceNode) {

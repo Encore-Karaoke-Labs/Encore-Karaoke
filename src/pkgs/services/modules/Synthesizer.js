@@ -60,6 +60,7 @@ export class ForteSynthesizer {
       const soundFontBuffer = await (await fetch(soundFontUrl)).arrayBuffer();
 
       this.state.playback.synthesizer = new Synthetizer(this.audioCore.context);
+      this.state.playback.synthesizer.setLogLevel(true, true, true);
       await this.state.playback.synthesizer.soundBankManager.addSoundBank(
         soundFontBuffer,
       );
