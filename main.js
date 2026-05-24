@@ -50,7 +50,7 @@ const logger = {
 
 // Initialization
 const versionInformation = {
-  number: "1.6.1",
+  number: "1.7.0",
   channel: "BETA",
   codename: "Virgo",
 };
