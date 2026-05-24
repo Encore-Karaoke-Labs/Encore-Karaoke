@@ -38,7 +38,7 @@
   - Record your best vocal performances directly to your hard drive with the press of a button.
 - **Pitch & Latency Control**
   - Adjust pitch (transpose) and tempo on the fly.
-  - Automatically calibrate your microphone and signal chain's latency quickly.
+  - Calibrate your microphone and signal chain's latency quickly.
 - **Japanese & Korean Romanization**
   - Love singing K-pop but can't read the language? What about your favorite anime openings? Encore automatically generates romanized lyrics for Japanese and Korean in real time.
   - Also supports Furigana (Ruby text) for MIDI karaoke files.
@@ -92,7 +92,7 @@ Encore can be fully controlled via a standard keyboard, a connected USB Numpad, 
 | `Left / Right`  | Multiplex pan (Toggle guide vocal on/off)            |
 | `' / "`         | Change drum presets                                  |
 | `[ / ]`         | Cycle background videos (BGVs) / Video sync offset   |
-| `F2`            | **Enter Setup Mode** (While booting or in main menu) |
+| `F2`            | Enter Setup Mode (in main menu)                      |
 
 ---
 
@@ -103,7 +103,7 @@ Pressing **`F2`** while playback is stopped will switch Encore into **Setup Mode
 - Change your target `EncoreLibrary` path.
 - Select the specific Microphone (Input) and Speaker (Output) hardware.
 - Adjust Master Volume and Mic Latency overrides.
-- Calibrate Video Sync offsets (for fixing A/V desync on older TVs).
+- Calibrate Video Sync offsets.
 - Change the Security PIN.
 
 ---
