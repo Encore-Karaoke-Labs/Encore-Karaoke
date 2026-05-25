@@ -30,11 +30,29 @@ function copyRecursiveSync(src, dest) {
   }
 }
 
+const buildBackend = esbuild.build({
+  entryPoints: ["main.js", "preload.js"],
+  bundle: true,
+  outdir: "dist",
+  platform: "node",
+  target: "node24",
+  format: "cjs",
+  external: [
+    "electron",
+    "loudness",
+    "systeminformation",
+    "kuroshiro-analyzer-kuromoji",
+    "electron-squirrel-startup",
+  ],
+  minify: !isDev,
+  sourcemap: isDev,
+});
+
 const osEntryPoints = ["src/core.js", ...getEntryPoints("src/pkgs")];
 const buildOS = esbuild.build({
   entryPoints: osEntryPoints,
   bundle: true,
-  outdir: "resources/static",
+  outdir: "dist/resources/static",
   format: "esm",
   splitting: true,
   minify: !isDev,
@@ -54,7 +72,7 @@ if (windowEntryPoints.length > 0) {
   buildWindows = esbuild.build({
     entryPoints: windowEntryPoints,
     bundle: true,
-    outdir: "resources",
+    outdir: "dist/resources",
     format: "iife",
     minify: !isDev,
     sourcemap: isDev,
@@ -66,14 +84,14 @@ if (windowEntryPoints.length > 0) {
 Promise.all([buildOS, buildWindows])
   .then(() => {
     console.log("Copying static assets...");
-    copyRecursiveSync("src/libs", "resources/static/libs");
-    copyRecursiveSync("src/assets", "resources/static/assets");
-    copyRecursiveSync("src/remote", "resources/static/remote");
+    copyRecursiveSync("src/libs", "dist/resources/static/libs");
+    copyRecursiveSync("src/assets", "dist/resources/static/assets");
+    copyRecursiveSync("src/remote", "dist/resources/static/remote");
 
     if (fs.existsSync("src/index.html"))
-      fs.copyFileSync("src/index.html", "resources/static/index.html");
+      fs.copyFileSync("src/index.html", "dist/resources/static/index.html");
     if (fs.existsSync("src/style.css"))
-      fs.copyFileSync("src/style.css", "resources/static/style.css");
+      fs.copyFileSync("src/style.css", "dist/resources/static/style.css");
 
     const windowsDir = "src/windows";
     if (fs.existsSync(windowsDir)) {
@@ -81,7 +99,7 @@ Promise.all([buildOS, buildWindows])
         if (file.endsWith(".html") || file.endsWith(".css")) {
           fs.copyFileSync(
             path.join(windowsDir, file),
-            path.join("resources", file),
+            path.join("dist/resources", file),
           );
         }
       });
@@ -93,7 +111,7 @@ Promise.all([buildOS, buildWindows])
         if (file.endsWith(".ico") || file.endsWith(".png")) {
           fs.copyFileSync(
             path.join(iconsDir, file),
-            path.join("resources", file),
+            path.join("dist/resources", file),
           );
         }
       });

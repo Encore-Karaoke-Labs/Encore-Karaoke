@@ -7,23 +7,28 @@ module.exports = {
   packagerConfig: {
     asar: true,
     name: "Encore Karaoke",
-    icon: "resources/icon.ico",
-    extraResource: ["resources/static", "resources/icon.png"],
+    icon: "dist/resources/icon.ico",
+    extraResource: ["dist/resources/static", "dist/resources/icon.png"],
     linux: {
       target: 'deb',
     },
+    ignore: (file) => {
+      if (!file || file === '/' || file === '') return false; 
+
+      const normalizedPath = file.replace(/\\/g, '/');
+
+      if (normalizedPath.startsWith('/dist/resources/static')) return true;
+      if (normalizedPath === '/dist/resources/icon.png') return true;
+
+      if (normalizedPath === '/package.json') return false;     
+      if (normalizedPath.startsWith('/dist')) return false;     
+      if (normalizedPath.startsWith('/node_modules')) return false;
+
+      return true; 
+    },
     executableName: "encore-karaoke"
   },
-  hooks: {
-    packageAfterCopy: async (_, appResources) => {
-      if (appResources == null)
-        throw new Error(`Unknown platform ${options.platform}`);
-
-      const srcNodeModules = path.join(__dirname, "node_modules");
-      const destNodeModules = path.join(appResources, "node_modules");
-      fs.cpSync(srcNodeModules, destNodeModules, { recursive: true });
-    },
-  },
+  hooks: {},
   rebuildConfig: {},
   makers: [
     {
