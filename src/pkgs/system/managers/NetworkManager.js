@@ -31,7 +31,10 @@ export default class NetworkManager {
     this.resizeDanmakuCanvas();
     this.drawDanmakuFrame();
 
-    this.socket = io({ query: { clientType: "app" } });
+    this.socket = io({
+      query: { clientType: "app" },
+      transports: ["websocket"],
+    });
 
     this.socket.on("connect", () => {
       console.log("[LINK] Connected to server.");
@@ -72,6 +75,36 @@ export default class NetworkManager {
         this.ctx.dom.qrContainer.classOff("has-remotes");
       }
     }
+  }
+
+  refreshQRCode() {
+    const dom = this.ctx.dom;
+    if (!dom.qrContainer) return;
+    const img = dom.qrContainer.elm.querySelector("img");
+    if (!img) return;
+
+    fetch(`http://127.0.0.1:${this.ctx.state.actualPort}/cloud_info`)
+      .then((r) => r.json())
+      .then((info) => {
+        if (!info.roomCode) throw new Error("No cloud connection");
+        const remoteUrl = `${info.relayUrl}/?room=${info.roomCode}`;
+        img.src = `http://127.0.0.1:${this.ctx.state.actualPort}/qr?url=${encodeURIComponent(remoteUrl)}`;
+        dom.qrContainer.classOff("hidden");
+      })
+      .catch(() => {
+        // Fallback to local IP network
+        fetch(`http://127.0.0.1:${this.ctx.state.actualPort}/local_ip`)
+          .then((r) => r.text())
+          .then((ip) => {
+            if (!ip) throw new Error("No local network connection");
+            const remoteUrl = `http://${ip}:${this.ctx.state.actualPort}/remote`;
+            img.src = `http://127.0.0.1:${this.ctx.state.actualPort}/qr?url=${encodeURIComponent(remoteUrl)}`;
+            dom.qrContainer.classOff("hidden");
+          })
+          .catch(() => {
+            dom.qrContainer.classOn("hidden");
+          });
+      });
   }
 
   broadcastSocialState() {
@@ -193,6 +226,23 @@ export default class NetworkManager {
     const state = this.ctx.state;
     const root = this.ctx.root;
     const input = root.input;
+
+    this.socket.on("cloud-status", (status) => {
+      if (status.connected) {
+        this.ctx.modules.infoBar.showTemp(
+          "LINK",
+          `Cloud Link Ready - PIN: <span style="color:#89cff0">${status.roomCode}</span>`,
+          5000,
+        );
+      } else {
+        this.ctx.modules.infoBar.showTemp(
+          "LINK",
+          "Cloud Link disconnected. Reconnecting...",
+          5000,
+        );
+      }
+      this.refreshQRCode();
+    });
 
     this.socket.on("join", (joinInformation) => {
       if (joinInformation.type == "remote") {

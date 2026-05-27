@@ -566,16 +566,32 @@ app.whenReady().then(() => {
       `Successfully connected to Cloud Relay at ${CLOUD_URL}`,
     );
   });
+
   cloudSocket.on("room-created", (data) => {
     activeRoomCode = data.roomCode;
     logger.info("CLOUD", `Cloud Room is ready! PIN: ${activeRoomCode}`);
+    io.to("karaoke-app").emit("cloud-status", {
+      connected: true,
+      roomCode: activeRoomCode,
+      relayUrl: "https://link.encorekaraoke.org",
+    });
   });
+
   cloudSocket.on("connect_error", (err) => {
     logger.error(
       "CLOUD",
       `Connection to relay failed: ${err.message}. Will retry.`,
     );
+    if (activeRoomCode !== null) {
+      activeRoomCode = null;
+      io.to("karaoke-app").emit("cloud-status", { connected: false });
+    }
+  });
+
+  cloudSocket.on("disconnect", (reason) => {
+    logger.warn("CLOUD", `Disconnected from relay: ${reason}`);
     activeRoomCode = null;
+    io.to("karaoke-app").emit("cloud-status", { connected: false });
   });
 
   server.get("/cloud_info", (req, res) => {
