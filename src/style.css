@@ -2960,12 +2960,60 @@ p + .flex-list button {
   opacity: 0.9;
 }
 
-.info-bar {
+.top-bar-container {
   position: absolute;
   top: 2rem;
   left: 3rem;
   right: 3rem;
   height: 50px;
+  display: flex;
+  gap: 1rem;
+  z-index: 67000;
+  pointer-events: none;
+}
+
+.system-indicators {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.5rem;
+  padding: 0 1.2rem;
+  font-family: "Rajdhani", sans-serif;
+  color: white;
+  transition: all 0.3s ease;
+  pointer-events: none;
+  flex-shrink: 0;
+  order: 2;
+}
+
+.system-indicators.hidden {
+  display: none !important;
+}
+
+.battery-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.battery-text {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.system-indicators ion-icon {
+  font-size: 1.6rem;
+}
+
+.info-bar {
+  position: relative;
+  height: 100%;
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: stretch;
   background: rgba(0, 0, 0, 0.7);
@@ -2973,11 +3021,11 @@ p + .flex-list button {
   border-radius: 0.5rem;
   font-family: "Rajdhani", sans-serif;
   color: white;
-  z-index: 67000;
   overflow: hidden;
   opacity: 0;
   transition: opacity 0.3s ease;
   pointer-events: none;
+  order: 1;
 }
 
 .info-bar.persist-visible,
@@ -3927,6 +3975,10 @@ p + .flex-list button {
 .mode-player .qr-code-container,
 .mode-yt-search .qr-code-container {
   display: flex;
+}
+
+.is-offline .qr-code-container {
+  display: none !important;
 }
 
 .qr-counter-badge {

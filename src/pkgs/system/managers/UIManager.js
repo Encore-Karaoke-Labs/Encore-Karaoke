@@ -99,6 +99,12 @@ export default class UIManager {
       .classOn("player-ui", "hidden")
       .appendTo(wrapper);
 
+    // Shared Top Container & Indicators
+    dom.topBarContainer = new Html("div")
+      .classOn("top-bar-container")
+      .appendTo(wrapper);
+    this.buildSystemIndicators();
+
     dom.formatIndicator = new Html("div")
       .classOn("format-indicator")
       .styleJs({
@@ -280,6 +286,95 @@ export default class UIManager {
         background: "#000",
       })
       .appendTo(dom.sessionRemoteContainer);
+  }
+
+  buildSystemIndicators() {
+    const dom = this.ctx.dom;
+    dom.systemIndicators = new Html("div")
+      .classOn("system-indicators", "hidden")
+      .appendTo(dom.topBarContainer);
+
+    dom.networkIcon = new Html("ion-icon")
+      .attr({ name: "wifi" })
+      .appendTo(dom.systemIndicators);
+    dom.batteryDisplay = new Html("div")
+      .classOn("battery-display")
+      .appendTo(dom.systemIndicators);
+    dom.batteryIcon = new Html("ion-icon")
+      .attr({ name: "battery-full" })
+      .appendTo(dom.batteryDisplay);
+    dom.batteryText = new Html("span")
+      .classOn("battery-text")
+      .appendTo(dom.batteryDisplay);
+
+    const updateVisibility = () => {
+      let shouldShow = false;
+
+      if (!navigator.onLine) shouldShow = true;
+
+      if (this.ctx.state.battery) {
+        const b = this.ctx.state.battery;
+        if (!b.charging || b.level < 1) {
+          shouldShow = true;
+        }
+      }
+
+      if (shouldShow) {
+        dom.systemIndicators.classOff("hidden");
+      } else {
+        dom.systemIndicators.classOn("hidden");
+      }
+    };
+
+    const updateNetwork = () => {
+      if (navigator.onLine) {
+        dom.networkIcon.attr({ name: "wifi" });
+        dom.networkIcon.styleJs({ color: "#89cff0" });
+        this.ctx.wrapper.classOff("is-offline");
+      } else {
+        dom.networkIcon.attr({ name: "cloud-offline" });
+        dom.networkIcon.styleJs({ color: "#ff5555" });
+        this.ctx.wrapper.classOn("is-offline");
+      }
+      updateVisibility();
+    };
+
+    window.addEventListener("online", updateNetwork);
+    window.addEventListener("offline", updateNetwork);
+    updateNetwork();
+
+    if ("getBattery" in navigator) {
+      navigator.getBattery().then((battery) => {
+        this.ctx.state.battery = battery;
+
+        const updateBattery = () => {
+          const level = Math.round(battery.level * 100);
+          const charging = battery.charging;
+
+          dom.batteryText.text(`${level}%`);
+
+          if (charging) {
+            dom.batteryIcon.attr({ name: "battery-charging" });
+            dom.batteryIcon.styleJs({ color: "#55ff55" });
+          } else {
+            if (level > 80) dom.batteryIcon.attr({ name: "battery-full" });
+            else if (level > 40) dom.batteryIcon.attr({ name: "battery-half" });
+            else dom.batteryIcon.attr({ name: "battery-dead" });
+
+            if (level <= 20) dom.batteryIcon.styleJs({ color: "#ff5555" });
+            else dom.batteryIcon.styleJs({ color: "white" });
+          }
+          updateVisibility();
+        };
+
+        battery.addEventListener("chargingchange", updateBattery);
+        battery.addEventListener("levelchange", updateBattery);
+        updateBattery();
+      });
+    } else {
+      dom.batteryDisplay.classOn("hidden");
+      updateVisibility();
+    }
   }
 
   buildPostSongScreen() {

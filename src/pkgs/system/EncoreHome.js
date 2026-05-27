@@ -181,7 +181,7 @@ class EncoreController {
 
     this.ui.buildAll();
 
-    this.infoBar.mount(this.context.wrapper);
+    this.infoBar.mount(this.dom.topBarContainer);
     this.scoreHud.mount(this.context.wrapper);
     this.mixer.mount(this.context.wrapper);
     this.bgv.mount(this.dom.bgvContainer);
