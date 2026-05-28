@@ -291,12 +291,13 @@ export default class UIManager {
   buildSystemIndicators() {
     const dom = this.ctx.dom;
     dom.systemIndicators = new Html("div")
-      .classOn("system-indicators", "hidden")
+      .classOn("system-indicators")
       .appendTo(dom.topBarContainer);
 
     dom.networkIcon = new Html("ion-icon")
       .attr({ name: "wifi" })
       .appendTo(dom.systemIndicators);
+
     dom.batteryDisplay = new Html("div")
       .classOn("battery-display")
       .appendTo(dom.systemIndicators);
@@ -306,25 +307,6 @@ export default class UIManager {
     dom.batteryText = new Html("span")
       .classOn("battery-text")
       .appendTo(dom.batteryDisplay);
-
-    const updateVisibility = () => {
-      let shouldShow = false;
-
-      if (!navigator.onLine) shouldShow = true;
-
-      if (this.ctx.state.battery) {
-        const b = this.ctx.state.battery;
-        if (!b.charging || b.level < 1) {
-          shouldShow = true;
-        }
-      }
-
-      if (shouldShow) {
-        dom.systemIndicators.classOff("hidden");
-      } else {
-        dom.systemIndicators.classOn("hidden");
-      }
-    };
 
     const updateNetwork = () => {
       if (navigator.onLine) {
@@ -336,7 +318,6 @@ export default class UIManager {
         dom.networkIcon.styleJs({ color: "#ff5555" });
         this.ctx.wrapper.classOn("is-offline");
       }
-      updateVisibility();
     };
 
     window.addEventListener("online", updateNetwork);
@@ -364,7 +345,12 @@ export default class UIManager {
             if (level <= 20) dom.batteryIcon.styleJs({ color: "#ff5555" });
             else dom.batteryIcon.styleJs({ color: "white" });
           }
-          updateVisibility();
+
+          if (charging && battery.level >= 1) {
+            dom.batteryDisplay.classOn("hidden");
+          } else {
+            dom.batteryDisplay.classOff("hidden");
+          }
         };
 
         battery.addEventListener("chargingchange", updateBattery);
@@ -373,7 +359,6 @@ export default class UIManager {
       });
     } else {
       dom.batteryDisplay.classOn("hidden");
-      updateVisibility();
     }
   }
 
