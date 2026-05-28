@@ -8,6 +8,7 @@ const DEFAULT_DARES = [
   "Sing your next song facing away from the screen.",
 ];
 
+// Fisher-Yates Shuffle
 function shuffleArray(array) {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -54,7 +55,7 @@ export default class DaresGame {
       listWrapper.clear();
       this.daresList.forEach((dare, index) => {
         const row = new Html("div")
-          .styleJs({ display: "flex", gap: "0.5rem", alignItems: "center" })
+          .styleJs({ display: "flex", gap: "0.5rem", alignItems: "stretch" })
           .appendTo(listWrapper);
 
         const input = new Html("input")
@@ -63,10 +64,12 @@ export default class DaresGame {
           .styleJs({
             flex: "1",
             fontSize: "1.1rem",
-            padding: "0.5rem",
+            padding: "0.75rem 1rem",
             textAlign: "left",
+            height: "auto",
           })
           .appendTo(row);
+
         input.elm.value = dare;
 
         input.on("change", () => {
@@ -82,7 +85,15 @@ export default class DaresGame {
         new Html("button")
           .text("✕")
           .classOn("session-btn", "danger")
-          .styleJs({ flex: "none", width: "40px", padding: "0" })
+          .styleJs({
+            flex: "none",
+            width: "3.5rem",
+            height: "auto",
+            padding: "0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          })
           .on("click", () => {
             this.daresList.splice(index, 1);
             this.saveDares();
@@ -97,7 +108,11 @@ export default class DaresGame {
     new Html("button")
       .text("+ ADD NEW DARE")
       .classOn("session-btn")
-      .styleJs({ width: "100%" })
+      .styleJs({
+        flex: "none",
+        width: "100%",
+        padding: "1rem",
+      })
       .on("click", () => {
         this.daresList.push("New Penalty Dare");
         this.saveDares();
@@ -211,7 +226,7 @@ export default class DaresGame {
       (p) => p.nickname,
     );
     if (participants.length === 0)
-      participants.push("Player 1", "Player 2", "Player 3");
+      participants.push("Player 1", "Player 2", "Player 3"); // Fallback
 
     let ticks = 0;
     const sfx = this.ctx.services.Forte;
@@ -276,6 +291,7 @@ export default class DaresGame {
               fontFamily: "'Radio Canada', sans-serif",
             })
             .appendTo(wrapper);
+
           new Html("button")
             .text("ACCEPT FATE")
             .classOn("session-btn")
@@ -283,6 +299,11 @@ export default class DaresGame {
               marginTop: "1rem",
               borderColor: "#ff5555",
               color: "#ff5555",
+              flex: "none",
+              width: "auto",
+              minWidth: "250px",
+              padding: "1rem 3rem",
+              alignSelf: "center",
             })
             .on("click", () => {
               this.handleEscape();
