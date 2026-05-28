@@ -339,6 +339,8 @@ export default class SessionManager {
   }
 
   performSessionDisconnect() {
+    this.ctx.root.games.hideOverlay();
+
     const state = this.ctx.state;
     const dom = this.ctx.dom;
     const root = this.ctx.root;
@@ -768,6 +770,20 @@ export default class SessionManager {
         })
         .appendTo(actionBtns);
 
+      if (state.isSessionHost && SessionsSvc.state.mode === "lounge") {
+        new Html("button")
+          .classOn("session-btn", "primary")
+          .styleJs({
+            width: "100%",
+            maxHeight: "65px",
+            fontSize: "1.3rem",
+            flexShrink: "0",
+          })
+          .text("MINIGAMES")
+          .on("click", () => this.renderSessionView("games"))
+          .appendTo(leftCol);
+      }
+
       const partList = new Html("div")
         .classOn("session-participants-list")
         .appendTo(leftCol);
@@ -865,14 +881,6 @@ export default class SessionManager {
           .appendTo(btnRow);
       }
 
-      if (state.isSessionHost && SessionsSvc.state.mode === "lounge") {
-        new Html("button")
-          .classOn("session-btn", "primary")
-          .text("MINIGAMES")
-          .on("click", () => this.renderSessionView("games"))
-          .appendTo(btnRow);
-      }
-
       new Html("button")
         .classOn("session-btn")
         .text("CLOSE MENU")
@@ -890,18 +898,24 @@ export default class SessionManager {
     } else if (view === "games") {
       new Html("h1").text("SESSION MINIGAMES").appendTo(dom.sessionHeader);
       new Html("p")
-        .text("Select a game to start playing with the room.")
+        .text("Configure and launch games for the room.")
         .appendTo(dom.sessionHeader);
 
       const layout = new Html("div")
-        .classOn("session-active-layout")
+        .classOn("mixer-layout")
+        .styleJs({ width: "100%", height: "100%" })
         .appendTo(dom.sessionContentArea);
-      const listCol = new Html("div")
+
+      const listPanel = new Html("div")
+        .classOn("mixer-list-panel")
+        .styleJs({ padding: "1rem" })
+        .appendTo(layout);
+      const detailsPanel = new Html("div")
+        .classOn("mixer-controls-panel")
         .styleJs({
-          width: "100%",
           display: "flex",
           flexDirection: "column",
-          gap: "1rem",
+          padding: "1.5rem",
         })
         .appendTo(layout);
 
@@ -910,29 +924,74 @@ export default class SessionManager {
       if (games.length === 0) {
         new Html("p")
           .text("No games currently loaded.")
-          .styleJs({ opacity: "0.5", textAlign: "center", padding: "2rem" })
-          .appendTo(listCol);
+          .styleJs({ padding: "2rem", opacity: 0.5 })
+          .appendTo(listPanel);
       } else {
-        games.forEach((game) => {
+        let activeGame = games[0];
+
+        const renderDetails = () => {
+          detailsPanel.clear();
+          new Html("h2")
+            .classOn("mixer-controls-title")
+            .text(activeGame.name)
+            .appendTo(detailsPanel);
+
+          const settingsContainer = new Html("div")
+            .styleJs({
+              flex: "1",
+              overflowY: "auto",
+              marginBottom: "1rem",
+              paddingRight: "1rem",
+            })
+            .appendTo(detailsPanel);
+
+          if (typeof activeGame.instance.renderSettings === "function") {
+            activeGame.instance.renderSettings(settingsContainer);
+          } else {
+            new Html("p")
+              .text("No configuration needed.")
+              .styleJs({ opacity: 0.5 })
+              .appendTo(settingsContainer);
+          }
+
+          const btnRow = new Html("div")
+            .classOn("session-btn-row")
+            .styleJs({ marginTop: "auto", width: "100%" })
+            .appendTo(detailsPanel);
+
           new Html("button")
             .classOn("session-btn")
-            .text(game.name.toUpperCase())
+            .text("BACK")
+            .on("click", () => this.renderSessionView("active"))
+            .appendTo(btnRow);
+          new Html("button")
+            .classOn("session-btn", "primary")
+            .text("START GAME")
             .on("click", () => {
-              game.instance.onHostTrigger();
+              activeGame.instance.onHostTrigger();
             })
-            .appendTo(listCol);
-        });
-      }
+            .appendTo(btnRow);
+        };
 
-      const btnRow = new Html("div")
-        .classOn("session-btn-row")
-        .styleJs({ marginTop: "auto", width: "100%" })
-        .appendTo(listCol);
-      new Html("button")
-        .classOn("session-btn")
-        .text("BACK")
-        .on("click", () => this.renderSessionView("active"))
-        .appendTo(btnRow);
+        const renderList = () => {
+          listPanel.clear();
+          games.forEach((game) => {
+            const item = new Html("div")
+              .classOn("mixer-item")
+              .text(game.name)
+              .appendTo(listPanel);
+            if (activeGame.id === game.id) item.classOn("mixer-item--active");
+            item.on("click", () => {
+              activeGame = game;
+              renderList();
+              renderDetails();
+            });
+          });
+        };
+
+        renderList();
+        renderDetails();
+      }
     }
   }
 

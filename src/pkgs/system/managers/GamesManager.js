@@ -8,6 +8,24 @@ export default class GamesManager {
     this.ctx = context;
     this.loadedGames = new Map();
     this.container = null;
+    this.isVisible = false;
+    this.activeGameId = null;
+
+    this.boundKeydown = (e) => {
+      if (this.isVisible && e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (this.activeGameId && this.loadedGames.has(this.activeGameId)) {
+          const game = this.loadedGames.get(this.activeGameId);
+          if (typeof game.handleEscape === "function") {
+            game.handleEscape();
+            return;
+          }
+        }
+        this.hideOverlay();
+      }
+    };
   }
 
   async init() {
@@ -16,14 +34,16 @@ export default class GamesManager {
       .styleJs({
         position: "absolute",
         inset: "0",
-        zIndex: "500",
+        zIndex: "500000",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(0, 0, 0, 0.8)",
-        backdropFilter: "blur(8px)",
+        background: "rgba(0, 0, 0, 0.9)",
+        backdropFilter: "blur(15px)",
       })
-      .appendTo(this.ctx.wrapper);
+      .appendTo(this.ctx.wrapper.elm);
+
+    window.addEventListener("keydown", this.boundKeydown, true);
 
     const gamesToLoad = this.ctx.config.enabledGames || ["/games/Dares.js"];
     console.log("[GAMES] Loading games");
@@ -41,15 +61,6 @@ export default class GamesManager {
     }
   }
 
-  showOverlay() {
-    this.container.classOff("hidden");
-  }
-
-  hideOverlay() {
-    this.container.classOn("hidden");
-    this.container.clear();
-  }
-
   getAvailableGames() {
     const gamesList = [];
     for (const [id, instance] of this.loadedGames.entries()) {
@@ -58,7 +69,23 @@ export default class GamesManager {
     return gamesList;
   }
 
+  showOverlay(gameId) {
+    this.activeGameId = gameId;
+    this.container.classOff("hidden");
+    this.isVisible = true;
+  }
+
+  hideOverlay() {
+    if (this.container) {
+      this.container.classOn("hidden");
+      this.container.clear();
+    }
+    this.isVisible = false;
+    this.activeGameId = null;
+  }
+
   destroy() {
+    window.removeEventListener("keydown", this.boundKeydown, true);
     for (const game of this.loadedGames.values()) {
       if (typeof game.destroy === "function") game.destroy();
     }
