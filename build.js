@@ -87,6 +87,7 @@ Promise.all([buildOS, buildWindows])
     copyRecursiveSync("src/libs", "dist/resources/static/libs");
     copyRecursiveSync("src/assets", "dist/resources/static/assets");
     copyRecursiveSync("src/remote", "dist/resources/static/remote");
+    copyRecursiveSync("src/games", "dist/resources/static/games");
 
     if (fs.existsSync("src/index.html"))
       fs.copyFileSync("src/index.html", "dist/resources/static/index.html");

@@ -10,6 +10,7 @@ import NetworkManager from "./managers/NetworkManager.js";
 import SessionManager from "./managers/SessionManager.js";
 import RecordingsManager from "./managers/RecordingsManager.js";
 import SetupManager from "./managers/SetupManager.js";
+import GamesManager from "./managers/GamesManager.js";
 
 import { MixerModule } from "../../modules/Mixer.js";
 import { BGVModule } from "../../modules/BGVPlayer.js";
@@ -131,6 +132,7 @@ class EncoreController {
     this.recordings = new RecordingsManager(this.context);
     this.input = new InputManager(this.context);
     this.setup = new SetupManager(this.context);
+    this.games = new GamesManager(this.context);
 
     this.boundKeydown = (e) => this.input.handleKeyDown(e);
   }
@@ -199,6 +201,7 @@ class EncoreController {
     this.recordings.init();
     this.lyrics.init();
     this.setup.init();
+    this.games.init();
 
     window.addEventListener("keydown", this.boundKeydown);
 
@@ -270,6 +273,7 @@ class EncoreController {
     this.network.destroy();
     this.sessions.destroy();
     this.setup.destroy();
+    this.games.destroy();
     if (this.recorder.isRecording) this.recorder.stop();
     this.bgv.stop();
     this.services.Forte.stopTrack();

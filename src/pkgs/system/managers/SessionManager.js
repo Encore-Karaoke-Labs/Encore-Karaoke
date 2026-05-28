@@ -865,6 +865,14 @@ export default class SessionManager {
           .appendTo(btnRow);
       }
 
+      if (state.isSessionHost && SessionsSvc.state.mode === "lounge") {
+        new Html("button")
+          .classOn("session-btn", "primary")
+          .text("MINIGAMES")
+          .on("click", () => this.renderSessionView("games"))
+          .appendTo(btnRow);
+      }
+
       new Html("button")
         .classOn("session-btn")
         .text("CLOSE MENU")
@@ -878,6 +886,52 @@ export default class SessionManager {
           SessionsSvc.leaveRoom();
           this.performSessionDisconnect();
         })
+        .appendTo(btnRow);
+    } else if (view === "games") {
+      new Html("h1").text("SESSION MINIGAMES").appendTo(dom.sessionHeader);
+      new Html("p")
+        .text("Select a game to start playing with the room.")
+        .appendTo(dom.sessionHeader);
+
+      const layout = new Html("div")
+        .classOn("session-active-layout")
+        .appendTo(dom.sessionContentArea);
+      const listCol = new Html("div")
+        .styleJs({
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          gap: "1rem",
+        })
+        .appendTo(layout);
+
+      const games = root.games.getAvailableGames();
+
+      if (games.length === 0) {
+        new Html("p")
+          .text("No games currently loaded.")
+          .styleJs({ opacity: "0.5", textAlign: "center", padding: "2rem" })
+          .appendTo(listCol);
+      } else {
+        games.forEach((game) => {
+          new Html("button")
+            .classOn("session-btn")
+            .text(game.name.toUpperCase())
+            .on("click", () => {
+              game.instance.onHostTrigger();
+            })
+            .appendTo(listCol);
+        });
+      }
+
+      const btnRow = new Html("div")
+        .classOn("session-btn-row")
+        .styleJs({ marginTop: "auto", width: "100%" })
+        .appendTo(listCol);
+      new Html("button")
+        .classOn("session-btn")
+        .text("BACK")
+        .on("click", () => this.renderSessionView("active"))
         .appendTo(btnRow);
     }
   }
@@ -979,16 +1033,16 @@ export default class SessionManager {
     const dom = this.ctx.dom;
     const state = this.ctx.state;
 
-    // Handle Back/Close
     if (e.key === "Escape") {
       e.preventDefault();
-      // If we are configuring a host/join and haven't joined yet, go back to select
       if (
         (state.sessionModalView === "host" ||
           state.sessionModalView === "join") &&
         !state.isSessionActive
       ) {
         this.renderSessionView("select");
+      } else if (state.sessionModalView === "games") {
+        this.renderSessionView("active");
       } else {
         this.toggleSessionModal(false);
       }
