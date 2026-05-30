@@ -61,7 +61,7 @@ const pkg = {
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d");
 
-            const SIZE = 64;
+            const SIZE = 256;
             canvas.width = SIZE;
             canvas.height = SIZE;
 
