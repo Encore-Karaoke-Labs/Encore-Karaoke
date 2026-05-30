@@ -641,10 +641,16 @@ export default class SessionManager {
 
           try {
             const updatedProfile = Identity.getProfile();
+            const supportedGames = root.games.getAvailableGames().map((g) => ({
+              id: g.id,
+              version: g.version,
+            }));
+            const sessionProfile = { ...updatedProfile, supportedGames };
+
             if (isHost) {
               const collisionFn = Identity.resolveCollision.bind(Identity);
               const roomId = await SessionsSvc.hostRoom(
-                updatedProfile,
+                sessionProfile,
                 collisionFn,
               );
               state.isSessionActive = true;
@@ -652,7 +658,7 @@ export default class SessionManager {
               state.sessionRoomId = roomId;
             } else {
               const room = roomInput.getValue().trim();
-              await SessionsSvc.joinRoom(room, updatedProfile);
+              await SessionsSvc.joinRoom(room, sessionProfile);
               state.isSessionActive = true;
               state.isSessionHost = false;
               state.sessionRoomId = room;
@@ -954,6 +960,38 @@ export default class SessionManager {
               .appendTo(settingsContainer);
           }
 
+          const participants = SessionsSvc.state.participants;
+          const requiredVersion = activeGame.version;
+          let missingUsers = [];
+
+          participants.forEach((p) => {
+            const pGame = (p.supportedGames || []).find(
+              (g) => g.id === activeGame.id,
+            );
+            if (!pGame || pGame.version !== requiredVersion) {
+              missingUsers.push(p.nickname);
+            }
+          });
+
+          const isPlayable = missingUsers.length === 0;
+
+          if (!isPlayable) {
+            new Html("div")
+              .styleJs({
+                background: "rgba(255, 85, 85, 0.15)",
+                border: "1px solid #ff5555",
+                padding: "1rem",
+                borderRadius: "8px",
+                color: "#ff5555",
+                marginBottom: "1rem",
+                fontSize: "0.95rem",
+              })
+              .text(
+                `Version Mismatch (Requires v${requiredVersion}). Unavailable for: ${missingUsers.join(", ")}`,
+              )
+              .appendTo(detailsPanel);
+          }
+
           const btnRow = new Html("div")
             .classOn("session-btn-row")
             .styleJs({ marginTop: "auto", width: "100%" })
@@ -964,13 +1002,18 @@ export default class SessionManager {
             .text("BACK")
             .on("click", () => this.renderSessionView("active"))
             .appendTo(btnRow);
-          new Html("button")
+
+          const startBtn = new Html("button")
             .classOn("session-btn", "primary")
             .text("START GAME")
             .on("click", () => {
-              activeGame.instance.onHostTrigger();
+              if (isPlayable) activeGame.instance.onHostTrigger();
             })
             .appendTo(btnRow);
+
+          if (!isPlayable) {
+            startBtn.styleJs({ opacity: "0.4", cursor: "not-allowed" });
+          }
         };
 
         const renderList = () => {

@@ -64,7 +64,12 @@ export default class GamesManager {
   getAvailableGames() {
     const gamesList = [];
     for (const [id, instance] of this.loadedGames.entries()) {
-      gamesList.push({ id, name: instance.name || id, instance });
+      gamesList.push({
+        id,
+        name: instance.name || id,
+        version: instance.version || "1.0.0",
+        instance,
+      });
     }
     return gamesList;
   }

@@ -24,6 +24,7 @@ export default class DaresGame {
     this.manager = manager;
     this.id = "dares";
     this.name = "Karaoke Penalty Dares";
+    this.version = "1.0.0";
 
     this.daresList = [];
     this.daresDeck = [];

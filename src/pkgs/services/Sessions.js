@@ -106,6 +106,7 @@ const pkg = {
         nickname: profile.nickname,
         avatar: profile.avatar,
         isHost: true,
+        supportedGames: profile.supportedGames || [],
       });
       this.broadcastState();
       this.handleMediaRouting();
@@ -157,6 +158,7 @@ const pkg = {
             nickname: uniqueName,
             avatar: incomingProfile.avatar || null,
             isHost: false,
+            supportedGames: incomingProfile.supportedGames || [],
           });
           this.broadcastState();
           this.handleMediaRouting();
