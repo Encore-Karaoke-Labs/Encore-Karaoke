@@ -28,7 +28,6 @@ export default class LyricsEngine {
     this.lyricsCtx = null;
     this.lyricsRafId = null;
     this.boundTimeUpdate = null;
-    this.boundLyricEvent = null;
     this.nextLineUpdateTimeout = null;
 
     this.lineCaches = [];
@@ -52,8 +51,9 @@ export default class LyricsEngine {
     this.renderableLines = [];
     this.midiLines = null;
     this.currentSongLineIndex = 0;
-    this.lastCompletedSyllableIndex = -1;
+
     this.currentMediaTime = 0;
+    this.lastMediaTimeUpdate = null;
 
     this.resizeLyricsCanvas = this.resizeLyricsCanvas.bind(this);
     window.addEventListener("resize", this.resizeLyricsCanvas);
@@ -67,7 +67,6 @@ export default class LyricsEngine {
 
   reset() {
     this.cleanupEvents();
-    this.lastCompletedSyllableIndex = -1;
     this.currentSongLineIndex = 0;
 
     this.ctx.dom.countdownDisplay.classOff("visible").text("");
@@ -107,14 +106,8 @@ export default class LyricsEngine {
         "CherryTree.Forte.Playback.TimeUpdate",
         this.boundTimeUpdate,
       );
-    if (this.boundLyricEvent)
-      document.removeEventListener(
-        "CherryTree.Forte.Playback.LyricEvent",
-        this.boundLyricEvent,
-      );
 
     this.boundTimeUpdate = null;
-    this.boundLyricEvent = null;
   }
 
   resizeLyricsCanvas() {
@@ -477,77 +470,6 @@ export default class LyricsEngine {
       this.resizeLyricsCanvas();
       dom.lyricsCanvas.styleJs({ opacity: "1" });
 
-      let currentVisualIndex = 0;
-      this.boundLyricEvent = (e) => {
-        const { text } = e.detail;
-        if (!text) return;
-
-        let targetSyllable = allSyllables[currentVisualIndex];
-        let matchFound = false;
-
-        if (targetSyllable && targetSyllable.rawText === text) {
-          matchFound = true;
-        } else {
-          if (text.trim().length > 0) {
-            const limit = Math.min(
-              currentVisualIndex + 15,
-              allSyllables.length,
-            );
-            for (let i = currentVisualIndex + 1; i < limit; i++) {
-              if (allSyllables[i].rawText === text) {
-                currentVisualIndex = i;
-                targetSyllable = allSyllables[i];
-                matchFound = true;
-                break;
-              }
-            }
-          }
-        }
-
-        if (!matchFound) return;
-
-        if (targetSyllable.lineIndex !== this.currentSongLineIndex) {
-          this.currentSongLineIndex = targetSyllable.lineIndex;
-          this.triggerLineFade();
-
-          if (this.currentSongLineIndex % 2 === 0) {
-            this.currentMidiLine1 =
-              this.midiLines[this.currentSongLineIndex] || [];
-            this.currentMidiLine2 =
-              this.midiLines[this.currentSongLineIndex + 1] || [];
-          } else {
-            this.currentMidiLine2 =
-              this.midiLines[this.currentSongLineIndex] || [];
-            this.currentMidiLine1 =
-              this.midiLines[this.currentSongLineIndex + 1] || [];
-          }
-
-          this.calculateLyricLayout();
-          this._resolveRomajiForLine(this.currentSongLineIndex + 2);
-        }
-
-        targetSyllable.wipeStartTime = performance.now();
-        let durationS =
-          (targetSyllable.durationTicks / this.currentPpqm) *
-          (60 / this.ctx.state.currentBpm);
-        if (targetSyllable.rawText.match(/[\r\n\/\\]$/)) {
-          durationS = Math.min(
-            durationS,
-            (this.currentPpqm / this.currentPpqm) *
-              (60 / this.ctx.state.currentBpm),
-          );
-        }
-        targetSyllable.wipeDurationMs = Math.max(
-          100,
-          Math.min(durationS * 1000, 1500),
-        );
-        this.lastCompletedSyllableIndex = targetSyllable.globalIndex - 1;
-        currentVisualIndex++;
-      };
-      document.addEventListener(
-        "CherryTree.Forte.Playback.LyricEvent",
-        this.boundLyricEvent,
-      );
       this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
     } else if (song.lrcPath) {
       const lrcText = await this.ctx.services.FsSvc.readFile(song.lrcPath);
@@ -1121,7 +1043,17 @@ export default class LyricsEngine {
       });
 
       ctx.globalAlpha = 1.0;
-      const currentTime = this.currentMediaTime || 0;
+
+      let baseTime = this.currentMediaTime || 0;
+      if (this.lastMediaTimeUpdate) {
+        const diff = (performance.now() - this.lastMediaTimeUpdate) / 1000;
+        if (diff < 0.1) {
+          baseTime += diff;
+        }
+      }
+
+      const LYRICS_SYNC_OFFSET = 0.08;
+      const currentTime = baseTime + LYRICS_SYNC_OFFSET;
 
       this.renderableLines.forEach((line, lineIdx) => {
         if (line.isNextLine) return;
@@ -1145,9 +1077,11 @@ export default class LyricsEngine {
             progress = 1;
           } else {
             if (currentTime >= s.endTime) progress = 1;
-            else if (currentTime >= s.absoluteTime)
+            else if (currentTime >= s.absoluteTime) {
+              const duration = s.endTime - s.absoluteTime;
               progress =
-                (currentTime - s.absoluteTime) / (s.endTime - s.absoluteTime);
+                duration > 0 ? (currentTime - s.absoluteTime) / duration : 1;
+            }
           }
 
           if (progress > 0) {
@@ -1178,10 +1112,19 @@ export default class LyricsEngine {
     this.boundTimeUpdate = (e) => {
       const { currentTime } = e.detail;
       this.currentMediaTime = currentTime;
+      this.lastMediaTimeUpdate = performance.now();
 
       if (this.midiLines && this.midiLines.length > 0) {
-        let newLineIndex = 0;
-        for (let i = 0; i < this.midiLines.length; i++) {
+        let newLineIndex = Math.max(0, this.currentSongLineIndex);
+
+        if (
+          newLineIndex > 0 &&
+          currentTime < this.midiLines[newLineIndex - 1][0].absoluteTime
+        ) {
+          newLineIndex = 0;
+        }
+
+        for (let i = newLineIndex; i < this.midiLines.length; i++) {
           let line = this.midiLines[i];
           if (line.length === 0) continue;
           if (currentTime >= line[line.length - 1].endTime + 0.1)
@@ -1243,7 +1186,6 @@ export default class LyricsEngine {
             this.ctx.state.isInterludeActive = false;
             this.ctx.dom.interludeOverlay.classOff("visible");
             this.ctx.dom.lyricsCanvas.styleJs({ opacity: "1" });
-            this.lastCompletedSyllableIndex = -1;
           }
         }
       }
