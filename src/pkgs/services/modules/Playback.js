@@ -315,6 +315,7 @@ export class FortePlayback {
     this.state.playback.lyricsEncoding = "utf-8";
     this.state.playback.transpose = 0;
     this.state.playback.isMultiplexed = false;
+    this.state.playback.isPlatinum = false;
     this.state.playback.multiplexPan = -1;
     this.state.playback.guideNotes = [];
     this.state.playback.guideRange = { min: 42, max: 90 };
@@ -328,6 +329,10 @@ export class FortePlayback {
       url.toLowerCase().endsWith(".midi") ||
       url.toLowerCase().endsWith(".kar");
     this.state.playback.isMidi = isMidi;
+
+    const isPlatinum = url.toLowerCase().endsWith(".xtsp.mid");
+    this.state.playback.isPlatinum = isPlatinum;
+
     if (!isMidi && url.toLowerCase().includes(".multiplexed.")) {
       this.state.playback.isMultiplexed = true;
     }
@@ -336,6 +341,7 @@ export class FortePlayback {
       url,
       isMidi,
       isMultiplexed: this.state.playback.isMultiplexed,
+      isPlatinum,
     });
 
     try {
@@ -444,9 +450,16 @@ export class FortePlayback {
             const dataArray = e.event.data;
             if (!dataArray || !(dataArray instanceof Uint8Array)) return;
 
-            const text = new TextDecoder(
+            let text = new TextDecoder(
               this.state.playback.lyricsEncoding,
             ).decode(dataArray);
+
+            // PLATINUM/MegaPro lyrics have these carats in them and I have NO IDEA why
+            // Assuming it's for timing, but Encore renders them fine without them.
+            if (this.state.playback.isPlatinum) {
+              text = text.replace(/\^/g, "");
+            }
+
             const cleanText = text.replace(/[\r\n\/\\]/g, "");
 
             if (cleanText === "@IENCOREDUET") {
@@ -526,7 +539,12 @@ export class FortePlayback {
           )
             return;
 
-          const text = decoder.decode(message.data);
+          let text = decoder.decode(message.data);
+
+          if (isPlatinum) {
+            text = text.replace(/\^/g, "");
+          }
+
           const clean = text.replace(/[\r\n\/\\]/g, "");
           const trimmed = clean.trim();
 
