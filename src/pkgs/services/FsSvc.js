@@ -1,6 +1,69 @@
 import NetworkingUtility from "../../libs/networkingUtility.js";
 import localforage from "localforage";
+import { BasicMIDI } from "spessasynth_core";
 const jsmediatags = window.jsmediatags;
+
+/**
+ * Attempts to detect the correct text encoding for MIDI lyrics data to prevent mojibake.
+ *
+ * @param {Uint8Array} uint8Array - The raw byte data of the lyrics.
+ * @returns {string} The identified encoding standard.
+ */
+function detectEncoding(uint8Array) {
+  const encodings = [
+    "utf-8",
+    "shift-jis",
+    "euc-kr",
+    "windows-1250",
+    "windows-1252",
+    "utf-16le",
+  ];
+  for (const encoding of encodings) {
+    try {
+      const decoder = new TextDecoder(encoding, { fatal: true });
+      const text = decoder.decode(uint8Array);
+      if (text.includes("\uFFFD")) continue;
+      const controlChars = (text.match(/[\x00-\x08\x0B-\x0C\x0E-\x1F]/g) || [])
+        .length;
+      if (text.length > 0 && controlChars / text.length > 0.05) continue;
+      return encoding;
+    } catch (e) {
+      continue;
+    }
+  }
+  return "utf-8";
+}
+
+/**
+ * Helper utility to process an array of items concurrently with a maximum limit.
+ *
+ * @param {Array} items - The items to process.
+ * @param {number} maxConcurrent - Maximum number of active async tasks.
+ * @param {Function} processFn - Async function to run on each item.
+ * @param {Function} progressCb - Callback for reporting progress.
+ * @returns {Promise<Array>} Results mapped to the exact original array order.
+ */
+async function processConcurrent(items, maxConcurrent, processFn, progressCb) {
+  const results = new Array(items.length);
+  let index = 0;
+  let processed = 0;
+
+  const worker = async () => {
+    while (index < items.length) {
+      const currentIndex = index++;
+      results[currentIndex] = await processFn(items[currentIndex]);
+      processed++;
+      if (progressCb) progressCb(processed, items.length);
+    }
+  };
+
+  const workers = Array.from(
+    { length: Math.min(maxConcurrent, items.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return results;
+}
 
 // Internal state for the service to hold the cached song list and manifest
 const state = {
@@ -271,104 +334,178 @@ const pkg = {
             file.name.endsWith(".kar")),
       );
 
-      let processed = 0;
       const totalFiles = processableFiles.length;
       dispatchBuildProgress(0, totalFiles);
 
-      for (const file of processableFiles) {
-        const filename = file.name;
-        const fullPath = `${libraryPath}${filename}`;
+      const parsedFilesData = await processConcurrent(
+        processableFiles,
+        30,
+        async (file) => {
+          const filename = file.name;
+          const fullPath = `${libraryPath}${filename}`;
 
-        const isMultiplexed = filename.toLowerCase().includes(".multiplexed.");
-        let basename, extension;
+          const isMultiplexed = filename
+            .toLowerCase()
+            .includes(".multiplexed.");
+          let basename, extension;
 
-        extension = filename.split(".").pop().toLowerCase();
+          extension = filename.split(".").pop().toLowerCase();
 
-        if (isMultiplexed) {
-          const regex = new RegExp(`\\.multiplexed\\.${extension}$`, "i");
-          basename = filename.replace(regex, "");
-        } else {
-          const lastDotIndex = filename.lastIndexOf(".");
-          basename =
-            lastDotIndex > -1 ? filename.substring(0, lastDotIndex) : filename;
-        }
-
-        let videoPath = null;
-        for (const videoExt of videoExtensions) {
-          const potentialVideoName = `${basename}.${videoExt}`;
-          if (allFilenames.has(potentialVideoName)) {
-            videoPath = `${libraryPath}${potentialVideoName}`;
-            break;
+          if (isMultiplexed) {
+            const regex = new RegExp(`\\.multiplexed\\.${extension}$`, "i");
+            basename = filename.replace(regex, "");
+          } else {
+            const lastDotIndex = filename.lastIndexOf(".");
+            basename =
+              lastDotIndex > -1
+                ? filename.substring(0, lastDotIndex)
+                : filename;
           }
-        }
 
-        let songData = null;
-        let artist = "Unknown Artist";
-        let title = basename.replace(/\[.*?\]/g, "").trim();
+          let videoPath = null;
+          for (const videoExt of videoExtensions) {
+            const potentialVideoName = `${basename}.${videoExt}`;
+            if (allFilenames.has(potentialVideoName)) {
+              videoPath = `${libraryPath}${potentialVideoName}`;
+              break;
+            }
+          }
 
-        if (
-          audioExtensions.has(extension) &&
-          allFilenames.has(`${basename}.lrc`)
-        ) {
-          songData = {
-            type: isMultiplexed ? "multiplexed" : "audio",
-            lrcPath: `${libraryPath}${basename}.lrc`,
-          };
-          try {
-            const urlObj = new URL(`http://127.0.0.1:${actualPort}/getFile`);
-            urlObj.searchParams.append("path", fullPath);
-            const tags = await new Promise((resolve, reject) => {
-              jsmediatags.read(urlObj.href, {
-                onSuccess: resolve,
-                onError: reject,
+          let songData = null;
+          let artist = "Unknown Artist";
+          let title = basename.replace(/\[.*?\]/g, "").trim();
+
+          if (
+            audioExtensions.has(extension) &&
+            allFilenames.has(`${basename}.lrc`)
+          ) {
+            songData = {
+              type: isMultiplexed ? "multiplexed" : "audio",
+              lrcPath: `${libraryPath}${basename}.lrc`,
+            };
+            try {
+              const urlObj = new URL(`http://127.0.0.1:${actualPort}/getFile`);
+              urlObj.searchParams.append("path", fullPath);
+              const tags = await new Promise((resolve, reject) => {
+                jsmediatags.read(urlObj.href, {
+                  onSuccess: resolve,
+                  onError: reject,
+                });
               });
-            });
-            if (tags.tags.title) title = tags.tags.title;
-            if (tags.tags.artist) artist = tags.tags.artist;
+              if (tags.tags.title) title = tags.tags.title;
+              if (tags.tags.artist) artist = tags.tags.artist;
 
-            if (!tags.tags.title && !tags.tags.artist) {
+              if (!tags.tags.title && !tags.tags.artist) {
+                let parts = title.split(" - ");
+                if (parts.length >= 2) {
+                  artist = parts[0].trim();
+                  title = parts.slice(1).join(" - ").trim();
+                }
+              }
+            } catch (error) {
+              console.warn(
+                `[FsSvc] Tag read failed for ${filename}, using filename.`,
+              );
               let parts = title.split(" - ");
               if (parts.length >= 2) {
                 artist = parts[0].trim();
                 title = parts.slice(1).join(" - ").trim();
               }
             }
-          } catch (error) {
-            console.warn(
-              `[FsSvc] Tag read failed for ${filename}, using filename.`,
-            );
-            let parts = title.split(" - ");
-            if (parts.length >= 2) {
-              artist = parts[0].trim();
-              title = parts.slice(1).join(" - ").trim();
+          } else if (extension === "mid" || extension === "kar") {
+            songData = { type: extension, lrcPath: null };
+            let parsedFromMidi = false;
+
+            // Process PLATINUM/MegaPro metadata
+            if (filename.toLowerCase().endsWith(".xtsp.mid")) {
+              try {
+                const urlObj = new URL(
+                  `http://127.0.0.1:${actualPort}/getFile`,
+                );
+                urlObj.searchParams.append("path", fullPath);
+                const res = await fetch(urlObj.href);
+
+                if (res.ok) {
+                  const arrayBuffer = await res.arrayBuffer();
+                  const parsedMidi = BasicMIDI.fromArrayBuffer(arrayBuffer);
+
+                  for (const track of parsedMidi.tracks) {
+                    for (const e of track.events) {
+                      if (
+                        e.data &&
+                        e.data instanceof Uint8Array &&
+                        e.data.length > 5
+                      ) {
+                        // 0x40 = '@'
+                        if (e.data[0] === 0x40) {
+                          const encoding = detectEncoding(e.data);
+                          const text = new TextDecoder(encoding).decode(e.data);
+
+                          const match = text.match(/^@(.+?)\$[0-9]+(.+)$/);
+                          if (match) {
+                            title = match[1].replace(/@/g, " ").trim();
+                            artist = match[2].trim();
+                            parsedFromMidi = true;
+                            break;
+                          }
+                        }
+                      }
+                    }
+                    if (parsedFromMidi) break;
+                  }
+                }
+              } catch (err) {
+                console.warn(
+                  `[FsSvc] Failed to parse PLATINUM/MegaPro metadata for ${filename}:`,
+                  err,
+                );
+              }
+            }
+
+            if (!parsedFromMidi) {
+              let parts = title.split(" - ");
+              if (parts.length >= 2) {
+                artist = parts[0].trim();
+                title = parts.slice(1).join(" - ").trim();
+              }
             }
           }
-        } else if (extension === "mid" || extension === "kar") {
-          songData = { type: extension, lrcPath: null };
-          let parts = title.split(" - ");
-          if (parts.length >= 2) {
-            artist = parts[0].trim();
-            title = parts.slice(1).join(" - ").trim();
-          }
-        }
-        if (songData) {
-          const newSongObj = {
-            code: String(songCodeCounter++).padStart(5, "0"),
-            artist,
-            title,
-            type: songData.type,
-            path: fullPath,
-            lrcPath: songData.lrcPath,
-            videoPath: videoPath,
-          };
-          newSongList.push(newSongObj);
 
-          if (cachedList.length > 0 && !oldPaths.has(fullPath)) {
-            newlyAddedSongs.push(newSongObj);
+          if (songData) {
+            return {
+              artist,
+              title,
+              type: songData.type,
+              path: fullPath,
+              lrcPath: songData.lrcPath,
+              videoPath: videoPath,
+            };
           }
+          return null; // Ignore invalid files
+        },
+        (processed) => {
+          dispatchBuildProgress(processed, totalFiles);
+        },
+      );
+
+      for (const parsedData of parsedFilesData) {
+        if (!parsedData) continue;
+
+        const newSongObj = {
+          code: String(songCodeCounter++).padStart(5, "0"),
+          artist: parsedData.artist,
+          title: parsedData.title,
+          type: parsedData.type,
+          path: parsedData.path,
+          lrcPath: parsedData.lrcPath,
+          videoPath: parsedData.videoPath,
+        };
+
+        newSongList.push(newSongObj);
+
+        if (cachedList.length > 0 && !oldPaths.has(parsedData.path)) {
+          newlyAddedSongs.push(newSongObj);
         }
-        processed++;
-        dispatchBuildProgress(processed, totalFiles);
       }
 
       state.songList = newSongList;
