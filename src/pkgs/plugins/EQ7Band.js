@@ -2,7 +2,16 @@ import BasePlugin from "../../libs/BasePlugin.js";
 
 const BANDS = [60, 150, 400, 1000, 2400, 6000, 15000];
 
+/**
+ * EQ7BandPlugin - Encore's 7-band graphic equalizer with peaking filters
+ * @class EQ7BandPlugin
+ * @extends BasePlugin
+ */
 export default class EQ7BandPlugin extends BasePlugin {
+  /**
+   * Creates a new EQ7BandPlugin instance
+   * @param {AudioContext} audioContext - Web Audio API context
+   */
   constructor(audioContext) {
     super(audioContext);
     this.name = "7-Band Graphic EQ";
@@ -29,18 +38,21 @@ export default class EQ7BandPlugin extends BasePlugin {
       };
     });
 
-    // Chain the filters together
     this.input.connect(this.filters[0]);
     for (let i = 0; i < this.filters.length - 1; i++) {
       this.filters[i].connect(this.filters[i + 1]);
     }
     this.filters[this.filters.length - 1].connect(this.output);
 
-    // Mouse drag state
     this.isDragging = false;
     this.currentDragIndex = -1;
   }
 
+  /**
+   * Sets a specific EQ band's gain with smooth exponential transition
+   * @param {string} key - Parameter key in format "gain{frequency}Hz"
+   * @param {number} value - Gain value in dB (-12 to +12)
+   */
   setParameter(key, value) {
     const index = BANDS.findIndex((freq) => `gain${freq}Hz` === key);
     if (index !== -1) {
@@ -53,15 +65,15 @@ export default class EQ7BandPlugin extends BasePlugin {
     }
   }
 
-  // ======================================================================
-  // --- CUSTOM GUI IMPLEMENTATION ---
-  // ======================================================================
-
+  /**
+   * Renders the custom fader-based GUI for the 7-band equalizer
+   * @param {HTMLElement} wrapper - Container element for the GUI
+   * @param {Html} Html - HTML builder utility class
+   */
   renderGUI(wrapper, Html) {
     this.activeBandIndex = 0;
     this.bandElements = [];
 
-    // Main EQ Panel Container
     const eqContainer = new Html("div")
       .styleJs({
         display: "flex",
@@ -80,7 +92,6 @@ export default class EQ7BandPlugin extends BasePlugin {
       .appendTo(wrapper);
 
     BANDS.forEach((freq, idx) => {
-      // Column for each band
       const bandCol = new Html("div")
         .styleJs({
           display: "flex",
@@ -90,7 +101,6 @@ export default class EQ7BandPlugin extends BasePlugin {
         })
         .appendTo(eqContainer);
 
-      // 1. Top Label (Current dB Value)
       const valLabel = new Html("div")
         .styleJs({
           fontFamily: "'Rajdhani', sans-serif",
@@ -102,7 +112,6 @@ export default class EQ7BandPlugin extends BasePlugin {
         })
         .appendTo(bandCol);
 
-      // 2. Fader Track Container
       const trackContainer = new Html("div")
         .styleJs({
           position: "relative",
@@ -116,7 +125,6 @@ export default class EQ7BandPlugin extends BasePlugin {
         })
         .appendTo(bandCol);
 
-      // 2a. Zero dB Center Line Marker
       new Html("div")
         .styleJs({
           position: "absolute",
@@ -130,7 +138,6 @@ export default class EQ7BandPlugin extends BasePlugin {
         })
         .appendTo(trackContainer);
 
-      // 2b. Fader Thumb
       const faderThumb = new Html("div")
         .styleJs({
           position: "absolute",
@@ -141,11 +148,10 @@ export default class EQ7BandPlugin extends BasePlugin {
           boxShadow: "0 0 10px rgba(137, 207, 240, 0.4)",
           zIndex: 2,
           pointerEvents: "none",
-          transition: "background-color 0.2s ease, box-shadow 0.2s ease", // Removed 'bottom' transition for instant 1:1 mouse tracking
+          transition: "background-color 0.2s ease, box-shadow 0.2s ease",
         })
         .appendTo(trackContainer);
 
-      // 2c. Invisible Hit Area for easier clicking/dragging
       const hitArea = new Html("div")
         .styleJs({
           position: "absolute",
@@ -158,7 +164,6 @@ export default class EQ7BandPlugin extends BasePlugin {
         })
         .appendTo(trackContainer);
 
-      // --- MOUSE EVENTS ---
       hitArea.on("mousedown", (e) => {
         this.isDragging = true;
         this.currentDragIndex = idx;
@@ -167,7 +172,6 @@ export default class EQ7BandPlugin extends BasePlugin {
         this._handleMouseFader(e, idx);
       });
 
-      // 3. Bottom Label (Frequency)
       const freqLabel = new Html("div")
         .styleJs({
           fontFamily: "'Rajdhani', sans-serif",
@@ -189,7 +193,6 @@ export default class EQ7BandPlugin extends BasePlugin {
         freq,
       });
 
-      // Initialize the visual position
       this._updateBandVisuals(idx);
     });
 
@@ -197,8 +200,10 @@ export default class EQ7BandPlugin extends BasePlugin {
     this._setupGlobalMouseEvents();
   }
 
-  // --- MOUSE EVENT HANDLERS ---
-
+  /**
+   * Registers global mouse event handlers for fader dragging
+   * @private
+   */
   _setupGlobalMouseEvents() {
     this._mouseMoveHandler = (e) => {
       if (!this.isDragging || this.currentDragIndex === -1) return;
@@ -214,59 +219,59 @@ export default class EQ7BandPlugin extends BasePlugin {
     window.addEventListener("mouseup", this._mouseUpHandler);
   }
 
+  /**
+   * Updates fader position based on mouse movement
+   * @private
+   * @param {MouseEvent} e - Mouse event with clientY position
+   * @param {number} idx - Band index being adjusted
+   */
   _handleMouseFader(e, idx) {
     const band = this.bandElements[idx];
     const rect = band.trackContainer.elm.getBoundingClientRect();
 
-    // Calculate mouse Y position relative to the track's bounding box
     let y = e.clientY - rect.top;
-
-    // Clamp Y to the track's boundaries (0 to height)
     y = Math.max(0, Math.min(rect.height, y));
-
-    // Convert Y position to a percentage (0.0 at bottom, 1.0 at top)
     const percent = 1 - y / rect.height;
 
     const key = `gain${band.freq}Hz`;
     const min = this.parameters[key].min;
     const max = this.parameters[key].max;
 
-    // Calculate new value based on percentage
     let val = min + percent * (max - min);
-
-    // Snap to standard 0.1 steps
     val = Math.round(val * 10) / 10;
 
     this.setParameter(key, val);
     this._updateBandVisuals(idx);
   }
 
-  // --- VISUAL UPDATES ---
-
-  // Helper: Updates the text and thumb position of a specific band
+  /**
+   * Updates visual representation of a band (value display and fader position)
+   * @private
+   * @param {number} idx - Band index to update
+   */
   _updateBandVisuals(idx) {
     const band = this.bandElements[idx];
     const key = `gain${band.freq}Hz`;
     const val = this.parameters[key].value;
 
-    // Format text (e.g., "+3.0", "0.0", "-2.5")
     const sign = val > 0 ? "+" : "";
     band.valLabel.text(`${sign}${val.toFixed(1)}`);
 
-    // Calculate thumb vertical percentage (-12 to +12 maps to 0% to 100%)
     const min = this.parameters[key].min;
     const max = this.parameters[key].max;
     const percentage = ((val - min) / (max - min)) * 100;
 
-    // -7px centers the 14px tall thumb on the exact percentage line
     band.faderThumb.styleJs({ bottom: `calc(${percentage}% - 7px)` });
   }
 
-  // Helper: Visually highlights the currently keyboard-focused band
+  /**
+   * Updates styling to highlight the active band and reset others
+   * @private
+   */
   _updatePluginHighlight() {
     this.bandElements.forEach((band, idx) => {
       if (idx === this.activeBandIndex) {
-        band.valLabel.styleJs({ color: "#ffd700" }); // Gold
+        band.valLabel.styleJs({ color: "#ffd700" });
         band.faderThumb.styleJs({
           backgroundColor: "#ffd700",
           boxShadow: "0 0 15px rgba(255, 215, 0, 0.6)",
@@ -276,7 +281,7 @@ export default class EQ7BandPlugin extends BasePlugin {
           backgroundColor: "#ffd700",
         });
       } else {
-        band.valLabel.styleJs({ color: "#89cff0" }); // Blue
+        band.valLabel.styleJs({ color: "#89cff0" });
         band.faderThumb.styleJs({
           backgroundColor: "#89cff0",
           boxShadow: "0 0 10px rgba(137, 207, 240, 0.4)",
@@ -289,8 +294,11 @@ export default class EQ7BandPlugin extends BasePlugin {
     });
   }
 
-  // --- KEYBOARD INTERACTION ---
-
+  /**
+   * Processes keyboard input for band navigation (arrow keys) and gain adjustment
+   * @param {KeyboardEvent} e - Keyboard event
+   * @returns {boolean} True if event was consumed, false otherwise
+   */
   handleKeyDown(e) {
     if (e.key === "ArrowLeft") {
       if (this.activeBandIndex > 0) {
@@ -298,41 +306,41 @@ export default class EQ7BandPlugin extends BasePlugin {
         this._updatePluginHighlight();
         return true;
       }
-      return false; // Exit plugin focus, go back to mixer list
+      return false;
     } else if (e.key === "ArrowRight") {
       if (this.activeBandIndex < BANDS.length - 1) {
         this.activeBandIndex++;
         this._updatePluginHighlight();
         return true;
       }
-      return false; // Hit right edge
+      return false;
     } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       e.preventDefault();
 
       const freq = BANDS[this.activeBandIndex];
       const key = `gain${freq}Hz`;
       let val = this.parameters[key].value;
-
-      // Fine-tune by 1 dB on up/down
       val += e.key === "ArrowUp" ? 1 : -1;
       val = Math.max(
         this.parameters[key].min,
         Math.min(this.parameters[key].max, val),
       );
 
-      this.setParameter(key, val); // Update the audio engine
-      this._updateBandVisuals(this.activeBandIndex); // Animate the thumb and text
+      this.setParameter(key, val);
+      this._updateBandVisuals(this.activeBandIndex);
       return true;
     }
 
-    return false; // Let "Escape" or "Tab" fall through to Mixer.js
+    return false;
   }
 
+  /**
+   * Disconnects audio nodes and removes event listeners
+   */
   disconnect() {
     super.disconnect();
     this.filters.forEach((f) => f.disconnect());
 
-    // Clean up global window events to prevent memory leaks
     if (this._mouseMoveHandler) {
       window.removeEventListener("mousemove", this._mouseMoveHandler);
     }

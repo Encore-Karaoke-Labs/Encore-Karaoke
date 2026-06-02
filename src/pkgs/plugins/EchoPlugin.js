@@ -7,21 +7,24 @@ const CONTROLS = [
 ];
 
 /**
- * EchoPlugin
- * A classic feedback delay effect for the Forte engine.
+ * EchoPlugin - Encore's echo plugin.
+ * @class EchoPlugin
+ * @extends BasePlugin
  */
 export default class EchoPlugin extends BasePlugin {
+  /**
+   * Creates a new EchoPlugin instance
+   * @param {AudioContext} audioContext - Web Audio API context
+   */
   constructor(audioContext) {
     super(audioContext);
     this.name = "Echo";
 
-    // --- Create Web Audio Nodes for the effect ---
     this.delayNode = this.audioContext.createDelay(2.0);
     this.feedbackGain = this.audioContext.createGain();
     this.dryGain = this.audioContext.createGain();
     this.wetGain = this.audioContext.createGain();
 
-    // --- Define the parameters that the UI can control ---
     this.parameters = {
       time: {
         type: "slider",
@@ -46,13 +49,11 @@ export default class EchoPlugin extends BasePlugin {
       },
     };
 
-    // --- Set initial values from the parameters object ---
     this.delayNode.delayTime.value = this.parameters.time.value;
     this.feedbackGain.gain.value = this.parameters.feedback.value;
     this.dryGain.gain.value = 1.0 - this.parameters.mix.value;
     this.wetGain.gain.value = this.parameters.mix.value;
 
-    // --- Connect the audio graph ---
     this.input.connect(this.dryGain);
     this.input.connect(this.delayNode);
     this.delayNode.connect(this.feedbackGain);
@@ -61,11 +62,15 @@ export default class EchoPlugin extends BasePlugin {
     this.delayNode.connect(this.wetGain);
     this.wetGain.connect(this.output);
 
-    // Mouse drag state
     this.isDragging = false;
     this.currentDragIndex = -1;
   }
 
+  /**
+   * Sets a specific parameter value with smooth exponential transition
+   * @param {string} key - Parameter key (time, feedback, mix)
+   * @param {number} value - New parameter value
+   */
   setParameter(key, value) {
     const now = this.audioContext.currentTime;
     const smoothTime = 0.02;
@@ -89,15 +94,15 @@ export default class EchoPlugin extends BasePlugin {
     }
   }
 
-  // ======================================================================
-  // --- CUSTOM GUI IMPLEMENTATION ---
-  // ======================================================================
-
+  /**
+   * Renders the custom fader-based GUI for the echo effect
+   * @param {HTMLElement} wrapper - Container element for the GUI
+   * @param {Html} Html - HTML builder utility class
+   */
   renderGUI(wrapper, Html) {
     this.activeControlIndex = 0;
     this.controlElements = [];
 
-    // Main Echo Panel Container
     const echoContainer = new Html("div")
       .styleJs({
         display: "flex",
@@ -127,7 +132,6 @@ export default class EchoPlugin extends BasePlugin {
         })
         .appendTo(echoContainer);
 
-      // 1. Top Label (Current Value)
       const valLabel = new Html("div")
         .styleJs({
           fontFamily: "'Rajdhani', sans-serif",
@@ -139,7 +143,6 @@ export default class EchoPlugin extends BasePlugin {
         })
         .appendTo(col);
 
-      // 2. Fader Track Container
       const trackContainer = new Html("div")
         .styleJs({
           position: "relative",
@@ -153,7 +156,6 @@ export default class EchoPlugin extends BasePlugin {
         })
         .appendTo(col);
 
-      // 2a. Fill indicator (shows volume/intensity from bottom up)
       const trackFill = new Html("div")
         .styleJs({
           position: "absolute",
@@ -165,7 +167,6 @@ export default class EchoPlugin extends BasePlugin {
         })
         .appendTo(trackContainer);
 
-      // 2b. Fader Thumb
       const faderThumb = new Html("div")
         .styleJs({
           position: "absolute",
@@ -180,7 +181,6 @@ export default class EchoPlugin extends BasePlugin {
         })
         .appendTo(trackContainer);
 
-      // 2c. Invisible Hit Area for mouse interaction
       const hitArea = new Html("div")
         .styleJs({
           position: "absolute",
@@ -193,7 +193,6 @@ export default class EchoPlugin extends BasePlugin {
         })
         .appendTo(trackContainer);
 
-      // --- MOUSE EVENTS ---
       hitArea.on("mousedown", (e) => {
         this.isDragging = true;
         this.currentDragIndex = idx;
@@ -202,7 +201,6 @@ export default class EchoPlugin extends BasePlugin {
         this._handleMouseFader(e, idx);
       });
 
-      // 3. Bottom Label (Parameter Name)
       const nameLabel = new Html("div")
         .styleJs({
           fontFamily: "'Rajdhani', sans-serif",
@@ -233,8 +231,10 @@ export default class EchoPlugin extends BasePlugin {
     this._setupGlobalMouseEvents();
   }
 
-  // --- MOUSE EVENT HANDLERS ---
-
+  /**
+   * Registers global mouse event handlers for fader dragging
+   * @private
+   */
   _setupGlobalMouseEvents() {
     this._mouseMoveHandler = (e) => {
       if (!this.isDragging || this.currentDragIndex === -1) return;
@@ -250,6 +250,12 @@ export default class EchoPlugin extends BasePlugin {
     window.addEventListener("mouseup", this._mouseUpHandler);
   }
 
+  /**
+   * Updates fader position based on mouse movement
+   * @private
+   * @param {MouseEvent} e - Mouse event with clientY position
+   * @param {number} idx - Control index being adjusted
+   */
   _handleMouseFader(e, idx) {
     const elData = this.controlElements[idx];
     const rect = elData.trackContainer.elm.getBoundingClientRect();
@@ -263,32 +269,36 @@ export default class EchoPlugin extends BasePlugin {
     const max = this.parameters[key].max;
 
     let val = min + percent * (max - min);
-    val = Math.round(val * 100) / 100; // Snap to 2 decimal places
+    val = Math.round(val * 100) / 100;
 
     this.setParameter(key, val);
     this._updateControlVisuals(idx);
   }
 
-  // --- VISUAL UPDATES ---
-
+  /**
+   * Updates visual representation of a control (fader position, value display)
+   * @private
+   * @param {number} idx - Control index to update
+   */
   _updateControlVisuals(idx) {
     const elData = this.controlElements[idx];
     const key = elData.ctrl.key;
     const val = this.parameters[key].value;
 
-    // Update Text using the specific format function for this parameter
     elData.valLabel.text(elData.ctrl.format(val));
 
-    // Calculate percentage
     const min = this.parameters[key].min;
     const max = this.parameters[key].max;
     const percentage = ((val - min) / (max - min)) * 100;
 
-    // Move Thumb & Fill Track
     elData.faderThumb.styleJs({ bottom: `calc(${percentage}% - 8px)` });
     elData.trackFill.styleJs({ height: `${percentage}%` });
   }
 
+  /**
+   * Updates styling to highlight the active control and reset others
+   * @private
+   */
   _updatePluginHighlight() {
     this.controlElements.forEach((elData, idx) => {
       if (idx === this.activeControlIndex) {
@@ -319,8 +329,11 @@ export default class EchoPlugin extends BasePlugin {
     });
   }
 
-  // --- KEYBOARD INTERACTION ---
-
+  /**
+   * Processes keyboard input for control navigation (arrow keys) and value adjustment
+   * @param {KeyboardEvent} e - Keyboard event
+   * @returns {boolean} True if event was consumed, false otherwise
+   */
   handleKeyDown(e) {
     if (e.key === "ArrowLeft") {
       if (this.activeControlIndex > 0) {
@@ -328,7 +341,7 @@ export default class EchoPlugin extends BasePlugin {
         this._updatePluginHighlight();
         return true;
       }
-      return false; // Exit back to mixer list
+      return false;
     } else if (e.key === "ArrowRight") {
       if (this.activeControlIndex < CONTROLS.length - 1) {
         this.activeControlIndex++;
@@ -342,12 +355,8 @@ export default class EchoPlugin extends BasePlugin {
       const elData = this.controlElements[this.activeControlIndex];
       const key = elData.ctrl.key;
       let val = this.parameters[key].value;
-
-      // Step value (larger increments for keyboard vs mouse)
       const step = 0.05;
       val += e.key === "ArrowUp" ? step : -step;
-
-      // Clamp value
       val = Math.max(
         this.parameters[key].min,
         Math.min(this.parameters[key].max, val),
@@ -361,6 +370,9 @@ export default class EchoPlugin extends BasePlugin {
     return false;
   }
 
+  /**
+   * Disconnects audio nodes and removes event listeners
+   */
   disconnect() {
     super.disconnect();
     this.delayNode.disconnect();
@@ -368,7 +380,6 @@ export default class EchoPlugin extends BasePlugin {
     this.wetGain.disconnect();
     this.dryGain.disconnect();
 
-    // Clean up global window events
     if (this._mouseMoveHandler) {
       window.removeEventListener("mousemove", this._mouseMoveHandler);
     }

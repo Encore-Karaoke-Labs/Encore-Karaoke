@@ -7,8 +7,16 @@ function dbToLinear(db) {
   return Math.pow(10, db / 20);
 }
 
+/**
+ * Audio worklet processor implementing a noise gate effect.
+ * Silences audio below a threshold and applies attack/release envelope.
+ * @extends AudioWorkletProcessor
+ */
 class NoiseGateProcessor extends AudioWorkletProcessor {
-  // Define the parameters that can be controlled from the main thread.
+  /**
+   * Defines the audio parameters for the noise gate.
+   * @returns {Array<Object>} Array of parameter descriptors (threshold, attack, release).
+   */
   static get parameterDescriptors() {
     return [
       {
@@ -19,36 +27,44 @@ class NoiseGateProcessor extends AudioWorkletProcessor {
       },
       {
         name: "attack",
-        defaultValue: 0.005, // 5ms
+        defaultValue: 0.005,
         minValue: 0.001,
         maxValue: 0.2,
       },
       {
         name: "release",
-        defaultValue: 0.1, // 100ms
+        defaultValue: 0.1,
         minValue: 0.01,
         maxValue: 1.0,
       },
     ];
   }
 
+  /**
+   * Initializes the noise gate processor.
+   * @param {Object} options - AudioWorkletProcessor options.
+   */
   constructor(options) {
     super(options);
-    this._gateState = "closed"; // Can be 'closed', 'opening', 'open', 'closing'
+    this._gateState = "closed";
     this._currentGain = 0.0;
   }
 
+  /**
+   * Processes audio samples through the noise gate.
+   * @param {Float32Array[][]} inputs - Input audio buffers.
+   * @param {Float32Array[][]} outputs - Output audio buffers.
+   * @param {Object} parameters - Audio parameters (threshold, attack, release).
+   * @returns {boolean} Always returns true to keep the processor alive.
+   */
   process(inputs, outputs, parameters) {
     const input = inputs[0];
     const output = outputs[0];
 
-    // Get parameter values for this processing block.
     const threshold = parameters.threshold[0];
     const attackTime = parameters.attack[0];
     const releaseTime = parameters.release[0];
 
-    // Calculate attack and release coefficients.
-    // These determine how quickly the gain changes per sample.
     const attackCoeff = Math.exp(-1.0 / (attackTime * sampleRate));
     const releaseCoeff = Math.exp(-1.0 / (releaseTime * sampleRate));
 
@@ -60,31 +76,23 @@ class NoiseGateProcessor extends AudioWorkletProcessor {
         const sample = inputChannel[i];
         const sampleAbs = Math.abs(sample);
 
-        // --- State Machine for the Gate ---
         if (sampleAbs > threshold) {
           this._gateState = "opening";
         } else {
           this._gateState = "closing";
         }
 
-        // --- Envelope Following (Gain Calculation) ---
         if (this._gateState === "opening") {
-          // Move gain towards 1.0 (open)
           this._currentGain = 1.0 + (this._currentGain - 1.0) * attackCoeff;
         } else {
-          // 'closing'
-          // Move gain towards 0.0 (closed)
           this._currentGain = 0.0 + (this._currentGain - 0.0) * releaseCoeff;
         }
 
-        // Apply the calculated gain to the output sample.
-        // The check prevents floating point inaccuracies from making silent audio non-zero.
         outputChannel[i] =
           sample * (this._currentGain < 0.0001 ? 0 : this._currentGain);
       }
     }
 
-    // Return true to keep the processor alive.
     return true;
   }
 }

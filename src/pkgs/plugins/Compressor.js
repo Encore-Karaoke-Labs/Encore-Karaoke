@@ -46,10 +46,15 @@ const CONTROLS = [
 ];
 
 /**
- * CompressorPlugin
- * A classic vocal compressor with input gain, standard compressor controls, and make-up gain.
+ * CompressorPlugin - Encore's dynamic range compressor
+ * @class CompressorPlugin
+ * @extends BasePlugin
  */
 export default class CompressorPlugin extends BasePlugin {
+  /**
+   * Creates a new CompressorPlugin instance
+   * @param {AudioContext} audioContext - Web Audio API context
+   */
   constructor(audioContext) {
     super(audioContext);
     this.name = "Compressor";
@@ -89,7 +94,7 @@ export default class CompressorPlugin extends BasePlugin {
   }
 
   /**
-   * Updates all compressor parameters based on current values
+   * Updates all compressor parameters from current parameter values
    */
   updateAllParameters() {
     this.inputGain.gain.value = this.dbToLinear(
@@ -105,8 +110,8 @@ export default class CompressorPlugin extends BasePlugin {
   }
 
   /**
-   * Sets a specific parameter value with smooth transition
-   * @param {string} key - Parameter key to update
+   * Sets a specific parameter value with smooth exponential transition
+   * @param {string} key - Parameter key (inputGain, threshold, ratio, attack, release, outputGain)
    * @param {number} value - New parameter value
    */
   setParameter(key, value) {
@@ -156,7 +161,7 @@ export default class CompressorPlugin extends BasePlugin {
   }
 
   /**
-   * Renders the custom GUI for the compressor plugin
+   * Renders the custom fader-based GUI for the compressor
    * @param {HTMLElement} wrapper - Container element for the GUI
    * @param {Html} Html - HTML builder utility class
    */
@@ -310,7 +315,7 @@ export default class CompressorPlugin extends BasePlugin {
   }
 
   /**
-   * Sets up global mouse event listeners for fader interaction
+   * Registers global mouse event handlers for fader dragging
    * @private
    */
   _setupGlobalMouseEvents() {
@@ -329,10 +334,10 @@ export default class CompressorPlugin extends BasePlugin {
   }
 
   /**
-   * Handles mouse movement on fader elements
+   * Updates fader position based on mouse movement
    * @private
-   * @param {MouseEvent} e - Mouse event
-   * @param {number} idx - Control index
+   * @param {MouseEvent} e - Mouse event with clientY position
+   * @param {number} idx - Control index being adjusted
    */
   _handleMouseFader(e, idx) {
     const elData = this.controlElements[idx];
@@ -357,9 +362,9 @@ export default class CompressorPlugin extends BasePlugin {
   }
 
   /**
-   * Updates all visual elements for a specific control
+   * Updates visual representation of a control (fader position, value display)
    * @private
-   * @param {number} idx - Control index
+   * @param {number} idx - Control index to update
    */
   _updateControlVisuals(idx) {
     const elData = this.controlElements[idx];
@@ -377,7 +382,7 @@ export default class CompressorPlugin extends BasePlugin {
   }
 
   /**
-   * Updates the visual highlight for the active control
+   * Updates styling to highlight the active control and reset others
    * @private
    */
   _updatePluginHighlight() {
@@ -411,9 +416,9 @@ export default class CompressorPlugin extends BasePlugin {
   }
 
   /**
-   * Handles keyboard input for control navigation and adjustment
+   * Processes keyboard input for control navigation (arrow keys) and value adjustment
    * @param {KeyboardEvent} e - Keyboard event
-   * @returns {boolean} True if event was handled, false otherwise
+   * @returns {boolean} True if event was consumed, false otherwise
    */
   handleKeyDown(e) {
     if (e.key === "ArrowLeft") {
@@ -453,7 +458,7 @@ export default class CompressorPlugin extends BasePlugin {
   }
 
   /**
-   * Disconnects and cleans up the plugin
+   * Disconnects audio nodes and removes event listeners
    */
   disconnect() {
     super.disconnect();
