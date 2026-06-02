@@ -142,6 +142,22 @@ class EncoreController {
     this.context.wrapper.classOn("loading");
     this.services.Forte.setPianoRollContainer(this.context.wrapper);
 
+    if (this.config.audioConfig?.micRecordingVolume !== undefined) {
+      this.services.Forte.setMicRecordingVolume(
+        this.config.audioConfig.micRecordingVolume,
+      );
+    }
+    if (this.config.audioConfig?.musicRecordingVolume !== undefined) {
+      this.services.Forte.setMusicRecordingVolume(
+        this.config.audioConfig.musicRecordingVolume,
+      );
+    }
+    if (this.config.audioConfig?.micMonitorVolume !== undefined) {
+      this.services.Forte.setMicMonitorVolume(
+        this.config.audioConfig.micMonitorVolume,
+      );
+    }
+
     if (this.config.audioConfig?.micLatency) {
       await this.services.Forte.setLatency(this.config.audioConfig.micLatency);
     }
