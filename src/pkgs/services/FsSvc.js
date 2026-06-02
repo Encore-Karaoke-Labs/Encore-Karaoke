@@ -441,10 +441,23 @@ const pkg = {
                           const encoding = detectEncoding(e.data);
                           const text = new TextDecoder(encoding).decode(e.data);
 
-                          const match = text.match(/^@(.+?)\$[0-9]+(.+)$/);
-                          if (match) {
-                            title = match[1].replace(/@/g, " ").trim();
-                            artist = match[2].trim();
+                          const dollarIndex = text.indexOf("$");
+                          if (dollarIndex !== -1) {
+                            let rawTitle = text.substring(1, dollarIndex);
+                            title = rawTitle.replace(/@/g, " ").trim();
+
+                            const artistMatch = text.match(/\$3([^$]+)/);
+                            if (artistMatch) {
+                              artist = artistMatch[1].trim();
+                            } else {
+                              const segments = text
+                                .substring(dollarIndex)
+                                .split(/\$[0-9]+/);
+                              artist =
+                                segments[segments.length - 1].trim() ||
+                                "Unknown Artist";
+                            }
+
                             parsedFromMidi = true;
                             break;
                           }
