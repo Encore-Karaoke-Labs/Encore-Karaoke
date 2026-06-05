@@ -461,42 +461,64 @@ const pkg = {
                   const arrayBuffer = await res.arrayBuffer();
                   const parsedMidi = BasicMIDI.fromArrayBuffer(arrayBuffer);
 
+                  let bestTitle = null;
+                  let bestArtist = "Unknown Artist";
+                  let foundWithDollar = false;
+
                   for (const track of parsedMidi.tracks) {
                     for (const e of track.events) {
                       if (
                         e.data &&
                         e.data instanceof Uint8Array &&
-                        e.data.length > 5
+                        e.data.length > 2
                       ) {
                         // 0x40 = '@'
                         if (e.data[0] === 0x40) {
                           const encoding = detectEncoding(e.data);
-                          const text = new TextDecoder(encoding).decode(e.data);
+                          const text = new TextDecoder(encoding)
+                            .decode(e.data)
+                            .replace(/\0/g, "")
+                            .trim();
+
+                          if (text.length <= 2) continue;
 
                           const dollarIndex = text.indexOf("$");
                           if (dollarIndex !== -1) {
                             let rawTitle = text.substring(1, dollarIndex);
-                            title = rawTitle.replace(/@/g, " ").trim();
+                            bestTitle = rawTitle.replace(/@/g, " ").trim();
 
                             const artistMatch = text.match(/\$3([^$]+)/);
                             if (artistMatch) {
-                              artist = artistMatch[1].trim();
+                              bestArtist = artistMatch[1].trim();
                             } else {
                               const segments = text
                                 .substring(dollarIndex)
                                 .split(/\$[0-9]+/);
-                              artist =
+                              bestArtist =
                                 segments[segments.length - 1].trim() ||
                                 "Unknown Artist";
                             }
 
-                            parsedFromMidi = true;
+                            foundWithDollar = true;
                             break;
+                          } else {
+                            if (!bestTitle) {
+                              bestTitle = text
+                                .substring(1)
+                                .replace(/@/g, " ")
+                                .trim();
+                            }
                           }
                         }
                       }
                     }
-                    if (parsedFromMidi) break;
+                    if (foundWithDollar) break;
+                  }
+
+                  if (bestTitle) {
+                    title = bestTitle;
+                    artist = bestArtist;
+                    parsedFromMidi = true;
                   }
                 }
               } catch (err) {
