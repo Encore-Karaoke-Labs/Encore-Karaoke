@@ -820,7 +820,7 @@ app.whenReady().then(() => {
       return;
     }
 
-    let fontRajdhani, fontRajdhaniBold, fontRadioCanada;
+    let fontRajdhani, fontRajdhaniBold, fontRadioCanada, fontCJK;
 
     try {
       fontRajdhani = fs.readFileSync(
@@ -837,6 +837,21 @@ app.whenReady().then(() => {
           "RadioCanada-Regular.ttf",
         ),
       );
+
+      const cjkPath = path.join(
+        staticAssetsPath,
+        "assets",
+        "fonts",
+        "NotoSansCJK-Regular.ttf",
+      );
+      if (fs.existsSync(cjkPath)) {
+        fontCJK = fs.readFileSync(cjkPath);
+      } else {
+        logger.warn(
+          "SYSTEM",
+          "NotoSansCJK-Regular.ttf missing! CJK characters will render as boxes.",
+        );
+      }
     } catch (fontErr) {
       logger.error("SYSTEM", `PDF Font Error: ${fontErr.message}`);
       BrowserWindow.getAllWindows().forEach((w) =>
@@ -847,6 +862,16 @@ app.whenReady().then(() => {
       );
       return;
     }
+
+    const cjkRegex =
+      /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/;
+
+    const getBoldFont = (text) =>
+      fontCJK && cjkRegex.test(text) ? "CJK-Fallback" : "Rajdhani-Bold";
+    const getRegularFont = (text) =>
+      fontCJK && cjkRegex.test(text) ? "CJK-Fallback" : "Rajdhani";
+    const getRadioFont = (text) =>
+      fontCJK && cjkRegex.test(text) ? "CJK-Fallback" : "RadioCanada";
 
     try {
       songs.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
@@ -864,11 +889,14 @@ app.whenReady().then(() => {
       doc.registerFont("RadioCanada", fontRadioCanada);
       doc.registerFont("Rajdhani", fontRajdhani);
 
+      if (fontCJK) doc.registerFont("CJK-Fallback", fontCJK);
+
       doc.rect(0, 0, doc.page.width, doc.page.height).fill("#080810");
 
+      const coverTitleFont = getBoldFont(libraryTitle);
       doc
         .fillColor("#89cff0")
-        .font("Rajdhani-Bold")
+        .font(coverTitleFont)
         .fontSize(65)
         .text(libraryTitle.toUpperCase(), 40, 60, {
           width: doc.page.width - 80,
@@ -926,8 +954,8 @@ app.whenReady().then(() => {
           "",
         );
 
-        const firstLetter = safeTitle.charAt(0).toUpperCase();
-        const isLetter = /[A-Z]/.test(firstLetter);
+        let firstLetter = safeTitle.charAt(0).toUpperCase();
+        const isLetter = /^[A-Z]$/.test(firstLetter);
         const groupingLetter = isLetter ? firstLetter : "#";
 
         const needsHeader = groupingLetter !== currentLetter;
@@ -987,8 +1015,8 @@ app.whenReady().then(() => {
           .text(song.code, textX, textY, { width: 35, lineBreak: false });
 
         const maxInfoWidth = boxW - 40 - 8;
-        doc.font("Rajdhani-Bold").fontSize(11);
 
+        doc.font("Rajdhani-Bold").fontSize(11);
         const formatWidth = doc.widthOfString(formatText);
         const gap = 4;
         const titleStartX = infoBlockX + formatWidth + gap;
@@ -999,6 +1027,9 @@ app.whenReady().then(() => {
           .text(formatText, infoBlockX, textY, { lineBreak: false });
 
         let displayTitle = safeTitle;
+        const titleFont = getBoldFont(displayTitle);
+        doc.font(titleFont).fontSize(11);
+
         if (doc.widthOfString(displayTitle) > availableTitleWidth) {
           while (
             displayTitle.length > 0 &&
@@ -1013,8 +1044,9 @@ app.whenReady().then(() => {
           .fillColor("#000000")
           .text(displayTitle, titleStartX, textY, { lineBreak: false });
 
+        const artistFont = getRadioFont(safeArtist);
         doc
-          .font("RadioCanada")
+          .font(artistFont)
           .fontSize(9)
           .fillColor("#555555")
           .text(safeArtist, infoBlockX, textY + 12, {
