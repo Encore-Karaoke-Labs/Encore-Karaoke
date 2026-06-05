@@ -820,7 +820,7 @@ app.whenReady().then(() => {
       return;
     }
 
-    let fontRajdhani, fontRajdhaniBold, fontRadioCanada, fontCJK;
+    let fontRajdhani, fontRajdhaniBold, fontRadioCanada, fontJP, fontKR, fontSC;
 
     try {
       fontRajdhani = fs.readFileSync(
@@ -838,20 +838,32 @@ app.whenReady().then(() => {
         ),
       );
 
-      const cjkPath = path.join(
+      const jpPath = path.join(
         staticAssetsPath,
         "assets",
         "fonts",
-        "NotoSansCJK-Regular.ttf",
+        "NotoSansJP-Regular.ttf",
       );
-      if (fs.existsSync(cjkPath)) {
-        fontCJK = fs.readFileSync(cjkPath);
-      } else {
-        logger.warn(
-          "SYSTEM",
-          "NotoSansCJK-Regular.ttf missing! CJK characters will render as boxes.",
-        );
-      }
+      if (fs.existsSync(jpPath)) fontJP = fs.readFileSync(jpPath);
+      else logger.warn("SYSTEM", "NotoSansJP-Regular.ttf missing!");
+
+      const krPath = path.join(
+        staticAssetsPath,
+        "assets",
+        "fonts",
+        "NotoSansKR-Regular.ttf",
+      );
+      if (fs.existsSync(krPath)) fontKR = fs.readFileSync(krPath);
+      else logger.warn("SYSTEM", "NotoSansKR-Regular.ttf missing!");
+
+      const scPath = path.join(
+        staticAssetsPath,
+        "assets",
+        "fonts",
+        "NotoSansSC-Regular.ttf",
+      );
+      if (fs.existsSync(scPath)) fontSC = fs.readFileSync(scPath);
+      else logger.warn("SYSTEM", "NotoSansSC-Regular.ttf missing!");
     } catch (fontErr) {
       logger.error("SYSTEM", `PDF Font Error: ${fontErr.message}`);
       BrowserWindow.getAllWindows().forEach((w) =>
@@ -863,15 +875,19 @@ app.whenReady().then(() => {
       return;
     }
 
-    const cjkRegex =
-      /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/;
+    const krRegex = /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/; // Hangul (Korean)
+    const kanaRegex = /[\u3040-\u30ff\u31f0-\u31ff]/; // Hiragana & Katakana (Japanese)
+    const hanIdeographsRegex = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/; // Hanzi/Kanji/Hanja
 
-    const getBoldFont = (text) =>
-      fontCJK && cjkRegex.test(text) ? "CJK-Fallback" : "Rajdhani-Bold";
-    const getRegularFont = (text) =>
-      fontCJK && cjkRegex.test(text) ? "CJK-Fallback" : "Rajdhani";
-    const getRadioFont = (text) =>
-      fontCJK && cjkRegex.test(text) ? "CJK-Fallback" : "RadioCanada";
+    const getFontForText = (text, defaultFont) => {
+      if (fontKR && krRegex.test(text)) return "KR-Fallback";
+      if (fontJP && kanaRegex.test(text)) return "JP-Fallback";
+      if (hanIdeographsRegex.test(text)) {
+        if (fontSC) return "SC-Fallback";
+        if (fontJP) return "JP-Fallback";
+      }
+      return defaultFont;
+    };
 
     try {
       songs.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
@@ -889,11 +905,13 @@ app.whenReady().then(() => {
       doc.registerFont("RadioCanada", fontRadioCanada);
       doc.registerFont("Rajdhani", fontRajdhani);
 
-      if (fontCJK) doc.registerFont("CJK-Fallback", fontCJK);
+      if (fontJP) doc.registerFont("JP-Fallback", fontJP);
+      if (fontKR) doc.registerFont("KR-Fallback", fontKR);
+      if (fontSC) doc.registerFont("SC-Fallback", fontSC);
 
       doc.rect(0, 0, doc.page.width, doc.page.height).fill("#080810");
 
-      const coverTitleFont = getBoldFont(libraryTitle);
+      const coverTitleFont = getFontForText(libraryTitle, "Rajdhani-Bold");
       doc
         .fillColor("#89cff0")
         .font(coverTitleFont)
@@ -1027,7 +1045,7 @@ app.whenReady().then(() => {
           .text(formatText, infoBlockX, textY, { lineBreak: false });
 
         let displayTitle = safeTitle;
-        const titleFont = getBoldFont(displayTitle);
+        const titleFont = getFontForText(displayTitle, "Rajdhani-Bold");
         doc.font(titleFont).fontSize(11);
 
         if (doc.widthOfString(displayTitle) > availableTitleWidth) {
@@ -1044,7 +1062,7 @@ app.whenReady().then(() => {
           .fillColor("#000000")
           .text(displayTitle, titleStartX, textY, { lineBreak: false });
 
-        const artistFont = getRadioFont(safeArtist);
+        const artistFont = getFontForText(safeArtist, "RadioCanada");
         doc
           .font(artistFont)
           .fontSize(9)
