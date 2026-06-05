@@ -470,6 +470,7 @@ const createWindow = () => {
   };
 
   win.on("focus", () => {
+    appView.webContents.focus();
     globalShortcut.register("CommandOrControl+0", resetZoom);
     globalShortcut.register("CommandOrControl+plus", addZoom);
     globalShortcut.register("CommandOrControl+=", addZoom);
