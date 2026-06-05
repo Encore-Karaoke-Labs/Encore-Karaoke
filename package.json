@@ -30,6 +30,7 @@
     "electron-squirrel-startup": "^1.0.1",
     "kuroshiro-analyzer-kuromoji": "^1.1.0",
     "loudness": "^0.4.2",
+    "pdfkit": "^0.18.0",
     "systeminformation": "^5.31.1"
   },
   "devDependencies": {

@@ -114,11 +114,43 @@ const pkg = {
   start: async function (Root) {
     actualPort = await NetworkingUtility.getPort();
     console.log("[FsSvc] File System Service started.");
-    // Reset state on start
     state.currentLibraryPath = null;
     state.currentManifest = null;
     state.songList = [];
     state.isBuilding = false;
+
+    window.desktopIntegration.ipc.on(
+      "request-songbook-data",
+      async (event, payload) => {
+        const { folderPath, filePath, libraryTitle } = payload;
+        let targetSongs = [];
+
+        if (state.currentLibraryPath === folderPath) {
+          targetSongs = pkg.data.getSongList();
+        } else {
+          const prevLib = state.currentLibraryPath;
+          const prevManifest = state.currentManifest;
+          const prevSongs = [...state.songList];
+          const prevNew = [...state.newSongs];
+
+          const success = await pkg.data.buildSongList(folderPath);
+          if (success) targetSongs = pkg.data.getSongList();
+
+          state.currentLibraryPath = prevLib;
+          state.currentManifest = prevManifest;
+          state.songList = prevSongs;
+          state.newSongs = prevNew;
+
+          dispatchSongListReady();
+        }
+
+        window.desktopIntegration.ipc.send("receive-songbook-data", {
+          songs: targetSongs,
+          filePath,
+          libraryTitle,
+        });
+      },
+    );
   },
 
   data: {

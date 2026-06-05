@@ -495,14 +495,18 @@
 
           <label>LIBRARY ROOT DIRECTORY</label>
           <div class="path-display" id="lib-path"></div>
-          <button
-            onclick="openFolder()"
-            class="action-btn outline"
-            style="width: max-content; margin-bottom: 20px"
-            id="openFolderBtn"
-          >
-            Open in File Explorer
-          </button>
+          <div style="display: flex; gap: 10px; margin-bottom: 20px">
+            <button
+              onclick="openFolder()"
+              class="action-btn outline"
+              id="openFolderBtn"
+            >
+              Open in File Explorer
+            </button>
+            <button onclick="exportSongbook()" class="action-btn outline">
+              Export PDF Songbook
+            </button>
+          </div>
 
           <div class="bottom-actions">
             <button class="action-btn danger" onclick="confirmRemoveLibrary()">
@@ -893,6 +897,32 @@
         toast.style.opacity = "1";
         setTimeout(() => (toast.style.opacity = "0"), 4000);
       }
+
+      async function exportSongbook() {
+        if (!selectedLib) return;
+
+        const res = await ipc.invoke("libmgr-export-songbook", {
+          folderPath: selectedLib.path,
+          libraryTitle: selectedLib.manifest.title || "Custom Library",
+        });
+
+        if (res.pending) {
+          showToast(
+            "Building songbook... This may take a moment.",
+            "var(--text-muted)",
+          );
+        } else if (!res.success && res.reason !== "canceled") {
+          showToast(`Error: ${res.reason}`, "var(--danger)");
+        }
+      }
+
+      ipc.on("songbook-export-complete", (event, res) => {
+        if (res.success) {
+          showToast("Songbook exported successfully!", "var(--success)");
+        } else {
+          showToast(`Failed: ${res.reason}`, "var(--danger)");
+        }
+      });
 
       loadData();
     </script>
