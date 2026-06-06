@@ -468,18 +468,67 @@ export class BGVModule {
         this.prevImageState = null;
       }, 500);
 
-      const v = this.videoElement;
+      const v = document.createElement("video");
+      v.muted = true;
+      v.autoplay = false;
+      v.playsInline = true;
+      v.defaultMuted = true;
+      v.preload = "auto";
+      v.volume = 0;
+
+      Object.assign(v.style, {
+        position: "absolute",
+        top: "0",
+        left: "0",
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        opacity: "0",
+        transition: "opacity 0.5s ease-in-out",
+        willChange: "opacity",
+        transform: "translateZ(0)",
+      });
+
+      v.addEventListener("volumechange", () => (v.volume = 0));
+      v.onended = () => this.playNext();
+      v.onerror = (e) => {
+        if (this.currentLoadId !== loadId) return;
+        console.warn("[BGV] Video error, skipping:", e);
+        this.playNext();
+      };
+
       const onCanPlay = () => {
         if (this.currentLoadId !== loadId) {
           v.removeEventListener("canplay", onCanPlay);
           return;
         }
 
+        if (this.videoElement && this.videoElement.parentNode) {
+          this.videoElement.pause();
+          this.videoElement.removeAttribute("src");
+          this.videoElement.load();
+          this.videoElement.parentNode.removeChild(this.videoElement);
+        }
+
+        this.videoElement = v;
+        if (!this.canvasOnlyMode) {
+          this.container.elm.appendChild(v);
+        }
+
+        // Never thought I'd ACTUALLY use void in this context but I'll take it
+        // (essentially just force layout calculation)
+        void v.offsetWidth;
+
         v.play()
           .then(() => {
-            v.style.opacity = "1";
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                v.style.opacity = "1";
+              });
+            });
           })
           .catch((e) => console.error("[BGV] Play failed", e));
+
         v.removeEventListener("canplay", onCanPlay);
       };
 
@@ -496,8 +545,7 @@ export class BGVModule {
    */
   async playSingleVideo(url) {
     this.isManualMode = true;
-    this.activeManualPlayer = this.videoElement;
-    this.videoElement.onended = null;
+    if (this.videoElement) this.videoElement.onended = null;
 
     this.currentLoadId = Date.now();
     const loadId = this.currentLoadId;
@@ -513,30 +561,71 @@ export class BGVModule {
       this.prevImageState = null;
     }, 500);
 
+    const v = document.createElement("video");
+    v.muted = true;
+    v.autoplay = false;
+    v.playsInline = true;
+    v.defaultMuted = true;
+    v.preload = "auto";
+    v.volume = 0;
+
+    Object.assign(v.style, {
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      opacity: "0",
+      transition: "opacity 0.5s ease-in-out",
+      willChange: "opacity",
+      transform: "translateZ(0)",
+    });
+
     if (this.canvasOnlyMode) {
-      this.videoElement.style.display = "";
+      v.style.display = "";
     }
 
-    this.videoElement.style.opacity = "0";
-    this.videoElement.src = url;
-    this.videoElement.load();
+    v.addEventListener("volumechange", () => (v.volume = 0));
+    this.activeManualPlayer = v;
+
+    v.src = url;
+    v.load();
 
     await new Promise((resolve) => {
       const onCanPlay = () => {
         if (this.currentLoadId === loadId) {
+          if (this.videoElement && this.videoElement.parentNode) {
+            this.videoElement.pause();
+            this.videoElement.removeAttribute("src");
+            this.videoElement.load();
+            this.videoElement.parentNode.removeChild(this.videoElement);
+          }
+
+          this.videoElement = v;
+          if (!this.canvasOnlyMode) {
+            this.container.elm.appendChild(v);
+          }
+
+          void v.offsetWidth;
+
           if (this.selectedCategory === "Off") {
-            this.videoElement.style.opacity = "0";
+            v.style.opacity = "0";
           } else {
-            this.videoElement.style.opacity = "1";
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                v.style.opacity = "1";
+              });
+            });
           }
         }
-        this.videoElement.removeEventListener("canplay", onCanPlay);
+        v.removeEventListener("canplay", onCanPlay);
         resolve();
       };
-      this.videoElement.addEventListener("canplay", onCanPlay);
+      v.addEventListener("canplay", onCanPlay);
     });
 
-    return this.videoElement;
+    return v;
   }
 
   /**
@@ -546,7 +635,10 @@ export class BGVModule {
     if (!this.isManualMode) return;
     this.isManualMode = false;
     this.activeManualPlayer = null;
-    this.videoElement.onended = () => this.playNext();
+
+    if (this.videoElement) {
+      this.videoElement.onended = () => this.playNext();
+    }
 
     this.start();
   }
