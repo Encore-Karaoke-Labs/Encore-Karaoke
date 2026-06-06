@@ -807,6 +807,17 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.on("songbook-build-progress", (event, data) => {
+    if (libraryManagerWin) {
+      libraryManagerWin.webContents.send("songbook-export-progress", {
+        phase: "Scanning Library...",
+        current: data.current,
+        total: data.total,
+        percentage: data.percentage,
+      });
+    }
+  });
+
   ipcMain.on("receive-songbook-data", (event, payload) => {
     const { songs, filePath, libraryTitle } = payload;
 
@@ -962,122 +973,148 @@ app.whenReady().then(() => {
         }
       }
 
-      songs.forEach((song) => {
-        const safeTitle = (song.title || "Unknown").replace(
-          /[\u0000-\x1F\x7F-\x9F]/g,
-          "",
-        );
-        const safeArtist = (song.artist || "Unknown").replace(
-          /[\u0000-\x1F\x7F-\x9F]/g,
-          "",
-        );
+      const processSongs = async () => {
+        for (let i = 0; i < songs.length; i++) {
+          const song = songs[i];
+          const safeTitle = (song.title || "Unknown").replace(
+            /[\u0000-\x1F\x7F-\x9F]/g,
+            "",
+          );
+          const safeArtist = (song.artist || "Unknown").replace(
+            /[\u0000-\x1F\x7F-\x9F]/g,
+            "",
+          );
 
-        let firstLetter = safeTitle.charAt(0).toUpperCase();
-        const isLetter = /^[A-Z]$/.test(firstLetter);
-        const groupingLetter = isLetter ? firstLetter : "#";
+          let firstLetter = safeTitle.charAt(0).toUpperCase();
+          const isLetter = /^[A-Z]$/.test(firstLetter);
+          const groupingLetter = isLetter ? firstLetter : "#";
 
-        const needsHeader = groupingLetter !== currentLetter;
-        const requiredHeight = 34 + (needsHeader ? 30 : 0);
+          const needsHeader = groupingLetter !== currentLetter;
+          const requiredHeight = 34 + (needsHeader ? 30 : 0);
 
-        checkSpace(requiredHeight);
+          checkSpace(requiredHeight);
 
-        const x = margins + col * (colWidth + gutter);
+          const x = margins + col * (colWidth + gutter);
 
-        if (needsHeader) {
-          currentLetter = groupingLetter;
+          if (needsHeader) {
+            currentLetter = groupingLetter;
 
-          doc.rect(x, currentY, colWidth, 22).fill("#89cff0");
-          doc
-            .fillColor("#080810")
-            .fontSize(16)
-            .font("Rajdhani-Bold")
-            .text(currentLetter, x + 8, currentY + 3.5);
+            doc.rect(x, currentY, colWidth, 22).fill("#89cff0");
+            doc
+              .fillColor("#080810")
+              .fontSize(16)
+              .font("Rajdhani-Bold")
+              .text(currentLetter, x + 8, currentY + 3.5);
 
-          currentY += 30;
-        }
-
-        const boxX = x;
-        const boxY = currentY;
-        const boxW = colWidth;
-        const boxH = 30;
-
-        doc.lineWidth(0.5).strokeColor("#cccccc");
-        doc.roundedRect(boxX, boxY, boxW, boxH, 4).stroke();
-
-        const textX = boxX + 8;
-        const textY = boxY + 5;
-        const infoBlockX = textX + 38;
-
-        let formatText = "[RS]";
-        let formatColor = "#B02FD1";
-
-        if (song.videoPath) {
-          formatText = "[MTV]";
-          formatColor = "#2F6CD1";
-        } else if (song.type === "multiplexed") {
-          formatText = "[MP]";
-          formatColor = "#2FD147";
-        } else if (
-          song.type === "mid" ||
-          song.type === "kar" ||
-          song.type === "midi"
-        ) {
-          formatText = "[MIDI]";
-          formatColor = "#D12F9E";
-        }
-
-        doc
-          .font("Rajdhani-Bold")
-          .fontSize(12)
-          .fillColor("#000000")
-          .text(song.code, textX, textY, { width: 35, lineBreak: false });
-
-        const maxInfoWidth = boxW - 40 - 8;
-
-        doc.font("Rajdhani-Bold").fontSize(11);
-        const formatWidth = doc.widthOfString(formatText);
-        const gap = 4;
-        const titleStartX = infoBlockX + formatWidth + gap;
-        const availableTitleWidth = maxInfoWidth - formatWidth - gap;
-
-        doc
-          .fillColor(formatColor)
-          .text(formatText, infoBlockX, textY, { lineBreak: false });
-
-        let displayTitle = safeTitle;
-        const titleFont = getFontForText(displayTitle, "Rajdhani-Bold");
-        doc.font(titleFont).fontSize(11);
-
-        if (doc.widthOfString(displayTitle) > availableTitleWidth) {
-          while (
-            displayTitle.length > 0 &&
-            doc.widthOfString(displayTitle + "...") > availableTitleWidth
-          ) {
-            displayTitle = displayTitle.slice(0, -1);
+            currentY += 30;
           }
-          displayTitle += "...";
+
+          const boxX = x;
+          const boxY = currentY;
+          const boxW = colWidth;
+          const boxH = 30;
+
+          doc.lineWidth(0.5).strokeColor("#cccccc");
+          doc.roundedRect(boxX, boxY, boxW, boxH, 4).stroke();
+
+          const textX = boxX + 8;
+          const textY = boxY + 5;
+          const infoBlockX = textX + 38;
+
+          let formatText = "[RS]";
+          let formatColor = "#B02FD1";
+
+          if (song.videoPath) {
+            formatText = "[MTV]";
+            formatColor = "#2F6CD1";
+          } else if (song.type === "multiplexed") {
+            formatText = "[MP]";
+            formatColor = "#2FD147";
+          } else if (
+            song.type === "mid" ||
+            song.type === "kar" ||
+            song.type === "midi"
+          ) {
+            formatText = "[MIDI]";
+            formatColor = "#D12F9E";
+          }
+
+          doc
+            .font("Rajdhani-Bold")
+            .fontSize(12)
+            .fillColor("#000000")
+            .text(song.code, textX, textY, { width: 35, lineBreak: false });
+
+          const maxInfoWidth = boxW - 40 - 8;
+          doc.font("Rajdhani-Bold").fontSize(11);
+          const formatWidth = doc.widthOfString(formatText);
+          const gap = 4;
+          const titleStartX = infoBlockX + formatWidth + gap;
+          const availableTitleWidth = maxInfoWidth - formatWidth - gap;
+
+          doc
+            .fillColor(formatColor)
+            .text(formatText, infoBlockX, textY, { lineBreak: false });
+
+          let displayTitle = safeTitle;
+          const titleFont = getFontForText(displayTitle, "Rajdhani-Bold");
+          doc.font(titleFont).fontSize(11);
+
+          if (doc.widthOfString(displayTitle) > availableTitleWidth) {
+            while (
+              displayTitle.length > 0 &&
+              doc.widthOfString(displayTitle + "...") > availableTitleWidth
+            ) {
+              displayTitle = displayTitle.slice(0, -1);
+            }
+            displayTitle += "...";
+          }
+
+          doc
+            .fillColor("#000000")
+            .text(displayTitle, titleStartX, textY, { lineBreak: false });
+
+          const artistFont = getFontForText(safeArtist, "RadioCanada");
+          doc
+            .font(artistFont)
+            .fontSize(9)
+            .fillColor("#555555")
+            .text(safeArtist, infoBlockX, textY + 12, {
+              width: maxInfoWidth,
+              height: 11,
+              lineBreak: false,
+              ellipsis: true,
+            });
+
+          currentY += 34;
+
+          if (i % 50 === 0 || i === songs.length - 1) {
+            const currentCount = i + 1;
+            BrowserWindow.getAllWindows().forEach((w) =>
+              w.webContents.send("songbook-export-progress", {
+                phase: "Generating PDF...",
+                current: currentCount,
+                total: songs.length,
+                percentage: Math.round((currentCount / songs.length) * 100),
+              }),
+            );
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
         }
 
-        doc
-          .fillColor("#000000")
-          .text(displayTitle, titleStartX, textY, { lineBreak: false });
+        doc.end();
+      };
 
-        const artistFont = getFontForText(safeArtist, "RadioCanada");
-        doc
-          .font(artistFont)
-          .fontSize(9)
-          .fillColor("#555555")
-          .text(safeArtist, infoBlockX, textY + 12, {
-            width: maxInfoWidth,
-            height: 11,
-            lineBreak: false,
-            ellipsis: true,
-          });
-
-        currentY += 34;
+      processSongs().catch((err) => {
+        logger.error("SYSTEM", `PDF Loop Error: ${err.message}`);
+        BrowserWindow.getAllWindows().forEach((w) =>
+          w.webContents.send("songbook-export-complete", {
+            success: false,
+            reason: err.message,
+          }),
+        );
       });
 
-      doc.end();
       stream.on("finish", () => {
         BrowserWindow.getAllWindows().forEach((w) =>
           w.webContents.send("songbook-export-complete", { success: true }),

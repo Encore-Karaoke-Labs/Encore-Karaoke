@@ -440,6 +440,23 @@
         justify-content: center;
         gap: 15px;
       }
+
+      .progress-bar-container {
+        width: 100%;
+        height: 15px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 5px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        overflow: hidden;
+        margin-top: 20px;
+      }
+      .progress-bar-fill {
+        height: 100%;
+        background: var(--accent);
+        width: 0%;
+        transition: width 0.1s linear;
+        box-shadow: 0 0 10px rgba(137, 207, 240, 0.5);
+      }
     </style>
   </head>
   <body>
@@ -581,6 +598,18 @@
           <button class="action-btn danger" id="modal-confirm-btn">
             Delete
           </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="export-progress-modal" class="modal-overlay hidden">
+      <div class="modal-box">
+        <h2 id="export-phase-text" style="color: var(--accent)">
+          EXPORTING SONGBOOK
+        </h2>
+        <p id="export-status-text">Preparing...</p>
+        <div class="progress-bar-container">
+          <div id="export-progress-fill" class="progress-bar-fill"></div>
         </div>
       </div>
     </div>
@@ -907,16 +936,32 @@
         });
 
         if (res.pending) {
-          showToast(
-            "Building songbook... This may take a moment.",
-            "var(--text-muted)",
-          );
+          document
+            .getElementById("export-progress-modal")
+            .classList.remove("hidden");
+          document.getElementById("export-phase-text").innerText =
+            "STARTING EXPORT";
+          document.getElementById("export-status-text").innerText =
+            "Initializing...";
+          document.getElementById("export-progress-fill").style.width = "0%";
         } else if (!res.success && res.reason !== "canceled") {
           showToast(`Error: ${res.reason}`, "var(--danger)");
         }
       }
 
+      ipc.on("songbook-export-progress", (event, data) => {
+        document.getElementById("export-phase-text").innerText =
+          data.phase.toUpperCase();
+        document.getElementById("export-status-text").innerText =
+          `Processing: ${data.current} / ${data.total}`;
+        document.getElementById("export-progress-fill").style.width =
+          `${data.percentage}%`;
+      });
+
       ipc.on("songbook-export-complete", (event, res) => {
+        document
+          .getElementById("export-progress-modal")
+          .classList.add("hidden");
         if (res.success) {
           showToast("Songbook exported successfully!", "var(--success)");
         } else {

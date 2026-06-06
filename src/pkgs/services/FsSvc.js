@@ -125,6 +125,17 @@ const pkg = {
         const { folderPath, filePath, libraryTitle } = payload;
         let targetSongs = [];
 
+        const progressHandler = (e) => {
+          window.desktopIntegration.ipc.send(
+            "songbook-build-progress",
+            e.detail,
+          );
+        };
+        document.addEventListener(
+          "CherryTree.FsSvc.SongList.Progress",
+          progressHandler,
+        );
+
         if (state.currentLibraryPath === folderPath) {
           targetSongs = pkg.data.getSongList();
         } else {
@@ -143,6 +154,11 @@ const pkg = {
 
           dispatchSongListReady();
         }
+
+        document.removeEventListener(
+          "CherryTree.FsSvc.SongList.Progress",
+          progressHandler,
+        );
 
         window.desktopIntegration.ipc.send("receive-songbook-data", {
           songs: targetSongs,
