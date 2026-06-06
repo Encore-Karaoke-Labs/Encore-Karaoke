@@ -645,7 +645,7 @@ export class RecorderModule {
     this.bgvCtx.fillStyle = "black";
     this.bgvCtx.fillRect(0, 0, w, h);
 
-    if (sourceVideo && sourceVideo.readyState >= 2 && !sourceVideo.paused) {
+    if (sourceVideo && sourceVideo.readyState >= 2) {
       this.bgvCtx.drawImage(sourceVideo, 0, 0, w, h);
     }
 
