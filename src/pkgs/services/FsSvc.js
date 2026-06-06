@@ -41,15 +41,25 @@ function detectEncoding(uint8Array) {
  * @param {number} maxConcurrent - Maximum number of active async tasks.
  * @param {Function} processFn - Async function to run on each item.
  * @param {Function} progressCb - Callback for reporting progress.
+ * @param {AbortSignal} abortSignal - Optional abort signal to cancel processing.
  * @returns {Promise<Array>} Results mapped to the exact original array order.
  */
-async function processConcurrent(items, maxConcurrent, processFn, progressCb) {
+async function processConcurrent(
+  items,
+  maxConcurrent,
+  processFn,
+  progressCb,
+  abortSignal,
+) {
   const results = new Array(items.length);
   let index = 0;
   let processed = 0;
 
   const worker = async () => {
     while (index < items.length) {
+      if (abortSignal?.aborted) {
+        throw new Error("Build cancelled");
+      }
       const currentIndex = index++;
       results[currentIndex] = await processFn(items[currentIndex]);
       processed++;
@@ -72,6 +82,7 @@ const state = {
   songList: [],
   newSongs: [],
   isBuilding: false,
+  buildAbortController: null,
 };
 
 let actualPort = 9864;
@@ -118,6 +129,25 @@ const pkg = {
     state.currentManifest = null;
     state.songList = [];
     state.isBuilding = false;
+    state.buildAbortController = null;
+
+    window.desktopIntegration.ipc.on("cancel-songbook-build", () => {
+      console.log("[FsSvc] Received cancel-songbook-build message");
+      if (state.buildAbortController) {
+        console.log("[FsSvc] Build is active, aborting...");
+        console.log("[FsSvc] Current build state:", {
+          isBuilding: state.isBuilding,
+          libraryPath: state.currentLibraryPath,
+          songListLength: state.songList.length,
+        });
+        state.buildAbortController.abort();
+        state.buildAbortController = null;
+        state.isBuilding = false;
+        console.log("[FsSvc] Build abort signal sent and state cleared");
+      } else {
+        console.log("[FsSvc] No active build to cancel");
+      }
+    });
 
     window.desktopIntegration.ipc.on(
       "request-songbook-data",
@@ -301,6 +331,7 @@ const pkg = {
       }
 
       state.isBuilding = true;
+      state.buildAbortController = new AbortController();
       console.log(`[FsSvc] Checking song list for: ${libraryPath}`);
 
       let loadedManifest = null;
@@ -385,231 +416,284 @@ const pkg = {
       const totalFiles = processableFiles.length;
       dispatchBuildProgress(0, totalFiles);
 
-      const parsedFilesData = await processConcurrent(
-        processableFiles,
-        30,
-        async (file) => {
-          const filename = file.name;
-          const fullPath = `${libraryPath}${filename}`;
-
-          const isMultiplexed = filename
-            .toLowerCase()
-            .includes(".multiplexed.");
-          let basename, extension;
-
-          extension = filename.split(".").pop().toLowerCase();
-
-          if (isMultiplexed) {
-            const regex = new RegExp(`\\.multiplexed\\.${extension}$`, "i");
-            basename = filename.replace(regex, "");
-          } else {
-            const lastDotIndex = filename.lastIndexOf(".");
-            basename =
-              lastDotIndex > -1
-                ? filename.substring(0, lastDotIndex)
-                : filename;
-          }
-
-          let videoPath = null;
-          for (const videoExt of videoExtensions) {
-            const potentialVideoName = `${basename}.${videoExt}`;
-            if (allFilenames.has(potentialVideoName)) {
-              videoPath = `${libraryPath}${potentialVideoName}`;
-              break;
+      try {
+        const parsedFilesData = await processConcurrent(
+          processableFiles,
+          30,
+          async (file) => {
+            if (state.buildAbortController?.signal.aborted) {
+              throw new Error("Build cancelled");
             }
-          }
+            const filename = file.name;
+            const fullPath = `${libraryPath}${filename}`;
 
-          let songData = null;
-          let artist = "Unknown Artist";
-          let title = basename.replace(/\[.*?\]/g, "").trim();
+            const isMultiplexed = filename
+              .toLowerCase()
+              .includes(".multiplexed.");
+            let basename, extension;
 
-          if (
-            audioExtensions.has(extension) &&
-            allFilenames.has(`${basename}.lrc`)
-          ) {
-            songData = {
-              type: isMultiplexed ? "multiplexed" : "audio",
-              lrcPath: `${libraryPath}${basename}.lrc`,
-            };
-            try {
-              const urlObj = new URL(`http://127.0.0.1:${actualPort}/getFile`);
-              urlObj.searchParams.append("path", fullPath);
-              const tags = await new Promise((resolve, reject) => {
-                jsmediatags.read(urlObj.href, {
-                  onSuccess: resolve,
-                  onError: reject,
+            extension = filename.split(".").pop().toLowerCase();
+
+            if (isMultiplexed) {
+              const regex = new RegExp(`\\.multiplexed\\.${extension}$`, "i");
+              basename = filename.replace(regex, "");
+            } else {
+              const lastDotIndex = filename.lastIndexOf(".");
+              basename =
+                lastDotIndex > -1
+                  ? filename.substring(0, lastDotIndex)
+                  : filename;
+            }
+
+            let videoPath = null;
+            for (const videoExt of videoExtensions) {
+              const potentialVideoName = `${basename}.${videoExt}`;
+              if (allFilenames.has(potentialVideoName)) {
+                videoPath = `${libraryPath}${potentialVideoName}`;
+                break;
+              }
+            }
+
+            let songData = null;
+            let artist = "Unknown Artist";
+            let title = basename.replace(/\[.*?\]/g, "").trim();
+
+            if (
+              audioExtensions.has(extension) &&
+              allFilenames.has(`${basename}.lrc`)
+            ) {
+              if (state.buildAbortController?.signal.aborted) {
+                throw new Error("Build cancelled");
+              }
+              songData = {
+                type: isMultiplexed ? "multiplexed" : "audio",
+                lrcPath: `${libraryPath}${basename}.lrc`,
+              };
+              try {
+                const urlObj = new URL(
+                  `http://127.0.0.1:${actualPort}/getFile`,
+                );
+                urlObj.searchParams.append("path", fullPath);
+                const tags = await new Promise((resolve, reject) => {
+                  if (state.buildAbortController?.signal.aborted) {
+                    reject(new Error("Build cancelled"));
+                  } else {
+                    jsmediatags.read(urlObj.href, {
+                      onSuccess: resolve,
+                      onError: reject,
+                    });
+                  }
                 });
-              });
-              if (tags.tags.title) title = tags.tags.title;
-              if (tags.tags.artist) artist = tags.tags.artist;
+                if (tags.tags.title) title = tags.tags.title;
+                if (tags.tags.artist) artist = tags.tags.artist;
 
-              if (!tags.tags.title && !tags.tags.artist) {
+                if (!tags.tags.title && !tags.tags.artist) {
+                  let parts = title.split(" - ");
+                  if (parts.length >= 2) {
+                    artist = parts[0].trim();
+                    title = parts.slice(1).join(" - ").trim();
+                  }
+                }
+              } catch (error) {
+                console.warn(
+                  `[FsSvc] Tag read failed for ${filename}, using filename.`,
+                );
                 let parts = title.split(" - ");
                 if (parts.length >= 2) {
                   artist = parts[0].trim();
                   title = parts.slice(1).join(" - ").trim();
                 }
               }
-            } catch (error) {
-              console.warn(
-                `[FsSvc] Tag read failed for ${filename}, using filename.`,
-              );
-              let parts = title.split(" - ");
-              if (parts.length >= 2) {
-                artist = parts[0].trim();
-                title = parts.slice(1).join(" - ").trim();
+            } else if (extension === "mid" || extension === "kar") {
+              if (state.buildAbortController?.signal.aborted) {
+                throw new Error("Build cancelled");
               }
-            }
-          } else if (extension === "mid" || extension === "kar") {
-            songData = { type: extension, lrcPath: null };
-            let parsedFromMidi = false;
+              songData = { type: extension, lrcPath: null };
+              let parsedFromMidi = false;
 
-            // Process PLATINUM/MegaPro metadata
-            if (filename.toLowerCase().endsWith(".xtsp.mid")) {
-              try {
-                const urlObj = new URL(
-                  `http://127.0.0.1:${actualPort}/getFile`,
-                );
-                urlObj.searchParams.append("path", fullPath);
-                const res = await fetch(urlObj.href);
+              // Process PLATINUM/MegaPro metadata
+              if (filename.toLowerCase().endsWith(".xtsp.mid")) {
+                try {
+                  if (state.buildAbortController?.signal.aborted) {
+                    throw new Error("Build cancelled");
+                  }
+                  const urlObj = new URL(
+                    `http://127.0.0.1:${actualPort}/getFile`,
+                  );
+                  urlObj.searchParams.append("path", fullPath);
+                  const res = await fetch(urlObj.href);
 
-                if (res.ok) {
-                  const arrayBuffer = await res.arrayBuffer();
-                  const parsedMidi = BasicMIDI.fromArrayBuffer(arrayBuffer);
+                  if (state.buildAbortController?.signal.aborted) {
+                    throw new Error("Build cancelled");
+                  }
 
-                  let bestTitle = null;
-                  let bestArtist = "Unknown Artist";
-                  let foundWithDollar = false;
+                  if (res.ok) {
+                    if (state.buildAbortController?.signal.aborted) {
+                      throw new Error("Build cancelled");
+                    }
+                    const arrayBuffer = await res.arrayBuffer();
+                    if (state.buildAbortController?.signal.aborted) {
+                      throw new Error("Build cancelled");
+                    }
+                    const parsedMidi = BasicMIDI.fromArrayBuffer(arrayBuffer);
 
-                  for (const track of parsedMidi.tracks) {
-                    for (const e of track.events) {
-                      if (
-                        e.data &&
-                        e.data instanceof Uint8Array &&
-                        e.data.length > 2
-                      ) {
-                        // 0x40 = '@'
-                        if (e.data[0] === 0x40) {
-                          const encoding = detectEncoding(e.data);
-                          const text = new TextDecoder(encoding)
-                            .decode(e.data)
-                            .replace(/\0/g, "")
-                            .trim();
+                    let bestTitle = null;
+                    let bestArtist = "Unknown Artist";
+                    let foundWithDollar = false;
 
-                          if (text.length <= 2) continue;
+                    for (const track of parsedMidi.tracks) {
+                      if (state.buildAbortController?.signal.aborted) {
+                        throw new Error("Build cancelled");
+                      }
+                      for (const e of track.events) {
+                        if (state.buildAbortController?.signal.aborted) {
+                          throw new Error("Build cancelled");
+                        }
+                        if (
+                          e.data &&
+                          e.data instanceof Uint8Array &&
+                          e.data.length > 2
+                        ) {
+                          // 0x40 = '@'
+                          if (e.data[0] === 0x40) {
+                            const encoding = detectEncoding(e.data);
+                            const text = new TextDecoder(encoding)
+                              .decode(e.data)
+                              .replace(/\0/g, "")
+                              .trim();
 
-                          const dollarIndex = text.indexOf("$");
-                          if (dollarIndex !== -1) {
-                            let rawTitle = text.substring(1, dollarIndex);
-                            bestTitle = rawTitle.replace(/@/g, " ").trim();
+                            if (text.length <= 2) continue;
 
-                            const artistMatch = text.match(/\$3([^$]+)/);
-                            if (artistMatch) {
-                              bestArtist = artistMatch[1].trim();
+                            const dollarIndex = text.indexOf("$");
+                            if (dollarIndex !== -1) {
+                              let rawTitle = text.substring(1, dollarIndex);
+                              bestTitle = rawTitle.replace(/@/g, " ").trim();
+
+                              const artistMatch = text.match(/\$3([^$]+)/);
+                              if (artistMatch) {
+                                bestArtist = artistMatch[1].trim();
+                              } else {
+                                const segments = text
+                                  .substring(dollarIndex)
+                                  .split(/\$[0-9]+/);
+                                bestArtist =
+                                  segments[segments.length - 1].trim() ||
+                                  "Unknown Artist";
+                              }
+
+                              foundWithDollar = true;
+                              break;
                             } else {
-                              const segments = text
-                                .substring(dollarIndex)
-                                .split(/\$[0-9]+/);
-                              bestArtist =
-                                segments[segments.length - 1].trim() ||
-                                "Unknown Artist";
-                            }
-
-                            foundWithDollar = true;
-                            break;
-                          } else {
-                            if (!bestTitle) {
-                              bestTitle = text
-                                .substring(1)
-                                .replace(/@/g, " ")
-                                .trim();
+                              if (!bestTitle) {
+                                bestTitle = text
+                                  .substring(1)
+                                  .replace(/@/g, " ")
+                                  .trim();
+                              }
                             }
                           }
                         }
                       }
+                      if (foundWithDollar) break;
                     }
-                    if (foundWithDollar) break;
-                  }
 
-                  if (bestTitle) {
-                    title = bestTitle;
-                    artist = bestArtist;
-                    parsedFromMidi = true;
+                    if (bestTitle) {
+                      title = bestTitle;
+                      artist = bestArtist;
+                      parsedFromMidi = true;
+                    }
                   }
+                } catch (err) {
+                  console.warn(
+                    `[FsSvc] Failed to parse PLATINUM/MegaPro metadata for ${filename}:`,
+                    err,
+                  );
                 }
-              } catch (err) {
-                console.warn(
-                  `[FsSvc] Failed to parse PLATINUM/MegaPro metadata for ${filename}:`,
-                  err,
-                );
+              }
+
+              if (!parsedFromMidi) {
+                let parts = title.split(" - ");
+                if (parts.length >= 2) {
+                  artist = parts[0].trim();
+                  title = parts.slice(1).join(" - ").trim();
+                }
               }
             }
 
-            if (!parsedFromMidi) {
-              let parts = title.split(" - ");
-              if (parts.length >= 2) {
-                artist = parts[0].trim();
-                title = parts.slice(1).join(" - ").trim();
-              }
+            if (songData) {
+              return {
+                artist,
+                title,
+                type: songData.type,
+                path: fullPath,
+                lrcPath: songData.lrcPath,
+                videoPath: videoPath,
+              };
             }
+            return null; // Ignore invalid files
+          },
+          (processed) => {
+            dispatchBuildProgress(processed, totalFiles);
+          },
+          state.buildAbortController?.signal,
+        );
+
+        for (const parsedData of parsedFilesData) {
+          if (!parsedData) continue;
+
+          const newSongObj = {
+            code: String(songCodeCounter++).padStart(5, "0"),
+            artist: parsedData.artist,
+            title: parsedData.title,
+            type: parsedData.type,
+            path: parsedData.path,
+            lrcPath: parsedData.lrcPath,
+            videoPath: parsedData.videoPath,
+          };
+
+          newSongList.push(newSongObj);
+
+          if (cachedList.length > 0 && !oldPaths.has(parsedData.path)) {
+            newlyAddedSongs.push(newSongObj);
           }
-
-          if (songData) {
-            return {
-              artist,
-              title,
-              type: songData.type,
-              path: fullPath,
-              lrcPath: songData.lrcPath,
-              videoPath: videoPath,
-            };
-          }
-          return null; // Ignore invalid files
-        },
-        (processed) => {
-          dispatchBuildProgress(processed, totalFiles);
-        },
-      );
-
-      for (const parsedData of parsedFilesData) {
-        if (!parsedData) continue;
-
-        const newSongObj = {
-          code: String(songCodeCounter++).padStart(5, "0"),
-          artist: parsedData.artist,
-          title: parsedData.title,
-          type: parsedData.type,
-          path: parsedData.path,
-          lrcPath: parsedData.lrcPath,
-          videoPath: parsedData.videoPath,
-        };
-
-        newSongList.push(newSongObj);
-
-        if (cachedList.length > 0 && !oldPaths.has(parsedData.path)) {
-          newlyAddedSongs.push(newSongObj);
         }
+
+        state.songList = newSongList;
+
+        if (newlyAddedSongs.length > 0) {
+          state.newSongs = newlyAddedSongs;
+        } else {
+          state.newSongs = cachedNewSongs;
+        }
+
+        console.log(
+          `[FsSvc] Build complete. Found ${state.songList.length} songs. ${state.newSongs.length} are marked as new.`,
+        );
+
+        await localforage.setItem(cacheKey, newSongList);
+        await localforage.setItem(signatureKey, currentSignature);
+        await localforage.setItem(newSongsKey, state.newSongs);
+
+        state.isBuilding = false;
+        state.buildAbortController = null;
+        dispatchSongListReady();
+        return true;
+      } catch (err) {
+        if (err.message === "Build cancelled") {
+          console.log("[FsSvc] Song list build was cancelled successfully.");
+          console.log("[FsSvc] Cancellation stats:", {
+            isBuilding: state.isBuilding,
+            libraryPath: state.currentLibraryPath,
+            songsSoFar: state.songList.length,
+          });
+        } else {
+          console.error("[FsSvc] Error during song list build:", err.message);
+          console.error("[FsSvc] Error stack:", err.stack);
+        }
+        state.isBuilding = false;
+        state.buildAbortController = null;
+        return false;
       }
-
-      state.songList = newSongList;
-
-      if (newlyAddedSongs.length > 0) {
-        state.newSongs = newlyAddedSongs;
-      } else {
-        state.newSongs = cachedNewSongs;
-      }
-
-      console.log(
-        `[FsSvc] Build complete. Found ${state.songList.length} songs. ${state.newSongs.length} are marked as new.`,
-      );
-
-      await localforage.setItem(cacheKey, newSongList);
-      await localforage.setItem(signatureKey, currentSignature);
-      await localforage.setItem(newSongsKey, state.newSongs);
-
-      state.isBuilding = false;
-      dispatchSongListReady();
-      return true;
     },
 
     /**

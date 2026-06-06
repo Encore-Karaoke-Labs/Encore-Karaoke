@@ -380,6 +380,7 @@ server.post("/auth/verify-hash", (req, res) => {
 
 const titleBarHeight = 55;
 let zoomFactor = Config.getItem("zoomLevel") || 0.85;
+let appViewWebContents = null;
 
 // Main App Startup
 const createWindow = () => {
@@ -406,6 +407,7 @@ const createWindow = () => {
   });
 
   win.contentView.addChildView(appView);
+  appViewWebContents = appView.webContents;
 
   const updateBounds = () => {
     const bounds = win.getContentBounds();
@@ -808,6 +810,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on("songbook-build-progress", (event, data) => {
+    isSongbookBuildActive = true;
     if (libraryManagerWin) {
       libraryManagerWin.webContents.send("songbook-export-progress", {
         phase: "Scanning Library...",
@@ -819,6 +822,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on("receive-songbook-data", (event, payload) => {
+    isSongbookBuildActive = true;
     const { songs, filePath, libraryTitle } = payload;
 
     if (!songs || songs.length === 0) {
@@ -1140,6 +1144,10 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.on("songbook-export-complete", (event, data) => {
+    isSongbookBuildActive = false;
+  });
+
   ipcMain.handle("get-update-servers", () => activeUpdateServers);
   ipcMain.handle(
     "sync-library",
@@ -1335,6 +1343,7 @@ app.whenReady().then(() => {
   );
 
   let libraryManagerWin = null;
+  let isSongbookBuildActive = false;
 
   ipcMain.on("open-library-manager", () => {
     if (libraryManagerWin) {
@@ -1363,6 +1372,19 @@ app.whenReady().then(() => {
     );
 
     libraryManagerWin.on("closed", () => {
+      if (isSongbookBuildActive) {
+        logger.info(
+          "SYSTEM",
+          "Library Manager closed. Cancelling songbook build...",
+        );
+        isSongbookBuildActive = false;
+        if (appViewWebContents && !appViewWebContents.isDestroyed()) {
+          logger.info("SYSTEM", "Sending cancel-songbook-build to appView");
+          appViewWebContents.send("cancel-songbook-build");
+        } else {
+          logger.warn("SYSTEM", "appViewWebContents is not available");
+        }
+      }
       libraryManagerWin = null;
     });
   });
