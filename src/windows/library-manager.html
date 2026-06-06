@@ -415,6 +415,15 @@
       }
       .modal-box {
         background: rgba(15, 15, 25, 0.95);
+        border: 2px solid var(--accent);
+        border-radius: 12px;
+        padding: 30px;
+        width: 450px;
+        text-align: center;
+        box-shadow: 0 15px 50px rgba(0, 0, 0, 0.9);
+      }
+      .modal-box.danger {
+        background: rgba(15, 15, 25, 0.95);
         border: 2px solid var(--danger);
         border-radius: 12px;
         padding: 30px;
@@ -588,7 +597,7 @@
     <div id="toast" class="toast"></div>
 
     <div id="confirm-modal" class="modal-overlay hidden">
-      <div class="modal-box">
+      <div class="modal-box danger">
         <h2 id="modal-title">CONFIRM</h2>
         <p id="modal-desc">Are you sure?</p>
         <div class="modal-actions">
