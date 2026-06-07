@@ -179,18 +179,41 @@ const pkg = {
     const libInfo = fsSvc.getLibraryInfo();
     const config = await window.config.getAll();
 
-    if (
-      libInfo?.manifest?.additionalContents?.soundFont &&
-      config.audioConfig?.useLibraryFont
+    let mode = config.audioConfig?.soundfontMode;
+    if (!mode) {
+      mode =
+        config.audioConfig?.useLibraryFont !== false ? "library" : "default";
+    }
+
+    let fontUrlToLoad = null;
+
+    if (mode === "custom" && config.audioConfig?.customSoundfontPath) {
+      const url = new URL(`http://127.0.0.1:${actualPort}/getFile`);
+      url.searchParams.append("path", config.audioConfig.customSoundfontPath);
+      fontUrlToLoad = url.href;
+    } else if (
+      mode === "library" &&
+      libInfo?.manifest?.additionalContents?.soundFont
     ) {
-      statusP.text("Loading sounds...");
       const url = new URL(`http://127.0.0.1:${actualPort}/getFile`);
       const soundFontPath = pathJoin([
         libInfo.path,
         libInfo.manifest.additionalContents.soundFont,
       ]);
       url.searchParams.append("path", soundFontPath);
-      await forteSvc.loadSoundFont(url.href);
+      fontUrlToLoad = url.href;
+    }
+
+    if (fontUrlToLoad) {
+      statusP.text("Loading sounds...");
+      try {
+        await forteSvc.loadSoundFont(fontUrlToLoad);
+      } catch (err) {
+        console.error(
+          "Failed to load preferred soundfont. Proceeding with system default.",
+          err,
+        );
+      }
     }
 
     await root.Libs.startPkg("system:EncoreHome", []);

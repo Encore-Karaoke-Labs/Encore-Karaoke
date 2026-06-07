@@ -780,6 +780,21 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle("select-soundfont-file", async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(win, {
+      title: "Select Custom Soundfont",
+      properties: ["openFile"],
+      filters: [
+        { name: "Soundfont Files", extensions: ["sf2", "sf3", "sfz", "dls"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0].replace(/\\/g, "/");
+  });
+
   ipcMain.handle("libmgr-export-songbook", async (event, payload) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     const { folderPath, libraryTitle } = payload;
