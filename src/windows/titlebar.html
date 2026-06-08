@@ -199,15 +199,39 @@
         background: rgba(57, 255, 20, 0.3);
       }
 
-      .window-controls button {
-        background: transparent;
-        border: none;
-        font-size: 1.1rem;
-        padding: 0 12px;
+      .window-controls {
+        display: flex;
+        align-items: center;
         height: 100%;
+        -webkit-app-region: no-drag;
+        gap: 6px;
       }
+
+      .window-controls button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-panel);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: var(--text-main);
+        width: 34px;
+        height: 30px;
+        padding: 0;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        outline: none;
+      }
+
+      .window-controls button:hover {
+        background: rgba(137, 207, 240, 0.15);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
       .window-controls .close-btn:hover {
-        color: #e81123;
+        background: rgba(255, 85, 85, 0.15);
+        border-color: #ff5555;
+        color: #ff5555;
       }
 
       body.is-mac .titlebar {
@@ -269,17 +293,51 @@
       </div>
 
       <div class="section window-controls" id="window-controls">
-        <button onclick="window.desktopIntegration.ipc.send('window-minimize')">
-          —
-        </button>
-        <button onclick="window.desktopIntegration.ipc.send('window-maximize')">
-          🗖
+        <button
+          tabindex="-1"
+          onclick="window.desktopIntegration.ipc.send('window-minimize')"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16">
+            <path
+              d="M2,8 h12"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              fill="none"
+            />
+          </svg>
         </button>
         <button
+          tabindex="-1"
+          onclick="window.desktopIntegration.ipc.send('window-maximize')"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16">
+            <rect
+              x="2"
+              y="2"
+              width="12"
+              height="12"
+              rx="2"
+              stroke="currentColor"
+              stroke-width="3"
+              fill="none"
+            />
+          </svg>
+        </button>
+        <button
+          tabindex="-1"
           class="close-btn"
           onclick="window.desktopIntegration.ipc.send('app-close')"
         >
-          ✕
+          <svg width="12" height="12" viewBox="0 0 16 16">
+            <path
+              d="M3,3 l10,10 M13,3 l-10,10"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              fill="none"
+            />
+          </svg>
         </button>
       </div>
     </div>

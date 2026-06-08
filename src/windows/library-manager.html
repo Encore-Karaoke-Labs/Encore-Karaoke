@@ -86,33 +86,42 @@
         color: var(--accent);
         letter-spacing: 2px;
       }
+
       .window-controls {
         display: flex;
         align-items: center;
         height: 100%;
         -webkit-app-region: no-drag;
+        gap: 6px;
       }
+
       .window-controls button {
-        background: transparent;
-        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-panel);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         color: var(--text-main);
-        font-family: "Rajdhani", sans-serif;
-        font-weight: 600;
-        font-size: 1.1rem;
-        padding: 0 12px;
-        height: 100%;
-        transition: all 0.2s;
+        width: 34px;
+        height: 30px;
+        padding: 0;
+        border-radius: 6px;
+        transition: all 0.2s ease;
         outline: none;
-        border-radius: 0;
       }
+
       .window-controls button:hover {
         background: rgba(137, 207, 240, 0.15);
+        border-color: var(--accent);
         color: var(--accent);
       }
+
       .window-controls .close-btn:hover {
-        background: transparent;
-        color: #e81123;
+        background: rgba(255, 85, 85, 0.15);
+        border-color: #ff5555;
+        color: #ff5555;
       }
+
       body.is-mac .titlebar {
         padding-left: 80px;
       }
@@ -372,7 +381,7 @@
       .toast {
         position: fixed;
         bottom: 20px;
-        right: 20px;
+        left: 20px;
         padding: 15px 25px;
         border-radius: 6px;
         font-size: 1.2rem;
@@ -471,9 +480,46 @@
     <div class="titlebar">
       <div class="titlebar-title">ENCORE LIBRARY MANAGER</div>
       <div class="window-controls" id="window-controls">
-        <button onclick="ipc.send('window-minimize')">—</button>
-        <button onclick="ipc.send('window-maximize')">🗖</button>
-        <button class="close-btn" onclick="ipc.send('window-close')">✕</button>
+        <button tabindex="-1" onclick="ipc.send('window-minimize')">
+          <svg width="12" height="12" viewBox="0 0 16 16">
+            <path
+              d="M2,8 h12"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              fill="none"
+            />
+          </svg>
+        </button>
+        <button tabindex="-1" onclick="ipc.send('window-maximize')">
+          <svg width="12" height="12" viewBox="0 0 16 16">
+            <rect
+              x="2"
+              y="2"
+              width="12"
+              height="12"
+              rx="2"
+              stroke="currentColor"
+              stroke-width="3"
+              fill="none"
+            />
+          </svg>
+        </button>
+        <button
+          tabindex="-1"
+          class="close-btn"
+          onclick="ipc.send('window-close')"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16">
+            <path
+              d="M3,3 l10,10 M13,3 l-10,10"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              fill="none"
+            />
+          </svg>
+        </button>
       </div>
     </div>
 
