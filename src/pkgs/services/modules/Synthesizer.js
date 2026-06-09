@@ -44,6 +44,7 @@ export class ForteSynthesizer {
     this.state = state;
     this.audioCore = audioCore;
     this.dispatchUpdate = dispatchUpdate;
+    this.currentLoadController = null;
   }
 
   /**
@@ -89,6 +90,14 @@ export class ForteSynthesizer {
   async loadSoundFont(url, playback) {
     if (!this.audioCore.context) return false;
 
+    if (this.currentLoadController) {
+      logVerbose(`Aborting previous SoundBank load to load: ${url}`);
+      this.currentLoadController.abort();
+    }
+
+    this.currentLoadController = new AbortController();
+    const signal = this.currentLoadController.signal;
+
     if (this.state.playback.status !== "stopped") {
       playback.stopTrack();
     }
@@ -96,13 +105,18 @@ export class ForteSynthesizer {
     logVerbose(`Swapping SoundBank with: ${url}`);
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
       const arrayBuffer = await response.arrayBuffer();
+
+      if (signal.aborted) {
+        return false;
+      }
 
       if (this.state.playback.synthesizer) {
         const sbm = this.state.playback.synthesizer.soundBankManager;
 
         if (sbm) {
+          // Clear previous banks directly from memory
           if (Array.isArray(sbm.soundBankList)) {
             const bankIds = sbm.soundBankList.map((b) => b.id);
             for (const bankId of bankIds) {
@@ -124,6 +138,10 @@ export class ForteSynthesizer {
           }
 
           logVerbose("New SoundBank loaded into existing Synthesizer.");
+
+          if (this.currentLoadController === this.currentLoadController) {
+            this.currentLoadController = null;
+          }
           return true;
         }
       }
@@ -142,9 +160,25 @@ export class ForteSynthesizer {
       }
 
       logVerbose("New SoundBank loaded and Synthesizer recreated.");
+
+      if (this.currentLoadController === this.currentLoadController) {
+        this.currentLoadController = null;
+      }
       return true;
     } catch (e) {
+      if (e.name === "AbortError") {
+        logVerbose(`SoundBank load dynamically aborted for: ${url}`);
+        return false;
+      }
+
       console.error(`[FORTE SVC] Failed to load custom SoundBank: ${url}`, e);
+
+      if (
+        this.currentLoadController &&
+        this.currentLoadController.signal === signal
+      ) {
+        this.currentLoadController = null;
+      }
       return false;
     }
   }
@@ -402,6 +436,11 @@ export class ForteSynthesizer {
    * Destroys synthesizer resources.
    */
   cleanup() {
+    if (this.currentLoadController) {
+      this.currentLoadController.abort();
+      this.currentLoadController = null;
+    }
+
     if (this.state.playback.synthesizer) {
       this.state.playback.synthesizer.disconnect();
 

@@ -409,8 +409,11 @@ export default class SetupManager {
               if (shouldLoad) {
                 this.showToast("LOADING SOUNDFONT...", "info");
                 try {
-                  await this.ctx.services.Forte.loadSoundFont(soundFontUrl);
-                  this.showToast("LOADED SUCCESSFULLY", "success");
+                  const result =
+                    await this.ctx.services.Forte.loadSoundFont(soundFontUrl);
+                  if (result != false) {
+                    this.showToast("LOADED SUCCESSFULLY", "success");
+                  }
                 } catch (err) {
                   console.error("Soundfont change failed", err);
                   this.showToast("FAILED TO LOAD SOUNDFONT", "error");
