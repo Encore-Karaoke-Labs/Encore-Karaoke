@@ -100,8 +100,32 @@ export class ForteSynthesizer {
       const arrayBuffer = await response.arrayBuffer();
 
       if (this.state.playback.synthesizer) {
-        this.state.playback.synthesizer.disconnect();
-        this.state.playback.synthesizer = null;
+        const sbm = this.state.playback.synthesizer.soundBankManager;
+
+        if (sbm) {
+          if (Array.isArray(sbm.soundBankList)) {
+            const bankIds = sbm.soundBankList.map((b) => b.id);
+            for (const bankId of bankIds) {
+              if (typeof sbm.deleteSoundBank === "function") {
+                sbm.deleteSoundBank(bankId);
+              }
+            }
+          } else if (typeof sbm.destroy === "function") {
+            sbm.destroy();
+          }
+
+          await sbm.addSoundBank(arrayBuffer);
+
+          if (this.state.playback.transpose !== 0) {
+            this.state.playback.synthesizer.setSystemParameter(
+              "keyShift",
+              this.state.playback.transpose,
+            );
+          }
+
+          logVerbose("New SoundBank loaded into existing Synthesizer.");
+          return true;
+        }
       }
 
       this.state.playback.synthesizer = new Synthetizer(this.audioCore.context);
@@ -109,8 +133,6 @@ export class ForteSynthesizer {
         arrayBuffer,
       );
       this.state.playback.synthesizer.connect(this.state.playback.midiGain);
-
-      logVerbose("Preset list", this.state.playback.synthesizer.presetList);
 
       if (this.state.playback.transpose !== 0) {
         this.state.playback.synthesizer.setSystemParameter(
@@ -368,7 +390,12 @@ export class ForteSynthesizer {
    * Resets the synthesizer
    */
   reset() {
-    this.state.playback.synthesizer.reset();
+    if (
+      this.state.playback.synthesizer &&
+      typeof this.state.playback.synthesizer.reset === "function"
+    ) {
+      this.state.playback.synthesizer.reset();
+    }
   }
 
   /**
@@ -377,6 +404,22 @@ export class ForteSynthesizer {
   cleanup() {
     if (this.state.playback.synthesizer) {
       this.state.playback.synthesizer.disconnect();
+
+      if (
+        this.state.playback.synthesizer.port &&
+        typeof this.state.playback.synthesizer.port.close === "function"
+      ) {
+        this.state.playback.synthesizer.port.close();
+      }
+
+      if (typeof this.state.playback.synthesizer.dispose === "function") {
+        this.state.playback.synthesizer.dispose();
+      } else if (
+        typeof this.state.playback.synthesizer.destroy === "function"
+      ) {
+        this.state.playback.synthesizer.destroy();
+      }
+
       this.state.playback.synthesizer = null;
     }
   }
