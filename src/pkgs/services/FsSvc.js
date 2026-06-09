@@ -365,6 +365,7 @@ const pkg = {
         "kar",
         "lrc",
         "json",
+        "cdg",
       ]);
 
       const currentSignature = [...files]
@@ -458,16 +459,17 @@ const pkg = {
             let artist = "Unknown Artist";
             let title = basename.replace(/\[.*?\]/g, "").trim();
 
-            if (
-              audioExtensions.has(extension) &&
-              allFilenames.has(`${basename}.lrc`)
-            ) {
+            const hasLrc = allFilenames.has(`${basename}.lrc`);
+            const hasCdg = allFilenames.has(`${basename}.cdg`);
+
+            if (audioExtensions.has(extension) && (hasLrc || hasCdg)) {
               if (state.buildAbortController?.signal.aborted) {
                 throw new Error("Build cancelled");
               }
               songData = {
-                type: isMultiplexed ? "multiplexed" : "audio",
-                lrcPath: `${libraryPath}${basename}.lrc`,
+                type: isMultiplexed ? "multiplexed" : hasCdg ? "cdg" : "audio",
+                lrcPath: hasLrc ? `${libraryPath}${basename}.lrc` : null,
+                cdgPath: hasCdg ? `${libraryPath}${basename}.cdg` : null,
               };
               try {
                 const urlObj = new URL(
@@ -627,6 +629,7 @@ const pkg = {
                 type: songData.type,
                 path: fullPath,
                 lrcPath: songData.lrcPath,
+                cdgPath: songData.cdgPath,
                 videoPath: videoPath,
               };
             }
@@ -648,6 +651,7 @@ const pkg = {
             type: parsedData.type,
             path: parsedData.path,
             lrcPath: parsedData.lrcPath,
+            cdgPath: parsedData.cdgPath,
             videoPath: parsedData.videoPath,
           };
 

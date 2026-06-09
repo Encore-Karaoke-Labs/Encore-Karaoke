@@ -1,4 +1,5 @@
 import Html from "../../../libs/html.js";
+import CDGraphics from "cdgraphics";
 
 export default class PlaybackManager {
   /**
@@ -9,6 +10,12 @@ export default class PlaybackManager {
 
     this.ytWarningTimer = null;
     this.ytAutoSkipTimer = null;
+
+    this.cdgRenderer = null;
+    this.cdgRafId = null;
+
+    this.boundTimeUpdate = null;
+    this.currentMediaTime = 0;
 
     this.boundPlaybackUpdate = this.handlePlaybackUpdate.bind(this);
     this.boundTempoUpdate = null;
@@ -260,9 +267,67 @@ export default class PlaybackManager {
         this.boundTempoUpdate,
       );
 
+      this.boundTimeUpdate = (e) => {
+        this.currentMediaTime = e.detail.currentTime;
+      };
+      document.addEventListener(
+        "CherryTree.Forte.Playback.TimeUpdate",
+        this.boundTimeUpdate,
+      );
+
       if (root.lyrics) {
         await root.lyrics.setupLyrics(song, pbState);
         root.lyrics.setupTimeUpdate(mvPlayer);
+      }
+
+      if (song.cdgPath) {
+        try {
+          const cdgUrl = new URL(
+            `http://127.0.0.1:${state.actualPort}/getFile`,
+          );
+          cdgUrl.searchParams.append("path", song.cdgPath);
+          const cdgRes = await fetch(cdgUrl.href);
+          const cdgBuffer = await cdgRes.arrayBuffer();
+
+          this.cdgRenderer = new CDGraphics(cdgBuffer);
+
+          const renderCdg = () => {
+            if (!this.cdgRenderer) return;
+            this.cdgRafId = requestAnimationFrame(renderCdg);
+
+            const time = this.currentMediaTime || 0;
+
+            const frame = this.cdgRenderer.render(time);
+            if (frame.isChanged) {
+              createImageBitmap(frame.imageData)
+                .then((bitmap) => {
+                  const canvas = modules.bgv.getCustomCanvas();
+                  const ctx = modules.bgv.getCustomContext();
+                  if (!canvas || !ctx) return;
+
+                  ctx.clearRect(0, 0, canvas.width, canvas.height);
+                  ctx.imageSmoothingEnabled = false;
+
+                  const scale = Math.min(
+                    canvas.width / bitmap.width,
+                    canvas.height / bitmap.height,
+                  );
+                  const w = bitmap.width * scale;
+                  const h = bitmap.height * scale;
+                  const x = (canvas.width - w) / 2;
+                  const y = (canvas.height - h) / 2;
+
+                  ctx.drawImage(bitmap, x, y, w, h);
+                })
+                .catch((e) =>
+                  console.error("[Encore] CDG ImageBitmap Error:", e),
+                );
+            }
+          };
+          this.cdgRafId = requestAnimationFrame(renderCdg);
+        } catch (e) {
+          console.error("[Encore] Failed to initialize CDG track:", e);
+        }
       }
 
       if (!state.currentSongIsYouTube) {
@@ -300,6 +365,12 @@ export default class PlaybackManager {
     dom.ytContainer.classOn("hidden");
     dom.ytIframe.attr({ src: "" });
     this.clearYoutubeTimers();
+    if (this.cdgRafId) {
+      cancelAnimationFrame(this.cdgRafId);
+      this.cdgRafId = null;
+    }
+    this.cdgRenderer = null;
+    this.ctx.modules.bgv.clearCustomGraphics();
     dom.bgvContainer.classOff("hidden");
     this.ctx.services.Forte.stopTrack();
     this.cleanupPlayerEvents();
@@ -343,9 +414,17 @@ export default class PlaybackManager {
         this.boundDuetEvent,
       );
 
+    if (this.boundTimeUpdate)
+      document.removeEventListener(
+        "CherryTree.Forte.Playback.TimeUpdate",
+        this.boundTimeUpdate,
+      );
+
     this.boundScoreUpdate = null;
     this.boundTempoUpdate = null;
     this.boundDuetEvent = null;
+    this.boundTimeUpdate = null;
+    this.currentMediaTime = 0;
   }
 
   async handlePlaybackUpdate(e) {
