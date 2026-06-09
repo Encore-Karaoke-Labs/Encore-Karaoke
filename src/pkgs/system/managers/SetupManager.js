@@ -1597,15 +1597,7 @@ export default class SetupManager {
   }
 
   showToast(msg, type) {
-    const toast = new Html("div")
-      .classOn("setup-toast", type)
-      .text(msg)
-      .appendTo(this.ctx.dom.setupScreen);
-    setTimeout(() => toast.classOn("visible"), 50);
-    setTimeout(() => {
-      toast.classOff("visible");
-      setTimeout(() => toast.cleanup(), 300);
-    }, 3000);
+    this.ctx.modules.infoBar.showTemp("SETUP", msg, 3000);
   }
 
   renderView() {
