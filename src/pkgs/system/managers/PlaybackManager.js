@@ -13,6 +13,7 @@ export default class PlaybackManager {
 
     this.cdgRenderer = null;
     this.cdgRafId = null;
+    this.currentCdgBitmap = null;
 
     this.boundTimeUpdate = null;
     this.currentMediaTime = 0;
@@ -296,32 +297,42 @@ export default class PlaybackManager {
             this.cdgRafId = requestAnimationFrame(renderCdg);
 
             const time = this.currentMediaTime || 0;
-
             const frame = this.cdgRenderer.render(time);
+
             if (frame.isChanged) {
               createImageBitmap(frame.imageData)
                 .then((bitmap) => {
-                  const canvas = modules.bgv.getCustomCanvas();
-                  const ctx = modules.bgv.getCustomContext();
-                  if (!canvas || !ctx) return;
-
-                  ctx.clearRect(0, 0, canvas.width, canvas.height);
-                  ctx.imageSmoothingEnabled = false;
-
-                  const scale = Math.min(
-                    canvas.width / bitmap.width,
-                    canvas.height / bitmap.height,
-                  );
-                  const w = bitmap.width * scale;
-                  const h = bitmap.height * scale;
-                  const x = (canvas.width - w) / 2;
-                  const y = (canvas.height - h) / 2;
-
-                  ctx.drawImage(bitmap, x, y, w, h);
+                  this.currentCdgBitmap = bitmap;
                 })
                 .catch((e) =>
                   console.error("[Encore] CDG ImageBitmap Error:", e),
                 );
+            }
+
+            if (this.currentCdgBitmap) {
+              const canvas = modules.bgv.getCustomCanvas();
+              const ctx = modules.bgv.getCustomContext();
+              if (!canvas || !ctx) return;
+
+              const dpr = window.devicePixelRatio || 1;
+              const logicalWidth = canvas.width / dpr;
+              const logicalHeight = canvas.height / dpr;
+
+              ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+              ctx.imageSmoothingEnabled = false;
+
+              const scale = Math.min(
+                logicalWidth / this.currentCdgBitmap.width,
+                logicalHeight / this.currentCdgBitmap.height,
+              );
+
+              const w = this.currentCdgBitmap.width * scale;
+              const h = this.currentCdgBitmap.height * scale;
+
+              const x = (logicalWidth - w) / 2;
+              const y = (logicalHeight - h) / 2;
+
+              ctx.drawImage(this.currentCdgBitmap, x, y, w, h);
             }
           };
           this.cdgRafId = requestAnimationFrame(renderCdg);
@@ -370,6 +381,7 @@ export default class PlaybackManager {
       this.cdgRafId = null;
     }
     this.cdgRenderer = null;
+    this.currentCdgBitmap = null;
     this.ctx.modules.bgv.clearCustomGraphics();
     dom.bgvContainer.classOff("hidden");
     this.ctx.services.Forte.stopTrack();
