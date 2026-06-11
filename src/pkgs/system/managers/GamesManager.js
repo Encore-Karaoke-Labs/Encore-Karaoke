@@ -12,7 +12,9 @@ export default class GamesManager {
     this.activeGameId = null;
 
     this.boundKeydown = (e) => {
-      if (this.isVisible && e.key === "Escape") {
+      if (!this.isVisible) return;
+
+      if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
 
@@ -24,6 +26,13 @@ export default class GamesManager {
           }
         }
         this.hideOverlay();
+      } else {
+        if (this.activeGameId && this.loadedGames.has(this.activeGameId)) {
+          const game = this.loadedGames.get(this.activeGameId);
+          if (typeof game.handleKeyDown === "function") {
+            game.handleKeyDown(e);
+          }
+        }
       }
     };
   }

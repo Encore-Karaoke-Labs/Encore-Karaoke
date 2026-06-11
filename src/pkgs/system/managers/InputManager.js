@@ -53,6 +53,10 @@ export default class InputManager {
       return;
     }
 
+    if (this.ctx.root.games && this.ctx.root.games.isVisible) {
+      return;
+    }
+
     if (
       dom.sessionChatInput &&
       document.activeElement === dom.sessionChatInput.elm
