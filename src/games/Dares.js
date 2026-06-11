@@ -80,11 +80,19 @@ export default class DaresGame {
   }
 
   onPlaybackStateChange(state, payload) {
+    if (state === "playing" && this.isActive) {
+      this.handleEscape();
+      return;
+    }
+
     if (
       state === "score_screen_end" &&
       this.isAutoMode &&
       this.ctx.services.SessionsSvc.isHost
     ) {
+      const lb = this.ctx.services.SessionsSvc.state.leaderboard;
+      if (!lb || lb.length < 2) return;
+
       this.ctx.services.SessionsSvc.broadcastPluginData(this.id, {
         action: "open_room",
         dares: this.daresList,
