@@ -871,7 +871,12 @@ export default class LyricsEngine {
 
     this.renderableLines.forEach((line, lineIdx) => {
       const cache = this.lineCaches[lineIdx];
-      if (cache.dim.width !== width || cache.dim.height !== height) {
+
+      if (
+        cache.dim.width !== width ||
+        cache.dim.height !== height ||
+        cache._dpr !== dpr
+      ) {
         cache.dim.width = width;
         cache.dim.height = height;
         cache.main.width = width;
@@ -880,6 +885,7 @@ export default class LyricsEngine {
         cache.mainCtx.setTransform(1, 0, 0, 1, 0, 0);
         cache.dimCtx.scale(dpr, dpr);
         cache.mainCtx.scale(dpr, dpr);
+        cache._dpr = dpr;
       } else {
         cache.dimCtx.save();
         cache.dimCtx.setTransform(1, 0, 0, 1, 0, 0);
