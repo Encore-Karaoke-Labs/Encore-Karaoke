@@ -18,7 +18,7 @@ const pkg = {
   data: {
     // Increment this ONLY when network structures, event behaviors,
     // or state payloads change in a way that breaks compatibility.
-    PROTOCOL_VERSION: 2,
+    PROTOCOL_VERSION: 3,
 
     peer: null,
     roomId: null,
