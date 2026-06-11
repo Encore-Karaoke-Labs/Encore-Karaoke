@@ -54,7 +54,10 @@ export default class GamesManager {
 
     window.addEventListener("keydown", this.boundKeydown, true);
 
-    const gamesToLoad = this.ctx.config.enabledGames || ["/games/Dares.js"];
+    const gamesToLoad = this.ctx.config.enabledGames || [
+      "/games/Dares.js",
+      "/games/Roulette.js",
+    ];
     console.log("[GAMES] Loading games");
 
     for (const gamePath of gamesToLoad) {
