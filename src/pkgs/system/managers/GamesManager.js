@@ -98,6 +98,21 @@ export default class GamesManager {
     this.activeGameId = null;
   }
 
+  broadcastPlaybackState(state, payload) {
+    for (const [id, game] of this.loadedGames.entries()) {
+      if (typeof game.onPlaybackStateChange === "function") {
+        try {
+          game.onPlaybackStateChange(state, payload);
+        } catch (e) {
+          console.error(
+            `[GAMES API] Error in game ${id} handling playback state:`,
+            e,
+          );
+        }
+      }
+    }
+  }
+
   destroy() {
     window.removeEventListener("keydown", this.boundKeydown, true);
     for (const game of this.loadedGames.values()) {

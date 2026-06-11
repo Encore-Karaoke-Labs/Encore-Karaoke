@@ -109,6 +109,7 @@ export default class PlaybackManager {
 
     state.isTransitioning = true;
     modules.recorder.setSongInfo(song);
+    if (root.games) root.games.broadcastPlaybackState("playing", song);
     this.cleanupPlayerEvents();
 
     if (root.lyrics) root.lyrics.reset();
@@ -372,6 +373,8 @@ export default class PlaybackManager {
     const modules = this.ctx.modules;
 
     modules.recorder.clearSongInfo();
+    if (this.ctx.root.games)
+      this.ctx.root.games.broadcastPlaybackState("stopped", null);
     dom.introCard.classOff("visible");
     dom.ytContainer.classOn("hidden");
     dom.ytIframe.attr({ src: "" });
@@ -537,6 +540,8 @@ export default class PlaybackManager {
     const root = this.ctx.root;
 
     state.isScoreScreenActive = true;
+    if (root.games)
+      root.games.broadcastPlaybackState("score_screen", scoreData);
     dom.postSongScreen.classOff("show-leaderboard");
 
     if (state.isSessionActive) {
@@ -729,6 +734,7 @@ export default class PlaybackManager {
     dom.postSongScreen.styleJs({ opacity: "0", pointerEvents: "none" });
     state.isScoreScreenActive = false;
     state.scoreSkipResolver = null;
+    if (root.games) root.games.broadcastPlaybackState("score_screen_end", null);
     await new Promise((r) => setTimeout(r, 400));
   }
 
