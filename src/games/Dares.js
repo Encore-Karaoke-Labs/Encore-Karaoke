@@ -33,7 +33,7 @@ export default class DaresGame {
     this.manager = manager;
     this.id = "dares";
     this.name = "Karaoke Penalty Dares";
-    this.version = "1.0.0";
+    this.version = "1.1.0";
 
     this.daresList = [];
     this.cursors = new Map(); // peerId -> { x, y, name, color }
@@ -58,6 +58,7 @@ export default class DaresGame {
     this.rollTarget = "";
     this.rollDare = "";
     this.rollStartTime = 0;
+    this.isAutoMode = false;
 
     this.playerWheelEndAngle = 0;
     this.dareWheelEndAngle = 0;
@@ -76,6 +77,26 @@ export default class DaresGame {
     const savedDares = await window.config.getItem("games.dares.list");
     this.daresList =
       savedDares && savedDares.length > 0 ? savedDares : [...DEFAULT_DARES];
+  }
+
+  onPlaybackStateChange(state, payload) {
+    if (
+      state === "score_screen_end" &&
+      this.isAutoMode &&
+      this.ctx.services.SessionsSvc.isHost
+    ) {
+      this.ctx.services.SessionsSvc.broadcastPluginData(this.id, {
+        action: "open_room",
+        dares: this.daresList,
+      });
+      this.openCanvasRoom(this.daresList);
+
+      setTimeout(() => {
+        if (this.isActive && this.view === "menu") {
+          this.triggerSpin();
+        }
+      }, 2000);
+    }
   }
 
   renderSettings(container) {
@@ -156,6 +177,9 @@ export default class DaresGame {
         break;
       case "sync_dares":
         this.daresList = payload.dares;
+        break;
+      case "sync_auto_mode":
+        this.isAutoMode = payload.enabled;
         break;
       case "start_sequence":
         this.startSequence(
@@ -541,26 +565,13 @@ export default class DaresGame {
       );
     }
 
-    this.drawButton(
-      ctx,
-      "+ ADD NEW DARE",
-      V_WIDTH / 2 - 125,
-      800,
-      250,
-      60,
-      "#89cff0",
-      () => {
-        this.openAddDareModal();
-      },
-    );
-
     if (isHost) {
       this.drawButton(
         ctx,
         "START SPIN",
-        V_WIDTH / 2 - 425,
+        V_WIDTH / 2 - 480,
         800,
-        250,
+        220,
         60,
         "#ffd700",
         () => {
@@ -570,14 +581,57 @@ export default class DaresGame {
 
       this.drawButton(
         ctx,
-        "CLOSE ROOM",
-        V_WIDTH / 2 + 175,
+        `AUTO: ${this.isAutoMode ? "ON" : "OFF"}`,
+        V_WIDTH / 2 - 240,
         800,
-        250,
+        220,
+        60,
+        this.isAutoMode ? "#55ff55" : "#aaaaaa",
+        () => {
+          this.isAutoMode = !this.isAutoMode;
+          this.ctx.services.SessionsSvc.broadcastPluginData(this.id, {
+            action: "sync_auto_mode",
+            enabled: this.isAutoMode,
+          });
+        },
+      );
+
+      this.drawButton(
+        ctx,
+        "+ ADD DARE",
+        V_WIDTH / 2 + 20,
+        800,
+        220,
+        60,
+        "#89cff0",
+        () => {
+          this.openAddDareModal();
+        },
+      );
+
+      this.drawButton(
+        ctx,
+        "CLOSE ROOM",
+        V_WIDTH / 2 + 260,
+        800,
+        220,
         60,
         "#ff5555",
         () => {
           this.handleEscape();
+        },
+      );
+    } else {
+      this.drawButton(
+        ctx,
+        "+ ADD DARE",
+        V_WIDTH / 2 - 110,
+        800,
+        220,
+        60,
+        "#89cff0",
+        () => {
+          this.openAddDareModal();
         },
       );
     }
@@ -866,8 +920,18 @@ export default class DaresGame {
     if (parts.length === 0)
       parts = ["Player 1", "Player 2", "Player 3", "Player 4"];
 
-    const targetPlayerIndex = Math.floor(Math.random() * parts.length);
-    const targetName = parts[targetPlayerIndex];
+    let targetName = parts[Math.floor(Math.random() * parts.length)];
+
+    const lb = SessionsSvc.state.leaderboard;
+    if (lb && lb.length > 0) {
+      const lowestScorer = lb[lb.length - 1].singerName;
+      if (!parts.includes(lowestScorer)) {
+        parts.push(lowestScorer);
+      }
+      targetName = lowestScorer;
+    }
+
+    const targetPlayerIndex = parts.indexOf(targetName);
 
     const daresDeck = shuffleArray(this.daresList);
     if (daresDeck.length === 0) daresDeck.push("Take a shot!");
