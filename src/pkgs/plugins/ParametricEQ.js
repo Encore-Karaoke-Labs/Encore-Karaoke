@@ -243,7 +243,14 @@ export default class ParametricEQPlugin extends BasePlugin {
       .appendTo(this.mainContainer);
 
     this.canvas = new Html("canvas")
-      .styleJs({ width: "100%", height: "100%", display: "block" })
+      .styleJs({
+        position: "absolute",
+        top: "0",
+        left: "0",
+        width: "100%",
+        height: "100%",
+        display: "block",
+      })
       .appendTo(canvasWrapper);
 
     this.canvasCtx = this.canvas.elm.getContext("2d");
