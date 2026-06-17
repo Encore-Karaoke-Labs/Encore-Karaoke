@@ -578,7 +578,7 @@ app.whenReady().then(() => {
     io.to("karaoke-app").emit("cloud-status", {
       connected: true,
       roomCode: activeRoomCode,
-      relayUrl: "https://link.encorekaraoke.org",
+      relayUrl: "https://enmoku.encorekaraoke.org/1.9.0/",
     });
   });
 
@@ -606,7 +606,7 @@ app.whenReady().then(() => {
         .json({ error: "Cloud relay not connected. Please wait." });
     }
     res.json({
-      relayUrl: "https://link.encorekaraoke.org",
+      relayUrl: "https://enmoku.encorekaraoke.org/1.9.0/",
       roomCode: activeRoomCode,
     });
   });
