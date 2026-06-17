@@ -450,11 +450,56 @@ export default class NetworkManager {
           root.library.performSearch(d.value);
           break;
         case "get_song_list":
+          const chunkSize = 1500;
+          const totalSongs = state.songList.length;
+
+          if (totalSongs === 0) {
+            this.socket.emit("sendData", {
+              identity: cmd.identity,
+              data: { type: "songlist_chunk", contents: [], isLast: true },
+            });
+            break;
+          }
+
+          for (let i = 0; i < totalSongs; i += chunkSize) {
+            const chunk = state.songList.slice(i, i + chunkSize).map((s) => ({
+              code: s.code,
+              title: s.title,
+              artist: s.artist,
+              type: s.type,
+              path: s.path,
+              videoPath: s.videoPath,
+            }));
+            this.socket.emit("sendData", {
+              identity: cmd.identity,
+              data: {
+                type: "songlist_chunk",
+                contents: chunk,
+                isLast: i + chunkSize >= totalSongs,
+              },
+            });
+          }
+          break;
+
+        case "remote_local_search":
+          const rawQuery = d.value || "";
+          const searchRes =
+            this.ctx.root.library.getLocalSearchResults(rawQuery);
+          const mappedResults = searchRes.map((s) => ({
+            code: s.code,
+            title: s.title,
+            artist: s.artist,
+            type: s.type,
+            path: s.path,
+            videoPath: s.videoPath,
+          }));
+
           this.socket.emit("sendData", {
             identity: cmd.identity,
-            data: { type: "songlist", contents: state.songList },
+            data: { type: "remote_search_results", results: mappedResults },
           });
           break;
+
         case "reserve_code":
           const s = state.songMap.get(d.value.padStart(5, "0"));
           if (s) {

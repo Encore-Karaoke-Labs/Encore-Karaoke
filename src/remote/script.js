@@ -38,11 +38,32 @@ document.addEventListener("DOMContentLoaded", () => {
   const socket = io({ query: { clientType: "remote" } });
 
   let fullSongList = [],
-    artistsMap = {},
-    currentArtistSongs = [],
+    tempChunkAccumulator = [],
     ytCache = [];
   let currentLibraryTab = "local";
-  let navState = { view: "artists", mobileLibraryOpen: false };
+  let navState = { mobileLibraryOpen: false };
+
+  function getFormatBadge(song) {
+    if (
+      song.isYouTube ||
+      song.type === "youtube" ||
+      (song.path && song.path.startsWith("yt://"))
+    )
+      return { label: "YT", color: "#D12F2F" };
+    if (song.videoPath) return { label: "MTV", color: "#2F6CD1" };
+    if (
+      song.type === "multiplexed" ||
+      (song.path && song.path.toLowerCase().includes("multiplex"))
+    )
+      return { label: "MP", color: "#2FD147" };
+    if (
+      song.type === "mid" ||
+      song.type === "kar" ||
+      (song.path && (song.path.endsWith(".mid") || song.path.endsWith(".kar")))
+    )
+      return { label: "MIDI", color: "#D12F9E" };
+    return { label: "RS", color: "#B02FD1" };
+  }
 
   function getOrCreateDeviceId() {
     let id = localStorage.getItem("encore_device_id");
@@ -72,9 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const tabLocal = document.getElementById("tab-local");
   const tabYt = document.getElementById("tab-yt");
-  const artistViewContainer = document.getElementById("artist-view-container");
   const songViewContainer = document.getElementById("song-view-container");
-  const currentArtistName = document.getElementById("current-artist-name");
 
   const chatView = document.getElementById("chat-view");
   const tabChat = document.getElementById("tab-chat");
@@ -85,42 +104,34 @@ document.addEventListener("DOMContentLoaded", () => {
   const typingIndicator = document.getElementById("typing-indicator");
   const chatContainer = document.getElementById("chat-messages-container");
 
-  const artistScroller = new VirtualScroller(
-    "artist-view-container",
-    "artist-list",
-    75,
-    (artist) => {
-      const row = document.createElement("div");
-      row.className = "artist-row";
-      const color1 = stringToColor(artist);
-      const color2 = stringToColor(artist.split("").reverse().join(""));
-      row.innerHTML = `<div class="artist-avatar" style="background: linear-gradient(135deg, ${color1}, ${color2})">${artist.charAt(0).toUpperCase()}</div><div class="artist-name-list">${artist}</div>`;
-      row.onclick = () => openArtistSongs(artist);
-      return row;
-    },
-  );
-
   const songScroller = new VirtualScroller(
     "song-scroller-container",
-    "artist-songs-list",
+    "songs-list",
     75,
     (song) => {
       const item = document.createElement("div");
       item.className = "song-item";
+      const badge = getFormatBadge(song);
+      const badgeHtml = `<span class="format-badge" style="background-color: ${badge.color}">${badge.label}</span>`;
+
       if (song.isYouTube) {
         item.innerHTML = `
               <img src="${song.thumbnail}" class="yt-thumb" loading="lazy">
-              <div style="flex:1; min-width:0;">
+              <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
                 <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 2px;">${song.title}</div>
-                <div style="font-size:0.85rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${song.artist || ""}</div>
+                <div style="font-size:0.85rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  ${badgeHtml} ${song.artist || ""}
+                </div>
               </div>
             `;
       } else {
         item.innerHTML = `
               <div class="song-code">${song.code}</div>
-              <div style="flex:1; min-width:0;">
+              <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
                 <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 2px;">${song.title}</div>
-                <div style="font-size:0.85rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${song.artist || ""}</div>
+                <div style="font-size:0.85rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  ${badgeHtml} ${song.artist || ""}
+                </div>
               </div>
             `;
       }
@@ -162,9 +173,20 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   socket.on("fromRemote", (payload) => {
-    if (payload.type === "songlist" && Array.isArray(payload.contents)) {
-      fullSongList = payload.contents;
-      processSongList(fullSongList);
+    if (payload.type === "songlist_chunk") {
+      tempChunkAccumulator = tempChunkAccumulator.concat(payload.contents);
+      if (payload.isLast) {
+        fullSongList = tempChunkAccumulator;
+        tempChunkAccumulator = [];
+        if (currentLibraryTab === "local" && !librarySearch.value.trim()) {
+          songScroller.setItems(fullSongList);
+        }
+      }
+    }
+    if (payload.type === "remote_search_results") {
+      if (currentLibraryTab === "local") {
+        songScroller.setItems(payload.results);
+      }
     }
     if (payload.type === "reserve_response") {
       if (payload.success) showToast(`Reserved: ${payload.song.title}`);
@@ -305,22 +327,6 @@ document.addEventListener("DOMContentLoaded", () => {
     showToast("Custom Cheer Sent!");
   };
 
-  function processSongList(songs) {
-    artistsMap = {};
-    songs.forEach((song) => {
-      const artistKey = (song.artist || "Unknown Artist").trim();
-      if (!artistsMap[artistKey]) artistsMap[artistKey] = [];
-      artistsMap[artistKey].push(song);
-    });
-    if (currentLibraryTab === "local" && navState.view === "artists") {
-      artistScroller.setItems(
-        Object.keys(artistsMap).sort((a, b) =>
-          a.localeCompare(b, undefined, { sensitivity: "base" }),
-        ),
-      );
-    }
-  }
-
   function switchToLocal() {
     currentLibraryTab = "local";
     tabLocal.classList.add("active");
@@ -330,23 +336,8 @@ document.addEventListener("DOMContentLoaded", () => {
     ytSearchBtn.style.display = "none";
     ytLoader.classList.remove("active");
 
-    if (navState.view === "artists") {
-      artistViewContainer.style.display = "block";
-      songViewContainer.style.display = "none";
-      unifiedBackBtn.classList.remove("desktop-visible");
-      artistScroller.setItems(
-        Object.keys(artistsMap).sort((a, b) =>
-          a.localeCompare(b, undefined, { sensitivity: "base" }),
-        ),
-      );
-    } else {
-      artistViewContainer.style.display = "none";
-      songViewContainer.style.display = "flex";
-      unifiedBackBtn.classList.add("desktop-visible");
-      songScroller.setItems(currentArtistSongs);
-      currentArtistName.textContent =
-        currentArtistName.getAttribute("data-last-local") || "Songs";
-    }
+    songScroller.setItems(fullSongList);
+    unifiedBackBtn.classList.remove("desktop-visible");
   }
 
   function switchToYouTube() {
@@ -357,15 +348,9 @@ document.addEventListener("DOMContentLoaded", () => {
     librarySearch.value = "";
     ytSearchBtn.style.display = "flex";
 
-    artistViewContainer.style.display = "none";
-    songViewContainer.style.display = "flex";
-    unifiedBackBtn.classList.add("desktop-visible");
-
     if (ytCache.length > 0) {
-      currentArtistName.textContent = "YouTube Results";
       songScroller.setItems(ytCache);
     } else {
-      currentArtistName.textContent = "Search above to find videos";
       songScroller.setItems([]);
     }
   }
@@ -373,32 +358,8 @@ document.addEventListener("DOMContentLoaded", () => {
   tabLocal.onclick = switchToLocal;
   tabYt.onclick = switchToYouTube;
 
-  function openArtistSongs(artistName) {
-    navState.view = "songs";
-    currentArtistName.textContent = artistName;
-    currentArtistName.setAttribute("data-last-local", artistName);
-    currentArtistSongs = artistsMap[artistName] || [];
-
-    artistViewContainer.style.display = "none";
-    songViewContainer.style.display = "flex";
-    songScroller.setItems(currentArtistSongs);
-    librarySearch.value = "";
-    unifiedBackBtn.classList.add("desktop-visible");
-  }
-
   function handleBackNavigation() {
-    if (currentLibraryTab === "local" && navState.view === "songs") {
-      navState.view = "artists";
-      artistViewContainer.style.display = "block";
-      songViewContainer.style.display = "none";
-      librarySearch.value = "";
-      artistScroller.setItems(
-        Object.keys(artistsMap).sort((a, b) =>
-          a.localeCompare(b, undefined, { sensitivity: "base" }),
-        ),
-      );
-      unifiedBackBtn.classList.remove("desktop-visible");
-    } else if (window.innerWidth < 768) {
+    if (window.innerWidth < 768) {
       songlistView.classList.remove("active");
       navState.mobileLibraryOpen = false;
     }
@@ -440,35 +401,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  let localSearchTimeout;
   librarySearch.addEventListener("input", (e) => {
     if (currentLibraryTab === "yt") return;
-    const query = e.target.value.toLowerCase();
-    if (navState.view === "artists") {
-      const allArtists = Object.keys(artistsMap);
-      if (!query)
-        return artistScroller.setItems(
-          allArtists.sort((a, b) => a.localeCompare(b)),
-        );
-      const matched = new Set();
-      allArtists.forEach((a) => {
-        if (a.toLowerCase().includes(query)) matched.add(a);
-      });
-      fullSongList.forEach((s) => {
-        if (s.title && s.title.toLowerCase().includes(query)) {
-          if (artistsMap[s.artist.trim()]) matched.add(s.artist.trim());
-        }
-      });
-      artistScroller.setItems(
-        Array.from(matched).sort((a, b) => a.localeCompare(b)),
-      );
-    } else {
-      songScroller.setItems(
-        currentArtistSongs.filter(
-          (s) =>
-            s.title.toLowerCase().includes(query) || s.code.includes(query),
-        ),
-      );
+    const query = e.target.value;
+
+    clearTimeout(localSearchTimeout);
+    if (!query.trim()) {
+      songScroller.setItems(fullSongList);
+      return;
     }
+
+    localSearchTimeout = setTimeout(() => {
+      socket.emit("remote-command", {
+        type: "remote_local_search",
+        value: query,
+      });
+    }, 250);
   });
 
   function reserveSong(song) {

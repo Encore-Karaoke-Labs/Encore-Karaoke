@@ -327,35 +327,16 @@
               </div>
             </div>
 
-            <div id="artist-view-container" class="virtual-scroller">
-              <div class="virtual-scroller-content" id="artist-list"></div>
-            </div>
-
             <div
               id="song-view-container"
-              style="display: none; flex-direction: column; height: 100%"
+              style="display: flex; flex-direction: column; height: 100%"
             >
-              <h3
-                id="current-artist-name"
-                style="
-                  margin: 0;
-                  padding: 1rem;
-                  color: var(--primary);
-                  background: rgba(0, 0, 0, 0.2);
-                  border-bottom: 1px solid var(--border);
-                "
-              >
-                Artist Name
-              </h3>
               <div
                 id="song-scroller-container"
                 class="virtual-scroller"
                 style="flex: 1"
               >
-                <div
-                  class="virtual-scroller-content"
-                  id="artist-songs-list"
-                ></div>
+                <div class="virtual-scroller-content" id="songs-list"></div>
               </div>
             </div>
           </div>

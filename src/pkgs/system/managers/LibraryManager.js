@@ -155,22 +155,13 @@ export default class LibraryManager {
   }
 
   /**
-   * Queries both local indexing and YouTube APIs to render a blended set of results.
+   * Internal search logic to retrieve results from the indexer synchronously.
    *
-   * @param {string} query - The raw text input from the user.
+   * @param {string} rawQuery - Text input to search.
+   * @returns {Array} - Formatted and sorted local results.
    */
-  async performSearch(query) {
-    const rawQuery = query.trim().toLowerCase();
-    const state = this.ctx.state;
-    const ui = this.ctx.root.ui;
-
-    if (!rawQuery) {
-      state.searchResults = [];
-      ui.renderSearchResults();
-      return;
-    }
-
-    state.isSearching = true;
+  getLocalSearchResults(rawQuery) {
+    if (!rawQuery || !this.fuse) return [];
 
     const cleanQuery = rawQuery
       .replace(/[-_.,;:'"()\[\]{}&/|]/g, " ")
@@ -178,73 +169,61 @@ export default class LibraryManager {
       .trim();
 
     const tokens = cleanQuery.split(" ").filter(Boolean);
+    let fuseQuery;
 
-    let localResults = [];
-    if (this.fuse) {
-      let fuseQuery;
-
-      if (tokens.length > 1) {
-        fuseQuery = {
-          $and: tokens.map((token) => ({
-            $or: [
-              { code: token },
-              { title: token },
-              { artist: token },
-              { _romaTitle: token },
-              { _romaArtist: token },
-              { _titleAcronym: token },
-              { _artistAcronym: token },
-              { _romaTitleAcronym: token },
-              { _romaArtistAcronym: token },
-            ],
-          })),
-        };
-      } else {
-        fuseQuery = {
+    if (tokens.length > 1) {
+      fuseQuery = {
+        $and: tokens.map((token) => ({
           $or: [
-            { code: cleanQuery },
-            { title: cleanQuery },
-            { artist: cleanQuery },
-            { _romaTitle: cleanQuery },
-            { _romaArtist: cleanQuery },
-            { _titleAcronym: cleanQuery },
-            { _artistAcronym: cleanQuery },
-            { _romaTitleAcronym: cleanQuery },
-            { _romaArtistAcronym: cleanQuery },
+            { code: token },
+            { title: token },
+            { artist: token },
+            { _romaTitle: token },
+            { _romaArtist: token },
+            { _titleAcronym: token },
+            { _artistAcronym: token },
+            { _romaTitleAcronym: token },
+            { _romaArtistAcronym: token },
           ],
-        };
-      }
-
-      const fuseResults = this.fuse.search(fuseQuery);
-
-      localResults = fuseResults.slice(0, 75).map((result) => {
-        const s = result.item;
-        let displayRomaTitle = null;
-        let displayRomaArtist = null;
-
-        if (result.matches) {
-          for (const match of result.matches) {
-            if (match.key.includes("_romaTitle"))
-              displayRomaTitle = s._romaTitle;
-            if (match.key.includes("_romaArtist"))
-              displayRomaArtist = s._romaArtist;
-          }
-        }
-
-        return {
-          ...s,
-          type: "local",
-          displayRomaTitle,
-          displayRomaArtist,
-        };
-      });
+        })),
+      };
+    } else {
+      fuseQuery = {
+        $or: [
+          { code: cleanQuery },
+          { title: cleanQuery },
+          { artist: cleanQuery },
+          { _romaTitle: cleanQuery },
+          { _romaArtist: cleanQuery },
+          { _titleAcronym: cleanQuery },
+          { _artistAcronym: cleanQuery },
+          { _romaTitleAcronym: cleanQuery },
+          { _romaArtistAcronym: cleanQuery },
+        ],
+      };
     }
+
+    const fuseResults = this.fuse.search(fuseQuery);
+
+    let localResults = fuseResults.slice(0, 75).map((result) => {
+      const s = result.item;
+      let displayRomaTitle = null;
+      let displayRomaArtist = null;
+
+      if (result.matches) {
+        for (const match of result.matches) {
+          if (match.key.includes("_romaTitle")) displayRomaTitle = s._romaTitle;
+          if (match.key.includes("_romaArtist"))
+            displayRomaArtist = s._romaArtist;
+        }
+      }
+      return { ...s, type: "local", displayRomaTitle, displayRomaArtist };
+    });
 
     const isNumericQuery = /^\d+$/.test(rawQuery);
     const queryNumber = isNumericQuery ? parseInt(rawQuery, 10) : null;
     const normQuery = rawQuery.replace(/[\W_]+/g, "");
 
-    // Prioritize exact matches (Code matches first, then exact Title matches)
     localResults.sort((a, b) => {
       let aExactCode =
         isNumericQuery && parseInt(a.code, 10) === queryNumber ? 1 : 0;
@@ -264,6 +243,29 @@ export default class LibraryManager {
 
       return 0;
     });
+
+    return localResults;
+  }
+
+  /**
+   * Queries both local indexing and YouTube APIs to render a blended set of results.
+   *
+   * @param {string} query - The raw text input from the user.
+   */
+  async performSearch(query) {
+    const rawQuery = query.trim().toLowerCase();
+    const state = this.ctx.state;
+    const ui = this.ctx.root.ui;
+
+    if (!rawQuery) {
+      state.searchResults = [];
+      ui.renderSearchResults();
+      return;
+    }
+
+    state.isSearching = true;
+
+    const localResults = this.getLocalSearchResults(rawQuery);
 
     state.searchResults = [...localResults];
     ui.renderSearchResults();
