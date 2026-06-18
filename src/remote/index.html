@@ -6,10 +6,35 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content"
     />
-    <title>Encore Link</title>
+    <title>EnMoku!</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <div id="loading-overlay" class="active">
+      <div class="spinner"></div>
+      <div
+        style="
+          color: var(--primary);
+          font-weight: 700;
+          letter-spacing: 2px;
+          margin-top: 1rem;
+        "
+      >
+        CONNECTING...
+      </div>
+    </div>
+
+    <div id="error-overlay">
+      <h2>Connection Error</h2>
+      <p id="error-message">Unable to connect to Encore Host.</p>
+    </div>
+
     <div id="nickname-overlay">
       <div class="nickname-box">
         <h2 style="margin-top: 0; color: var(--primary); letter-spacing: 2px">
@@ -34,7 +59,7 @@
             width: 100%;
             margin-bottom: 1rem;
             text-align: center;
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             padding: 1rem;
           "
         />
@@ -149,6 +174,7 @@
           </div>
         </div>
 
+        <!-- Chat / Cheer Panel -->
         <div id="chat-view" class="view">
           <div class="library-header">
             <div class="library-tabs">
@@ -259,6 +285,7 @@
                 </button>
               </div>
             </div>
+
             <div>
               <h3 style="color: var(--primary); letter-spacing: 1px">
                 CUSTOM CHEER
@@ -344,7 +371,7 @@
       </div>
     </div>
 
-    <div class="toast" id="toast">Song Reserved!</div>
+    <div class="toast" id="toast">Song Queued!</div>
 
     <script src="/libs/socket.io.min.js"></script>
     <script src="script.js"></script>

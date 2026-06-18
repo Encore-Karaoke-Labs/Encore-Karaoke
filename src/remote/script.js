@@ -1,3 +1,15 @@
+const EncoreEnv = {
+  isLocal:
+    ["localhost", "127.0.0.1", "::1", ""].includes(window.location.hostname) ||
+    /^\d{1,3}(\.\d{1,3}){3}$/.test(window.location.hostname) ||
+    window.location.hostname.endsWith(".local") ||
+    window.location.protocol === "file:",
+
+  isSecure: window.isSecureContext,
+
+  cloudServerUrl: "https://olive.nxw.pw:8443",
+};
+
 class VirtualScroller {
   constructor(containerId, contentId, itemHeight, renderCallback) {
     this.container = document.getElementById(containerId);
@@ -35,7 +47,38 @@ class VirtualScroller {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const socket = io({ query: { clientType: "remote" } });
+  console.log(
+    `[EnMoku] Environment: ${EncoreEnv.isLocal ? "LOCAL" : "CLOUD"} | Secure Context: ${EncoreEnv.isSecure}`,
+  );
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const roomPin = urlParams.get("room");
+
+  const loadingOverlay = document.getElementById("loading-overlay");
+  const errorOverlay = document.getElementById("error-overlay");
+  const errorMessage = document.getElementById("error-message");
+
+  let socketQuery = { clientType: "remote" };
+
+  if (!roomPin && !EncoreEnv.isLocal) {
+    loadingOverlay.classList.remove("active");
+    errorMessage.innerHTML =
+      "No Room PIN provided.<br><br>Please scan the QR code displayed on the TV.";
+    errorOverlay.classList.add("active");
+    return;
+  }
+
+  if (roomPin) {
+    socketQuery.room = roomPin;
+  }
+
+  const socketEndpoint = EncoreEnv.isLocal
+    ? window.location.origin
+    : EncoreEnv.cloudServerUrl;
+
+  const socket = io(socketEndpoint, {
+    query: { clientType: "remote", room: roomPin },
+  });
 
   let fullSongList = [],
     tempChunkAccumulator = [],
@@ -65,27 +108,23 @@ document.addEventListener("DOMContentLoaded", () => {
     return { label: "RS", color: "#B02FD1" };
   }
 
-  function getOrCreateDeviceId() {
-    let id = localStorage.getItem("encore_device_id");
-    if (!id) {
-      id =
-        (crypto.randomUUID && crypto.randomUUID()) ||
-        "dev_" + Math.random().toString(36).substring(2, 15);
-      localStorage.setItem("encore_device_id", id);
-    }
-    return id;
-  }
+  const deviceId =
+    localStorage.getItem("encore_device_id") ||
+    "dev_" + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem("encore_device_id", deviceId);
 
-  const deviceId = getOrCreateDeviceId();
   let myNickname = localStorage.getItem("encore_nickname") || "";
   let chatMessages = [];
-  let typingTimeout = null;
+  let typingTimer = null;
 
   const nickOverlay = document.getElementById("nickname-overlay"),
     nickInput = document.getElementById("nickname-input"),
     nickSubmit = document.getElementById("nickname-submit");
 
-  const librarySearch = document.getElementById("library-search");
+  const chatContainer = document.getElementById("chat-messages-container");
+  const chatInput = document.getElementById("chat-input");
+
+  const searchInput = document.getElementById("library-search");
   const ytSearchBtn = document.getElementById("yt-search-btn");
   const ytLoader = document.getElementById("yt-loader");
   const unifiedBackBtn = document.getElementById("unified-back-btn");
@@ -100,9 +139,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const tabCheer = document.getElementById("tab-cheer");
   const chatContentArea = document.getElementById("chat-content-area");
   const cheerContentArea = document.getElementById("cheer-content-area");
-  const chatInput = document.getElementById("chat-input");
-  const typingIndicator = document.getElementById("typing-indicator");
-  const chatContainer = document.getElementById("chat-messages-container");
 
   const songScroller = new VirtualScroller(
     "song-scroller-container",
@@ -116,24 +152,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (song.isYouTube) {
         item.innerHTML = `
-              <img src="${song.thumbnail}" class="yt-thumb" loading="lazy">
-              <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
-                <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 2px;">${song.title}</div>
-                <div style="font-size:0.85rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                  ${badgeHtml} ${song.artist || ""}
-                </div>
-              </div>
-            `;
+        <img src="${song.thumbnail}" class="yt-thumb" loading="lazy">
+        <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
+          <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 2px;">${song.title}</div>
+          <div style="font-size:0.85rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            ${badgeHtml} ${song.artist || ""}
+          </div>
+        </div>
+      `;
       } else {
         item.innerHTML = `
-              <div class="song-code">${song.code}</div>
-              <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
-                <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 2px;">${song.title}</div>
-                <div style="font-size:0.85rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                  ${badgeHtml} ${song.artist || ""}
-                </div>
-              </div>
-            `;
+        <div class="song-code">${song.code}</div>
+        <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
+          <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 2px;">${song.title}</div>
+          <div style="font-size:0.85rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            ${badgeHtml} ${song.artist || ""}
+          </div>
+        </div>
+      `;
       }
       item.onclick = () => reserveSong(song);
       return item;
@@ -141,6 +177,9 @@ document.addEventListener("DOMContentLoaded", () => {
   );
 
   socket.on("connect", () => {
+    loadingOverlay.classList.remove("active");
+    errorOverlay.classList.remove("active");
+
     socket.emit("remote-command", { type: "get_song_list", value: "" });
     if (!myNickname) {
       nickOverlay.classList.add("active");
@@ -154,10 +193,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  socket.on("connect_error", () => {
+    loadingOverlay.classList.remove("active");
+    errorMessage.innerHTML = `Connection failed.<br><br>Please ensure the ${EncoreEnv.isLocal ? "host device" : "Cloud Server"} is online.`;
+    errorOverlay.classList.add("active");
+  });
+
+  socket.on("host-disconnected", () => {
+    errorMessage.innerHTML =
+      "The Host Player disconnected or closed.<br><br>Session ended.";
+    errorOverlay.classList.add("active");
+  });
+
   nickSubmit.onclick = () => {
-    const val = nickInput.value.trim();
-    if (val) {
-      myNickname = val;
+    if (nickInput.value.trim()) {
+      myNickname = nickInput.value.trim();
       localStorage.setItem("encore_nickname", myNickname);
       nickOverlay.classList.remove("active");
       socket.emit("remote-command", {
@@ -178,20 +228,23 @@ document.addEventListener("DOMContentLoaded", () => {
       if (payload.isLast) {
         fullSongList = tempChunkAccumulator;
         tempChunkAccumulator = [];
-        if (currentLibraryTab === "local" && !librarySearch.value.trim()) {
+        if (currentLibraryTab === "local" && !searchInput.value.trim()) {
           songScroller.setItems(fullSongList);
         }
       }
     }
+
     if (payload.type === "remote_search_results") {
       if (currentLibraryTab === "local") {
         songScroller.setItems(payload.results);
       }
     }
+
     if (payload.type === "reserve_response") {
-      if (payload.success) showToast(`Reserved: ${payload.song.title}`);
-      else showToast(`Song not found.`, true);
+      if (payload.success) showToast(`Queued: ${payload.song.title}`);
+      else showToast("Song not found.", true);
     }
+
     if (payload.type === "yt_search_results") {
       ytLoader.classList.remove("active");
       const ytItems = payload.results.map((res) => ({
@@ -206,10 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }));
       ytCache = ytItems;
       if (currentLibraryTab === "yt") {
-        currentArtistSongs = ytItems;
         songScroller.setItems(ytItems);
-        currentArtistName.textContent =
-          ytItems.length === 0 ? "No results found." : "YouTube Results";
       }
     }
 
@@ -219,16 +269,21 @@ document.addEventListener("DOMContentLoaded", () => {
       chatMessages = payload.history || [];
       renderChat();
     }
+
     if (payload.type === "social_update") {
       const uCount = payload.usersCount || 1;
       document.getElementById("user-count").textContent =
-        `${uCount} User${uCount !== 1 ? "s" : ""}`;
+        `${uCount} User${uCount !== 1 ? "s" : ""} Connected`;
+
       const typers = payload.typing.filter((n) => n !== myNickname);
-      if (typers.length === 0) typingIndicator.textContent = "";
-      else if (typers.length === 1)
+      const typingIndicator = document.getElementById("typing-indicator");
+      if (typers.length === 1)
         typingIndicator.textContent = `${typers[0]} is typing...`;
-      else typingIndicator.textContent = `Several people are typing...`;
+      else if (typers.length > 1)
+        typingIndicator.textContent = `Multiple people are typing...`;
+      else typingIndicator.textContent = "";
     }
+
     if (payload.type === "new_chat") {
       chatMessages.push(payload.message);
       renderChat();
@@ -244,7 +299,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chatContainer.innerHTML = "";
     chatMessages.forEach((msg) => {
       const isSelf = msg.sender === myNickname;
-      chatContainer.innerHTML += `<div class="chat-msg ${isSelf ? "self" : ""}"><div class="sender">${isSelf ? "You" : msg.sender}</div><div class="text">${msg.text}</div></div>`;
+      chatContainer.innerHTML += `<div class="chat-msg ${isSelf ? "self" : ""}"><div class="sender">${isSelf ? "You" : msg.sender}</div><div>${msg.text}</div></div>`;
     });
     if (isNearBottom || chatMessages.length === 1)
       chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -273,25 +328,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("close-chat-btn").onclick = () =>
     chatView.classList.remove("active");
 
-  const sendChatMessage = () => {
-    const val = chatInput.value.trim();
-    if (!val) return;
-    socket.emit("remote-command", { type: "chat_message", value: val });
-    chatInput.value = "";
-    socket.emit("remote-command", { type: "typing_state", value: false });
-    clearTimeout(typingTimeout);
-  };
-
-  document.getElementById("chat-send-btn").onclick = sendChatMessage;
-
   chatInput.addEventListener("input", (e) => {
     if (e.target.value.trim().length > 0) {
       socket.emit("remote-command", {
         type: "typing_state",
         value: true,
       });
-      clearTimeout(typingTimeout);
-      typingTimeout = setTimeout(() => {
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(() => {
         socket.emit("remote-command", {
           type: "typing_state",
           value: false,
@@ -302,12 +346,25 @@ document.addEventListener("DOMContentLoaded", () => {
         type: "typing_state",
         value: false,
       });
-      clearTimeout(typingTimeout);
+      clearTimeout(typingTimer);
     }
   });
 
+  document.getElementById("chat-send-btn").onclick = () => {
+    const v = chatInput.value.trim();
+    if (v) {
+      socket.emit("remote-command", { type: "chat_message", value: v });
+      chatInput.value = "";
+      socket.emit("remote-command", {
+        type: "typing_state",
+        value: false,
+      });
+      clearTimeout(typingTimer);
+    }
+  };
+
   chatInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") sendChatMessage();
+    if (e.key === "Enter") document.getElementById("chat-send-btn").onclick();
   });
 
   document.querySelectorAll(".cheer-btn").forEach((btn) => {
@@ -319,6 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
       showToast("Cheer Sent!");
     };
   });
+
   document.getElementById("custom-cheer-btn").onclick = () => {
     const v = document.getElementById("custom-cheer-input").value.trim();
     if (!v) return showToast("Type a message to Cheer!");
@@ -331,8 +389,9 @@ document.addEventListener("DOMContentLoaded", () => {
     currentLibraryTab = "local";
     tabLocal.classList.add("active");
     tabYt.classList.remove("active");
-    librarySearch.placeholder = "Search songs or artists...";
-    librarySearch.value = "";
+
+    searchInput.placeholder = "Search songs or artists...";
+    searchInput.value = "";
     ytSearchBtn.style.display = "none";
     ytLoader.classList.remove("active");
 
@@ -344,9 +403,12 @@ document.addEventListener("DOMContentLoaded", () => {
     currentLibraryTab = "yt";
     tabYt.classList.add("active");
     tabLocal.classList.remove("active");
-    librarySearch.placeholder = "Search YouTube...";
-    librarySearch.value = "";
+
+    searchInput.placeholder = "Search YouTube...";
+    searchInput.value = "";
     ytSearchBtn.style.display = "flex";
+
+    unifiedBackBtn.classList.add("desktop-visible");
 
     if (ytCache.length > 0) {
       songScroller.setItems(ytCache);
@@ -358,14 +420,12 @@ document.addEventListener("DOMContentLoaded", () => {
   tabLocal.onclick = switchToLocal;
   tabYt.onclick = switchToYouTube;
 
-  function handleBackNavigation() {
+  unifiedBackBtn.onclick = () => {
     if (window.innerWidth < 768) {
       songlistView.classList.remove("active");
       navState.mobileLibraryOpen = false;
     }
-  }
-
-  unifiedBackBtn.onclick = handleBackNavigation;
+  };
 
   document.getElementById("open-library-btn").onclick = () => {
     navState.mobileLibraryOpen = true;
@@ -380,10 +440,10 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   function triggerYTSearch() {
-    const query = librarySearch.value.trim();
+    const query = searchInput.value.trim();
     if (query) {
       ytLoader.classList.add("active");
-      librarySearch.blur();
+      searchInput.blur();
       socket.emit("remote-command", {
         type: "client_yt_search",
         value: query,
@@ -395,18 +455,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ytSearchBtn.onclick = triggerYTSearch;
 
-  librarySearch.addEventListener("keypress", (e) => {
-    if (e.key === "Enter" && currentLibraryTab === "yt") {
-      triggerYTSearch();
-    }
+  searchInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter" && currentLibraryTab === "yt") triggerYTSearch();
   });
 
   let localSearchTimeout;
-  librarySearch.addEventListener("input", (e) => {
+  searchInput.addEventListener("input", (e) => {
     if (currentLibraryTab === "yt") return;
-    const query = e.target.value;
 
+    const query = e.target.value;
     clearTimeout(localSearchTimeout);
+
     if (!query.trim()) {
       songScroller.setItems(fullSongList);
       return;
@@ -421,14 +480,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   function reserveSong(song) {
-    if (song.isYouTube) {
+    if (song.isYouTube)
       socket.emit("remote-command", { type: "reserve_yt", value: song });
-    } else {
+    else
       socket.emit("remote-command", {
         type: "reserve_code",
         value: song.code,
       });
-    }
   }
 
   document.querySelectorAll("button[data-type]").forEach((btn) => {
@@ -439,14 +497,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  function stringToColor(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++)
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    const c = (hash & 0x00ffffff).toString(16).toUpperCase();
-    return "#" + "00000".substring(0, 6 - c.length) + c;
-  }
-
   let toastTimeout;
   function showToast(msg, isError = false) {
     const toast = document.getElementById("toast");
@@ -454,6 +504,6 @@ document.addEventListener("DOMContentLoaded", () => {
     isError ? toast.classList.add("error") : toast.classList.remove("error");
     toast.classList.add("show");
     clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(() => toast.classList.remove("show"), 2500);
+    toastTimeout = setTimeout(() => toast.classList.remove("show"), 3000);
   }
 });
