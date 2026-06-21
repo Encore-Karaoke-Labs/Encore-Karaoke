@@ -1,4 +1,5 @@
 import Html from "../../../libs/html.js";
+import NetworkingUtility from "../../../libs/networkingUtility.js";
 
 export default class RecordingsManager {
   /**
@@ -185,13 +186,12 @@ export default class RecordingsManager {
    * Triggers playback of a specific recorded file using the local streaming endpoint.
    * @param {Object} rec - The recording metadata object
    */
-  playRecording(rec) {
+  async playRecording(rec) {
     const state = this.ctx.state;
     const dom = this.ctx.dom;
 
     state.isPlayingRecording = true;
-    const videoUrl = new URL(`http://127.0.0.1:${state.actualPort}/getFile`);
-    videoUrl.searchParams.append("path", rec.videoPath);
+    const videoUrl = await NetworkingUtility.getFileLink(rec.videoPath);
 
     const displayTitle =
       rec.title.split("-").slice(0, -3).join("-") || rec.title;

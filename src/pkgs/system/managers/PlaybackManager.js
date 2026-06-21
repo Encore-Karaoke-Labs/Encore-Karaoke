@@ -1,4 +1,5 @@
 import Html from "../../../libs/html.js";
+import NetworkingUtility from "../../../libs/networkingUtility.js";
 import CDGraphics from "cdgraphics";
 
 export default class PlaybackManager {
@@ -204,10 +205,7 @@ export default class PlaybackManager {
       dom.lyricsCanvas.styleJs({ opacity: "0" }).classOff("hidden");
 
       if (state.currentSongIsMV) {
-        const videoUrl = new URL(
-          `http://127.0.0.1:${state.actualPort}/getFile`,
-        );
-        videoUrl.searchParams.append("path", song.videoPath);
+        const videoUrl = await NetworkingUtility.getFileLink(song.videoPath);
         mvPlayer = await modules.bgv.playSingleVideo(videoUrl.href);
       } else {
         modules.bgv.resumePlaylist();
@@ -217,8 +215,7 @@ export default class PlaybackManager {
       dom.ytContainer.classOn("hidden");
       dom.ytIframe.attr({ src: "" });
 
-      const trackUrl = new URL(`http://127.0.0.1:${state.actualPort}/getFile`);
-      trackUrl.searchParams.append("path", song.path);
+      const trackUrl = await NetworkingUtility.getFileLink(song.path);
       await Forte.loadTrack(trackUrl.href);
 
       const pbState = Forte.getPlaybackState();
@@ -284,10 +281,7 @@ export default class PlaybackManager {
 
       if (song.cdgPath) {
         try {
-          const cdgUrl = new URL(
-            `http://127.0.0.1:${state.actualPort}/getFile`,
-          );
-          cdgUrl.searchParams.append("path", song.cdgPath);
+          const cdgUrl = await NetworkingUtility.getFileLink(song.cdgPath);
           const cdgRes = await fetch(cdgUrl.href);
           const cdgBuffer = await cdgRes.arrayBuffer();
 
@@ -655,11 +649,7 @@ export default class PlaybackManager {
           if (match && match.file) {
             const joinPath = (p1, p2) =>
               p1.replace(/\/$/, "") + "/" + p2.replace(/^\//, "");
-            const narrationUrl = new URL(
-              `http://127.0.0.1:${state.actualPort}/getFile`,
-            );
-            narrationUrl.searchParams.append(
-              "path",
+            const narrationUrl = await NetworkingUtility.getFileLink(
               joinPath(libraryInfo.path, match.file),
             );
             await Forte.playSfx(narrationUrl.href);

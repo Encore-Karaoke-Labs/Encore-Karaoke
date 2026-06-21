@@ -1,4 +1,5 @@
 import Html from "../../../libs/html.js";
+import NetworkingUtility from "../../../libs/networkingUtility.js";
 
 export default class UIManager {
   /**
@@ -1126,7 +1127,7 @@ export default class UIManager {
       this.ctx.dom.standbyBumper.styleJs({ opacity: 0 });
       this.ctx.dom.newSongScreen.styleJs({ opacity: 0 });
 
-      setTimeout(() => {
+      setTimeout(async () => {
         this.idleState = currentItem.type;
         const state = this.ctx.state;
         const dom = this.ctx.dom;
@@ -1167,10 +1168,9 @@ export default class UIManager {
             dom.newSongScreen.styleJs({ opacity: 1 });
           }
         } else if (currentItem.type === "bumper") {
-          const imageUrl = new URL(
-            `http://127.0.0.1:${state.actualPort}/getFile`,
+          const imageUrl = await NetworkingUtility.getFileLink(
+            currentItem.data,
           );
-          imageUrl.searchParams.append("path", currentItem.data);
           dom.standbyBumper.attr({ src: imageUrl.href });
 
           if (isIdling) {

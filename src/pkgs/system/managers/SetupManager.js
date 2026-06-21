@@ -1,4 +1,5 @@
 import Html from "../../../libs/html.js";
+import NetworkingUtility from "../../../libs/networkingUtility.js";
 
 /**
  * Joins path parts with a given separator, normalizing leading and trailing slashes.
@@ -381,22 +382,15 @@ export default class SetupManager {
                 v === "library" &&
                 this.currentManifest?.additionalContents?.soundFont
               ) {
-                const url = new URL(
-                  `http://127.0.0.1:${this.ctx.state.actualPort}/getFile`,
-                );
                 const soundFontPath = pathJoin([
                   this.ctx.config.libraryPath,
                   this.currentManifest.additionalContents.soundFont,
                 ]);
-                url.searchParams.append("path", soundFontPath);
+                const url = await NetworkingUtility.getFileLink(soundFontPath);
                 soundFontUrl = url.href;
               } else if (v === "custom") {
                 if (this.ctx.config.audioConfig.customSoundfontPath) {
-                  const url = new URL(
-                    `http://127.0.0.1:${this.ctx.state.actualPort}/getFile`,
-                  );
-                  url.searchParams.append(
-                    "path",
+                  const url = await NetworkingUtility.getFileLink(
                     this.ctx.config.audioConfig.customSoundfontPath,
                   );
                   soundFontUrl = url.href;
@@ -451,10 +445,7 @@ export default class SetupManager {
 
                 this.showToast("LOADING CUSTOM SOUNDFONT...", "info");
 
-                const url = new URL(
-                  `http://127.0.0.1:${this.ctx.state.actualPort}/getFile`,
-                );
-                url.searchParams.append("path", filePath);
+                const url = await NetworkingUtility.getFileLink(filePath);
 
                 try {
                   await this.ctx.services.Forte.loadSoundFont(url.href);
@@ -1069,10 +1060,7 @@ export default class SetupManager {
     this.renderView();
     this.ctx.services.Forte.setLatency(0);
 
-    const fileUrl = new URL(
-      `http://127.0.0.1:${this.ctx.state.actualPort}/getFile`,
-    );
-    fileUrl.searchParams.append("path", song.path);
+    const fileUrl = await NetworkingUtility.getFileLink(song.path);
     await this.ctx.services.Forte.loadTrack(fileUrl.href);
     this.ctx.services.Forte.togglePianoRollVisibility(false);
 
@@ -1541,17 +1529,11 @@ export default class SetupManager {
     this.setupState.previewingVideo = true;
     this.renderView();
 
-    const audioUrl = new URL(
-      `http://127.0.0.1:${this.ctx.state.actualPort}/getFile`,
-    );
-    audioUrl.searchParams.append("path", mtvSong.path);
+    const audioUrl = await NetworkingUtility.getFileLink(mtvSong.path);
     this.showToast("LOADING TRACK...", "info");
     await this.ctx.services.Forte.loadTrack(audioUrl.href);
 
-    const videoUrl = new URL(
-      `http://127.0.0.1:${this.ctx.state.actualPort}/getFile`,
-    );
-    videoUrl.searchParams.append("path", mtvSong.videoPath);
+    const videoUrl = await NetworkingUtility.getFileLink(mtvSong.videoPath);
 
     this.previewVideoEl.attr({ src: videoUrl.href });
     this.previewVideoEl.elm.play().catch((e) => console.error(e));

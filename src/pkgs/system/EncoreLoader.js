@@ -188,19 +188,19 @@ const pkg = {
     let fontUrlToLoad = null;
 
     if (mode === "custom" && config.audioConfig?.customSoundfontPath) {
-      const url = new URL(`http://127.0.0.1:${actualPort}/getFile`);
-      url.searchParams.append("path", config.audioConfig.customSoundfontPath);
+      const url = await NetworkingUtility.getFileLink(
+        config.audioConfig.customSoundfontPath,
+      );
       fontUrlToLoad = url.href;
     } else if (
       mode === "library" &&
       libInfo?.manifest?.additionalContents?.soundFont
     ) {
-      const url = new URL(`http://127.0.0.1:${actualPort}/getFile`);
       const soundFontPath = pathJoin([
         libInfo.path,
         libInfo.manifest.additionalContents.soundFont,
       ]);
-      url.searchParams.append("path", soundFontPath);
+      const url = await NetworkingUtility.getFileLink(soundFontPath);
       fontUrlToLoad = url.href;
     }
 

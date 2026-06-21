@@ -192,13 +192,10 @@ export class BGVModule {
 
     for (const cat of catList) {
       if (cat.isAbsolute) {
-        allVideos.push(
-          ...cat.BGV_LIST.map((path) => {
-            const url = new URL(`http://127.0.0.1:${this.PORT}/getFile`);
-            url.searchParams.append("path", path);
-            return url.href;
-          }),
-        );
+        for (const path of cat.BGV_LIST) {
+          const url = await NetworkingUtility.getFileLink(path);
+          allVideos.push(url.href);
+        }
       } else {
         allVideos.push(...cat.BGV_LIST.map((path) => assetBaseUrl + path));
       }

@@ -206,8 +206,7 @@ const pkg = {
      * @returns {Promise<string|null>} File content or null on error.
      */
     readFile: async (path) => {
-      const params = new URLSearchParams({ path: path });
-      const url = `http://localhost:${actualPort}/getFile?${params.toString()}`;
+      const url = await NetworkingUtility.getFileLink(path);
       try {
         const res = await fetch(url, { method: "GET" });
         if (!res.ok) {
@@ -472,10 +471,7 @@ const pkg = {
                 cdgPath: hasCdg ? `${libraryPath}${basename}.cdg` : null,
               };
               try {
-                const urlObj = new URL(
-                  `http://127.0.0.1:${actualPort}/getFile`,
-                );
-                urlObj.searchParams.append("path", fullPath);
+                const urlObj = await NetworkingUtility.getFileLink(fullPath);
                 const tags = await new Promise((resolve, reject) => {
                   if (state.buildAbortController?.signal.aborted) {
                     reject(new Error("Build cancelled"));
@@ -519,10 +515,7 @@ const pkg = {
                   if (state.buildAbortController?.signal.aborted) {
                     throw new Error("Build cancelled");
                   }
-                  const urlObj = new URL(
-                    `http://127.0.0.1:${actualPort}/getFile`,
-                  );
-                  urlObj.searchParams.append("path", fullPath);
+                  const urlObj = await NetworkingUtility.getFileLink(fullPath);
                   const res = await fetch(urlObj.href);
 
                   if (state.buildAbortController?.signal.aborted) {
