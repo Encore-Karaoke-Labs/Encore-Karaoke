@@ -7,7 +7,9 @@ const NetworkingUtility = {
   },
   async getFileLink(path) {
     const port = await this.getPort();
+    const token = await this.getAccessToken();
     const url = new URL(`http://127.0.0.1:${port}/getFile`);
+    url.searchParams.append("token", token);
     url.searchParams.append("path", path);
     return url;
   },

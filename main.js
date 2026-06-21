@@ -336,6 +336,13 @@ server.post("/list", (req, res) => {
 
 server.get("/getFile", (req, res) => {
   const fPath = req.query.path;
+  const fToken = req.query.token;
+  if (!fToken)
+    return res
+      .status(403)
+      .json({ error: "Provide an access token to continue." });
+  if (fToken != fileToken)
+    return res.status(403).json({ error: "Invalid access token" });
   if (!fPath) return res.status(400).json({ error: "No path" });
 
   fs.stat(fPath, (err, stats) => {
