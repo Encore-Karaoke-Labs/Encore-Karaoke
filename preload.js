@@ -25,7 +25,8 @@ contextBridge.exposeInMainWorld("romanization", {
 });
 
 contextBridge.exposeInMainWorld("networking", {
-  port: async (rawJapanese) => ipcRenderer.invoke("get-port"),
+  port: async () => ipcRenderer.invoke("get-port"),
+  accessToken: async () => ipcRenderer.invoke("get-file-token"),
 });
 
 contextBridge.exposeInMainWorld("volume", {
