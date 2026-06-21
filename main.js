@@ -68,6 +68,8 @@ const io = new Server(serverHttp);
 const instance = new Bonjour();
 const bonjourId = `encore-link-${crypto.randomUUID()}`;
 
+const fileToken = crypto.randomUUID();
+
 // Pre-compute CRC32 table for maximum performance
 const crcTable = new Uint32Array(256);
 for (let i = 0; i < 256; i++) {
@@ -652,6 +654,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle("get-version", () => versionInformation);
   ipcMain.handle("get-kiosk-enabled", () => kioskEnabled);
+  ipcMain.handle("get-file-token", () => fileToken);
   ipcMain.handle("config-get-all", () => Config.getAll());
   ipcMain.handle("config-get-item", (event, key) => {
     if (typeof key !== "string") return null;
