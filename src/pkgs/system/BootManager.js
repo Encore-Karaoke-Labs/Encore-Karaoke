@@ -243,6 +243,7 @@ const pkg = {
     await Root.Core.pkg.run("services:FsSvc", [], true);
     await Root.Core.pkg.run("services:Identity", [], true);
     await Root.Core.pkg.run("services:Sessions", [], true);
+    await Root.Core.pkg.run("services:Camera", [], true);
 
     async function checkServicesLoaded() {
       let curInterval = setInterval(() => {
@@ -252,6 +253,7 @@ const pkg = {
           Root.Processes.getService("ForteSvc").data;
           Root.Processes.getService("IdentitySvc").data;
           Root.Processes.getService("SessionsSvc").data;
+          Root.Processes.getService("CameraSvc").data;
           clearInterval(curInterval);
           doEverythingElse();
         } catch (e) {

@@ -45,6 +45,7 @@ class EncoreController {
       Forte: Root.Processes.getService("ForteSvc").data,
       Identity: Root.Processes.getService("IdentitySvc").data,
       SessionsSvc: Root.Processes.getService("SessionsSvc")?.data,
+      CameraSvc: Root.Processes.getService("CameraSvc")?.data,
     };
 
     this.state = {
