@@ -164,6 +164,13 @@
                 PARTY CHAT & CHEER
               </button>
               <button
+                class="btn-secondary span-4"
+                id="open-camera-btn"
+                style="margin-top: 0.5rem"
+              >
+                ENMOKU CAMERA
+              </button>
+              <button
                 id="open-yt-btn"
                 class="span-4"
                 style="margin-top: 0.5rem"
@@ -368,12 +375,76 @@
             </div>
           </div>
         </div>
+
+        <div id="camera-view" class="view">
+          <div class="library-header">
+            <div class="search-row" style="align-items: center">
+              <button
+                id="close-camera-btn"
+                style="width: 50px; font-size: 1.5rem; padding: 0"
+              >
+                &larr;
+              </button>
+              <div
+                style="
+                  flex: 1;
+                  text-align: center;
+                  font-weight: 700;
+                  color: var(--primary);
+                "
+              >
+                ENMOKU CAMERA
+              </div>
+              <div style="width: 50px"></div>
+            </div>
+          </div>
+          <div
+            style="
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              background: #000;
+              position: relative;
+            "
+          >
+            <video
+              id="camera-preview"
+              autoplay
+              playsinline
+              muted
+              style="width: 100%; height: 100%; object-fit: cover"
+            ></video>
+            <div
+              style="
+                position: absolute;
+                bottom: 2rem;
+                width: 100%;
+                display: flex;
+                justify-content: center;
+                gap: 1rem;
+                padding: 0 1rem;
+              "
+            >
+              <button id="start-cam-btn" class="btn-primary" style="flex: 1">
+                START BROADCAST
+              </button>
+              <button
+                id="switch-cam-btn"
+                class="btn-secondary"
+                style="flex: 1; display: none"
+              >
+                SWITCH CAM
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="toast" id="toast">Song Queued!</div>
 
     <script src="/libs/socket.io.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

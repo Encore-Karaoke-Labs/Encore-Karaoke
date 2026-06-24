@@ -36,6 +36,27 @@ export class BGVModule {
     this.transitionTimeout = null;
     this.imageCleanupTimeout = null;
     this.currentLoadId = null;
+
+    this.liveStream = null;
+    document.addEventListener("CherryTree.Camera.StreamReceived", (e) => {
+      this.liveStream = e.detail;
+      this.addDynamicCategory({
+        BGV_CATEGORY: "EnMoku Camera",
+        BGV_LIST: ["live_stream"],
+        isAbsolute: true,
+      });
+      this.selectedCategory = "EnMoku Camera";
+      this.updatePlaylistForCategory();
+    });
+
+    document.addEventListener("CherryTree.Camera.StreamEnded", () => {
+      this.liveStream = null;
+      if (this.selectedCategory === "EnMoku Camera") {
+        this.selectedCategory = "Auto";
+        this.updatePlaylistForCategory();
+      }
+    });
+
     console.log("[BGV] BGV Player initialized.");
   }
 
@@ -193,8 +214,12 @@ export class BGVModule {
     for (const cat of catList) {
       if (cat.isAbsolute) {
         for (const path of cat.BGV_LIST) {
-          const url = await NetworkingUtility.getFileLink(path);
-          allVideos.push(url.href);
+          if (path === "live_stream") {
+            allVideos.push(path);
+          } else {
+            const url = await NetworkingUtility.getFileLink(path);
+            allVideos.push(url.href);
+          }
         }
       } else {
         allVideos.push(...cat.BGV_LIST.map((path) => assetBaseUrl + path));
@@ -529,9 +554,14 @@ export class BGVModule {
         v.removeEventListener("canplay", onCanPlay);
       };
 
-      v.addEventListener("canplay", onCanPlay);
-      v.src = url;
-      v.load();
+      if (url === "live_stream" && this.liveStream) {
+        v.addEventListener("loadedmetadata", onCanPlay);
+        v.srcObject = this.liveStream;
+      } else {
+        v.addEventListener("canplay", onCanPlay);
+        v.src = url;
+        v.load();
+      }
     }
   }
 

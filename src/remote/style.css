@@ -494,6 +494,18 @@ button:active {
   margin-bottom: 2rem;
 }
 
+#camera-view {
+  z-index: 50;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  visibility: hidden;
+}
+
+#camera-view.active {
+  transform: translateY(0);
+  visibility: visible;
+}
+
 @media (min-width: 768px) {
   .view-container {
     display: flex;

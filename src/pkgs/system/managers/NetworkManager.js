@@ -582,6 +582,17 @@ export default class NetworkManager {
             identity: cmd.identity,
             data: { type: "reserve_response", success: true, song: ytSong },
           });
+
+        case "request_camera_peer":
+          const cameraSvc = this.ctx.services.CameraSvc;
+          if (cameraSvc) {
+            cameraSvc.initPeer().then((peerId) => {
+              this.socket.emit("sendData", {
+                identity: cmd.identity,
+                data: { type: "camera_peer_id", peerId },
+              });
+            });
+          }
           break;
       }
     });

@@ -140,6 +140,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const chatContentArea = document.getElementById("chat-content-area");
   const cheerContentArea = document.getElementById("cheer-content-area");
 
+  const cameraView = document.getElementById("camera-view");
+  const cameraPreview = document.getElementById("camera-preview");
+  const startCamBtn = document.getElementById("start-cam-btn");
+  const switchCamBtn = document.getElementById("switch-cam-btn");
+
+  let localCameraStream = null;
+  let cameraPeer = null;
+  let cameraCall = null;
+  let currentCameraIndex = 0;
+  let videoDevices = [];
+
   const songScroller = new VirtualScroller(
     "song-scroller-container",
     "songs-list",
@@ -288,6 +299,31 @@ document.addEventListener("DOMContentLoaded", () => {
       chatMessages.push(payload.message);
       renderChat();
     }
+
+    if (payload.type === "camera_peer_id") {
+      if (typeof Peer === "undefined") {
+        showToast("PeerJS library is missing!", true);
+        stopCamera();
+        return;
+      }
+
+      cameraPeer = new Peer({ debug: 2 });
+
+      cameraPeer.on("open", () => {
+        cameraCall = cameraPeer.call(payload.peerId, localCameraStream);
+
+        startCamBtn.textContent = "STOP BROADCAST";
+        startCamBtn.classList.remove("btn-primary");
+        startCamBtn.classList.add("btn-danger");
+        showToast("Broadcasting to TV!");
+      });
+
+      cameraPeer.on("error", (err) => {
+        console.error("[CAMERA] Peer error:", err);
+        showToast("Connection to TV failed", true);
+        stopCamera();
+      });
+    }
   });
 
   function renderChat() {
@@ -328,6 +364,22 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("close-chat-btn").onclick = () =>
     chatView.classList.remove("active");
 
+  document.getElementById("open-camera-btn").onclick = () => {
+    if (!EncoreEnv.isSecure) {
+      showToast(
+        "Camera requires HTTPS. Please connect using the Cloud Link QR code.",
+        true,
+      );
+      return;
+    }
+    cameraView.classList.add("active");
+  };
+
+  document.getElementById("close-camera-btn").onclick = () => {
+    cameraView.classList.remove("active");
+    stopCamera();
+  };
+
   chatInput.addEventListener("input", (e) => {
     if (e.target.value.trim().length > 0) {
       socket.emit("remote-command", {
@@ -349,6 +401,106 @@ document.addEventListener("DOMContentLoaded", () => {
       clearTimeout(typingTimer);
     }
   });
+
+  async function initCamera() {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("MediaDevices API not available.");
+      }
+
+      await navigator.mediaDevices.getUserMedia({ video: true });
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      videoDevices = devices.filter((d) => d.kind === "videoinput");
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: videoDevices[currentCameraIndex]?.deviceId,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "environment", // Rear camera
+        },
+        audio: false,
+      });
+
+      localCameraStream = stream;
+      cameraPreview.srcObject = stream;
+
+      if (videoDevices.length > 1) {
+        switchCamBtn.style.display = "flex";
+      }
+    } catch (err) {
+      showToast("Camera access denied or unavailable", true);
+      console.error("[CAMERA] Init error:", err);
+      stopCamera();
+    }
+  }
+
+  async function switchCamera() {
+    if (videoDevices.length < 2) return;
+    currentCameraIndex = (currentCameraIndex + 1) % videoDevices.length;
+
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: { exact: videoDevices[currentCameraIndex].deviceId },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      });
+
+      const oldTracks = localCameraStream.getVideoTracks();
+      localCameraStream = newStream;
+      cameraPreview.srcObject = newStream;
+
+      if (cameraCall && cameraCall.peerConnection) {
+        const sender = cameraCall.peerConnection
+          .getSenders()
+          .find((s) => s.track.kind === "video");
+        if (sender) sender.replaceTrack(newStream.getVideoTracks()[0]);
+      }
+
+      oldTracks.forEach((t) => t.stop());
+    } catch (err) {
+      console.error("[CAMERA] Error switching camera:", err);
+      showToast("Failed to switch camera", true);
+    }
+  }
+
+  function stopCamera() {
+    if (localCameraStream) {
+      localCameraStream.getTracks().forEach((t) => t.stop());
+      localCameraStream = null;
+    }
+    if (cameraCall) {
+      cameraCall.close();
+      cameraCall = null;
+    }
+    if (cameraPeer) {
+      cameraPeer.destroy();
+      cameraPeer = null;
+    }
+    if (cameraPreview) cameraPreview.srcObject = null;
+
+    startCamBtn.textContent = "START BROADCAST";
+    startCamBtn.classList.remove("btn-danger");
+    startCamBtn.classList.add("btn-primary");
+  }
+
+  startCamBtn.onclick = async () => {
+    if (localCameraStream && cameraCall) {
+      stopCamera();
+      return;
+    }
+
+    startCamBtn.textContent = "CONNECTING...";
+    await initCamera();
+
+    if (localCameraStream) {
+      socket.emit("remote-command", { type: "request_camera_peer" });
+    }
+  };
+
+  switchCamBtn.onclick = switchCamera;
 
   document.getElementById("chat-send-btn").onclick = () => {
     const v = chatInput.value.trim();
