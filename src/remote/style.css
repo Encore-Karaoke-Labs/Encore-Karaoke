@@ -268,6 +268,74 @@ button:active {
   border-color: var(--primary);
 }
 
+/* Camera View Layout */
+.camera-preview-container {
+  flex: 1;
+  position: relative;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-status-overlay {
+  position: absolute;
+  text-align: center;
+  padding: 2rem;
+  z-index: 10;
+  transition: opacity 0.3s ease;
+}
+
+.camera-status-overlay ion-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  color: var(--text-dim);
+  transition: color 0.3s ease;
+}
+
+.camera-status-overlay h3 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  transition: color 0.3s ease;
+}
+
+/* Error State */
+.camera-status-overlay.error ion-icon,
+.camera-status-overlay.error h3 {
+  color: #ff5555;
+}
+
+/* Video Element */
+#camera-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+#camera-preview.active {
+  opacity: 1;
+}
+
+/* Bottom Controls */
+.camera-controls-bar {
+  padding: 1rem;
+  background: #000;
+  display: flex;
+  gap: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.camera-controls-bar button {
+  flex: 1;
+}
+
 /* Main Remote Full Grid layout */
 #remote-view-content {
   flex: 1;

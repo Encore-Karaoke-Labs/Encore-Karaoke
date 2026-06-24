@@ -145,11 +145,30 @@ document.addEventListener("DOMContentLoaded", () => {
   const startCamBtn = document.getElementById("start-cam-btn");
   const switchCamBtn = document.getElementById("switch-cam-btn");
 
+  const camStatusOverlay = document.getElementById("camera-status-overlay");
+  const camStatusText = document.getElementById("camera-status-text");
+  const camStatusIcon = document.getElementById("camera-status-icon");
+  const camControlsBar = document.getElementById("camera-controls-bar");
+
   let localCameraStream = null;
   let cameraPeer = null;
   let cameraCall = null;
   let currentCameraIndex = 0;
   let videoDevices = [];
+
+  function setCameraStatus(msg, isError = false) {
+    camStatusOverlay.style.display = "block";
+    cameraPreview.classList.remove("active");
+    camStatusText.textContent = msg;
+
+    if (isError) {
+      camStatusOverlay.classList.add("error");
+      camStatusIcon.setAttribute("name", "warning-outline");
+    } else {
+      camStatusOverlay.classList.remove("error");
+      camStatusIcon.setAttribute("name", "videocam-outline");
+    }
+  }
 
   const songScroller = new VirtualScroller(
     "song-scroller-container",
@@ -301,8 +320,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (payload.type === "camera_error") {
-      showToast(payload.message, true);
-      stopCamera();
+      stopCamera(payload.message, true);
       return;
     }
 
@@ -319,7 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
         cameraCall = cameraPeer.call(payload.peerId, localCameraStream);
 
         cameraCall.on("close", () => {
-          if (localCameraStream) stopCamera();
+          if (localCameraStream) stopCamera("Broadcast ended.");
         });
 
         startCamBtn.textContent = "STOP BROADCAST";
@@ -375,14 +393,18 @@ document.addEventListener("DOMContentLoaded", () => {
     chatView.classList.remove("active");
 
   document.getElementById("open-camera-btn").onclick = () => {
+    cameraView.classList.add("active");
+
     if (!EncoreEnv.isSecure) {
-      showToast(
+      camControlsBar.style.display = "none";
+      setCameraStatus(
         "Camera requires HTTPS. Please connect using the Cloud Link QR code.",
         true,
       );
-      return;
+    } else {
+      camControlsBar.style.display = "flex";
+      setCameraStatus("Ready to broadcast.");
     }
-    cameraView.classList.add("active");
   };
 
   document.getElementById("close-camera-btn").onclick = () => {
@@ -484,13 +506,16 @@ document.addEventListener("DOMContentLoaded", () => {
       localCameraStream = stream;
       cameraPreview.srcObject = stream;
 
+      camStatusOverlay.style.display = "none";
+      cameraPreview.style.opacity = "1";
+
       if (videoDevices.length > 1) {
         switchCamBtn.style.display = "flex";
       }
     } catch (err) {
       showToast("Camera access denied or all cameras in use.", true);
       console.error("[CAMERA] Init error:", err);
-      stopCamera();
+      stopCamera("Camera access denied or all cameras in use.", true);
     }
   }
 
@@ -556,7 +581,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function stopCamera() {
+  function stopCamera(msg = "Ready to broadcast.", isError = false) {
     if (localCameraStream) {
       localCameraStream.getTracks().forEach((t) => t.stop());
       localCameraStream = null;
@@ -565,7 +590,6 @@ document.addEventListener("DOMContentLoaded", () => {
       cameraPreview.srcObject.getTracks().forEach((t) => t.stop());
       cameraPreview.srcObject = null;
     }
-
     if (cameraCall) {
       cameraCall.close();
       cameraCall = null;
@@ -578,6 +602,13 @@ document.addEventListener("DOMContentLoaded", () => {
     startCamBtn.textContent = "START BROADCAST";
     startCamBtn.classList.remove("btn-danger");
     startCamBtn.classList.add("btn-primary");
+    switchCamBtn.style.display = "none";
+
+    if (EncoreEnv.isSecure) {
+      camControlsBar.style.display = "flex";
+    }
+
+    setCameraStatus(msg, isError);
   }
 
   startCamBtn.onclick = async () => {
