@@ -471,6 +471,11 @@ document.addEventListener("DOMContentLoaded", () => {
       localCameraStream.getTracks().forEach((t) => t.stop());
       localCameraStream = null;
     }
+    if (cameraPreview && cameraPreview.srcObject) {
+      cameraPreview.srcObject.getTracks().forEach((t) => t.stop());
+      cameraPreview.srcObject = null;
+    }
+
     if (cameraCall) {
       cameraCall.close();
       cameraCall = null;
@@ -479,7 +484,6 @@ document.addEventListener("DOMContentLoaded", () => {
       cameraPeer.destroy();
       cameraPeer = null;
     }
-    if (cameraPreview) cameraPreview.srcObject = null;
 
     startCamBtn.textContent = "START BROADCAST";
     startCamBtn.classList.remove("btn-danger");
