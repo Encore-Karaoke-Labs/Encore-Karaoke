@@ -40,6 +40,9 @@ export class BGVModule {
     this.liveStream = null;
     document.addEventListener("CherryTree.Camera.StreamReceived", (e) => {
       this.liveStream = e.detail;
+      this.categories = this.categories.filter(
+        (c) => c.BGV_CATEGORY !== "EnMoku Camera",
+      );
       this.addDynamicCategory({
         BGV_CATEGORY: "EnMoku Camera",
         BGV_LIST: ["live_stream"],
@@ -51,6 +54,9 @@ export class BGVModule {
 
     document.addEventListener("CherryTree.Camera.StreamEnded", () => {
       this.liveStream = null;
+      this.categories = this.categories.filter(
+        (c) => c.BGV_CATEGORY !== "EnMoku Camera",
+      );
       if (this.selectedCategory === "EnMoku Camera") {
         this.selectedCategory = "Auto";
         this.updatePlaylistForCategory();
@@ -554,9 +560,17 @@ export class BGVModule {
         v.removeEventListener("canplay", onCanPlay);
       };
 
-      if (url === "live_stream" && this.liveStream) {
-        v.addEventListener("loadedmetadata", onCanPlay);
-        v.srcObject = this.liveStream;
+      if (url === "live_stream") {
+        if (this.liveStream) {
+          v.addEventListener("loadedmetadata", onCanPlay);
+          v.srcObject = this.liveStream;
+        } else {
+          console.warn(
+            "[BGV] Camera stream requested but not available. Skipping.",
+          );
+          this.playNext();
+          return;
+        }
       } else {
         v.addEventListener("canplay", onCanPlay);
         v.src = url;
