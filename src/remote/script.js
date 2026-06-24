@@ -343,7 +343,6 @@ document.addEventListener("DOMContentLoaded", () => {
         startCamBtn.textContent = "STOP BROADCAST";
         startCamBtn.classList.remove("btn-primary");
         startCamBtn.classList.add("btn-danger");
-        showToast("Broadcasting to TV!");
       });
 
       cameraPeer.on("error", (err) => {
