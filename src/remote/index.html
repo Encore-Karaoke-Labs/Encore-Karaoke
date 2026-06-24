@@ -154,34 +154,39 @@
                 </div>
               </div>
 
-              <button
-                class="btn-secondary span-4 mobile-only"
-                id="open-library-btn"
-              >
-                BROWSE SONGLIST
-              </button>
-              <button class="btn-primary span-4" id="open-chat-btn">
-                PARTY CHAT & CHEER
-              </button>
-              <button
-                class="btn-secondary span-4"
-                id="open-camera-btn"
-                style="margin-top: 0.5rem"
-              >
-                ENMOKU CAMERA
-              </button>
-              <button
-                id="open-yt-btn"
-                class="span-4"
-                style="margin-top: 0.5rem"
-              >
-                YOUTUBE SEARCH
-              </button>
+              <div class="action-grid span-4">
+                <button
+                  class="action-btn btn-primary mobile-only"
+                  id="open-library-btn"
+                >
+                  <ion-icon name="musical-notes"></ion-icon>
+                  <span>SONGBOOK</span>
+                </button>
+                <button
+                  class="action-btn"
+                  id="open-yt-btn"
+                  style="
+                    background: rgba(255, 0, 0, 0.15);
+                    border-color: rgba(255, 0, 0, 0.4);
+                    color: #ff6b6b;
+                  "
+                >
+                  <ion-icon name="logo-youtube"></ion-icon>
+                  <span>YOUTUBE</span>
+                </button>
+                <button class="action-btn btn-secondary" id="open-chat-btn">
+                  <ion-icon name="chatbubbles"></ion-icon>
+                  <span>CHAT & CHEER</span>
+                </button>
+                <button class="action-btn btn-secondary" id="open-camera-btn">
+                  <ion-icon name="videocam"></ion-icon>
+                  <span>CAMERA</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Chat / Cheer Panel -->
         <div id="chat-view" class="view">
           <div class="library-header">
             <div class="library-tabs">
@@ -450,6 +455,14 @@
 
     <script src="/libs/socket.io.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"
+    ></script>
     <script src="script.js"></script>
   </body>
 </html>
