@@ -155,6 +155,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let cameraCall = null;
   let currentCameraIndex = 0;
   let videoDevices = [];
+  let currentFacingMode = "environment";
 
   function setCameraStatus(msg, isError = false) {
     camStatusOverlay.style.display = "block";
@@ -508,7 +509,10 @@ document.addEventListener("DOMContentLoaded", () => {
       camStatusOverlay.style.display = "none";
       cameraPreview.style.opacity = "1";
 
-      if (videoDevices.length > 1) {
+      if (
+        videoDevices.length > 1 ||
+        /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
+      ) {
         switchCamBtn.style.display = "flex";
       }
     } catch (err) {
@@ -519,50 +523,59 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function switchCamera() {
-    if (videoDevices.length < 2) return;
+    if (localCameraStream) {
+      localCameraStream.getVideoTracks().forEach((t) => t.stop());
+    }
 
     let newStream = null;
-    let attempts = 0;
-    let nextIndex = (currentCameraIndex + 1) % videoDevices.length;
 
-    while (!newStream && attempts < videoDevices.length - 1) {
+    if (videoDevices.length >= 2) {
+      let attempts = 0;
+      let nextIndex = (currentCameraIndex + 1) % videoDevices.length;
+
+      while (!newStream && attempts < videoDevices.length) {
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              deviceId: { exact: videoDevices[nextIndex].deviceId },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          });
+          currentCameraIndex = nextIndex;
+        } catch (err) {
+          console.warn(
+            `[CAMERA] Failed to switch to ID ${nextIndex}: ${err.message}`,
+          );
+          attempts++;
+          nextIndex = (nextIndex + 1) % videoDevices.length;
+        }
+      }
+    } else {
+      currentFacingMode =
+        currentFacingMode === "environment" ? "user" : "environment";
       try {
         newStream = await navigator.mediaDevices.getUserMedia({
           video: {
-            deviceId: { exact: videoDevices[nextIndex].deviceId },
+            facingMode: { ideal: currentFacingMode },
             width: { ideal: 1280 },
             height: { ideal: 720 },
           },
           audio: false,
         });
-        currentCameraIndex = nextIndex;
       } catch (err) {
-        if (err.name === "NotAllowedError") {
-          break;
-        } else if (
-          err.name === "NotReadableError" ||
-          err.name === "TrackStartError"
-        ) {
-          console.warn(
-            `[CAMERA] Failed to switch: Camera ${nextIndex} locked (NotReadableError). Trying next...`,
-          );
-        } else {
-          console.warn(
-            `[CAMERA] Failed to switch to camera ${nextIndex}: ${err.message}. Trying next...`,
-          );
-        }
-        attempts++;
-        nextIndex = (nextIndex + 1) % videoDevices.length;
+        console.warn("[CAMERA] Failed to switch facingMode:", err);
       }
     }
 
     if (!newStream) {
-      showToast("No other available cameras found.", true);
+      showToast("No other cameras available.", true);
+      stopCamera("Camera switch failed. Please restart broadcast.", true);
       return;
     }
 
     try {
-      const oldTracks = localCameraStream.getVideoTracks();
       localCameraStream = newStream;
       cameraPreview.srcObject = newStream;
 
@@ -572,11 +585,10 @@ document.addEventListener("DOMContentLoaded", () => {
           .find((s) => s.track.kind === "video");
         if (sender) sender.replaceTrack(newStream.getVideoTracks()[0]);
       }
-
-      oldTracks.forEach((t) => t.stop());
     } catch (err) {
       console.error("[CAMERA] Error applying switched camera:", err);
       showToast("Failed to switch camera", true);
+      stopCamera("An error occurred while switching.", true);
     }
   }
 
