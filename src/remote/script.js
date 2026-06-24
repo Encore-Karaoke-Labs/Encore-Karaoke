@@ -300,6 +300,12 @@ document.addEventListener("DOMContentLoaded", () => {
       renderChat();
     }
 
+    if (payload.type === "camera_error") {
+      showToast(payload.message, true);
+      stopCamera();
+      return;
+    }
+
     if (payload.type === "camera_peer_id") {
       if (typeof Peer === "undefined") {
         showToast("PeerJS library is missing!", true);
@@ -311,6 +317,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       cameraPeer.on("open", () => {
         cameraCall = cameraPeer.call(payload.peerId, localCameraStream);
+
+        cameraCall.on("close", () => {
+          if (localCameraStream) stopCamera();
+        });
 
         startCamBtn.textContent = "STOP BROADCAST";
         startCamBtn.classList.remove("btn-primary");

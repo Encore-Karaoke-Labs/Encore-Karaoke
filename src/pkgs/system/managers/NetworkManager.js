@@ -586,6 +586,17 @@ export default class NetworkManager {
         case "request_camera_peer":
           const cameraSvc = this.ctx.services.CameraSvc;
           if (cameraSvc) {
+            if (cameraSvc.isBusy()) {
+              this.socket.emit("sendData", {
+                identity: cmd.identity,
+                data: {
+                  type: "camera_error",
+                  message: "Camera is already in use by another user.",
+                },
+              });
+              break;
+            }
+
             cameraSvc.initPeer().then((peerId) => {
               this.socket.emit("sendData", {
                 identity: cmd.identity,

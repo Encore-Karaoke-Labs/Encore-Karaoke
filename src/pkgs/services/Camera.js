@@ -18,12 +18,12 @@ const pkg = {
     peer: null,
     peerId: null,
     currentCall: null,
-
+    isBusy: function () {
+      return this.currentCall !== null;
+    },
     initPeer: function () {
       return new Promise((resolve, reject) => {
-        if (this.peer) {
-          return resolve(this.peerId);
-        }
+        if (this.peer) return resolve(this.peerId);
 
         this.peer = new Peer({ debug: 1 });
 
@@ -35,6 +35,8 @@ const pkg = {
         this.peer.on("error", (err) => reject(err));
 
         this.peer.on("call", (call) => {
+          if (this.currentCall) this.currentCall.close();
+
           this.currentCall = call;
           call.answer();
 
