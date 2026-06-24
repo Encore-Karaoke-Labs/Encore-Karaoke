@@ -134,7 +134,18 @@
                 <button class="numpad-btn" data-type="digit" data-value="0">
                   0
                 </button>
-                <div></div>
+                <button
+                  class="numpad-btn"
+                  data-type="toggle_recording"
+                  style="
+                    color: #ff5555;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  "
+                >
+                  <ion-icon name="radio-button-on"></ion-icon>
+                </button>
               </div>
 
               <div class="controls-wrapper span-4">
@@ -418,6 +429,26 @@
           <div id="camera-controls-bar" class="camera-controls-bar">
             <button id="start-cam-btn" class="btn-primary">
               START BROADCAST
+            </button>
+            <button
+              id="camera-record-btn"
+              data-type="toggle_recording"
+              class="btn-secondary"
+              style="
+                flex: 0 0 60px;
+                background: rgba(255, 85, 85, 0.15);
+                border-color: rgba(255, 85, 85, 0.4);
+                color: #ff5555;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+              "
+            >
+              <ion-icon
+                name="radio-button-on"
+                style="font-size: 1.8rem"
+              ></ion-icon>
             </button>
             <button
               id="switch-cam-btn"
