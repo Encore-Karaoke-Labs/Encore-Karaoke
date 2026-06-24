@@ -398,7 +398,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!EncoreEnv.isSecure) {
       camControlsBar.style.display = "none";
       setCameraStatus(
-        "Camera requires HTTPS. Please connect using the Cloud Link QR code.",
+        "EnMoku Camera is unavailable at the moment as it requires HTTPS.",
         true,
       );
     } else {
