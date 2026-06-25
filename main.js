@@ -396,7 +396,7 @@ const createWindow = () => {
   const win = new BrowserWindow({
     title: `Encore Karaoke ${versionInformation.channel} ${versionInformation.number} (${versionInformation.codename})`,
     width: 1280,
-    height: 752,
+    height: 774,
     icon: "resources/icon.png",
     autoHideMenuBar: true,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
