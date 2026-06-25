@@ -57,7 +57,7 @@ export class ForteSynthesizer {
       await this.audioCore.context.audioWorklet.addModule(
         "/libs/spessasynth_lib/dist/spessasynth_processor.min.js",
       );
-      const soundFontUrl = "/libs/soundfonts/SAM2695.sf2";
+      const soundFontUrl = "/libs/soundfonts/SAM2634.sf3";
       const soundFontBuffer = await (await fetch(soundFontUrl)).arrayBuffer();
 
       this.state.playback.synthesizer = new Synthetizer(this.audioCore.context);

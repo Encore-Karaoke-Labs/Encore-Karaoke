@@ -375,7 +375,7 @@ export default class SetupManager {
                 v === "library",
               );
 
-              let soundFontUrl = "/libs/soundfonts/SAM2695.sf2";
+              let soundFontUrl = "/libs/soundfonts/SAM2634.sf3";
               let shouldLoad = true;
 
               if (
