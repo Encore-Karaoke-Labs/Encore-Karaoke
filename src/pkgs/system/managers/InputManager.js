@@ -221,6 +221,67 @@ export default class InputManager {
       return;
     }
 
+    if (state.isQueueOverlayVisible) {
+      e.preventDefault();
+      if (e.key === "Escape" || e.key.toLowerCase() === "q") {
+        ui.toggleQueueOverlay(false);
+      } else if (e.key === "ArrowUp") {
+        const queueLen = state.isSessionActive
+          ? this.ctx.services.SessionsSvc?.state?.queue?.length || 0
+          : state.reservationQueue.length;
+        if (queueLen === 0) return;
+        state.highlightedQueueIndex = Math.max(
+          0,
+          state.highlightedQueueIndex - 1,
+        );
+        this.playNavSfx("nav");
+        ui.updateQueueHighlight();
+      } else if (e.key === "ArrowDown") {
+        const queueLen = state.isSessionActive
+          ? this.ctx.services.SessionsSvc?.state?.queue?.length || 0
+          : state.reservationQueue.length;
+        if (queueLen === 0) return;
+        state.highlightedQueueIndex = Math.min(
+          queueLen - 1,
+          state.highlightedQueueIndex + 1,
+        );
+        this.playNavSfx("nav");
+        ui.updateQueueHighlight();
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        if (
+          !state.isSessionActive &&
+          state.highlightedQueueIndex >= 0 &&
+          state.highlightedQueueIndex < state.reservationQueue.length
+        ) {
+          state.reservationQueue.splice(state.highlightedQueueIndex, 1);
+          if (state.highlightedQueueIndex >= state.reservationQueue.length) {
+            state.highlightedQueueIndex = Math.max(
+              0,
+              state.reservationQueue.length - 1,
+            );
+          }
+          if (state.reservationQueue.length === 0)
+            state.highlightedQueueIndex = -1;
+
+          this.ctx.modules.infoBar.showTemp(
+            "QUEUE",
+            "Song removed from queue.",
+            3000,
+          );
+          this.ctx.modules.infoBar.update();
+          ui.renderQueue();
+        } else if (state.isSessionActive) {
+          this.playNavSfx("out_of_bounds");
+          this.ctx.modules.infoBar.showTemp(
+            "QUEUE",
+            "Cannot delete in Sessions mode.",
+            3000,
+          );
+        }
+      }
+      return;
+    }
+
     if (isSearchInputFocused) {
       if (e.key === "Backspace" && !dom.searchInput.getValue()) {
         e.preventDefault();
@@ -266,6 +327,16 @@ export default class InputManager {
       } else if (state.mode === "menu") {
         recordings.toggleRecordingsList();
       }
+      return;
+    }
+
+    if (
+      e.key.toLowerCase() === "q" &&
+      !isSearchInputFocused &&
+      !state.isSearchOverlayVisible
+    ) {
+      e.preventDefault();
+      ui.toggleQueueOverlay(!state.isQueueOverlayVisible);
       return;
     }
 

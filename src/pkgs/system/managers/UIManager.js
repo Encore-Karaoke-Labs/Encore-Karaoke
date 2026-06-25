@@ -100,6 +100,18 @@ export default class UIManager {
       .classOn("player-ui", "hidden")
       .appendTo(wrapper);
 
+    dom.queueUi = new Html("div").classOn("queue-ui").appendTo(wrapper);
+    dom.queueWindow = new Html("div")
+      .classOn("queue-window")
+      .appendTo(dom.queueUi);
+    new Html("div")
+      .classOn("queue-header")
+      .text("RESERVATION QUEUE")
+      .appendTo(dom.queueWindow);
+    dom.queueList = new Html("div")
+      .classOn("queue-list-container")
+      .appendTo(dom.queueWindow);
+
     // Shared Top Container & Indicators
     dom.topBarContainer = new Html("div")
       .classOn("top-bar-container")
@@ -699,6 +711,7 @@ export default class UIManager {
     if (dom.setupScreen) dom.setupScreen.classOn("hidden");
 
     if (state.isSearchOverlayVisible) this.toggleSearchOverlay(false);
+    if (state.isQueueOverlayVisible) this.toggleQueueOverlay(false);
 
     if (
       newMode !== "yt-search" &&
@@ -933,6 +946,98 @@ export default class UIManager {
         this.visibleItemsMap.set(i, item);
       }
     }
+  }
+
+  toggleQueueOverlay(visible) {
+    const state = this.ctx.state;
+    const wrapper = this.ctx.wrapper;
+
+    if (state.currentSongIsMultiplexed)
+      this.ctx.services.Forte.togglePianoRollVisibility(!visible);
+
+    state.isQueueOverlayVisible = visible;
+
+    if (visible) {
+      wrapper.classOn("queue-overlay-active");
+      state.highlightedQueueIndex = -1;
+      this.renderQueue();
+    } else {
+      state.highlightedQueueIndex = -1;
+      wrapper.classOff("queue-overlay-active");
+    }
+  }
+
+  renderQueue() {
+    const state = this.ctx.state;
+    const dom = this.ctx.dom;
+    dom.queueList.clear();
+
+    const queue = state.isSessionActive
+      ? this.ctx.services.SessionsSvc?.state?.queue || []
+      : state.reservationQueue;
+
+    if (queue.length === 0) {
+      dom.queueList.text("No songs in the reservation queue.");
+      state.highlightedQueueIndex = -1;
+      return;
+    }
+
+    queue.forEach((song, idx) => {
+      const item = new Html("div")
+        .classOn("queue-result-item")
+        .appendTo(dom.queueList);
+      item.on("click", () => {
+        state.highlightedQueueIndex = idx;
+        this.updateQueueHighlight();
+      });
+
+      const fmt = this.ctx.root.library.getFormatInfo(song);
+      const info = new Html("div").classOn("queue-info").appendTo(item);
+      const titleRow = new Html("div").classOn("queue-title").appendTo(info);
+
+      if (song.code) {
+        new Html("span")
+          .classOn("queue-code")
+          .text(song.code)
+          .appendTo(titleRow);
+      } else {
+        new Html("span")
+          .classOn("queue-code")
+          .styleJs({ color: "#ff5555" })
+          .text("YT")
+          .appendTo(titleRow);
+      }
+
+      new Html("span")
+        .classOn("format-badge")
+        .text(fmt.label)
+        .styleJs({ backgroundColor: fmt.color })
+        .appendTo(titleRow);
+      new Html("span").text(song.title).appendTo(titleRow);
+
+      const artistRow = new Html("div").classOn("queue-artist").appendTo(info);
+      new Html("span").text(song.artist).appendTo(artistRow);
+
+      if (!state.isSessionActive) {
+        new Html("div").classOn("queue-del-hint").text("DEL").appendTo(item);
+      }
+    });
+
+    if (state.highlightedQueueIndex >= queue.length) {
+      state.highlightedQueueIndex = queue.length - 1;
+    }
+    this.updateQueueHighlight();
+  }
+
+  updateQueueHighlight() {
+    this.ctx.dom.queueList.qsa(".queue-result-item").forEach((item, idx) => {
+      item[
+        idx === this.ctx.state.highlightedQueueIndex ? "classOn" : "classOff"
+      ]("highlighted");
+      if (idx === this.ctx.state.highlightedQueueIndex) {
+        item.elm.scrollIntoView({ block: "nearest" });
+      }
+    });
   }
 
   toggleSearchOverlay(visible) {

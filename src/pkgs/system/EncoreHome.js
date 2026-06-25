@@ -67,6 +67,9 @@ class EncoreController {
       currentSongIsMV: false,
       lastPlaybackStatus: null,
 
+      isQueueOverlayVisible: false,
+      highlightedQueueIndex: -1,
+
       isScoreFanfareEnabled: config.audioConfig?.enableScoreFanfare ?? true,
       isScoreNarrationEnabled: config.audioConfig?.enableScoreNarration ?? true,
       isNavSfxEnabled: config.audioConfig?.enableNavSfx ?? true,
