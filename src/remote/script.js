@@ -157,49 +157,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let videoDevices = [];
   let currentFacingMode = "environment";
 
-  const broadcastCanvas = document.createElement("canvas");
-  broadcastCanvas.width = 1280;
-  broadcastCanvas.height = 720;
-  const broadcastCtx = broadcastCanvas.getContext("2d", { alpha: false });
-  let broadcastAnimFrame;
-  let processedStream = null;
-
-  let lastDrawTime = 0;
-  const fpsInterval = 1000 / 30;
-
-  function renderBroadcastFrame(timestamp) {
-    broadcastAnimFrame = requestAnimationFrame(renderBroadcastFrame);
-
-    if (timestamp - lastDrawTime < fpsInterval) return;
-    lastDrawTime = timestamp;
-
-    if (!localCameraStream || !cameraPreview || cameraPreview.videoWidth === 0)
-      return;
-
-    const vw = cameraPreview.videoWidth;
-    const vh = cameraPreview.videoHeight;
-    const canvasRatio = 1280 / 720;
-    const videoRatio = vw / vh;
-
-    let drawWidth = 1280;
-    let drawHeight = 720;
-    let dx = 0;
-    let dy = 0;
-
-    if (videoRatio > canvasRatio) {
-      drawHeight = 1280 / videoRatio;
-      dy = (720 - drawHeight) / 2;
-    } else {
-      drawWidth = 720 * videoRatio;
-      dx = (1280 - drawWidth) / 2;
-    }
-
-    broadcastCtx.fillStyle = "#000000";
-    broadcastCtx.fillRect(0, 0, 1280, 720);
-
-    broadcastCtx.drawImage(cameraPreview, dx, dy, drawWidth, drawHeight);
-  }
-
   function setCameraStatus(msg, isError = false) {
     camStatusOverlay.style.display = "block";
     cameraPreview.classList.remove("active");
@@ -378,10 +335,7 @@ document.addEventListener("DOMContentLoaded", () => {
       cameraPeer = new Peer({ debug: 2 });
 
       cameraPeer.on("open", () => {
-        if (!processedStream) {
-          processedStream = broadcastCanvas.captureStream(30);
-        }
-        cameraCall = cameraPeer.call(payload.peerId, processedStream);
+        cameraCall = cameraPeer.call(payload.peerId, localCameraStream);
 
         cameraCall.on("close", () => {
           if (localCameraStream) stopCamera("Broadcast ended.");
@@ -555,14 +509,6 @@ document.addEventListener("DOMContentLoaded", () => {
       camStatusOverlay.style.display = "none";
       cameraPreview.style.opacity = "1";
 
-      cancelAnimationFrame(broadcastAnimFrame);
-      cameraPreview
-        .play()
-        .then(() => {
-          renderBroadcastFrame();
-        })
-        .catch((e) => console.warn("[CAMERA] Play error:", e));
-
       if (
         videoDevices.length > 1 ||
         /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
@@ -632,6 +578,13 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       localCameraStream = newStream;
       cameraPreview.srcObject = newStream;
+
+      if (cameraCall && cameraCall.peerConnection) {
+        const sender = cameraCall.peerConnection
+          .getSenders()
+          .find((s) => s.track.kind === "video");
+        if (sender) sender.replaceTrack(newStream.getVideoTracks()[0]);
+      }
     } catch (err) {
       console.error("[CAMERA] Error applying switched camera:", err);
       showToast("Failed to switch camera", true);
@@ -640,8 +593,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function stopCamera(msg = "Ready to broadcast.", isError = false) {
-    cancelAnimationFrame(broadcastAnimFrame);
-
     if (localCameraStream) {
       localCameraStream.getTracks().forEach((t) => t.stop());
       localCameraStream = null;

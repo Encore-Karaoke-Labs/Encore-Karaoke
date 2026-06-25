@@ -16,6 +16,19 @@ export class BGVModule {
     this.resizeObserver = null;
     this.canvasOnlyMode = false;
 
+    this.videoElementStyles = {
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: "100%",
+      height: "100%",
+      objectFit: "contain",
+      opacity: "0",
+      transition: "opacity 0.5s ease-in-out",
+      willChange: "opacity",
+      transform: "translateZ(0)",
+    };
+
     this.imageCanvas = null;
     this.imageCtx = null;
     this.imageRafId = null;
@@ -86,18 +99,7 @@ export class BGVModule {
         defaultMuted: true,
         preload: "auto",
       })
-      .styleJs({
-        position: "absolute",
-        top: "0",
-        left: "0",
-        width: "100%",
-        height: "100%",
-        objectFit: "cover",
-        opacity: "0",
-        transition: "opacity 0.5s ease-in-out",
-        willChange: "opacity",
-        transform: "translateZ(0)",
-      })
+      .styleJs(this.videoElementStyles)
       .appendTo(this.container).elm;
 
     this.videoElement.volume = 0;
@@ -504,18 +506,7 @@ export class BGVModule {
       v.preload = "auto";
       v.volume = 0;
 
-      Object.assign(v.style, {
-        position: "absolute",
-        top: "0",
-        left: "0",
-        width: "100%",
-        height: "100%",
-        objectFit: "cover",
-        opacity: "0",
-        transition: "opacity 0.5s ease-in-out",
-        willChange: "opacity",
-        transform: "translateZ(0)",
-      });
+      Object.assign(v.style, this.videoElementStyles);
 
       v.addEventListener("volumechange", () => (v.volume = 0));
       v.onended = () => this.playNext();
@@ -610,18 +601,7 @@ export class BGVModule {
     v.preload = "auto";
     v.volume = 0;
 
-    Object.assign(v.style, {
-      position: "absolute",
-      top: "0",
-      left: "0",
-      width: "100%",
-      height: "100%",
-      objectFit: "cover",
-      opacity: "0",
-      transition: "opacity 0.5s ease-in-out",
-      willChange: "opacity",
-      transform: "translateZ(0)",
-    });
+    Object.assign(v.style, this.videoElementStyles);
 
     if (this.canvasOnlyMode) {
       v.style.display = "";
