@@ -181,30 +181,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const canvasRatio = 1280 / 720;
     const videoRatio = vw / vh;
 
-    let sWidth = vw,
-      sHeight = vh,
-      sx = 0,
-      sy = 0;
+    let drawWidth = 1280;
+    let drawHeight = 720;
+    let dx = 0;
+    let dy = 0;
 
     if (videoRatio > canvasRatio) {
-      sWidth = vh * canvasRatio;
-      sx = (vw - sWidth) / 2;
+      drawHeight = 1280 / videoRatio;
+      dy = (720 - drawHeight) / 2;
     } else {
-      sHeight = vw / canvasRatio;
-      sy = (vh - sHeight) / 2;
+      drawWidth = 720 * videoRatio;
+      dx = (1280 - drawWidth) / 2;
     }
 
-    broadcastCtx.drawImage(
-      cameraPreview,
-      sx,
-      sy,
-      sWidth,
-      sHeight,
-      0,
-      0,
-      1280,
-      720,
-    );
+    broadcastCtx.fillStyle = "#000000";
+    broadcastCtx.fillRect(0, 0, 1280, 720);
+
+    broadcastCtx.drawImage(cameraPreview, dx, dy, drawWidth, drawHeight);
   }
 
   function setCameraStatus(msg, isError = false) {
