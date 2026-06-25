@@ -595,6 +595,34 @@ export class RecorderModule {
   }
 
   /**
+   * Helper to draw a source element onto a canvas maintaining aspect ratio (mimics object-fit: contain)
+   * @private
+   */
+  _drawContain(ctx, source, sourceW, sourceH, canvasW, canvasH) {
+    if (!sourceW || !sourceH) return;
+
+    const sourceRatio = sourceW / sourceH;
+    const canvasRatio = canvasW / canvasH;
+
+    let drawW = canvasW;
+    let drawH = canvasH;
+    let drawX = 0;
+    let drawY = 0;
+
+    if (sourceRatio > canvasRatio) {
+      // Source is wider than the target canvas (Letterbox vertically)
+      drawH = canvasW / sourceRatio;
+      drawY = (canvasH - drawH) / 2;
+    } else {
+      // Source is taller than the target canvas (Pillarbox horizontally)
+      drawW = canvasH * sourceRatio;
+      drawX = (canvasW - drawW) / 2;
+    }
+
+    ctx.drawImage(source, drawX, drawY, drawW, drawH);
+  }
+
+  /**
    * Renders a single frame to the recording canvas.
    * Handles background video, lyrics, countdown, score, and interlude overlays.
    */
@@ -646,17 +674,38 @@ export class RecorderModule {
     this.bgvCtx.fillRect(0, 0, w, h);
 
     if (sourceVideo && sourceVideo.readyState >= 2) {
-      this.bgvCtx.drawImage(sourceVideo, 0, 0, w, h);
+      this._drawContain(
+        this.bgvCtx,
+        sourceVideo,
+        sourceVideo.videoWidth,
+        sourceVideo.videoHeight,
+        w,
+        h,
+      );
     }
 
     const imageCanvas = this.bgvPlayer.imageCanvas;
     if (imageCanvas && parseFloat(imageCanvas.style.opacity || "0") > 0.01) {
-      this.bgvCtx.drawImage(imageCanvas, 0, 0, w, h);
+      this._drawContain(
+        this.bgvCtx,
+        imageCanvas,
+        imageCanvas.width,
+        imageCanvas.height,
+        w,
+        h,
+      );
     }
 
     const customCanvas = this.bgvPlayer.customCanvas;
     if (customCanvas && customCanvas.width > 0 && customCanvas.height > 0) {
-      this.bgvCtx.drawImage(customCanvas, 0, 0, w, h);
+      this._drawContain(
+        this.bgvCtx,
+        customCanvas,
+        customCanvas.width,
+        customCanvas.height,
+        w,
+        h,
+      );
     }
 
     if (this.bgvCurrentOpacity > 0.01) {
