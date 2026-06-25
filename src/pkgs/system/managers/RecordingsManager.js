@@ -17,10 +17,20 @@ export default class RecordingsManager {
     state.highlightedRecordingIndex = 0;
 
     this.recOsdTimeout = null;
+
+    this.itemHeight = 85;
+    this.renderedItems = new Map();
+    this.listContent = null;
+    this.scrollRaf = null;
+
+    this.boundHandleScroll = this.handleScroll.bind(this);
   }
 
   init() {
-    // nothing to init for now
+    this.ctx.dom.recordingsList.styleJs({
+      overflowY: "auto",
+      position: "relative",
+    });
   }
 
   /**
@@ -70,7 +80,12 @@ export default class RecordingsManager {
     const state = this.ctx.state;
     const dom = this.ctx.dom;
 
+    dom.recordingsList.elm.removeEventListener(
+      "scroll",
+      this.boundHandleScroll,
+    );
     dom.recordingsList.clear();
+    this.renderedItems.clear();
     state.recordingsData = [];
 
     try {
@@ -93,67 +108,18 @@ export default class RecordingsManager {
 
       state.recordingsData = recordings;
 
-      state.recordingsData.forEach((rec, idx) => {
-        const item = new Html("div")
-          .classOn("rec-item")
-          .styleJs({ cursor: "pointer" })
-          .appendTo(dom.recordingsList);
+      const totalHeight = state.recordingsData.length * this.itemHeight;
+      this.listContent = new Html("div")
+        .styleJs({
+          height: `${totalHeight}px`,
+          position: "relative",
+          width: "100%",
+        })
+        .appendTo(dom.recordingsList);
 
-        const displayTitle =
-          rec.title.split("-").slice(0, -3).join("-") || rec.title;
+      dom.recordingsList.elm.addEventListener("scroll", this.boundHandleScroll);
 
-        const infoCol = new Html("div")
-          .styleJs({ display: "flex", flexDirection: "column", flexGrow: "1" })
-          .appendTo(item);
-
-        new Html("div")
-          .classOn("rec-title")
-          .text(displayTitle)
-          .appendTo(infoCol);
-        new Html("div")
-          .classOn("rec-date")
-          .text(new Date(rec.date).toLocaleString())
-          .appendTo(infoCol);
-
-        const deleteBtn = new Html("div")
-          .text("✕")
-          .styleJs({
-            color: "rgba(255, 85, 85, 0.5)",
-            cursor: "pointer",
-            fontWeight: "bold",
-            fontSize: "1.5rem",
-            padding: "0.5rem 1rem",
-            marginLeft: "1rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "color 0.2s ease, transform 0.2s ease",
-          })
-          .appendTo(item);
-
-        deleteBtn.elm.onmouseover = () =>
-          deleteBtn.styleJs({ color: "#ff5555", transform: "scale(1.2)" });
-        deleteBtn.elm.onmouseout = () =>
-          deleteBtn.styleJs({
-            color: "rgba(255, 85, 85, 0.5)",
-            transform: "scale(1)",
-          });
-
-        item.on("click", (e) => {
-          if (e.target === deleteBtn.elm) return;
-          state.highlightedRecordingIndex = idx;
-          this.updateRecordingsHighlight();
-          this.playRecording(rec);
-        });
-
-        deleteBtn.on("click", (e) => {
-          e.stopPropagation();
-          state.highlightedRecordingIndex = idx;
-          this.updateRecordingsHighlight();
-          this.openDeletePrompt(rec);
-        });
-      });
-
+      this.renderVisibleItems();
       this.updateRecordingsHighlight();
     } catch (e) {
       new Html("div")
@@ -170,16 +136,153 @@ export default class RecordingsManager {
     }
   }
 
-  updateRecordingsHighlight() {
-    const items = this.ctx.dom.recordingsList.qsa(".rec-item");
-    if (!items) return;
-
-    items.forEach((item, idx) => {
-      const isHi = idx === this.ctx.state.highlightedRecordingIndex;
-      item[isHi ? "classOn" : "classOff"]("active");
-      if (isHi)
-        item.elm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  handleScroll() {
+    if (this.scrollRaf) cancelAnimationFrame(this.scrollRaf);
+    this.scrollRaf = requestAnimationFrame(() => {
+      this.renderVisibleItems();
     });
+  }
+
+  renderVisibleItems() {
+    const state = this.ctx.state;
+    const container = this.ctx.dom.recordingsList.elm;
+
+    if (!state.recordingsData.length || !this.listContent) return;
+
+    const scrollTop = container.scrollTop;
+    const clientHeight = container.clientHeight || window.innerHeight;
+
+    const buffer = 3;
+    const startIndex = Math.max(
+      0,
+      Math.floor(scrollTop / this.itemHeight) - buffer,
+    );
+    const endIndex = Math.min(
+      state.recordingsData.length - 1,
+      Math.floor((scrollTop + clientHeight) / this.itemHeight) + buffer,
+    );
+
+    const visibleIndices = new Set();
+    for (let i = startIndex; i <= endIndex; i++) {
+      visibleIndices.add(i);
+    }
+
+    for (const [idx, itemHtml] of this.renderedItems.entries()) {
+      if (!visibleIndices.has(idx)) {
+        itemHtml.elm.remove();
+        this.renderedItems.delete(idx);
+      }
+    }
+
+    for (let i = startIndex; i <= endIndex; i++) {
+      if (!this.renderedItems.has(i)) {
+        const itemElement = this.createRecordingItemDOM(
+          i,
+          state.recordingsData[i],
+        );
+        this.renderedItems.set(i, itemElement);
+      }
+    }
+  }
+
+  createRecordingItemDOM(idx, rec) {
+    const state = this.ctx.state;
+
+    const item = new Html("div")
+      .classOn("rec-item")
+      .styleJs({
+        position: "absolute",
+        top: `${idx * this.itemHeight}px`,
+        left: "0",
+        right: "0",
+        height: `${this.itemHeight}px`,
+        cursor: "pointer",
+        margin: "0",
+        boxSizing: "border-box",
+      })
+      .appendTo(this.listContent);
+
+    if (idx === state.highlightedRecordingIndex) {
+      item.classOn("active");
+    }
+
+    const displayTitle =
+      rec.title.split("-").slice(0, -3).join("-") || rec.title;
+
+    const infoCol = new Html("div")
+      .styleJs({
+        display: "flex",
+        flexDirection: "column",
+        flexGrow: "1",
+        justifyContent: "center",
+      })
+      .appendTo(item);
+
+    new Html("div").classOn("rec-title").text(displayTitle).appendTo(infoCol);
+
+    new Html("div")
+      .classOn("rec-date")
+      .text(new Date(rec.date).toLocaleString())
+      .appendTo(infoCol);
+
+    const deleteBtn = new Html("div")
+      .text("✕")
+      .styleJs({
+        color: "rgba(255, 85, 85, 0.5)",
+        cursor: "pointer",
+        fontWeight: "bold",
+        fontSize: "1.5rem",
+        padding: "0.5rem 1rem",
+        marginLeft: "1rem",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "color 0.2s ease, transform 0.2s ease",
+      })
+      .appendTo(item);
+
+    deleteBtn.elm.onmouseover = () =>
+      deleteBtn.styleJs({ color: "#ff5555", transform: "scale(1.2)" });
+    deleteBtn.elm.onmouseout = () =>
+      deleteBtn.styleJs({
+        color: "rgba(255, 85, 85, 0.5)",
+        transform: "scale(1)",
+      });
+
+    item.on("click", (e) => {
+      if (e.target === deleteBtn.elm) return;
+      state.highlightedRecordingIndex = idx;
+      this.updateRecordingsHighlight();
+      this.playRecording(rec);
+    });
+
+    deleteBtn.on("click", (e) => {
+      e.stopPropagation();
+      state.highlightedRecordingIndex = idx;
+      this.updateRecordingsHighlight();
+      this.openDeletePrompt(rec);
+    });
+
+    return item;
+  }
+
+  updateRecordingsHighlight() {
+    const state = this.ctx.state;
+    const container = this.ctx.dom.recordingsList.elm;
+
+    for (const [idx, item] of this.renderedItems.entries()) {
+      const isHi = idx === state.highlightedRecordingIndex;
+      item[isHi ? "classOn" : "classOff"]("active");
+    }
+
+    const targetTop = state.highlightedRecordingIndex * this.itemHeight;
+    const targetBottom = targetTop + this.itemHeight;
+
+    if (targetTop < container.scrollTop) {
+      container.scrollTop = targetTop;
+    } else if (targetBottom > container.scrollTop + container.clientHeight) {
+      container.scrollTop = targetBottom - container.clientHeight;
+    }
   }
 
   /**
