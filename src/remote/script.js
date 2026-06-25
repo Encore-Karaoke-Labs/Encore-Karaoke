@@ -472,6 +472,7 @@ document.addEventListener("DOMContentLoaded", () => {
               deviceId: { exact: videoDevices[currentCameraIndex].deviceId },
               width: { ideal: 1280 },
               height: { ideal: 720 },
+              aspectRatio: { ideal: 16 / 9 },
             },
             audio: false,
           });
@@ -540,6 +541,7 @@ document.addEventListener("DOMContentLoaded", () => {
               deviceId: { exact: videoDevices[nextIndex].deviceId },
               width: { ideal: 1280 },
               height: { ideal: 720 },
+              aspectRatio: { ideal: 16 / 9 },
             },
             audio: false,
           });
@@ -561,6 +563,7 @@ document.addEventListener("DOMContentLoaded", () => {
             facingMode: { ideal: currentFacingMode },
             width: { ideal: 1280 },
             height: { ideal: 720 },
+            aspectRatio: { ideal: 16 / 9 },
           },
           audio: false,
         });
