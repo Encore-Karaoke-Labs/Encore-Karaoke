@@ -200,6 +200,89 @@ export default class InputManager {
       return;
     }
 
+    if (state.isQueueOverlayVisible) {
+      e.preventDefault();
+
+      const doDelete = () => {
+        if (
+          !state.isSessionActive &&
+          state.highlightedQueueIndex >= 0 &&
+          state.highlightedQueueIndex < state.reservationQueue.length
+        ) {
+          state.reservationQueue.splice(state.highlightedQueueIndex, 1);
+          if (state.highlightedQueueIndex >= state.reservationQueue.length) {
+            state.highlightedQueueIndex = Math.max(
+              0,
+              state.reservationQueue.length - 1,
+            );
+          }
+          if (state.reservationQueue.length === 0) {
+            state.highlightedQueueIndex = -1;
+            state.isQueueDeleteHighlighted = false;
+          }
+
+          this.ctx.modules.infoBar.showTemp(
+            "QUEUE",
+            "Song removed from queue.",
+            3000,
+          );
+          setTimeout(() => this.ctx.modules.infoBar.showDefault(), 3000);
+          ui.renderQueue();
+        } else if (state.isSessionActive) {
+          this.playNavSfx("out_of_bounds");
+          this.ctx.modules.infoBar.showTemp(
+            "QUEUE",
+            "Cannot delete in Sessions mode.",
+            3000,
+          );
+        }
+      };
+
+      if (e.key === "Escape" || e.key.toLowerCase() === "q") {
+        ui.toggleQueueOverlay(false);
+      } else if (e.key === "ArrowUp") {
+        const queueLen = state.isSessionActive
+          ? this.ctx.services.SessionsSvc?.state?.queue?.length || 0
+          : state.reservationQueue.length;
+        if (queueLen === 0) return;
+        state.highlightedQueueIndex = Math.max(
+          0,
+          state.highlightedQueueIndex - 1,
+        );
+        state.isQueueDeleteHighlighted = false;
+        ui.updateQueueHighlight();
+      } else if (e.key === "ArrowDown") {
+        const queueLen = state.isSessionActive
+          ? this.ctx.services.SessionsSvc?.state?.queue?.length || 0
+          : state.reservationQueue.length;
+        if (queueLen === 0) return;
+        state.highlightedQueueIndex = Math.min(
+          queueLen - 1,
+          state.highlightedQueueIndex + 1,
+        );
+        state.isQueueDeleteHighlighted = false;
+        ui.updateQueueHighlight();
+      } else if (e.key === "ArrowRight") {
+        if (
+          !state.isSessionActive &&
+          state.highlightedQueueIndex >= 0 &&
+          !state.isQueueDeleteHighlighted
+        ) {
+          state.isQueueDeleteHighlighted = true;
+          ui.updateQueueHighlight();
+        }
+      } else if (e.key === "ArrowLeft") {
+        if (!state.isSessionActive && state.isQueueDeleteHighlighted) {
+          state.isQueueDeleteHighlighted = false;
+          ui.updateQueueHighlight();
+        }
+      } else if (e.key === "Enter" && state.isQueueDeleteHighlighted) {
+        doDelete();
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        doDelete();
+      }
+      return;
+    }
     if (state.isYtSkipWarningActive && e.key === "ArrowUp") {
       e.preventDefault();
       playback.extendYoutubeSkip();
@@ -217,67 +300,6 @@ export default class InputManager {
           }
         }
         e.preventDefault();
-      }
-      return;
-    }
-
-    if (state.isQueueOverlayVisible) {
-      e.preventDefault();
-      if (e.key === "Escape" || e.key.toLowerCase() === "q") {
-        ui.toggleQueueOverlay(false);
-      } else if (e.key === "ArrowUp") {
-        const queueLen = state.isSessionActive
-          ? this.ctx.services.SessionsSvc?.state?.queue?.length || 0
-          : state.reservationQueue.length;
-        if (queueLen === 0) return;
-        state.highlightedQueueIndex = Math.max(
-          0,
-          state.highlightedQueueIndex - 1,
-        );
-        this.playNavSfx("nav");
-        ui.updateQueueHighlight();
-      } else if (e.key === "ArrowDown") {
-        const queueLen = state.isSessionActive
-          ? this.ctx.services.SessionsSvc?.state?.queue?.length || 0
-          : state.reservationQueue.length;
-        if (queueLen === 0) return;
-        state.highlightedQueueIndex = Math.min(
-          queueLen - 1,
-          state.highlightedQueueIndex + 1,
-        );
-        this.playNavSfx("nav");
-        ui.updateQueueHighlight();
-      } else if (e.key === "Delete" || e.key === "Backspace") {
-        if (
-          !state.isSessionActive &&
-          state.highlightedQueueIndex >= 0 &&
-          state.highlightedQueueIndex < state.reservationQueue.length
-        ) {
-          state.reservationQueue.splice(state.highlightedQueueIndex, 1);
-          if (state.highlightedQueueIndex >= state.reservationQueue.length) {
-            state.highlightedQueueIndex = Math.max(
-              0,
-              state.reservationQueue.length - 1,
-            );
-          }
-          if (state.reservationQueue.length === 0)
-            state.highlightedQueueIndex = -1;
-
-          this.ctx.modules.infoBar.showTemp(
-            "QUEUE",
-            "Song removed from queue.",
-            3000,
-          );
-          this.ctx.modules.infoBar.update();
-          ui.renderQueue();
-        } else if (state.isSessionActive) {
-          this.playNavSfx("out_of_bounds");
-          this.ctx.modules.infoBar.showTemp(
-            "QUEUE",
-            "Cannot delete in Sessions mode.",
-            3000,
-          );
-        }
       }
       return;
     }

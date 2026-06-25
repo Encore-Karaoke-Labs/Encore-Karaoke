@@ -960,10 +960,12 @@ export default class UIManager {
     if (visible) {
       wrapper.classOn("queue-overlay-active");
       state.highlightedQueueIndex = -1;
+      state.isQueueDeleteHighlighted = false;
       this.renderQueue();
     } else {
-      state.highlightedQueueIndex = -1;
       wrapper.classOff("queue-overlay-active");
+      state.highlightedQueueIndex = -1;
+      state.isQueueDeleteHighlighted = false;
     }
   }
 
@@ -1013,13 +1015,38 @@ export default class UIManager {
         .text(fmt.label)
         .styleJs({ backgroundColor: fmt.color })
         .appendTo(titleRow);
-      new Html("span").text(song.title).appendTo(titleRow);
+      new Html("span")
+        .classOn("queue-song-text")
+        .text(song.title)
+        .appendTo(titleRow);
 
       const artistRow = new Html("div").classOn("queue-artist").appendTo(info);
       new Html("span").text(song.artist).appendTo(artistRow);
 
       if (!state.isSessionActive) {
-        new Html("div").classOn("queue-del-hint").text("DEL").appendTo(item);
+        const delBtn = new Html("div")
+          .classOn("queue-del-btn")
+          .html('<ion-icon name="trash"></ion-icon>')
+          .appendTo(item);
+
+        delBtn.on("click", (e) => {
+          e.stopPropagation();
+          state.reservationQueue.splice(idx, 1);
+          if (state.highlightedQueueIndex >= state.reservationQueue.length) {
+            state.highlightedQueueIndex = Math.max(
+              0,
+              state.reservationQueue.length - 1,
+            );
+          }
+          if (state.reservationQueue.length === 0) {
+            state.highlightedQueueIndex = -1;
+            state.isQueueDeleteHighlighted = false;
+          }
+
+          this.ctx.modules.infoBar.showTemp("QUEUE", "Song removed.", 2000);
+          setTimeout(() => this.ctx.modules.infoBar.showDefault(), 2000);
+          this.renderQueue();
+        });
       }
     });
 
@@ -1031,10 +1058,19 @@ export default class UIManager {
 
   updateQueueHighlight() {
     this.ctx.dom.queueList.qsa(".queue-result-item").forEach((item, idx) => {
-      item[
-        idx === this.ctx.state.highlightedQueueIndex ? "classOn" : "classOff"
-      ]("highlighted");
-      if (idx === this.ctx.state.highlightedQueueIndex) {
+      const isHighlighted = idx === this.ctx.state.highlightedQueueIndex;
+      item[isHighlighted ? "classOn" : "classOff"]("highlighted");
+
+      const delBtn = item.elm.querySelector(".queue-del-btn");
+      if (delBtn) {
+        if (isHighlighted && this.ctx.state.isQueueDeleteHighlighted) {
+          delBtn.classList.add("focused");
+        } else {
+          delBtn.classList.remove("focused");
+        }
+      }
+
+      if (isHighlighted) {
         item.elm.scrollIntoView({ block: "nearest" });
       }
     });

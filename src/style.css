@@ -2783,11 +2783,9 @@ p + .flex-list button {
 
 .queue-title {
   font-weight: bold;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
 .queue-code {
@@ -2795,6 +2793,14 @@ p + .flex-list button {
   font-family: "Rajdhani", sans-serif;
   font-weight: 700;
   margin-right: 0.5rem;
+  flex-shrink: 0;
+}
+
+.queue-song-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-grow: 1;
 }
 
 .queue-artist {
@@ -2803,19 +2809,36 @@ p + .flex-list button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-.queue-del-hint {
-  font-family: "Rajdhani", sans-serif;
-  font-size: 0.8rem;
-  font-weight: 700;
+.queue-del-btn {
+  font-size: 1.2rem;
   color: #ff5555;
   background: rgba(255, 85, 85, 0.15);
-  border: 1px solid #ff5555;
-  padding: 0.2rem 0.4rem;
-  border-radius: 0.2rem;
+  border: 1px solid transparent;
+  padding: 0.35rem;
+  border-radius: 0.3rem;
   margin-left: 0.5rem;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.queue-del-btn:hover {
+  background: #ff5555;
+  color: #ffffff;
+}
+
+.queue-del-btn.focused {
+  border-color: #ff5555;
+  background: #ff5555;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 85, 85, 0.5);
+  transform: scale(1.1);
 }
 
 /* ==========================================================================
