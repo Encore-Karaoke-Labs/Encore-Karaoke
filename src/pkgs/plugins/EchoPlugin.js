@@ -188,7 +188,7 @@ export default class EchoPlugin extends BasePlugin {
           bottom: "-15px",
           left: "-25px",
           right: "-25px",
-          cursor: "pointer",
+          cursor: "var(--cursor-pointer)",
           zIndex: 5,
         })
         .appendTo(trackContainer);

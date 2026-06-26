@@ -159,7 +159,7 @@ export default class EQ7BandPlugin extends BasePlugin {
           bottom: "-10px",
           left: "-20px",
           right: "-20px",
-          cursor: "pointer",
+          cursor: "var(--cursor-pointer)",
           zIndex: 5,
         })
         .appendTo(trackContainer);

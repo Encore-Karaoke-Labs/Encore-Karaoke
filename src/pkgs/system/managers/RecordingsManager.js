@@ -196,7 +196,7 @@ export default class RecordingsManager {
         left: "0",
         right: "0",
         height: `${this.itemHeight}px`,
-        cursor: "pointer",
+        cursor: "var(--cursor-pointer)",
         margin: "0",
         boxSizing: "border-box",
       })
@@ -229,7 +229,7 @@ export default class RecordingsManager {
       .text("✕")
       .styleJs({
         color: "rgba(255, 85, 85, 0.5)",
-        cursor: "pointer",
+        cursor: "var(--cursor-pointer)",
         fontWeight: "bold",
         fontSize: "1.5rem",
         padding: "0.5rem 1rem",

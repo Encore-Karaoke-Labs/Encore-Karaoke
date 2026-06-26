@@ -386,7 +386,7 @@ export default class DaresGame {
         border: "1px solid rgba(255, 255, 255, 0.15)",
         borderRadius: "12px",
         color: "#fff",
-        cursor: "pointer",
+        cursor: "var(--cursor-pointer)",
         transition: "all 0.15s",
       })
       .on(
@@ -412,7 +412,7 @@ export default class DaresGame {
         border: "none",
         borderRadius: "12px",
         color: "#0a0a14",
-        cursor: "pointer",
+        cursor: "var(--cursor-pointer)",
         transition: "all 0.15s",
       })
       .on("mouseenter", (e) => (e.target.style.filter = "brightness(1.1)"))

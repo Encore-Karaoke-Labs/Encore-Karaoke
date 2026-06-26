@@ -427,7 +427,7 @@ input[type="range"]::-webkit-slider-thumb {
   height: 20px;
   background: #89cff0;
   border-radius: 50%;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   border: 2px solid #010141;
 }
 
@@ -436,7 +436,7 @@ input[type="range"]::-moz-range-thumb {
   height: 20px;
   background: #89cff0;
   border-radius: 50%;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   border: 2px solid #010141;
 }
 
@@ -2434,7 +2434,7 @@ p + .flex-list button {
   padding: 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   transition: background-color 0.2s;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   font-family: "Rajdhani", sans-serif;
 }
 
@@ -2520,7 +2520,7 @@ p + .flex-list button {
   font-family: "Rajdhani", sans-serif;
   font-size: 1.2rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
@@ -2664,7 +2664,7 @@ p + .flex-list button {
   padding: 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   transition: background-color 0.2s;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
 }
 
 .search-result-item:last-child {
@@ -2800,7 +2800,7 @@ p + .flex-list button {
   padding: 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   transition: background-color 0.2s;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
 }
 
 .queue-result-item:last-child {
@@ -2860,7 +2860,7 @@ p + .flex-list button {
   border-radius: 0.3rem;
   margin-left: 0.5rem;
   flex-shrink: 0;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
@@ -3859,7 +3859,7 @@ p + .flex-list button {
   padding: 0.75rem 1.5rem;
   font-size: 1.2rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   border-left: 4px solid transparent;
   transition:
     background-color 0.2s ease,
@@ -3899,7 +3899,7 @@ p + .flex-list button {
   padding: 0.5rem;
   border-radius: 0.25rem;
   transition: background-color 0.2s ease;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
 }
 
 .mixer-control--active {
@@ -4071,7 +4071,7 @@ p + .flex-list button {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   font-size: 1.2rem;
   font-weight: 600;
   transition: all 0.2s ease;
@@ -4350,7 +4350,7 @@ p + .flex-list button {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
@@ -4701,7 +4701,7 @@ p + .flex-list button {
   border-radius: 8px;
   font-size: 1.4rem;
   font-weight: 700;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   transition: all 0.2s;
   flex: 1;
 }
@@ -4923,7 +4923,7 @@ p + .flex-list button {
   font-size: 1.1rem;
   letter-spacing: 0.05em;
   pointer-events: auto;
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   backdrop-filter: blur(5px);
   box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
   transition: all 0.2s ease;

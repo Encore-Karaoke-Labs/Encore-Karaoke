@@ -290,7 +290,7 @@ export default class ParametricEQPlugin extends BasePlugin {
         .styleJs({
           padding: "0.5rem 1.2rem",
           borderRadius: "6px",
-          cursor: "pointer",
+          cursor: "var(--cursor-pointer)",
           background: isActive
             ? "rgba(255, 215, 0, 0.2)"
             : "rgba(255, 255, 255, 0.05)",
@@ -315,7 +315,7 @@ export default class ParametricEQPlugin extends BasePlugin {
         .styleJs({
           padding: "0.5rem 1.2rem",
           borderRadius: "6px",
-          cursor: "pointer",
+          cursor: "var(--cursor-pointer)",
           background: "rgba(137, 207, 240, 0.1)",
           border: "1px dashed rgba(137, 207, 240, 0.5)",
           color: "#89cff0",
@@ -385,7 +385,7 @@ export default class ParametricEQPlugin extends BasePlugin {
         fontSize: "0.9rem",
         color: "#89cff0",
         fontWeight: "bold",
-        cursor: "pointer",
+        cursor: "var(--cursor-pointer)",
         textAlign: "center",
       })
       .text(filter.type.toUpperCase())
@@ -468,7 +468,7 @@ export default class ParametricEQPlugin extends BasePlugin {
         fontSize: "0.85rem",
         color: "#ff5555",
         fontWeight: "bold",
-        cursor: "pointer",
+        cursor: "var(--cursor-pointer)",
       })
       .text("REMOVE BAND")
       .appendTo(rightGroup);
