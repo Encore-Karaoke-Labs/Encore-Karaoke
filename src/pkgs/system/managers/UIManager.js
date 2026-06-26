@@ -240,10 +240,30 @@ export default class UIManager {
     dom.searchWindow = new Html("div")
       .classOn("search-window")
       .appendTo(dom.searchUi);
+    dom.searchBarContainer = new Html("div")
+      .classOn("search-bar-container")
+      .appendTo(dom.searchWindow);
+
+    dom.searchCloseBtn = new Html("button")
+      .classOn("search-icon-btn", "close-btn")
+      .html('<ion-icon name="close"></ion-icon>')
+      .appendTo(dom.searchBarContainer)
+      .on("click", () => {
+        this.ctx.root.input.handleEscape();
+      });
     dom.searchInput = new Html("input")
       .classOn("search-input")
       .attr({ type: "text", placeholder: "Type here to search..." })
-      .appendTo(dom.searchWindow);
+      .appendTo(dom.searchBarContainer);
+
+    dom.searchSubmitBtn = new Html("button")
+      .classOn("search-icon-btn", "submit-btn")
+      .html('<ion-icon name="search"></ion-icon>')
+      .appendTo(dom.searchBarContainer)
+      .on("click", () => {
+        this.ctx.root.library.performSearch(dom.searchInput.getValue());
+      });
+
     dom.searchResultsContainer = new Html("div")
       .classOn("search-results-container")
       .appendTo(dom.searchWindow);

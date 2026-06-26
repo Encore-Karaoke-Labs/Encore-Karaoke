@@ -2589,6 +2589,7 @@ p + .flex-list button {
     box-shadow 0.25s ease-in-out;
   overflow: hidden;
   z-index: 2000000;
+  padding: 15px;
 }
 
 .mode-yt-search .search-window {
@@ -2608,6 +2609,54 @@ p + .flex-list button {
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
+.search-bar-container {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.search-icon-btn {
+  border-radius: 0.5rem;
+  width: 4.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: var(--cursor-pointer);
+  transition: all 0.2s ease;
+  font-size: 1.8rem;
+  padding: 0;
+  min-width: unset;
+}
+
+.search-icon-btn ion-icon {
+  pointer-events: none;
+  display: block;
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+.search-icon-btn {
+  background: rgba(137, 207, 240, 0.15);
+  border: 2px solid #89cff0;
+  color: #89cff0;
+}
+
+.search-icon-btn:hover {
+  background: #89cff0;
+  color: #010141;
+  box-shadow: 0 0 15px rgba(137, 207, 240, 0.4);
+}
+
+.search-icon-btn.close-btn:hover {
+  background: #ff5555;
+  border: 2px solid #ff5555;
+  color: #ffffff;
+  box-shadow: 0 0 15px rgba(255, 85, 85, 0.4);
+}
+
 .search-input {
   font-family: "Rajdhani", sans-serif;
   font-size: 2rem;
@@ -2615,7 +2664,8 @@ p + .flex-list button {
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 0.5rem;
   color: white;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   text-align: center;
   outline: none;
   transition: all 0.2s ease;
@@ -2627,6 +2677,11 @@ p + .flex-list button {
   font-size: 1.5rem;
 }
 
+.in-game-search-active .search-icon-btn {
+  width: 3.5rem;
+  font-size: 1.4rem;
+}
+
 .search-input:focus {
   border-color: #89cff0;
   box-shadow: 0 0 20px #89cff066;
@@ -2636,6 +2691,7 @@ p + .flex-list button {
   overflow-y: auto;
   transition: max-height 0.25s ease-in-out;
   border-top: none;
+  padding: 1rem !important;
 }
 
 .mode-yt-search .search-results-container {
