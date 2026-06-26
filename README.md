@@ -22,10 +22,10 @@
   - Sing with friends and family across the world with Encore Sessions! Perfect for OFWs, LDRs, or remote karaoke hangouts with friends!
   - Queue, Cheer, and Chat in the room just like a real karaoke box.
   - Have fun with a sprinkle of competition with a score leaderboard!
-- **Encore Link (Mobile Remote Control)**
+- **EnMoku! (Mobile Remote Control)**
   - No more passing a bulky songbook around! Just scan the QR code on the screen to connect your smartphone.
-  - No additional app installs needed! Encore Link works straight in your web browser. (Chromium-based browsers (e.g., Chrome, Edge) and Firefox)
-  - Browse the song library, queue tracks, search YouTube, send "Cheers", and chat with the room.
+  - No additional app installs needed! EnMoku works straight in your web browser. (Chromium-based browsers (e.g., Chrome, Edge) and Firefox)
+  - Queue tracks, send "Cheers", chat with the room, and turn your phone into a camera in one tap!
   - Works seamlessly on your local network, with a Cloud tunnel fallback for devices not on the same network.
 - **Versatile Media Support (MTVs & Multiplex)**
   - Supports MIDI karaoke (`.mid`, `.kar`) with SoundFont (`.sf2`) playback.
@@ -63,6 +63,7 @@ D:/EncoreLibrary/                                             # Also works on th
  ├── manifest.json                                            # Metadata and BGV (Background Video) configs
  ├── [Your Artist] - [Song].mp3                               # Audio file (Compatible with ID3 tags)
  ├── [Your Artist] - [Song].lrc                               # Matching LRC lyrics file
+ ├── [Your Artist] - [Song].cdg                               # or matching CDG file
  ├── [Your Artist] - [Song].mp4                               # Video files for MTV
  └── [Your Artist] - [Song].mid or [Your Artist] - [Song].kar # MIDI files
 ```
@@ -73,7 +74,7 @@ _Note: For Multiplex tracks (where vocals are on one channel and instrumentals o
 
 ## Controls & Shortcuts
 
-Encore can be fully controlled via a standard keyboard, a connected USB Numpad, or the Encore Link mobile app.
+Encore can be fully controlled via a standard keyboard or through EnMoku.
 
 | Key             | Action                                               |
 | :-------------- | :--------------------------------------------------- |
@@ -81,6 +82,7 @@ Encore can be fully controlled via a standard keyboard, a connected USB Numpad, 
 | `Enter`         | Confirm reservation / Play highlighted song          |
 | `Escape`        | Stop playback / Clear input / Go back                |
 | `Y`             | Open Search Menu (Local + YouTube)                   |
+| `Q`             | Open Reservation List                                |
 | `M`             | Open Mixer (Adjust Mic & Music levels)               |
 | `R`             | Toggle recording (during playback) / View recordings |
 | `S`             | Open Encore Sessions menu                            |
@@ -98,13 +100,13 @@ Encore can be fully controlled via a standard keyboard, a connected USB Numpad, 
 
 ## Configuration & Setup Mode
 
-Pressing **`F2`** while playback is stopped will switch Encore into **Setup Mode**. Setup Mode is PIN-protected (default: `0000`) and allows you to:
+Pressing **`F2`** in the Main Menu will put you into **Setup Mode**. Setup Mode is a PIN-protected (default: `0000`) menu that allows you to:
 
-- Change your target `EncoreLibrary` path.
+- Change your target Library path.
 - Select the specific Microphone (Input) and Speaker (Output) hardware.
 - Adjust Master Volume and Mic Latency overrides.
 - Calibrate Video Sync offsets.
-- Change the Security PIN.
+- Change the Security PIN (Recommended).
 
 ---
 
@@ -144,7 +146,7 @@ Ready-to-use installers are available on the [Releases](https://github.com/Encor
    npm run make
    ```
 
-_To run in full-screen Kiosk mode (which disables Windows Explorer to replicate a true arcade machine), pass the `--kiosk` flag._
+_To run in full-screen Kiosk mode (which disables Windows Explorer that may improve performance), pass the `--kiosk` flag._
 
 ### Contributing
 
@@ -173,6 +175,9 @@ For the best experience contributing towards Encore, we recommend using [Visual 
   - 3D BGV development
   - Voice provider for Encore's score sounds
   - Creator and designer behind Encore's mascot, Akiyama Hoshi
+- **[Spessasus](http://github.com/spessasus/)**:
+  - Creator of SpessaSynth, the synthesizer that powers Encore
+  - Has provided code suggestions & deeper insights to SpessaSynth
 - **[Objecty](https://www.youtube.com/@objecty)**:
   - Designer behind Encore's format indicators
 - **[Lap](https://github.com/ItsLap)** & **[Kat21](https://github.com/datkat21)**
