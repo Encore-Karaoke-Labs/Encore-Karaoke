@@ -409,7 +409,7 @@ export class RecorderModule {
           if (result.success) {
             this.infoBar.showTemp(
               "RECORDING",
-              "Saved session to Encore Recordings!",
+              "Recording saved! See it on the Recordings menu.",
               5000,
             );
           } else {
