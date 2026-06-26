@@ -109,10 +109,19 @@ export default class UIManager {
     dom.queueWindow = new Html("div")
       .classOn("queue-window")
       .appendTo(dom.queueUi);
-    new Html("div")
+    const queueHeader = new Html("div")
       .classOn("queue-header")
-      .text("RESERVATION QUEUE")
       .appendTo(dom.queueWindow);
+    new Html("div")
+      .classOn("queue-header-title")
+      .text("RESERVATION QUEUE")
+      .appendTo(queueHeader);
+    new Html("button")
+      .classOn("queue-close-btn")
+      .html('<ion-icon name="close"></ion-icon>')
+      .appendTo(queueHeader)
+      .on("click", () => this.toggleQueueOverlay(false));
+
     dom.queueList = new Html("div")
       .classOn("queue-list-container")
       .appendTo(dom.queueWindow);

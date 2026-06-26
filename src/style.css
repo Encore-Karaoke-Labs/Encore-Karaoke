@@ -2828,15 +2828,56 @@ p + .flex-list button {
 }
 
 .queue-header {
-  padding: 1rem;
+  padding: 0.75rem 1rem;
   background: rgba(0, 0, 0, 0.6);
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.queue-header-title {
   font-family: "Rajdhani", sans-serif;
   font-size: 1.2rem;
   font-weight: 700;
   color: #89cff0;
-  text-align: center;
   letter-spacing: 0.1em;
+  margin: 0;
+}
+
+.queue-close-btn {
+  position: absolute;
+  right: 0.75rem;
+  background: rgba(255, 85, 85, 0.15);
+  border: 1px solid rgba(255, 85, 85, 0.4);
+  color: #ff5555;
+  border-radius: 0.4rem;
+  width: 2rem;
+  height: 2rem;
+  min-width: unset;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: var(--cursor-pointer);
+  transition: all 0.2s ease;
+  font-size: 1.2rem;
+}
+
+.queue-close-btn ion-icon {
+  pointer-events: none;
+  display: block;
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+.queue-close-btn:hover {
+  background: #ff5555;
+  color: #ffffff;
+  border-color: #ff5555;
+  box-shadow: 0 0 10px rgba(255, 85, 85, 0.4);
 }
 
 .queue-list-container {
