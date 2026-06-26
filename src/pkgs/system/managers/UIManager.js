@@ -1047,8 +1047,8 @@ export default class UIManager {
       } else {
         new Html("span")
           .classOn("queue-code")
-          .styleJs({ color: "#ff5555" })
-          .text("YT")
+          .styleJs({ color: "rgba(255, 85, 85, 0.5)" })
+          .text("-----")
           .appendTo(titleRow);
       }
 

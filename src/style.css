@@ -2930,6 +2930,16 @@ p + .flex-list button {
   font-weight: 700;
   margin-right: 0.5rem;
   flex-shrink: 0;
+  width: 3.5rem;
+  display: inline-block;
+  text-align: right;
+}
+
+.queue-title .format-badge {
+  width: 45px;
+  flex-shrink: 0;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .queue-song-text {
