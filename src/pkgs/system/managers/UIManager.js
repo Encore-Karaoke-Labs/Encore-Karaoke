@@ -95,6 +95,11 @@ export default class UIManager {
       .classOn("new-song-list")
       .appendTo(dom.newSongScreen);
 
+    dom.idleHint = new Html("div")
+      .classOn("idle-hint")
+      .html("PRESS <kbd>▼</kbd> TO CONTINUE")
+      .appendTo(dom.overlay);
+
     dom.searchUi = new Html("div").classOn("search-ui").appendTo(wrapper);
     dom.playerUi = new Html("div")
       .classOn("player-ui", "hidden")
@@ -766,6 +771,7 @@ export default class UIManager {
         !state.showSongList && !state.isTypingNumber && state.mode === "menu";
 
       if (isIdling) {
+        dom.idleHint.classOff("hidden");
         if (this.idleState === "newsong") {
           dom.standbyScreen.classOn("hidden");
           dom.newSongScreen.classOff("hidden");
@@ -790,6 +796,7 @@ export default class UIManager {
         return;
       }
 
+      dom.idleHint.classOn("hidden");
       dom.standbyScreen.classOn("hidden");
       dom.newSongScreen.classOn("hidden");
       dom.standbyBumper.styleJs({ opacity: 0 });

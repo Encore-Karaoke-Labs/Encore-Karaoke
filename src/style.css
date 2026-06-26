@@ -1924,7 +1924,7 @@ p + .flex-list button {
 
 .standby-screen {
   position: absolute;
-  bottom: 8%;
+  bottom: 10%;
   left: 50%;
   transform: translateX(-50%);
   width: auto;
@@ -1976,6 +1976,36 @@ p + .flex-list button {
   text-transform: uppercase;
   white-space: nowrap;
   padding: 0 1.5rem;
+}
+
+.idle-hint {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1.1rem;
+  color: rgb(255, 255, 255);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  animation: blink-hint 2s infinite;
+  z-index: 15;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.idle-hint.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.idle-hint kbd {
+  font-size: 0.9rem;
+  padding: 0.2rem 0.4rem;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* --- New Song Idle Screen --- */
