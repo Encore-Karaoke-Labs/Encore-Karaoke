@@ -485,10 +485,6 @@ export class RecorderModule {
     this.musicRecorder = null;
 
     this.infoBar.showDefault();
-    this.dialogShow(
-      new Html("div").classOn("temp-dialog-text").text("RECORD STOPPED"),
-      2000,
-    );
   }
 
   /**
