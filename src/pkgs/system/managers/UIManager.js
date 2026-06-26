@@ -194,24 +194,30 @@ export default class UIManager {
     dom.bottomActions = new Html("div")
       .classOn("bottom-actions")
       .appendTo(dom.overlay);
+
     new Html("div")
       .classOn("action-button")
-      .text("Search (Y)")
+      .html('<ion-icon name="search"></ion-icon> <span>Search (Y)</span>')
       .on("click", () => this.setMode("yt-search"))
       .appendTo(dom.bottomActions);
+
     new Html("div")
       .classOn("action-button")
-      .text("Recordings (R)")
+      .html(
+        '<ion-icon name="radio-button-on"></ion-icon> <span>Recordings (R)</span>',
+      )
       .on("click", () => this.ctx.root.recordings.toggleRecordingsList())
       .appendTo(dom.bottomActions);
+
     new Html("div")
       .classOn("action-button")
-      .text("Mixer (M)")
+      .html('<ion-icon name="options"></ion-icon> <span>Mixer (M)</span>')
       .on("click", () => this.ctx.modules.mixer.toggle())
       .appendTo(dom.bottomActions);
+
     new Html("div")
       .classOn("action-button")
-      .text("Sessions (S)")
+      .html('<ion-icon name="people"></ion-icon> <span>Sessions (S)</span>')
       .on("click", () => this.ctx.root.sessions.toggleSessionModal())
       .appendTo(dom.bottomActions);
 
