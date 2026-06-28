@@ -561,7 +561,10 @@ if (isLowLatency) {
   app.commandLine.appendSwitch("alsa-output-buffer-size", "512");
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  setTimeout(() => {
+    logger.debug("GPU", app.getGPUFeatureStatus());
+  }, 2000);
   setupDiscordRPC();
   discordClient
     .login()
