@@ -80,6 +80,8 @@ class EncoreController {
 
       showSongList: false,
 
+      isEasterEggInterludeEnabled: config.enableEasterEggInterludes ?? false,
+
       songList: [],
       songMap: new Map(),
     };

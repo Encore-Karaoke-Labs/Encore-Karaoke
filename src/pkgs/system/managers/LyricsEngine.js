@@ -6,10 +6,13 @@ const INTERLUDE_TIPS = [
   "”Maybe there's only a dark road up ahead. But you still have to believe and keep going. Believe that the stars will light your path, even a little bit.” - Kaori Miyazono, Your Lie in April",
   "”Music speaks louder than words” - Kousei Arima, Your Lie in April",
   "Grab a drink and rest your vocal cords.",
-  "TIP: Press F2 to enter the setup menu when playback is stopped.",
-  "Adjust the instrumental volume using the - and = keys.",
   "”Rock resonates as the music of the perpetual underdog. Is it really rock if it's sung by life's winners?” - Hitori Gotoh, Bocchi The Rock!",
   "TIP: You can search for songs by title, artist, or song number by pressing Y.",
+  "TIP: Press F2 to enter the setup menu in the Main Menu.",
+  "TIP: Adjust the instrumental volume using the - and = keys.",
+];
+
+const EXPERIMENTAL_INTERLUDES = [
   "”Get freaky 🤑🤑” - Stariix, Encore Karaoke Labs",
   "”it had to wait 9 months” - Austin, Encore Karaoke Labs\n”Who's the mother? Electron Forge” - Austin, Encore Karaoke Labs\n”It's a girl! Who's the father? SkySorcerer!” - ”Dave”, Encore Karaoke Labs\n”ok 'dave'” - SkySorcerer, Founder @ Encore Karaoke Labs",
 ];
@@ -20,6 +23,11 @@ export default class LyricsEngine {
    */
   constructor(context) {
     this.ctx = context;
+
+    if (this.ctx.state.isEasterEggInterludeEnabled) {
+      console.log("ooo freaky 🤪");
+      INTERLUDE_TIPS.push(EXPERIMENTAL_INTERLUDES);
+    }
 
     this.asianRegex =
       /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/;

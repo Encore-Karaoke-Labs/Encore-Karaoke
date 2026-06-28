@@ -575,6 +575,21 @@ export default class SetupManager {
         title: "Video Settings",
         items: [
           {
+            id: "enable_extra_interludes",
+            label: "Easter Egg Interludes (Requires Restart)",
+            type: "select",
+            options: [
+              { value: false, label: "No" },
+              { value: true, label: "Yes" },
+            ],
+            get: () => this.ctx.config.enableEasterEggInterludes ?? false,
+            set: (v) => {
+              this.ctx.config.enableEasterEggInterludes = v;
+              this.ctx.state.isEasterEggInterludeEnabled = v;
+              window.config.setItem("enableEasterEggInterludes", v);
+            },
+          },
+          {
             id: "sync",
             label: "Video Sync Offset (ms)",
             type: "range",
