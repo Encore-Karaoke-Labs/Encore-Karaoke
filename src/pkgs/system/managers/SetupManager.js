@@ -641,7 +641,6 @@ export default class SetupManager {
             options: [
               { value: "RELEASE", label: "Stable" },
               { value: "BETA", label: "Beta" },
-              { value: "ALL", label: "Beta & Stable" },
             ],
             get: () =>
               this.ctx.config.releaseChannel ?? this.versionInformation.channel,
@@ -654,13 +653,44 @@ export default class SetupManager {
             id: "about_release_channels",
             label: "About Release Channels",
             type: "info-action",
-            get: () => "Press Enter o learn more",
+            get: () => "Press Enter to learn more",
             action: () => {
               this.setupState.dialog = {
                 title: "About Release Channels",
                 content:
                   "Encore has two release channels: The Beta (Pre-Release) channel, and the Stable channel. You get the latest features in Beta, while the Stable version gives you the most stability.",
               };
+              this.renderView();
+            },
+          },
+          {
+            id: "check_for_updates",
+            label: "Check for Updates",
+            type: "info-action",
+            get: () => "Press Enter to check",
+            action: async () => {
+              let infoBarTimeout = setTimeout(() => {
+                this.showToast("Checking for updates...");
+              }, 1000);
+              await this.ctx.services.Updates.refreshUpdateInformation();
+              let updateInfo =
+                await this.ctx.services.Updates.getUpdateInformation();
+
+              clearTimeout(infoBarTimeout);
+
+              this.setupState.dialog = {
+                title: "Check for Updates",
+                content: "You are up to date.",
+              };
+
+              if (updateInfo.number != this.versionInformation.number) {
+                if (
+                  this.ctx.config.releaseChannel == "BETA" ||
+                  updateInfo.channel == "RELEASE"
+                ) {
+                  this.setupState.dialog.content = `You have a new update: v${updateInfo.number} ${updateInfo.channel} (${updateInfo.codename})`;
+                }
+              }
               this.renderView();
             },
           },

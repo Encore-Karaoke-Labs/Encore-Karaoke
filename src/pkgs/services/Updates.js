@@ -1,3 +1,7 @@
+let versioningEndpoint = "https://versioning.encorekaraoke.org/versionInfo";
+let updateInformation = null;
+let config = null;
+
 const pkg = {
   name: "Encore Update Checker Service",
   svcName: "UpdateSvc",
@@ -5,6 +9,16 @@ const pkg = {
   privs: 0,
   start: async function (Root) {
     this.root = Root;
+    config = await window.config.getAll();
+    fetch(versioningEndpoint)
+      .then((res) => res.json())
+      .then((data) => {
+        this.updateInformation = data;
+        console.log(
+          "[UPDATE] Fetched update information",
+          this.updateInformation,
+        );
+      });
     console.log("[UPDATE] Update Service started.");
   },
   end: async function () {
@@ -12,7 +26,11 @@ const pkg = {
   },
   data: {
     getUpdateInformation: function () {
-      return {};
+      return updateInformation;
+    },
+    refreshUpdateInformation: async function () {
+      let res = await fetch(versioningEndpoint);
+      updateInformation = await res.json();
     },
   },
 };

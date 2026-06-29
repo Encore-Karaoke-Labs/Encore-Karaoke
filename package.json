@@ -28,9 +28,11 @@
   "homepage": "./",
   "dependencies": {
     "cdgraphics": "^7.0.0",
+    "dompurify": "^3.4.11",
     "electron-squirrel-startup": "^1.0.1",
     "kuroshiro-analyzer-kuromoji": "^1.1.0",
     "loudness": "^0.4.2",
+    "marked": "^18.0.5",
     "pdfkit": "^0.18.0",
     "systeminformation": "^5.31.1"
   },

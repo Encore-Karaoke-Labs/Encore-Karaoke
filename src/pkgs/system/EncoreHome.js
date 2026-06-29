@@ -43,6 +43,7 @@ class EncoreController {
       Ui: Root.Processes.getService("UiLib").data,
       FsSvc: Root.Processes.getService("FsSvc").data,
       Forte: Root.Processes.getService("ForteSvc").data,
+      Updates: Root.Processes.getService("UpdateSvc").data,
       Identity: Root.Processes.getService("IdentitySvc").data,
       SessionsSvc: Root.Processes.getService("SessionsSvc")?.data,
       CameraSvc: Root.Processes.getService("CameraSvc")?.data,
