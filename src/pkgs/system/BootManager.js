@@ -241,6 +241,7 @@ const pkg = {
     await Root.Core.pkg.run("services:UiLib", [], true);
     await Root.Core.pkg.run("services:Forte", [], true);
     await Root.Core.pkg.run("services:FsSvc", [], true);
+    await Root.Core.pkg.run("services:Updates", [], true);
     await Root.Core.pkg.run("services:Identity", [], true);
     await Root.Core.pkg.run("services:Sessions", [], true);
     await Root.Core.pkg.run("services:Camera", [], true);
@@ -251,6 +252,7 @@ const pkg = {
           Root.Processes.getService("UiLib").data;
           Root.Processes.getService("FsSvc").data;
           Root.Processes.getService("ForteSvc").data;
+          Root.Processes.getService("UpdateSvc").data;
           Root.Processes.getService("IdentitySvc").data;
           Root.Processes.getService("SessionsSvc").data;
           Root.Processes.getService("CameraSvc").data;
