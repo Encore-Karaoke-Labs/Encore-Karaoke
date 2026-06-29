@@ -100,6 +100,7 @@ export default class SetupManager {
     this.playbackDevices = await this.ctx.services.Forte.getPlaybackDevices();
     this.updateServers =
       await window.desktopIntegration.ipc.invoke("get-update-servers");
+    this.versionInformation = await window.version.getVersionInformation();
 
     const foundLibs = await this.ctx.services.FsSvc.findEncoreLibraries();
     const activeLib = foundLibs.find(
@@ -180,6 +181,11 @@ export default class SetupManager {
       { id: "mic", label: "Microphone Settings", icon: "mic" },
       { id: "video", label: "Video Settings", icon: "tv" },
       { id: "security", label: "User Security", icon: "lock-closed" },
+      {
+        id: "firmware",
+        label: "About & Update",
+        icon: "information-circle",
+      },
       { id: "exit", label: "Exit Setup", icon: "log-out" },
     ];
 
@@ -608,6 +614,55 @@ export default class SetupManager {
             label: "Preview & Calibrate Sync",
             type: "action",
             action: () => this.startVideoPreview(),
+          },
+        ],
+      },
+      firmware: {
+        title: "About & Update",
+        items: [
+          {
+            id: "check_on_startup",
+            label: "Check Updates on Startup",
+            type: "select",
+            options: [
+              { value: false, label: "No" },
+              { value: true, label: "Yes" },
+            ],
+            get: () => this.ctx.config.checkUpdatesOnStartup ?? true,
+            set: (v) => {
+              this.ctx.config.checkUpdatesOnStartup = v;
+              window.config.setItem("checkUpdatesOnStartup", v);
+            },
+          },
+          {
+            id: "release_channel",
+            label: "Release Channel",
+            type: "select",
+            options: [
+              { value: "RELEASE", label: "Stable" },
+              { value: "BETA", label: "Beta" },
+              { value: "ALL", label: "Beta & Stable" },
+            ],
+            get: () =>
+              this.ctx.config.releaseChannel ?? this.versionInformation.channel,
+            set: (v) => {
+              this.ctx.config.releaseChannel = v;
+              window.config.setItem("releaseChannel", v);
+            },
+          },
+          {
+            id: "about_release_channels",
+            label: "About Release Channels",
+            type: "info-action",
+            get: () => "Press Enter o learn more",
+            action: () => {
+              this.setupState.dialog = {
+                title: "About Release Channels",
+                content:
+                  "Encore has two release channels: The Beta (Pre-Release) channel, and the Stable channel. You get the latest features in Beta, while the Stable version gives you the most stability.",
+              };
+              this.renderView();
+            },
           },
         ],
       },
