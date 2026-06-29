@@ -10,15 +10,14 @@ const pkg = {
   start: async function (Root) {
     this.root = Root;
     config = await window.config.getAll();
-    fetch(versioningEndpoint)
-      .then((res) => res.json())
-      .then((data) => {
-        this.updateInformation = data;
-        console.log(
-          "[UPDATE] Fetched update information",
-          this.updateInformation,
-        );
-      });
+    if ((config.checkUpdatesOnStartup ?? true) == true) {
+      fetch(versioningEndpoint)
+        .then((res) => res.json())
+        .then((data) => {
+          updateInformation = data;
+          console.log("[UPDATE] Fetched update information", updateInformation);
+        });
+    }
     console.log("[UPDATE] Update Service started.");
   },
   end: async function () {

@@ -195,6 +195,7 @@ class EncoreController {
     );
 
     this.versionInformation = await window.version.getVersionInformation();
+    this.updateInformation = await this.services.Updates.getUpdateInformation();
     document.title = `Encore Karaoke ${this.versionInformation.channel} v${this.versionInformation.number} (${this.versionInformation.codename})`;
 
     await this.services.Forte.setTrackVolume(this.state.volume);
@@ -279,6 +280,21 @@ class EncoreController {
 
     this.ui.startBumperCycle();
     await this.bgv.updatePlaylistForCategory();
+
+    if (this.updateInformation) {
+      if (this.updateInformation.number != this.versionInformation.number) {
+        if (
+          (this.config.releaseChannel ?? "") == "BETA" ||
+          this.updateInformation.channel == "RELEASE"
+        ) {
+          this.infoBar.showTemp(
+            "UPDATE",
+            `Encore has a new version: v${this.updateInformation.number} ${this.updateInformation.channel} (${this.updateInformation.codename})`,
+            3000,
+          );
+        }
+      }
+    }
 
     setTimeout(() => {
       document.dispatchEvent(new CustomEvent("CherryTree.UI.Ready"));
