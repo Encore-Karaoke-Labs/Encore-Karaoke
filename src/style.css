@@ -760,12 +760,10 @@ input[type="range"]::-moz-range-thumb {
 @keyframes pulse-interlude {
   0%,
   100% {
-    box-shadow: 0 0 40px rgba(137, 207, 240, 0.2);
-    border-color: rgba(137, 207, 240, 0.5);
+    opacity: 0.3;
   }
   50% {
-    box-shadow: 0 0 60px rgba(137, 207, 240, 0.6);
-    border-color: rgba(137, 207, 240, 1);
+    opacity: 1;
   }
 }
 
@@ -3199,10 +3197,9 @@ p + .flex-list button {
   left: 50%;
   transform: translate(-50%, -50%);
   background: rgba(10, 10, 20, 0.85);
-  border: 2px solid #89cff0;
+  border: 2px solid rgba(137, 207, 240, 0.8);
   padding: 2rem 5rem;
   border-radius: 20px;
-  box-shadow: 0 0 40px rgba(137, 207, 240, 0.3);
   z-index: 100;
   opacity: 0;
   pointer-events: none;
@@ -3215,12 +3212,28 @@ p + .flex-list button {
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
+  will-change: transform, opacity;
+  transform-style: preserve-3d;
+}
+
+.interlude-overlay::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 20px;
+  box-shadow: 0 0 60px rgba(137, 207, 240, 0.6);
+  z-index: -1;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .interlude-overlay.visible {
   opacity: 1;
   visibility: visible;
   transform: translate(-50%, -50%) scale(1.05);
+}
+
+.interlude-overlay.visible::before {
   animation: pulse-interlude 3s infinite ease-in-out;
 }
 
