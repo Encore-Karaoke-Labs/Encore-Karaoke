@@ -1,12 +1,9 @@
 import Html from "../../../libs/html.js";
 
 const PIXELS_PER_SECOND = 150;
+const NOTE_HEIGHT = 16;
 
 export class FortePianoRoll {
-  /**
-   * Initializes the Piano Roll visualizer class.
-   * @param {Object} state - The centralized Forte state object.
-   */
   constructor(state) {
     this.state = state;
 
@@ -14,6 +11,20 @@ export class FortePianoRoll {
     this.canvas = null;
     this.ctx = null;
     this.cachedWidth = 0;
+
+    this.pageCanvas = null;
+    this.pageCtx = null;
+    this.cachedPageIndex = -1;
+    this.cachedNotesLength = -1;
+    this.lastTime = -1;
+
+    this.noteStartIndex = 0;
+
+    this.gradHit = null;
+    this.gradMiss = null;
+    this.gradNeutral = null;
+    this.gradSweep = null;
+    this.gradSpark = null;
 
     this.resizeHandler = this.handleResize.bind(this);
   }
@@ -30,20 +41,62 @@ export class FortePianoRoll {
       .classOn("forte-piano-roll-canvas")
       .appendTo(this.container);
 
-    this.ctx = this.canvas.elm.getContext("2d");
-    this.cachedWidth = window.innerWidth;
+    this.ctx = this.canvas.elm.getContext("2d", {
+      alpha: true,
+      desynchronized: true,
+    });
 
+    this.pageCanvas = document.createElement("canvas");
+    this.pageCtx = this.pageCanvas.getContext("2d", { alpha: true });
+
+    this.cachedWidth = window.innerWidth;
     window.addEventListener("resize", this.resizeHandler);
+
+    this.handleResize();
   }
 
-  /**
-   * Adjusts the canvas sizing dynamically on window resize events.
-   */
+  generateGradients() {
+    if (!this.ctx) return;
+
+    const createNoteGrad = (c1, c2) => {
+      const g = this.ctx.createLinearGradient(
+        0,
+        -(NOTE_HEIGHT / 2),
+        0,
+        NOTE_HEIGHT / 2,
+      );
+      g.addColorStop(0, c1);
+      g.addColorStop(1, c2);
+      return g;
+    };
+
+    this.gradHit = createNoteGrad("#a3e635", "#4d7c0f");
+    this.gradMiss = createNoteGrad("#fca5a5", "#991b1b");
+    this.gradNeutral = createNoteGrad("#7dd3fc", "#0284c7");
+
+    this.gradSweep = this.ctx.createLinearGradient(-120, 0, 0, 0);
+    this.gradSweep.addColorStop(0, "transparent");
+    this.gradSweep.addColorStop(1, "rgba(255, 215, 0, 0.15)");
+
+    this.gradSpark = this.ctx.createRadialGradient(0, 0, 0, 0, 0, 20);
+    this.gradSpark.addColorStop(0, "rgba(255, 255, 255, 1)");
+    this.gradSpark.addColorStop(0.3, "rgba(163, 230, 53, 0.8)");
+    this.gradSpark.addColorStop(1, "rgba(163, 230, 53, 0)");
+  }
+
   handleResize() {
     if (this.canvas && this.container) {
       this.cachedWidth = this.container.elm.clientWidth || window.innerWidth;
+
       this.canvas.elm.width = this.cachedWidth;
       this.canvas.elm.height = 250;
+      if (this.pageCanvas) {
+        this.pageCanvas.width = this.cachedWidth;
+        this.pageCanvas.height = 250;
+      }
+
+      this.generateGradients();
+      this.cachedPageIndex = -1;
 
       if (this.state.playback.status !== "playing") {
         this.render(this.state.playback.smoothedTime);
@@ -60,27 +113,14 @@ export class FortePianoRoll {
    */
   setContainer(containerSelector) {
     try {
-      let targetContainer;
-      if (typeof containerSelector === "string") {
-        targetContainer = Html.qs(containerSelector);
-      } else {
-        targetContainer = containerSelector;
-      }
-
-      if (!targetContainer) {
-        console.error(
-          "[FORTE SVC] Invalid piano roll container",
-          containerSelector,
-        );
-        return false;
-      }
-
-      if (this.container) {
-        this.container.appendTo(targetContainer);
-      }
+      let targetContainer =
+        typeof containerSelector === "string"
+          ? Html.qs(containerSelector)
+          : containerSelector;
+      if (!targetContainer) return false;
+      if (this.container) this.container.appendTo(targetContainer);
       return true;
     } catch (e) {
-      console.error("[FORTE SVC] Failed to move piano roll container:", e);
       return false;
     }
   }
@@ -92,65 +132,112 @@ export class FortePianoRoll {
    */
   toggleVisibility(bool) {
     this.state.ui.pianoRollVisible = bool;
-    if (bool && this.container) {
-      this.container.classOn("visible");
-    } else if (this.container) {
-      this.container.classOff("visible");
-    }
+    if (bool && this.container) this.container.classOn("visible");
+    else if (this.container) this.container.classOff("visible");
   }
 
-  /**
-   * Draws the active viewport of the piano roll directly onto the canvas.
-   *
-   * @param {number} currentTime - Current track playback time in seconds.
-   */
+  drawNote(ctxToUse, note, startX, y, noteWidth, isActive) {
+    ctxToUse.save();
+
+    // Bitwise OR 0 forces integer values, drastically speeding up canvas rendering
+    ctxToUse.translate(startX | 0, y | 0);
+
+    if (note.hitStatus === "hit") {
+      ctxToUse.fillStyle = this.gradHit;
+      ctxToUse.shadowColor = isActive ? "#a3e635" : "transparent";
+      ctxToUse.shadowBlur = isActive ? 15 : 0;
+    } else if (note.hitStatus === "miss") {
+      ctxToUse.fillStyle = this.gradMiss;
+      ctxToUse.shadowColor = "transparent";
+      ctxToUse.shadowBlur = 0;
+    } else {
+      ctxToUse.fillStyle = this.gradNeutral;
+      ctxToUse.shadowColor = isActive ? "#38bdf8" : "transparent";
+      ctxToUse.shadowBlur = isActive ? 10 : 0;
+    }
+
+    ctxToUse.beginPath();
+    if (typeof ctxToUse.roundRect === "function") {
+      ctxToUse.roundRect(
+        0,
+        -(NOTE_HEIGHT / 2),
+        noteWidth,
+        NOTE_HEIGHT,
+        NOTE_HEIGHT / 2,
+      );
+    } else {
+      ctxToUse.rect(0, -(NOTE_HEIGHT / 2), noteWidth, NOTE_HEIGHT);
+    }
+    ctxToUse.fill();
+    ctxToUse.shadowBlur = 0;
+
+    ctxToUse.fillStyle = "rgba(255, 255, 255, 0.25)";
+    ctxToUse.beginPath();
+    if (typeof ctxToUse.roundRect === "function") {
+      ctxToUse.roundRect(
+        2,
+        -(NOTE_HEIGHT / 2) + 1,
+        noteWidth - 4,
+        NOTE_HEIGHT / 3,
+        3,
+      );
+    } else {
+      ctxToUse.rect(2, -(NOTE_HEIGHT / 2) + 1, noteWidth - 4, NOTE_HEIGHT / 3);
+    }
+    ctxToUse.fill();
+
+    ctxToUse.restore();
+  }
+
   render(currentTime) {
     if (!this.canvas || !this.ctx || !this.container) return;
 
-    const canvasEl = this.canvas.elm;
+    const expectedWidth = this.container.elm.clientWidth || window.innerWidth;
+    if (
+      this.canvas.elm.width !== expectedWidth ||
+      this.canvas.elm.height !== 250
+    ) {
+      this.cachedWidth = expectedWidth;
+      this.canvas.elm.width = expectedWidth;
+      this.canvas.elm.height = 250;
+      if (this.pageCanvas) {
+        this.pageCanvas.width = expectedWidth;
+        this.pageCanvas.height = 250;
+      }
+      this.generateGradients();
+      this.cachedPageIndex = -1;
+    }
+
     const ctx = this.ctx;
-
-    const expectedWidth = this.cachedWidth;
-    if (canvasEl.width !== expectedWidth) canvasEl.width = expectedWidth;
-    if (canvasEl.height !== 250) canvasEl.height = 250;
-
-    const width = canvasEl.width;
-    const height = canvasEl.height;
+    const width = this.canvas.elm.width;
+    const height = this.canvas.elm.height;
     if (width === 0 || height === 0) return;
 
-    ctx.clearRect(0, 0, width, height);
-
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-    const numGridLines = 8;
-    ctx.beginPath();
-    for (let i = 1; i < numGridLines; i++) {
-      const lineY = (height / numGridLines) * i;
-      ctx.moveTo(0, lineY);
-      ctx.lineTo(width, lineY);
-    }
-    ctx.stroke();
-
     const notes = this.state.playback.guideNotes || [];
-    const PRE_ROLL_SECONDS = 2.5;
-    let firstNoteTime = 0;
 
-    if (notes.length > 0) {
-      firstNoteTime = notes[0].startTime;
+    if (this.cachedNotesLength !== notes.length) {
+      this.cachedPageIndex = -1;
+      this.cachedNotesLength = notes.length;
+      this.noteStartIndex = 0;
     }
 
+    if (currentTime < this.lastTime) {
+      this.noteStartIndex = 0;
+    }
+    this.lastTime = currentTime;
+
+    const PRE_ROLL_SECONDS = 2.5;
+    const firstNoteTime = notes.length > 0 ? notes[0].startTime : 0;
     const globalOffset = Math.max(0, firstNoteTime - PRE_ROLL_SECONDS);
     const adjustedTime = currentTime - globalOffset;
     const PAGE_DURATION = width / PIXELS_PER_SECOND;
 
     const pageIndex = Math.floor(Math.max(0, adjustedTime) / PAGE_DURATION);
-    const pageAdjustedStartTime = pageIndex * PAGE_DURATION;
-
-    const pageRealStartTime = pageAdjustedStartTime + globalOffset;
+    const pageRealStartTime = pageIndex * PAGE_DURATION + globalOffset;
     const pageRealEndTime = pageRealStartTime + PAGE_DURATION;
 
     const playheadX =
-      (adjustedTime - pageAdjustedStartTime) * PIXELS_PER_SECOND;
+      ((adjustedTime - pageIndex * PAGE_DURATION) * PIXELS_PER_SECOND) | 0;
 
     const minMidi =
       (this.state.playback.guideRange?.min ?? 42) +
@@ -159,121 +246,86 @@ export class FortePianoRoll {
       (this.state.playback.guideRange?.max ?? 90) +
       this.state.playback.transpose;
     const rangeDiff = Math.max(1, maxMidi - minMidi);
-    const NOTE_HEIGHT = 16;
 
     const pitchToY = (pitch) => {
       if (pitch < minMidi) return height;
       if (pitch > maxMidi) return 0;
-      const normalized = (pitch - minMidi) / rangeDiff;
-      return height - normalized * height;
+      return height - ((pitch - minMidi) / rangeDiff) * height;
     };
 
-    for (let i = 0; i < notes.length; i++) {
+    if (pageIndex !== this.cachedPageIndex) {
+      this.cachedPageIndex = pageIndex;
+      this.pageCtx.clearRect(0, 0, width, height);
+
+      this.pageCtx.lineWidth = 1;
+      this.pageCtx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+      this.pageCtx.beginPath();
+      for (let i = 1; i < 8; i++) {
+        const lineY = ((height / 8) * i) | 0;
+        this.pageCtx.moveTo(0, lineY);
+        this.pageCtx.lineTo(width, lineY);
+      }
+      this.pageCtx.stroke();
+
+      for (let i = 0; i < notes.length; i++) {
+        const note = notes[i];
+        if (note.startTime + note.duration < pageRealStartTime) continue;
+        if (note.startTime > pageRealEndTime) break;
+
+        const startX = (note.startTime - pageRealStartTime) * PIXELS_PER_SECOND;
+        const noteWidth = Math.max(note.duration * PIXELS_PER_SECOND, 8);
+        const y = pitchToY(note.pitch + this.state.playback.transpose);
+
+        note._cachedStatus = note.hitStatus || "neutral";
+        this.drawNote(this.pageCtx, note, startX, y, noteWidth, false);
+      }
+    }
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(this.pageCanvas, 0, 0);
+
+    while (
+      this.noteStartIndex < notes.length &&
+      notes[this.noteStartIndex].startTime +
+        notes[this.noteStartIndex].duration <
+        pageRealStartTime
+    ) {
+      this.noteStartIndex++;
+    }
+
+    for (let i = this.noteStartIndex; i < notes.length; i++) {
       const note = notes[i];
-      if (note.startTime + note.duration < pageRealStartTime) continue;
       if (note.startTime > pageRealEndTime) break;
 
-      const startX = (note.startTime - pageRealStartTime) * PIXELS_PER_SECOND;
-      const noteWidth = Math.max(note.duration * PIXELS_PER_SECOND, 8);
-      const y = pitchToY(note.pitch + this.state.playback.transpose);
-
-      if (!isFinite(startX) || !isFinite(y) || !isFinite(noteWidth)) continue;
+      const startX =
+        ((note.startTime - pageRealStartTime) * PIXELS_PER_SECOND) | 0;
+      const noteWidth = Math.max(note.duration * PIXELS_PER_SECOND, 8) | 0;
+      const y = pitchToY(note.pitch + this.state.playback.transpose) | 0;
 
       const isActive = playheadX >= startX && playheadX <= startX + noteWidth;
 
-      const grad = ctx.createLinearGradient(
-        0,
-        y - NOTE_HEIGHT / 2,
-        0,
-        y + NOTE_HEIGHT / 2,
-      );
+      if (isActive) {
+        this.drawNote(ctx, note, startX, y, noteWidth, true);
 
-      if (note.hitStatus === "hit") {
-        grad.addColorStop(0, "#a3e635");
-        grad.addColorStop(1, "#4d7c0f");
-        ctx.shadowColor = "#a3e635";
-        ctx.shadowBlur = isActive ? 15 : 5;
-      } else if (note.hitStatus === "miss") {
-        grad.addColorStop(0, "#fca5a5");
-        grad.addColorStop(1, "#991b1b");
-        ctx.shadowColor = "transparent";
-        ctx.shadowBlur = 0;
-      } else {
-        grad.addColorStop(0, "#7dd3fc");
-        grad.addColorStop(1, "#0284c7");
-        ctx.shadowColor = "#38bdf8";
-        ctx.shadowBlur = isActive ? 10 : 0;
-      }
-
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      if (typeof ctx.roundRect === "function") {
-        ctx.roundRect(
-          startX,
-          y - NOTE_HEIGHT / 2,
-          noteWidth,
-          NOTE_HEIGHT,
-          NOTE_HEIGHT / 2,
-        );
-      } else {
-        ctx.rect(startX, y - NOTE_HEIGHT / 2, noteWidth, NOTE_HEIGHT);
-      }
-      ctx.fill();
-      ctx.shadowBlur = 0;
-
-      ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
-      ctx.beginPath();
-      if (typeof ctx.roundRect === "function") {
-        ctx.roundRect(
-          startX + 2,
-          y - NOTE_HEIGHT / 2 + 1,
-          noteWidth - 4,
-          NOTE_HEIGHT / 3,
-          3,
-        );
-      } else {
-        ctx.rect(
-          startX + 2,
-          y - NOTE_HEIGHT / 2 + 1,
-          noteWidth - 4,
-          NOTE_HEIGHT / 3,
-        );
-      }
-      ctx.fill();
-
-      if (
-        isActive &&
-        note.hitStatus === "hit" &&
-        this.state.scoring.isSinging
-      ) {
-        const sparkGrad = ctx.createRadialGradient(
-          playheadX,
-          y,
-          0,
-          playheadX,
-          y,
-          20,
-        );
-        sparkGrad.addColorStop(0, "rgba(255, 255, 255, 1)");
-        sparkGrad.addColorStop(0.3, "rgba(163, 230, 53, 0.8)");
-        sparkGrad.addColorStop(1, "rgba(163, 230, 53, 0)");
-        ctx.fillStyle = sparkGrad;
-        ctx.fillRect(playheadX - 20, y - 20, 40, 40);
+        if (note.hitStatus === "hit" && this.state.scoring.isSinging) {
+          ctx.save();
+          ctx.translate(playheadX, y);
+          ctx.fillStyle = this.gradSpark;
+          ctx.fillRect(-20, -20, 40, 40);
+          ctx.restore();
+        }
+      } else if (note.hitStatus !== note._cachedStatus) {
+        this.drawNote(this.pageCtx, note, startX, y, noteWidth, false);
+        note._cachedStatus = note.hitStatus;
       }
     }
 
     if (playheadX >= 0) {
-      const sweepWidth = 120;
-      const sweepGrad = ctx.createLinearGradient(
-        playheadX - sweepWidth,
-        0,
-        playheadX,
-        0,
-      );
-      sweepGrad.addColorStop(0, "transparent");
-      sweepGrad.addColorStop(1, "rgba(255, 215, 0, 0.15)");
-      ctx.fillStyle = sweepGrad;
-      ctx.fillRect(playheadX - sweepWidth, 0, sweepWidth, height);
+      ctx.save();
+      ctx.translate(playheadX, 0);
+      ctx.fillStyle = this.gradSweep;
+      ctx.fillRect(-120, 0, 120, height);
+      ctx.restore();
 
       ctx.fillStyle = "#ffd700";
       ctx.shadowColor = "#ffd700";
@@ -282,79 +334,43 @@ export class FortePianoRoll {
       ctx.shadowBlur = 0;
     }
 
-    if (
-      this.state.scoring.micPitchHistory &&
-      this.state.scoring.micPitchHistory.length > 0 &&
-      playheadX >= 0
-    ) {
-      const activeSegments = [];
-      let currentSegment = [];
+    const history = this.state.scoring.micPitchHistory;
+    if (history && history.length > 0 && playheadX >= 0) {
+      ctx.beginPath();
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
 
-      for (let i = 0; i < this.state.scoring.micPitchHistory.length; i++) {
-        const pt = this.state.scoring.micPitchHistory[i];
+      let isDrawing = false;
+      let lastTime = 0;
+
+      for (let i = 0; i < history.length; i++) {
+        const pt = history[i];
 
         if (pt.time < pageRealStartTime - 1.0) continue;
         if (pt.time > pageRealEndTime + 1.0) break;
 
         if (pt.isSinging && pt.pitch > 0) {
-          if (currentSegment.length > 0) {
-            const prevPt = currentSegment[currentSegment.length - 1];
-            if (pt.time - prevPt.time > 0.15) {
-              activeSegments.push(currentSegment);
-              currentSegment = [];
-            }
+          const px = ((pt.time - pageRealStartTime) * PIXELS_PER_SECOND) | 0;
+          const py = pitchToY(pt.pitch) | 0;
+
+          if (!isDrawing || pt.time - lastTime > 0.15) {
+            ctx.moveTo(px, py);
+          } else {
+            ctx.lineTo(px, py);
           }
-          currentSegment.push({ time: pt.time, pitch: pt.pitch });
+          isDrawing = true;
+          lastTime = pt.time;
         } else {
-          if (currentSegment.length > 0) {
-            activeSegments.push(currentSegment);
-            currentSegment = [];
-          }
+          isDrawing = false;
         }
       }
-      if (currentSegment.length > 0) activeSegments.push(currentSegment);
 
-      if (activeSegments.length > 0) {
-        ctx.beginPath();
-        ctx.lineWidth = 5;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.strokeStyle = "rgba(137, 207, 240, 0.6)";
-        ctx.shadowColor = "#38bdf8";
-        ctx.shadowBlur = 8;
-
-        for (const segment of activeSegments) {
-          if (segment.length === 1) {
-            const ptX =
-              (segment[0].time - pageRealStartTime) * PIXELS_PER_SECOND;
-            const ptY = pitchToY(segment[0].pitch);
-            ctx.moveTo(ptX, ptY);
-            ctx.lineTo(ptX + 1, ptY);
-            continue;
-          }
-
-          const getScreenPt = (idx) => ({
-            x: (segment[idx].time - pageRealStartTime) * PIXELS_PER_SECOND,
-            y: pitchToY(segment[idx].pitch),
-          });
-
-          const startPt = getScreenPt(0);
-          ctx.moveTo(startPt.x, startPt.y);
-
-          for (let i = 0; i < segment.length - 1; i++) {
-            const p0 = getScreenPt(i);
-            const p1 = getScreenPt(i + 1);
-            const midX = (p0.x + p1.x) / 2;
-            const midY = (p0.y + p1.y) / 2;
-            ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
-          }
-
-          const lastPt = getScreenPt(segment.length - 1);
-          ctx.lineTo(lastPt.x, lastPt.y);
-        }
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-      }
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.25)";
+      ctx.stroke();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(137, 207, 240, 0.8)";
+      ctx.stroke();
     }
 
     if (
@@ -362,10 +378,9 @@ export class FortePianoRoll {
       this.state.scoring.currentMicMidi > 0 &&
       playheadX >= 0
     ) {
-      const userY = pitchToY(this.state.scoring.currentMicMidi);
+      const userY = pitchToY(this.state.scoring.currentMicMidi) | 0;
       if (isFinite(userY)) {
-        const time = performance.now();
-        const pulse = Math.sin(time / 100) * 3;
+        const pulse = (Math.sin(performance.now() / 100) * 3) | 0;
 
         ctx.beginPath();
         ctx.arc(playheadX, userY, 12 + pulse, 0, Math.PI * 2);

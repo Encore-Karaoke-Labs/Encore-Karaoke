@@ -448,7 +448,7 @@ export class ForteScoring {
 
     while (
       this.state.scoring.micPitchHistory.length > 0 &&
-      this.state.scoring.micPitchHistory[0].time < currentTime - 10
+      this.state.scoring.micPitchHistory[0].time < currentTime - 30
     ) {
       this.state.scoring.micPitchHistory.shift();
     }
