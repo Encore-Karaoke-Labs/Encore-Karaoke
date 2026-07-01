@@ -1000,6 +1000,10 @@ export default class LyricsEngine {
 
   drawLyricsFrame() {
     if (this.ctx.state.mode !== "player") return;
+    if (this.ctx.state.isInterludeActive) {
+      this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
+      return;
+    }
     const ctx = this.lyricsCtx;
     const canvas = this.ctx.dom.lyricsCanvas.elm;
     const logicalWidth =
