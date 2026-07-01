@@ -38,6 +38,9 @@ export default class LyricsEngine {
     this.boundTimeUpdate = null;
     this.nextLineUpdateTimeout = null;
 
+    this.romajiCache = {};
+    this.pendingRomajiFetches = new Set();
+
     this.lineCaches = [];
     for (let i = 0; i < 2; i++) {
       const dim = document.createElement("canvas");
@@ -76,6 +79,9 @@ export default class LyricsEngine {
   reset() {
     this.cleanupEvents();
     this.currentSongLineIndex = 0;
+
+    this.romajiCache = {};
+    this.pendingRomajiFetches = new Set();
 
     this.ctx.dom.countdownDisplay.classOff("visible").text("");
     this.lastCountdownTick = null;
@@ -358,8 +364,6 @@ export default class LyricsEngine {
           const syllable = {
             text: mainText,
             furigana: furiganaText,
-            romanized: null,
-            romanizationPromise: null,
             rawText: cleanText,
             displayText: displayText,
             globalIndex: displayableSyllableIndex,
@@ -489,22 +493,10 @@ export default class LyricsEngine {
           let needsRomaji = this.asianRegex.test(line.text);
           let syllables = [];
 
+          let chunks = [];
           if (!needsRomaji) {
-            const blocks = line.text.match(/\S+\s*/g) || [line.text];
-            syllables = blocks.map((block) => ({
-              text: block,
-              rawText: block,
-              furigana: null,
-              romanized: null,
-              blockWidth: 0,
-              absoluteTime: line.time,
-              endTime: line.time + 1,
-              durationTicks: 0,
-              duetRole: "default",
-              isHidden: block.trim() === "",
-            }));
+            chunks = line.text.match(/\S+\s*/g) || [line.text];
           } else {
-            let chunks = [];
             if (line.text.match(/[ 　]/)) {
               chunks = line.text.match(/[^ 　]+[ 　]*/g) || [line.text];
             } else if (line.text.length > 16) {
@@ -518,30 +510,21 @@ export default class LyricsEngine {
             } else {
               chunks = [line.text];
             }
+          }
 
-            for (let chunk of chunks) {
-              let chunkRomaji = null;
-              const trimmed = chunk.trim();
-              if (trimmed.length > 0) {
-                let romResult = await Romanizer.romanize(trimmed);
-                if (romResult && romResult !== "null") {
-                  chunkRomaji = romResult;
-                  if (chunk.match(/[ 　]$/)) chunkRomaji += " ";
-                }
-              }
-              syllables.push({
-                text: chunk,
-                rawText: chunk,
-                furigana: null,
-                romanized: chunkRomaji,
-                blockWidth: 0,
-                absoluteTime: line.time,
-                endTime: line.time + 1,
-                durationTicks: 0,
-                duetRole: "default",
-                isHidden: trimmed === "",
-              });
-            }
+          for (let chunk of chunks) {
+            const trimmed = chunk.trim();
+            syllables.push({
+              text: chunk,
+              rawText: chunk,
+              furigana: null,
+              blockWidth: 0,
+              absoluteTime: line.time,
+              endTime: line.time + 1,
+              durationTicks: 0,
+              duetRole: "default",
+              isHidden: trimmed === "",
+            });
           }
           line.syllables = syllables;
         }
@@ -582,7 +565,13 @@ export default class LyricsEngine {
         parseInt(match[3].padEnd(3, "0")) / 1000;
       const txt = line.replace(regex, "").trim();
       if (!txt) return null;
-      return { time, text: txt, romanized: await Romanizer.romanize(txt) };
+
+      let romanized = "";
+      if (this.asianRegex.test(txt)) {
+        romanized = await Romanizer.romanize(txt);
+        this.romajiCache[txt] = romanized;
+      }
+      return { time, text: txt, romanized };
     });
     return (await Promise.all(promises)).filter(Boolean);
   }
@@ -590,26 +579,27 @@ export default class LyricsEngine {
   async _resolveRomajiForLine(lineIndex) {
     if (!this.midiLines || lineIndex >= this.midiLines.length) return;
     const line = this.midiLines[lineIndex];
-    let hasChanges = false;
-    for (const syllable of line) {
-      if (!syllable.romanized && !syllable.romanizationPromise) {
-        syllable.romanizationPromise = Romanizer.romanize(
-          syllable.furigana || syllable.text,
-        ).then((rt) => {
-          syllable.romanized = rt || "";
-        });
-        await syllable.romanizationPromise;
-        hasChanges = true;
-        await new Promise((r) => setTimeout(r, 2));
+
+    const fullText = line.map((s) => s.furigana || s.text || "").join("");
+
+    if (this.asianRegex.test(fullText)) {
+      if (
+        this.romajiCache[fullText] === undefined &&
+        !this.pendingRomajiFetches.has(fullText)
+      ) {
+        this.pendingRomajiFetches.add(fullText);
+        const res = await Romanizer.romanize(fullText);
+        this.romajiCache[fullText] = res || "";
+        this.pendingRomajiFetches.delete(fullText);
+
+        if (
+          lineIndex === this.currentSongLineIndex ||
+          lineIndex === this.currentSongLineIndex + 1
+        ) {
+          this.calculateLyricLayout();
+          this.requestCanvasCacheUpdate = true;
+        }
       }
-    }
-    if (
-      hasChanges &&
-      (lineIndex === this.currentSongLineIndex ||
-        lineIndex === this.currentSongLineIndex + 1)
-    ) {
-      this.calculateLyricLayout();
-      this.requestCanvasCacheUpdate = true;
     }
   }
 
@@ -650,7 +640,7 @@ export default class LyricsEngine {
 
       for (let i = 0; i < lineData.length; i++) {
         const s = lineData[i];
-        if (!s.furigana && !s.romanized && s.text && s.text.match(/[ 　]/)) {
+        if (!s.furigana && s.text && s.text.match(/[ 　]/)) {
           const parts = s.text.match(/([^ 　]+[ 　]*|[ 　]+)/g);
           if (parts && parts.length > 1) {
             const totalWidth = ctx.measureText(s.text).width;
@@ -699,7 +689,7 @@ export default class LyricsEngine {
         }
         ctx.font = rubyFontStr;
         s.furiW = s.furigana ? ctx.measureText(s.furigana).width : 0;
-        s.romW = s.romanized ? ctx.measureText(s.romanized).width : 0;
+        s.romW = 0;
         ctx.font = mainFontStr;
         s.standaloneW = s.text ? ctx.measureText(s.text).width : 0;
         currentWord.push(s);
@@ -710,10 +700,7 @@ export default class LyricsEngine {
         const word = words[i].syllables;
         let requiresExpansion = false;
         for (let j = 0; j < word.length; j++) {
-          if (
-            word[j].furiW > word[j].standaloneW ||
-            word[j].romW > word[j].standaloneW
-          ) {
+          if (word[j].furiW > word[j].standaloneW) {
             requiresExpansion = true;
             break;
           }
@@ -793,18 +780,42 @@ export default class LyricsEngine {
 
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
+
+        let rowText = r.map((s) => s.furigana || s.text || "").join("");
+
+        if (this.asianRegex.test(rowText)) {
+          if (this.romajiCache[rowText] !== undefined) {
+            r.rowRomaji = this.romajiCache[rowText];
+          } else {
+            r.rowRomaji = "";
+            if (!this.pendingRomajiFetches.has(rowText)) {
+              this.pendingRomajiFetches.add(rowText);
+              Romanizer.romanize(rowText).then((res) => {
+                this.romajiCache[rowText] = res || "";
+                this.pendingRomajiFetches.delete(rowText);
+                this.calculateLyricLayout();
+                this.requestCanvasCacheUpdate = true;
+              });
+            }
+          }
+        } else {
+          r.rowRomaji = "";
+        }
+
         let rowWidth = 0,
-          hasFurigana = false,
-          hasRomaji = false;
+          hasFurigana = false;
         for (let j = 0; j < r.length; j++) {
           rowWidth += r[j].blockWidth;
           if (r[j].furiW > 0 || r[j].furigana) hasFurigana = true;
-          if (r[j].romW > 0 || r[j].romanized) hasRomaji = true;
         }
+
         const startX = (logicalWidth - rowWidth) / 2;
         const extraTop = hasFurigana ? mainFontSize * 0.6 : 0;
-        const extraBottom = hasRomaji ? mainFontSize * 0.6 : 0;
+        const extraBottom = r.rowRomaji ? mainFontSize * 0.6 : 0;
+
         if (hasFurigana) currentY += extraTop;
+        r.layoutY = currentY;
+
         for (let j = 0; j < r.length; j++) {
           r[j].layoutX += startX;
           r[j].layoutY = currentY;
@@ -813,7 +824,11 @@ export default class LyricsEngine {
       }
       currentY -= lineSpacing;
       currentY += paragraphGap;
-      this.renderableLines.push({ isNextLine, syllables: flatSyllables });
+      this.renderableLines.push({
+        isNextLine,
+        syllables: flatSyllables,
+        rows: rows,
+      });
     };
 
     if (this.ctx.state.currentSongIsMIDI) {
@@ -849,6 +864,9 @@ export default class LyricsEngine {
         const line = this.renderableLines[i];
         for (let j = 0; j < line.syllables.length; j++) {
           line.syllables[j].layoutY += yOffset;
+        }
+        for (let j = 0; j < line.rows.length; j++) {
+          line.rows[j].layoutY += yOffset;
         }
       }
     }
@@ -978,23 +996,30 @@ export default class LyricsEngine {
             true,
           );
         }
-        renderTextToCtx(
-          cache.dimCtx,
-          s.romanized,
-          s.layoutY + mainFontSize * 0.6,
-          `700 ${subFontSize}px "Radio Canada"`,
-          s.romW,
-          false,
-        );
-        renderTextToCtx(
-          cache.mainCtx,
-          s.romanized,
-          s.layoutY + mainFontSize * 0.6,
-          `700 ${subFontSize}px "Radio Canada"`,
-          s.romW,
-          true,
-        );
       });
+
+      cache.dimCtx.textAlign = "center";
+
+      line.rows.forEach((r) => {
+        if (r.rowRomaji) {
+          const dominantRole = r[0]?.duetRole || "default";
+          const colors = this.ctx.state.isDuet
+            ? this.getDuetColors(dominantRole)
+            : this.getDuetColors("default");
+
+          const romajiY = r.layoutY + mainFontSize * 0.6;
+          const romajiX = logicalWidth / 2;
+
+          cache.dimCtx.font = `700 ${subFontSize}px "Radio Canada"`;
+          cache.dimCtx.fillStyle = colors.main;
+          cache.dimCtx.strokeStyle = colors.stroke;
+          cache.dimCtx.lineWidth = subFontSize * 0.15;
+          cache.dimCtx.strokeText(r.rowRomaji, romajiX, romajiY);
+          cache.dimCtx.fillText(r.rowRomaji, romajiX, romajiY);
+        }
+      });
+
+      cache.dimCtx.textAlign = "left";
     });
   }
 
@@ -1105,14 +1130,13 @@ export default class LyricsEngine {
           if (progress > 0) {
             let clipTop = s.layoutY - mainFontSize * 0.9;
             let clipBottom = s.layoutY + mainFontSize * 0.35;
+
             if (s.furigana) clipTop -= mainFontSize * 0.6;
-            if (s.romanized) clipBottom += mainFontSize * 0.55;
-            ctx.rect(
-              centerX - s.blockWidth / 2 - 5,
-              clipTop,
-              (s.blockWidth + 10) * progress,
-              clipBottom - clipTop,
-            );
+
+            let clipLeft = centerX - s.blockWidth / 2 - 5;
+            let clipWidth = (s.blockWidth + 10) * progress;
+
+            ctx.rect(clipLeft, clipTop, clipWidth, clipBottom - clipTop);
           }
         });
         ctx.clip();
