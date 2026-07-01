@@ -43,7 +43,6 @@ export class FortePianoRoll {
 
     this.ctx = this.canvas.elm.getContext("2d", {
       alpha: true,
-      desynchronized: true,
     });
 
     this.pageCanvas = document.createElement("canvas");
