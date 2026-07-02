@@ -622,7 +622,7 @@ export default class SetupManager {
         items: [
           {
             id: "check_on_startup",
-            label: "Check Updates on Startup",
+            label: "Notify Updates on Startup",
             type: "select",
             options: [
               { value: false, label: "No" },
