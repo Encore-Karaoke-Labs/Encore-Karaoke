@@ -381,6 +381,8 @@ export class RecorderModule {
         resolve(new Blob(this.musicChunks, { type: musicMime }));
     });
 
+    const recordedSongTitle = this.currentSongInfo?.title || "Unknown";
+
     Promise.all([mixPromise, micPromise, musicPromise]).then(
       async ([mixBlob, micBlob, musicBlob]) => {
         this.infoBar.showTemp(
@@ -394,7 +396,7 @@ export class RecorderModule {
           const micWavBuffer = await processAudioBlobToWav(micBlob);
           const musicWavBuffer = await processAudioBlobToWav(musicBlob);
 
-          const songTitle = this.currentSongInfo?.title || "Unknown";
+          const songTitle = recordedSongTitle;
 
           const result = await window.desktopIntegration.ipc.invoke(
             "save-recording",
