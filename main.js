@@ -688,9 +688,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("get-port", () => PORT);
   ipcMain.handle("romanize", async (event, rawJapanese) => {
     let romaji = "";
-    const hasKanji = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/.test(
-      rawJapanese,
-    );
+    const hasKanji = hanIdeographsRegex.test(rawJapanese);
     if (hasKanji) {
       romaji = await kuroshiro.convert(rawJapanese, {
         to: "romaji",
@@ -699,9 +697,6 @@ app.whenReady().then(async () => {
     } else {
       romaji = await Kuroshiro.Util.kanaToRomaji(rawJapanese, "hepburn");
     }
-    logger.debug("ROMANIZER", `Has Kanji? ${hasKanji}`);
-    logger.debug("ROMANIZER", `Original Japanese: ${rawJapanese}`);
-    logger.debug("ROMANIZER", `Romaji: ${romaji}`);
     return romaji;
   });
   ipcMain.on("set-volume", async (event, vol) => setVolume(vol));
