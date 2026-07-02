@@ -38,6 +38,10 @@ const { Client } = require("@xhayper/discord-rpc");
 const Config = require("./config-manager");
 const { log } = require("console");
 
+const krRegex = /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/; // Hangul (Korean)
+const kanaRegex = /[\u3040-\u30ff\u31f0-\u31ff]/; // Hiragana & Katakana (Japanese)
+const hanIdeographsRegex = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/; // Hanzi/Kanji/Hanja
+
 // Logging System
 const logger = {
   info: (tag, msg) =>
@@ -929,10 +933,6 @@ app.whenReady().then(async () => {
       );
       return;
     }
-
-    const krRegex = /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/; // Hangul (Korean)
-    const kanaRegex = /[\u3040-\u30ff\u31f0-\u31ff]/; // Hiragana & Katakana (Japanese)
-    const hanIdeographsRegex = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/; // Hanzi/Kanji/Hanja
 
     const getFontForText = (text, defaultFont) => {
       if (fontKR && krRegex.test(text)) return "KR-Fallback";
