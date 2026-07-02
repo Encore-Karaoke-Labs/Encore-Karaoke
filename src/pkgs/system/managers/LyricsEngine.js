@@ -157,39 +157,99 @@ export default class LyricsEngine {
     const colors = {
       f: {
         main: "#ffff33",
-        stroke: "#806600",
-        dim: "rgba(255,255,51,0.35)",
-        dimStroke: "rgba(128,102,0,0.6)",
+        stroke: "#665200",
+        dim: "rgba(255, 255, 51, 0.35)",
+        dimStroke: "rgba(102, 82, 0, 0.6)",
+        ruby: {
+          main: "#fffefa",
+          stroke: "#594700",
+          dim: "rgba(255, 255, 180, 0.35)",
+          dimStroke: "rgba(89, 71, 0, 0.5)",
+        },
+        romaji: {
+          text: "rgba(255, 255, 170, 0.85)",
+          stroke: "rgba(60, 45, 0, 0.85)",
+        },
       },
       f2: {
         main: "#66ff66",
         stroke: "#004d00",
-        dim: "rgba(102,255,102,0.35)",
-        dimStroke: "rgba(0,77,0,0.6)",
+        dim: "rgba(102, 255, 102, 0.35)",
+        dimStroke: "rgba(0, 77, 0, 0.6)",
+        ruby: {
+          main: "#eafeea",
+          stroke: "#003800",
+          dim: "rgba(180, 255, 180, 0.35)",
+          dimStroke: "rgba(0, 56, 0, 0.5)",
+        },
+        romaji: {
+          text: "rgba(180, 255, 180, 0.85)",
+          stroke: "rgba(0, 40, 0, 0.85)",
+        },
       },
       m: {
         main: "#66e6ff",
         stroke: "#004d66",
-        dim: "rgba(102,230,255,0.35)",
-        dimStroke: "rgba(0,77,102,0.6)",
+        dim: "rgba(102, 230, 255, 0.35)",
+        dimStroke: "rgba(0, 77, 102, 0.6)",
+        ruby: {
+          main: "#e6faff",
+          stroke: "#00364d",
+          dim: "rgba(180, 240, 255, 0.35)",
+          dimStroke: "rgba(0, 54, 77, 0.5)",
+        },
+        romaji: {
+          text: "rgba(180, 242, 255, 0.85)",
+          stroke: "rgba(0, 45, 60, 0.85)",
+        },
       },
       m2: {
         main: "#ff6666",
         stroke: "#660000",
-        dim: "rgba(255,102,102,0.35)",
-        dimStroke: "rgba(102,0,0,0.6)",
+        dim: "rgba(255, 102, 102, 0.35)",
+        dimStroke: "rgba(102, 0, 0, 0.6)",
+        ruby: {
+          main: "#ffe6e6",
+          stroke: "#4d0000",
+          dim: "rgba(255, 180, 180, 0.35)",
+          dimStroke: "rgba(77, 0, 0, 0.5)",
+        },
+        romaji: {
+          text: "rgba(255, 180, 180, 0.85)",
+          stroke: "rgba(60, 0, 0, 0.85)",
+        },
       },
       a: {
         main: "#ffb233",
         stroke: "#804000",
-        dim: "rgba(255,178,51,0.35)",
-        dimStroke: "rgba(128,64,0,0.6)",
+        dim: "rgba(255, 178, 51, 0.35)",
+        dimStroke: "rgba(128, 64, 0, 0.6)",
+        ruby: {
+          main: "#fff2e6",
+          stroke: "#663300",
+          dim: "rgba(255, 210, 150, 0.35)",
+          dimStroke: "rgba(102, 51, 0, 0.5)",
+        },
+        romaji: {
+          text: "rgba(255, 215, 160, 0.85)",
+          stroke: "rgba(70, 35, 0, 0.85)",
+        },
       },
       default: {
         main: "#ffffff",
         stroke: "#010141",
-        dim: "rgba(255,255,255,0.4)",
-        dimStroke: "rgba(1,1,65,0.6)",
+        dim: "rgba(255, 255, 255, 0.4)",
+        dimStroke: "rgba(1, 1, 65, 0.6)",
+        ruby: {
+          main: "#f2f2ff",
+          stroke: "#01012b",
+          dim: "rgba(230, 230, 255, 0.35)",
+          dimStroke: "rgba(1, 1, 45, 0.5)",
+        },
+        romaji: {
+          text: "rgba(235, 238, 255, 0.88)",
+          stroke: "rgba(5, 5, 45, 0.85)",
+        },
       },
     };
     return colors[role] || colors["default"];
@@ -926,7 +986,6 @@ export default class LyricsEngine {
       cache.mainCtx.textBaseline = "alphabetic";
       cache.dimCtx.lineJoin = "round";
       cache.mainCtx.lineJoin = "round";
-
       line.syllables.forEach((s) => {
         if (s.isHidden) return;
         const centerX = s.layoutX + s.blockWidth / 2;
@@ -934,13 +993,28 @@ export default class LyricsEngine {
           ? this.getDuetColors(s.duetRole)
           : this.getDuetColors("default");
 
-        const renderTextToCtx = (ctx, text, y, font, w, isMain) => {
+        const renderTextToCtx = (
+          ctx,
+          text,
+          y,
+          font,
+          w,
+          isMain,
+          isRuby = false,
+        ) => {
           if (!text) return;
           ctx.font = font;
-          ctx.fillStyle = isMain ? colors.main : colors.dim;
-          ctx.strokeStyle = isMain ? colors.stroke : colors.dimStroke;
-          ctx.lineWidth =
-            (font.includes(mainFontSize) ? mainFontSize : subFontSize) * 0.15;
+
+          const palette = isRuby ? colors.ruby : colors;
+          ctx.fillStyle = isMain ? palette.main : palette.dim;
+          ctx.strokeStyle = isMain ? palette.stroke : palette.dimStroke;
+
+          const strokeMultiplier = isRuby ? 0.12 : 0.15;
+          const fontSize = font.includes(mainFontSize)
+            ? mainFontSize
+            : subFontSize;
+          ctx.lineWidth = fontSize * strokeMultiplier;
+
           ctx.strokeText(text, centerX - w / 2, y);
           ctx.fillText(text, centerX - w / 2, y);
         };
@@ -952,6 +1026,7 @@ export default class LyricsEngine {
           `700 ${subFontSize}px "Radio Canada"`,
           s.furiW,
           false,
+          true,
         );
         renderTextToCtx(
           cache.mainCtx,
@@ -959,6 +1034,7 @@ export default class LyricsEngine {
           s.layoutY - mainFontSize * 1.1,
           `700 ${subFontSize}px "Radio Canada"`,
           s.furiW,
+          true,
           true,
         );
 
@@ -971,6 +1047,7 @@ export default class LyricsEngine {
             cache.dimCtx.lineWidth = mainFontSize * 0.15;
             cache.dimCtx.strokeText(s.continuousWordText, wordX, s.layoutY);
             cache.dimCtx.fillText(s.continuousWordText, wordX, s.layoutY);
+
             cache.mainCtx.font = `900 ${mainFontSize}px "Radio Canada", sans-serif`;
             cache.mainCtx.fillStyle = colors.main;
             cache.mainCtx.strokeStyle = colors.stroke;
@@ -1011,9 +1088,10 @@ export default class LyricsEngine {
           const romajiX = logicalWidth / 2;
 
           cache.dimCtx.font = `700 ${subFontSize}px "Radio Canada"`;
-          cache.dimCtx.fillStyle = colors.main;
-          cache.dimCtx.strokeStyle = colors.stroke;
-          cache.dimCtx.lineWidth = subFontSize * 0.15;
+          cache.dimCtx.fillStyle = colors.romaji.text;
+          cache.dimCtx.strokeStyle = colors.romaji.stroke;
+          cache.dimCtx.lineWidth = subFontSize * 0.12;
+
           cache.dimCtx.strokeText(r.rowRomaji, romajiX, romajiY);
           cache.dimCtx.fillText(r.rowRomaji, romajiX, romajiY);
         }
