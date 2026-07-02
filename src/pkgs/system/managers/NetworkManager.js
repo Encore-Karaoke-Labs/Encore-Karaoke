@@ -399,7 +399,11 @@ export default class NetworkManager {
           input.handlePan("right");
           break;
         case "toggle_recording":
-          if (state.mode === "player" && !state.currentSongIsYouTube) {
+          if (
+            state.mode === "player" &&
+            !state.currentSongIsYouTube &&
+            !state.isScoreScreenActive
+          ) {
             if (state.isSessionActive) {
               this.ctx.modules.infoBar.showTemp(
                 "RECORDING",
