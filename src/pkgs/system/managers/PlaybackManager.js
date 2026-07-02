@@ -142,8 +142,13 @@ export default class PlaybackManager {
     state.reservationNumber = "";
 
     root.ui.setMode("player");
-    if (state.currentSongIsYouTube)
+    if (state.currentSongIsYouTube) {
       this.ctx.wrapper.classOn("mode-player-youtube");
+    }
+
+    if (song.cdgPath) {
+      this.ctx.wrapper.classOn("mode-player-cdg");
+    }
 
     window.desktopIntegration.ipc.send("setRPC", {
       details: song.title,
@@ -365,6 +370,9 @@ export default class PlaybackManager {
     const state = this.ctx.state;
     const dom = this.ctx.dom;
     const modules = this.ctx.modules;
+
+    this.ctx.wrapper.classOff("mode-player-cdg");
+    this.ctx.wrapper.classOff("mode-player-youtube");
 
     modules.recorder.clearSongInfo();
     if (this.ctx.root.games)

@@ -3004,7 +3004,8 @@ p + .flex-list button {
   pointer-events: none;
 }
 
-.mode-player-youtube .player-ui {
+.mode-player-youtube .player-ui,
+.mode-player-cdg .player-ui {
   background: transparent;
 }
 
