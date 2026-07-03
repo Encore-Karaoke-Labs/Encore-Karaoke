@@ -69,6 +69,7 @@ export class FortePlayback {
     this.dispatchUpdate = dispatchUpdate;
 
     this.sourceNode = null;
+    this.audioElement = null;
     this.animationFrameId = null;
     this.lastScoreTime = 0;
     this.guideVolumeSwitchTimeout = null;
@@ -95,8 +96,8 @@ export class FortePlayback {
     const duration = engineState.duration;
 
     let rate = 1.0;
-    if (!this.state.playback.isMidi && this.sourceNode) {
-      rate = this.sourceNode.playbackRate.value;
+    if (!this.state.playback.isMidi && this.audioElement) {
+      rate = this.audioElement.playbackRate;
     }
 
     this.state.playback.smoothedTime += delta * rate;
@@ -147,141 +148,201 @@ export class FortePlayback {
   }
 
   /**
-   * Starts a background asynchronous chunked processing routine measuring Multiplex pitch lines.
+   * Fetches the track incrementally and decodes partial chunks dynamically so guide notes stream in natively,
+   * yielding to the event loop to completely eliminate audio/UI stutter.
    *
-   * @param {AudioBuffer} audioBuffer - Full track decoded buffer containing isolated guide track on right channel.
+   * @param {string} url - Track location containing the multiplexed file.
    */
-  startIncrementalGuideAnalysis(audioBuffer) {
-    console.log("[FORTE SVC] Starting incremental analysis for piano roll...");
+  async startStreamingGuideAnalysis(url) {
+    console.log("[FORTE SVC] Starting streaming analysis for piano roll...");
     this.state.playback.isAnalyzing = true;
-    const channelData = audioBuffer.getChannelData(1);
-    const sampleRate = audioBuffer.sampleRate;
 
     const bufferSize = 2048;
     const detector = PitchDetector.forFloat32Array(bufferSize);
-
     const minNoteDuration = 0.08;
     const stepSize = 1024;
+
     let noteIdCounter = this.state.playback.guideNotes.length;
-
-    let analysisPosition = 0;
-    const analysisChunkDurationS = 2;
-    const analysisChunkSamples = analysisChunkDurationS * sampleRate;
-
     let currentNote = null;
+    let lastAnalyzedTime = 0;
 
-    const processChunk = () => {
-      if (!this.state.playback.isAnalyzing) {
-        console.log("[FORTE SVC] Incremental analysis stopped.");
-        return;
-      }
+    let accumulateBuffer = new Uint8Array(0);
+    let isStreamDone = false;
 
-      const chunkEndPosition = Math.min(
-        analysisPosition + analysisChunkSamples,
-        channelData.length - bufferSize,
-      );
-      const foundNotes = [];
-      const dataLen = channelData.length;
+    const fetchStream = async () => {
+      try {
+        const response = await fetch(url);
+        if (!response.body) throw new Error("ReadableStream not supported");
+        const reader = response.body.getReader();
 
-      for (let i = analysisPosition; i < chunkEndPosition; i += stepSize) {
-        const chunk = channelData.subarray(i, i + bufferSize);
-        const [pitch, clarity] = detector.findPitch(chunk, sampleRate);
-        const time = i / sampleRate;
-
-        const midiPitch = 12 * Math.log2(pitch / 440) + 69;
-
-        const isNoteActive =
-          clarity > GUIDE_CLARITY_THRESHOLD &&
-          pitch >= MIN_VOCAL_HZ &&
-          pitch <= MAX_VOCAL_HZ &&
-          midiPitch >= 0 &&
-          midiPitch < 128;
-
-        if (isNoteActive) {
-          if (!currentNote) {
-            currentNote = {
-              midi: midiPitch,
-              startTime: time,
-              pitches: [midiPitch],
-            };
-          } else {
-            currentNote.pitches.push(midiPitch);
+        while (true) {
+          if (!this.state.playback.isAnalyzing) break;
+          const { done, value } = await reader.read();
+          if (value) {
+            const newBuf = new Uint8Array(
+              accumulateBuffer.length + value.length,
+            );
+            newBuf.set(accumulateBuffer);
+            newBuf.set(value, accumulateBuffer.length);
+            accumulateBuffer = newBuf;
           }
-        } else if (currentNote) {
-          const duration = time - currentNote.startTime;
-          if (duration > minNoteDuration) {
-            let pSum = 0;
-            const pLen = currentNote.pitches.length;
-            for (let k = 0; k < pLen; k++) pSum += currentNote.pitches[k];
-
-            foundNotes.push({
-              id: noteIdCounter++,
-              pitch: pSum / pLen,
-              startTime: currentNote.startTime,
-              duration: duration,
-            });
-          }
-          currentNote = null;
-        }
-      }
-
-      if (foundNotes.length > 0) {
-        const lastGlobalNote =
-          this.state.playback.guideNotes[
-            this.state.playback.guideNotes.length - 1
-          ];
-        const firstChunkNote = foundNotes[0];
-
-        if (
-          lastGlobalNote &&
-          firstChunkNote.startTime -
-            (lastGlobalNote.startTime + lastGlobalNote.duration) <
-            0.05 &&
-          Math.abs(firstChunkNote.pitch - lastGlobalNote.pitch) < 1.0
-        ) {
-          lastGlobalNote.duration =
-            firstChunkNote.startTime +
-            firstChunkNote.duration -
-            lastGlobalNote.startTime;
-          foundNotes.shift();
-        }
-
-        this.state.playback.guideNotes.push(...foundNotes);
-
-        if (this.state.ui.pianoRollVisible) {
-          this.pianoRoll.render(this.getPlaybackState().currentTime);
-        }
-      }
-
-      analysisPosition = chunkEndPosition;
-      if (analysisPosition < dataLen - bufferSize) {
-        setTimeout(processChunk, 16);
-      } else {
-        if (currentNote) {
-          const time = (dataLen - 1) / sampleRate;
-          const duration = time - currentNote.startTime;
-          if (duration > minNoteDuration) {
-            let pSum = 0;
-            for (let k = 0; k < currentNote.pitches.length; k++)
-              pSum += currentNote.pitches[k];
-
-            const finalNote = {
-              id: noteIdCounter++,
-              pitch: pSum / currentNote.pitches.length,
-              startTime: currentNote.startTime,
-              duration: duration,
-            };
-            this.state.playback.guideNotes.push(finalNote);
-            if (this.state.ui.pianoRollVisible)
-              this.pianoRoll.render(this.getPlaybackState().currentTime);
+          if (done) {
+            isStreamDone = true;
+            break;
           }
         }
-        this.state.playback.isAnalyzing = false;
-        logVerbose("Incremental guide analysis complete.");
+      } catch (err) {
+        console.error("[FORTE SVC] Guide fetch error:", err);
       }
     };
 
-    setTimeout(processChunk, 16);
+    fetchStream();
+
+    const analyzeLoop = async () => {
+      let lastDecodedSize = 0;
+      const DECODE_CHUNK_THRESHOLD = 256 * 1024;
+
+      while (this.state.playback.isAnalyzing) {
+        if (
+          !isStreamDone &&
+          accumulateBuffer.length - lastDecodedSize < DECODE_CHUNK_THRESHOLD
+        ) {
+          await new Promise((r) => setTimeout(r, 200));
+          continue;
+        }
+
+        const currentBufferSize = accumulateBuffer.length;
+        if (currentBufferSize === 0) {
+          if (isStreamDone) break;
+          await new Promise((r) => setTimeout(r, 200));
+          continue;
+        }
+
+        try {
+          const bufferCopy = accumulateBuffer.slice(0).buffer;
+          const audioBuffer =
+            await this.audioCore.context.decodeAudioData(bufferCopy);
+
+          const channelIndex = audioBuffer.numberOfChannels > 1 ? 1 : 0;
+          const channelData = audioBuffer.getChannelData(channelIndex);
+          const sampleRate = audioBuffer.sampleRate;
+
+          const startSample = Math.floor(lastAnalyzedTime * sampleRate);
+          const endSample = isStreamDone
+            ? channelData.length - bufferSize
+            : channelData.length - bufferSize - 4096;
+
+          if (startSample < endSample) {
+            const BATCH_SIZE = sampleRate;
+            let i = startSample;
+
+            while (i < endSample && this.state.playback.isAnalyzing) {
+              const foundNotes = [];
+              const batchEnd = Math.min(i + BATCH_SIZE, endSample);
+
+              for (; i < batchEnd; i += stepSize) {
+                const chunk = channelData.subarray(i, i + bufferSize);
+                const [pitch, clarity] = detector.findPitch(chunk, sampleRate);
+                const time = i / sampleRate;
+
+                const midiPitch = 12 * Math.log2(pitch / 440) + 69;
+                const isNoteActive =
+                  clarity > GUIDE_CLARITY_THRESHOLD &&
+                  pitch >= MIN_VOCAL_HZ &&
+                  pitch <= MAX_VOCAL_HZ &&
+                  midiPitch >= 0 &&
+                  midiPitch < 128;
+
+                if (isNoteActive) {
+                  if (!currentNote) {
+                    currentNote = {
+                      midi: midiPitch,
+                      startTime: time,
+                      pitches: [midiPitch],
+                    };
+                  } else {
+                    currentNote.pitches.push(midiPitch);
+                  }
+                } else if (currentNote) {
+                  const duration = time - currentNote.startTime;
+                  if (duration > minNoteDuration) {
+                    let pSum = 0;
+                    for (let k = 0; k < currentNote.pitches.length; k++) {
+                      pSum += currentNote.pitches[k];
+                    }
+                    foundNotes.push({
+                      id: noteIdCounter++,
+                      pitch: pSum / currentNote.pitches.length,
+                      startTime: currentNote.startTime,
+                      duration: duration,
+                    });
+                  }
+                  currentNote = null;
+                }
+              }
+
+              if (foundNotes.length > 0) {
+                const lastGlobalNote =
+                  this.state.playback.guideNotes[
+                    this.state.playback.guideNotes.length - 1
+                  ];
+                const firstChunkNote = foundNotes[0];
+
+                if (
+                  lastGlobalNote &&
+                  firstChunkNote.startTime -
+                    (lastGlobalNote.startTime + lastGlobalNote.duration) <
+                    0.05 &&
+                  Math.abs(firstChunkNote.pitch - lastGlobalNote.pitch) < 1.0
+                ) {
+                  lastGlobalNote.duration =
+                    firstChunkNote.startTime +
+                    firstChunkNote.duration -
+                    lastGlobalNote.startTime;
+                  foundNotes.shift();
+                }
+
+                this.state.playback.guideNotes.push(...foundNotes);
+
+                if (this.state.ui.pianoRollVisible) {
+                  this.pianoRoll.render(this.getPlaybackState().currentTime);
+                }
+              }
+
+              await new Promise((r) => setTimeout(r, 10));
+            }
+
+            lastAnalyzedTime = endSample / sampleRate;
+            lastDecodedSize = currentBufferSize;
+          }
+        } catch (e) {}
+
+        if (isStreamDone) {
+          if (currentNote) {
+            const duration = lastAnalyzedTime - currentNote.startTime;
+            if (duration > minNoteDuration) {
+              let pSum = 0;
+              for (let k = 0; k < currentNote.pitches.length; k++)
+                pSum += currentNote.pitches[k];
+              this.state.playback.guideNotes.push({
+                id: noteIdCounter++,
+                pitch: pSum / currentNote.pitches.length,
+                startTime: currentNote.startTime,
+                duration: duration,
+              });
+              if (this.state.ui.pianoRollVisible) {
+                this.pianoRoll.render(this.getPlaybackState().currentTime);
+              }
+            }
+          }
+          this.state.playback.isAnalyzing = false;
+          logVerbose("Streaming guide analysis complete.");
+          break;
+        }
+      }
+    };
+
+    analyzeLoop();
   }
 
   /**
@@ -293,6 +354,19 @@ export class FortePlayback {
   async loadTrack(url) {
     if (!this.audioCore.context) return false;
     if (this.state.playback.status !== "stopped") this.stopTrack();
+
+    if (this.audioElement) {
+      this.audioElement.pause();
+      this.audioElement.removeAttribute("src");
+      this.audioElement.load();
+      this.audioElement = null;
+    }
+    if (this.sourceNode) {
+      try {
+        this.sourceNode.disconnect();
+      } catch (e) {}
+      this.sourceNode = null;
+    }
 
     if (this.state.playback.sequencer) {
       try {
@@ -345,10 +419,10 @@ export class FortePlayback {
     });
 
     try {
-      const response = await fetch(url);
-      const arrayBuffer = await response.arrayBuffer();
-
       if (isMidi) {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+
         if (!this.state.playback.synthesizer)
           throw new Error("MIDI Synthesizer not ready.");
 
@@ -881,10 +955,25 @@ export class FortePlayback {
         }
         this.state.playback.buffer = null;
       } else {
-        this.state.playback.buffer =
-          await this.audioCore.context.decodeAudioData(arrayBuffer);
+        this.audioElement = new Audio(url);
+        this.audioElement.crossOrigin = "anonymous";
+        this.audioElement.preservesPitch = false;
+
+        await new Promise((resolve, reject) => {
+          this.audioElement.addEventListener("canplay", resolve, {
+            once: true,
+          });
+          this.audioElement.addEventListener("error", reject, { once: true });
+        });
+
+        this.sourceNode = this.audioCore.context.createMediaElementSource(
+          this.audioElement,
+        );
+
+        this.state.playback.buffer = null;
+
         if (this.state.playback.isMultiplexed) {
-          this.startIncrementalGuideAnalysis(this.state.playback.buffer);
+          this.startStreamingGuideAnalysis(url);
         }
       }
 
@@ -969,18 +1058,18 @@ export class FortePlayback {
       this.state.playback.sequencer.play();
       this.state.playback.status = "playing";
     } else {
-      if (
-        !this.state.playback.buffer ||
-        this.state.playback.status === "playing"
-      )
+      if (!this.audioElement || this.state.playback.status === "playing")
         return;
 
-      this.sourceNode = this.audioCore.context.createBufferSource();
-      this.sourceNode.buffer = this.state.playback.buffer;
-      this.sourceNode.playbackRate.value = Math.pow(
+      try {
+        this.sourceNode.disconnect();
+      } catch (e) {}
+
+      this.audioElement.playbackRate = Math.pow(
         2,
         this.state.playback.transpose / 12,
       );
+      this.audioElement.preservesPitch = false;
 
       if (
         this.state.playback.guideNotes &&
@@ -1029,11 +1118,14 @@ export class FortePlayback {
         }
       }
 
-      this.sourceNode.onended = () => {
+      this.audioElement.onended = () => {
         if (this.state.playback.status === "playing") this.stopTrack();
       };
 
-      this.sourceNode.start(0, this.state.playback.pauseTime);
+      this.audioElement.currentTime = this.state.playback.pauseTime || 0;
+      this.audioElement
+        .play()
+        .catch((e) => console.error("[FORTE SVC] Playback error:", e));
       this.state.playback.startTime = this.audioCore.context.currentTime;
       this.state.playback.status = "playing";
     }
@@ -1041,7 +1133,7 @@ export class FortePlayback {
     if (
       !this.state.playback.isMidi &&
       !this.state.playback.isMultiplexed &&
-      this.state.playback.buffer
+      this.audioElement
     ) {
       if (typeof Meyda !== "undefined") {
         if (!this.state.scoring.meydaAnalyzer) {
@@ -1095,16 +1187,16 @@ export class FortePlayback {
       }
       this.state.playback.status = "paused";
     } else {
-      if (!this.sourceNode) return;
-      const rate = this.sourceNode.playbackRate.value;
-      const elapsed =
-        this.audioCore.context.currentTime - this.state.playback.startTime;
-      this.state.playback.pauseTime += elapsed * rate;
-      this.sourceNode.stop();
+      if (!this.audioElement) return;
+      this.state.playback.pauseTime = this.audioElement.currentTime;
+      this.audioElement.pause();
+      try {
+        this.sourceNode.disconnect();
+      } catch (e) {}
+
       this.state.playback.leftPannerGain = null;
       this.state.playback.rightPannerGain = null;
       this.state.playback.status = "paused";
-      this.sourceNode = null;
     }
 
     this.dispatchUpdate();
@@ -1122,6 +1214,7 @@ export class FortePlayback {
 
     if (this.state.playback.status === "stopped") return;
     this.state.playback.status = "stopped";
+    this.state.playback.isAnalyzing = false;
 
     if (this.state.scoring.meydaAnalyzer)
       this.state.scoring.meydaAnalyzer.stop();
@@ -1167,10 +1260,15 @@ export class FortePlayback {
         }
       }
     } else {
+      if (this.audioElement) {
+        this.audioElement.onended = null;
+        this.audioElement.pause();
+        this.audioElement.currentTime = 0;
+      }
       if (this.sourceNode) {
-        this.sourceNode.onended = null;
-        this.sourceNode.stop();
-        this.sourceNode = null;
+        try {
+          this.sourceNode.disconnect();
+        } catch (e) {}
       }
     }
 
@@ -1233,12 +1331,9 @@ export class FortePlayback {
     if (
       !this.state.playback.isMidi &&
       this.state.playback.status === "playing" &&
-      this.sourceNode
+      this.audioElement
     ) {
-      const rate = this.sourceNode.playbackRate.value;
-      const elapsed =
-        this.audioCore.context.currentTime - this.state.playback.startTime;
-      this.state.playback.pauseTime += elapsed * rate;
+      this.state.playback.pauseTime = this.audioElement.currentTime;
       this.state.playback.startTime = this.audioCore.context.currentTime;
     }
 
@@ -1246,11 +1341,9 @@ export class FortePlayback {
 
     if (this.state.playback.isMidi && this.state.playback.synthesizer) {
       this.state.playback.synthesizer.setSystemParameter("keyShift", clamped);
-    } else if (!this.state.playback.isMidi && this.sourceNode) {
-      this.sourceNode.playbackRate.setValueAtTime(
-        Math.pow(2, clamped / 12),
-        this.audioCore.context.currentTime,
-      );
+    } else if (!this.state.playback.isMidi && this.audioElement) {
+      this.audioElement.playbackRate = Math.pow(2, clamped / 12);
+      this.audioElement.preservesPitch = false;
     }
 
     this.dispatchUpdate();
@@ -1319,16 +1412,9 @@ export class FortePlayback {
     if (this.state.playback.isMidi && this.state.playback.sequencer) {
       duration = this.state.playback.sequencer.duration || 0;
       currentTime = this.state.playback.sequencer.currentTime || 0;
-    } else if (this.state.playback.buffer) {
-      duration = this.state.playback.buffer.duration;
-      if (this.state.playback.status === "playing" && this.sourceNode) {
-        const rate = this.sourceNode.playbackRate.value;
-        const elapsed =
-          this.audioCore.context.currentTime - this.state.playback.startTime;
-        currentTime = this.state.playback.pauseTime + elapsed * rate;
-      } else {
-        currentTime = this.state.playback.pauseTime;
-      }
+    } else if (this.audioElement) {
+      duration = this.audioElement.duration || 0;
+      currentTime = this.audioElement.currentTime || 0;
     }
 
     return {
