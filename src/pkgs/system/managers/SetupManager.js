@@ -54,6 +54,7 @@ export default class SetupManager {
       pinChangeStep: 0,
       newPinTemp: "",
       isVerifying: false,
+      isDataLoaded: false,
       dialog: null,
       previewingVideo: false,
       manualCalib: null,
@@ -92,30 +93,49 @@ export default class SetupManager {
   /**
    * Triggers the setup mode, taking over the screen and loading initial configurations.
    */
-  async open() {
+  open() {
     this.ctx.modules.bgv.stop();
     this.ctx.services.Forte.stopTrack();
-
-    this.micDevices = await this.ctx.services.Forte.getMicDevices();
-    this.playbackDevices = await this.ctx.services.Forte.getPlaybackDevices();
-    this.updateServers =
-      await window.desktopIntegration.ipc.invoke("get-update-servers");
-    this.versionInformation = await window.version.getVersionInformation();
-
-    const foundLibs = await this.ctx.services.FsSvc.findEncoreLibraries();
-    const activeLib = foundLibs.find(
-      (l) => l.path === this.ctx.config.libraryPath,
-    );
-    this.currentManifest = activeLib
-      ? activeLib.manifest
-      : { title: "Unknown", description: "No metadata available." };
 
     this.setupState.view = "auth";
     this.setupState.authInput = "";
     this.setupState.dashboardIndex = 0;
+    this.setupState.isDataLoaded = false;
 
-    this.buildSettingsMap();
     this.renderView();
+    this._loadInitialData();
+  }
+
+  /**
+   * Loads hardware and library configurations
+   */
+  async _loadInitialData() {
+    try {
+      this.micDevices = await this.ctx.services.Forte.getMicDevices();
+      this.playbackDevices = await this.ctx.services.Forte.getPlaybackDevices();
+      this.updateServers =
+        await window.desktopIntegration.ipc.invoke("get-update-servers");
+      this.versionInformation = await window.version.getVersionInformation();
+
+      const foundLibs = await this.ctx.services.FsSvc.findEncoreLibraries();
+      const activeLib = foundLibs.find(
+        (l) => l.path === this.ctx.config.libraryPath,
+      );
+      this.currentManifest = activeLib
+        ? activeLib.manifest
+        : { title: "Unknown", description: "No metadata available." };
+
+      this.buildSettingsMap();
+    } catch (error) {
+      console.error("Setup background load error:", error);
+    } finally {
+      this.setupState.isDataLoaded = true;
+
+      if (this.setupState.view === "loading") {
+        this.setupState.view = "dashboard";
+        this.renderView();
+      }
+    }
   }
 
   /**
@@ -700,6 +720,10 @@ export default class SetupManager {
   }
 
   handleKeyDown(e) {
+    if (this.setupState.view === "loading") {
+      if (e.key === "Escape") this.exitSetup();
+      return;
+    }
     if (this.setupState.manualCalib && this.setupState.manualCalib.active) {
       e.preventDefault();
       if (this.setupState.manualCalib.phase === "input") {
@@ -782,7 +806,8 @@ export default class SetupManager {
         this.renderView();
       } else if (
         this.setupState.view === "dashboard" ||
-        this.setupState.view === "auth"
+        this.setupState.view === "auth" ||
+        this.setupState.view === "loading"
       ) {
         this.exitSetup();
       }
@@ -1541,8 +1566,13 @@ export default class SetupManager {
   async processAuth() {
     if (this.setupState.view === "auth") {
       const isValid = await this.verifyPin(this.setupState.authInput);
-      if (isValid) this.setupState.view = "dashboard";
-      else this.showToast("INCORRECT PIN", "error");
+      if (isValid) {
+        this.setupState.view = this.setupState.isDataLoaded
+          ? "dashboard"
+          : "loading";
+      } else {
+        this.showToast("INCORRECT PIN", "error");
+      }
       this.setupState.authInput = "";
     } else if (this.setupState.view === "pin_change") {
       if (this.setupState.pinChangeStep === 0) {
@@ -1717,6 +1747,7 @@ export default class SetupManager {
       this.setupState.view === "pin_change"
     )
       this.renderAuthScreen(body);
+    else if (this.setupState.view === "loading") this.renderLoadingScreen(body);
     else if (this.setupState.view === "dashboard") this.renderDashboard(body);
     else if (this.setupState.view === "submenu") {
       body.classOn("is-submenu");
@@ -1734,9 +1765,17 @@ export default class SetupManager {
       hint += " | ESC: Back";
     if (this.setupState.view === "auth")
       hint = "Enter 4-digit PIN using number keys | ESC: Exit Setup";
+    if (this.setupState.view === "loading")
+      hint = "Loading system settings... | ESC: Exit Setup";
     new Html("p").text(hint).appendTo(footer);
 
     if (this.setupState.dialog) this.renderDialog(this.ctx.dom.setupContainer);
+  }
+
+  renderLoadingScreen(container) {
+    const loadingBox = new Html("div").classOn("auth-box").appendTo(container);
+    new Html("h2").text("LOADING CONFIGURATION").appendTo(loadingBox);
+    new Html("p").text("PLEASE WAIT...").appendTo(loadingBox);
   }
 
   renderManualCalibrationOverlay(container) {
