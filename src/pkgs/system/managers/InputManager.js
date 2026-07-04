@@ -534,8 +534,10 @@ export default class InputManager {
     state[target] = state[target].length >= 5 ? digit : state[target] + digit;
 
     if (state.mode !== "player") {
-      this.ctx.services.Forte.stopSfx();
-      this.ctx.services.Forte.playSfx(`/assets/audio/numbers/${digit}.wav`);
+      if (state.isNumberSfxEnabled !== false) {
+        this.ctx.services.Forte.stopSfx();
+        this.ctx.services.Forte.playSfx(`/assets/audio/numbers/${digit}.wav`);
+      }
       state.isTypingNumber = true;
       ui.updateMenuUI();
     } else {

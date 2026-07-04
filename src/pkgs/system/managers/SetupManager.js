@@ -501,6 +501,22 @@ export default class SetupManager {
             },
           },
           {
+            id: "enable_number_sfx",
+            label: "Enable Number Keypad Sounds",
+            type: "select",
+            options: [
+              { value: false, label: "No" },
+              { value: true, label: "Yes" },
+            ],
+            get: () => this.ctx.config.audioConfig?.enableNumberSfx ?? true,
+            set: (v) => {
+              this.ctx.config.audioConfig ??= {};
+              this.ctx.config.audioConfig.enableNumberSfx = v;
+              this.ctx.state.isNumberSfxEnabled = v;
+              window.config.setItem("audioConfig.enableNumberSfx", v);
+            },
+          },
+          {
             id: "enable_score_fanfare",
             label: "Enable Score Fanfare",
             type: "select",
