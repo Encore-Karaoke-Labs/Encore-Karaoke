@@ -1177,16 +1177,27 @@ export default class LyricsEngine {
       const currentTime = baseTime + LYRICS_SYNC_OFFSET;
 
       this.renderableLines.forEach((line, lineIdx) => {
-        if (line.isNextLine) return;
+        if (
+          line.isNextLine &&
+          (isLrcMode ||
+            !line.syllables ||
+            line.syllables.length === 0 ||
+            currentTime < line.syllables[0].absoluteTime)
+        ) {
+          return;
+        }
         const cache = this.lineCaches[lineIdx];
         if (!cache) return;
 
         ctx.save();
-        if (isLrcMode && this.lrcChangeTime)
+        if (line.isNextLine) {
+          ctx.globalAlpha = fadeProgress;
+        } else if (isLrcMode && this.lrcChangeTime) {
           ctx.globalAlpha = Math.min(
             1.0,
             Math.max(0, (performance.now() - this.lrcChangeTime) / 300),
           );
+        }
         ctx.beginPath();
 
         line.syllables.forEach((s) => {
