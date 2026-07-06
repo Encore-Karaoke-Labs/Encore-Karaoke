@@ -23,7 +23,7 @@ const Romanizer = {
       try {
         return await window.romanization.romanize(text);
       } catch (err) {
-        console.error(`[Romanizer] Network error:`, err);
+        console.error(`[Romanizer] Romanization error:`, err);
         return null;
       }
     }
