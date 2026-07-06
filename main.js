@@ -687,17 +687,45 @@ app.whenReady().then(async () => {
   ipcMain.handle("get-volume", async () => getVolume());
   ipcMain.handle("get-port", () => PORT);
   ipcMain.handle("romanize", async (event, rawJapanese) => {
-    let romaji = "";
-    const hasKanji = hanIdeographsRegex.test(rawJapanese);
-    if (hasKanji) {
-      romaji = await kuroshiro.convert(rawJapanese, {
+    if (!rawJapanese || typeof rawJapanese !== "string") return "";
+
+    try {
+      const cleanText = rawJapanese.replace(/[\r\n\t]/g, " ").trim();
+      if (!cleanText) return "";
+
+      let romaji = await kuroshiro.convert(cleanText, {
         to: "romaji",
         mode: "spaced",
+        romajiSystem: "hepburn",
       });
-    } else {
-      romaji = await Kuroshiro.Util.kanaToRomaji(rawJapanese, "hepburn");
+
+      romaji = romaji
+        .replace(/\s+/g, " ") // Collapse multiple spaces
+        .replace(/\s+([,.\?!♪~～''])/g, "$1") // Remove awkward space right before punctuation/symbols
+        .replace(/([（(])\s+/g, "$1") // Remove space right after opening brackets
+        .trim();
+
+      return romaji;
+    } catch (error) {
+      logger.warn(
+        "ROMANIZE",
+        `Kuromoji conversion failed for "${rawJapanese}": ${error.message}. Using safe fallback.`,
+      );
+
+      try {
+        let fallbackRomaji = await Kuroshiro.Util.kanaToRomaji(
+          rawJapanese,
+          "hepburn",
+        );
+        return fallbackRomaji.replace(/\s+/g, " ").trim();
+      } catch (fallbackError) {
+        logger.error(
+          "ROMANIZE",
+          `Fallback romanization failed: ${fallbackError.message}`,
+        );
+        return rawJapanese;
+      }
     }
-    return romaji;
   });
   ipcMain.on("set-volume", async (event, vol) => setVolume(vol));
   ipcMain.handle("get-recordings", async () => {
