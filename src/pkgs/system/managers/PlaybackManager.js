@@ -246,9 +246,11 @@ export default class PlaybackManager {
         ? "mtv.png"
         : state.currentSongIsMultiplexed
           ? "mp.png"
-          : pbState.isMidi
-            ? "midi.png"
-            : "rs.png";
+          : pbState.hasChorus
+            ? "chr.png"
+            : pbState.isMidi
+              ? "midi.png"
+              : "rs.png";
       dom.formatIndicator.styleJs({
         backgroundImage: `url("/assets/img/icons/${icon}")`,
         opacity: "1",
