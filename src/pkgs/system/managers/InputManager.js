@@ -379,8 +379,46 @@ export default class InputManager {
     else if (e.key === "[" || e.key === "]") this.handleBracket(e.key);
     else if (e.key === ";") this.cycleDrumPreset("left");
     else if (e.key === "'") this.cycleDrumPreset("right");
+    else if (e.key.toLowerCase() === "c") this.handleChorusToggle();
     else if (e.key.toLowerCase() === "g") this.cycleGuideMelody();
     else if (e.key.toLowerCase() === "y") this.handleYKey();
+  }
+
+  /**
+   * Toggles Chorus
+   */
+  handleChorusToggle() {
+    const state = this.ctx.state;
+    const Forte = this.ctx.services.Forte;
+    const modules = this.ctx.modules;
+
+    if (state.mode !== "player") return;
+
+    const pbState = Forte.getPlaybackState();
+
+    if (!state.currentSongIsMIDI || !pbState.hasChorus) {
+      modules.infoBar.showTemp(
+        "CHORUS",
+        "Not available for this format.",
+        3000,
+      );
+      if (typeof modules.dialog === "function") {
+        modules.dialog(
+          new Html("div").classOn("temp-dialog-text").text("NOT AVAILABLE"),
+          2000,
+        );
+      }
+      return;
+    }
+
+    const isEnabled = Forte.toggleChorus();
+
+    const html = `
+      <div class="volume-display" style="display: flex; align-items: center; justify-content: center; width: 100%;">
+        <div style="font-weight: 700; color: #ffd700; font-size: 1.2rem;">CHORUS ${isEnabled ? "ON" : "OFF"}</div>
+      </div>
+    `;
+    modules.infoBar.showTemp("CHORUS", html, 3000);
   }
 
   /**

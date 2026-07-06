@@ -100,7 +100,8 @@ const pkg = {
     togglePianoRollVisibility: (bool) => pianoRoll.toggleVisibility(bool),
 
     loadSoundFont: (url) => synthesizer.loadSoundFont(url, playback),
-    loadTrack: (url) => playback.loadTrack(url),
+    loadTrack: (url, chorusUrl = null) => playback.loadTrack(url, chorusUrl),
+    toggleChorus: () => playback.toggleChorus(),
     playTrack: () => playback.playTrack(),
     pauseTrack: () => playback.pauseTrack(),
     stopTrack: () => playback.stopTrack(),

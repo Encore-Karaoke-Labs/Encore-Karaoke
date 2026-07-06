@@ -56,7 +56,12 @@ export default class LibraryManager {
       MIDI: "#D12F9E",
       Multiplex: "#2FD147",
       YouTube: "#D12F2F",
+      Chorus: "#FFD700",
     };
+
+    if (song.chorusPath) {
+      return { label: "CHR", color: colors.Chorus };
+    }
 
     if (
       song.type === "youtube" ||

@@ -342,7 +342,7 @@ export class FortePlayback {
    * @param {string} url - The targeted local media.
    * @returns {Promise<boolean>} True if all media segments parsed cleanly.
    */
-  async loadTrack(url) {
+  async loadTrack(url, chorusUrl = null) {
     if (!this.audioCore.context) return false;
     if (this.state.playback.status !== "stopped") this.stopTrack();
 
@@ -358,6 +358,21 @@ export class FortePlayback {
       } catch (e) {}
       this.sourceNode = null;
     }
+
+    if (this.chorusElement) {
+      logVerbose("Chorus exists", chorusUrl);
+      this.chorusElement.pause();
+      this.chorusElement.removeAttribute("src");
+      this.chorusElement.load();
+      this.chorusElement = null;
+    }
+    if (this.chorusSourceNode) {
+      try {
+        this.chorusSourceNode.disconnect();
+      } catch (e) {}
+      this.chorusSourceNode = null;
+    }
+    this.state.playback.hasChorus = false;
 
     if (this.state.playback.sequencer) {
       try {
@@ -944,6 +959,30 @@ export class FortePlayback {
             }
           }
         }
+
+        if (chorusUrl) {
+          this.chorusElement = new Audio(chorusUrl);
+          this.chorusElement.crossOrigin = "anonymous";
+          this.chorusElement.preservesPitch = false;
+
+          await new Promise((resolve) => {
+            this.chorusElement.addEventListener("canplay", resolve, {
+              once: true,
+            });
+            this.chorusElement.addEventListener("error", resolve, {
+              once: true,
+            });
+          });
+
+          this.chorusSourceNode =
+            this.audioCore.context.createMediaElementSource(this.chorusElement);
+          this.chorusSourceNode.connect(this.state.effects.chorusPitchNode);
+
+          this.state.playback.hasChorus = true;
+          this.state.playback.isChorusEnabled = true;
+          this.state.playback.chorusGain.gain.value = 1;
+        }
+
         this.state.playback.buffer = null;
       } else {
         this.audioElement = new Audio(url);
@@ -1036,6 +1075,10 @@ export class FortePlayback {
         this.state.playback.midiGain.connect(
           this.state.recording.trackDelayNode,
         );
+        if (this.state.playback.chorusGain)
+          this.state.playback.chorusGain.connect(
+            this.state.recording.trackDelayNode,
+          );
       }
 
       if (
@@ -1047,6 +1090,14 @@ export class FortePlayback {
 
       this.state.playback.sequencer.currentTime = 0;
       this.state.playback.sequencer.play();
+
+      if (this.state.playback.hasChorus && this.chorusElement) {
+        this.chorusElement.currentTime = 0;
+        this.chorusElement
+          .play()
+          .catch((e) => console.error("Chorus play error:", e));
+      }
+
       this.state.playback.status = "playing";
     } else {
       if (!this.audioElement || this.state.playback.status === "playing")
@@ -1176,6 +1227,8 @@ export class FortePlayback {
           this.state.playback.sequencer.pause();
         } catch (e) {}
       }
+      if (this.state.playback.hasChorus && this.chorusElement)
+        this.chorusElement.pause();
       this.state.playback.status = "paused";
     } else {
       if (!this.audioElement) return;
@@ -1231,6 +1284,11 @@ export class FortePlayback {
         try {
           this.state.playback.sequencer.currentTime = 0;
         } catch (e) {}
+      }
+
+      if (this.state.playback.hasChorus && this.chorusElement) {
+        this.chorusElement.pause();
+        this.chorusElement.currentTime = 0;
       }
 
       logVerbose("Unlocking channels");
@@ -1337,6 +1395,13 @@ export class FortePlayback {
       this.audioElement.preservesPitch = false;
     }
 
+    if (this.state.playback.hasChorus && this.state.effects.chorusPitchNode) {
+      const pitchFactor = Math.pow(2, clamped / 12);
+      this.state.effects.chorusPitchNode.parameters
+        .get("pitchFactor")
+        .setValueAtTime(pitchFactor, this.audioCore.context.currentTime);
+    }
+
     this.dispatchUpdate();
   }
 
@@ -1392,6 +1457,23 @@ export class FortePlayback {
   }
 
   /**
+   * Toggles Chorus
+   */
+  toggleChorus() {
+    if (!this.state.playback.hasChorus) return false;
+
+    this.state.playback.isChorusEnabled = !this.state.playback.isChorusEnabled;
+    const gainValue = this.state.playback.isChorusEnabled ? 1 : 0;
+
+    this.state.playback.chorusGain.gain.setTargetAtTime(
+      gainValue,
+      this.audioCore.context.currentTime,
+      0.05,
+    );
+    return this.state.playback.isChorusEnabled;
+  }
+
+  /**
    * Assembles all metadata properties currently framing active media tracks output.
    *
    * @returns {Object} Representation of engine time properties and statuses.
@@ -1415,6 +1497,7 @@ export class FortePlayback {
       currentDeviceId: this.state.playback.currentDeviceId,
       isMidi: this.state.playback.isMidi,
       isMultiplexed: this.state.playback.isMultiplexed,
+      hasChorus: this.state.playback.hasChorus,
       hasGuideNotes:
         this.state.playback.guideNotes &&
         this.state.playback.guideNotes.length > 0,

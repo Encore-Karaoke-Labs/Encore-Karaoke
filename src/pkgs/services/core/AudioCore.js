@@ -30,6 +30,9 @@ export class ForteAudioCore {
       const monitorWorkletPath = "/libs/micMonitorProcessor.js";
       await this.context.audioWorklet.addModule(monitorWorkletPath);
 
+      const pitchShifterPath = "/libs/pitch-shifter-processor.js";
+      await this.context.audioWorklet.addModule(pitchShifterPath);
+
       // Setup Master Out
       this.masterGain = this.context.createGain();
       this.sfxGain = this.context.createGain();
@@ -79,6 +82,17 @@ export class ForteAudioCore {
       );
 
       this.state.effects.micMonitorNode.connect(this.context.destination);
+
+      this.state.effects.chorusPitchNode = new AudioWorkletNode(
+        this.context,
+        "pitch-shifter-processor",
+      );
+      this.state.playback.chorusGain = this.context.createGain();
+
+      this.state.effects.chorusPitchNode.connect(
+        this.state.playback.chorusGain,
+      );
+      this.state.playback.chorusGain.connect(this.masterGain);
 
       this.state.effects.micMonitorNode.parameters.get("volume").value =
         this.config.audioConfig?.micMonitorVolume ?? 1.0;

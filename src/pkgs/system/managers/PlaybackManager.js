@@ -220,8 +220,14 @@ export default class PlaybackManager {
       dom.ytContainer.classOn("hidden");
       dom.ytIframe.attr({ src: "" });
 
+      console.log("SONg", song);
+
       const trackUrl = await NetworkingUtility.getFileLink(song.path);
-      await Forte.loadTrack(trackUrl.href);
+      let chorusUrl = null;
+      if (song.chorusPath) {
+        chorusUrl = (await NetworkingUtility.getFileLink(song.chorusPath)).href;
+      }
+      await Forte.loadTrack(trackUrl.href, chorusUrl);
 
       const pbState = Forte.getPlaybackState();
       state.currentSongIsMultiplexed = pbState.isMultiplexed;

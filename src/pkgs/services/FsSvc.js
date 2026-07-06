@@ -355,7 +355,7 @@ const pkg = {
       const signatureKey = `encore-signature:${libraryPath}`;
       const newSongsKey = `encore-newsongs:${libraryPath}`;
 
-      const audioExtensions = new Set(["wav", "mp3", "m4a"]);
+      const audioExtensions = new Set(["wav", "mp3", "m4a", "ogg"]);
       const videoExtensions = new Set(["mp4", "mkv", "webm", "avi"]);
       const validExts = new Set([
         ...audioExtensions,
@@ -450,6 +450,15 @@ const pkg = {
               const potentialVideoName = `${basename}.${videoExt}`;
               if (allFilenames.has(potentialVideoName)) {
                 videoPath = `${libraryPath}${potentialVideoName}`;
+                break;
+              }
+            }
+
+            let chorusPath = null;
+            for (const audioExt of audioExtensions) {
+              const potentialChorusName = `${basename}.chorus.${audioExt}`;
+              if (allFilenames.has(potentialChorusName)) {
+                chorusPath = `${libraryPath}${potentialChorusName}`;
                 break;
               }
             }
@@ -624,6 +633,7 @@ const pkg = {
                 lrcPath: songData.lrcPath,
                 cdgPath: songData.cdgPath,
                 videoPath: videoPath,
+                chorusPath: chorusPath,
               };
             }
             return null; // Ignore invalid files
@@ -646,6 +656,7 @@ const pkg = {
             lrcPath: parsedData.lrcPath,
             cdgPath: parsedData.cdgPath,
             videoPath: parsedData.videoPath,
+            chorusPath: parsedData.chorusPath,
           };
 
           newSongList.push(newSongObj);
