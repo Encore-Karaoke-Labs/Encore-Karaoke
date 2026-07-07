@@ -392,6 +392,19 @@ export default class NetworkManager {
         case "key_down":
           input.handleNav("down");
           break;
+        case "key_down":
+          input.handleNav("down");
+          break;
+        case "toggle_melody":
+          input.cycleGuideMelody();
+          break;
+        case "cycle_rhythm":
+          input.cycleDrumPreset("right");
+          break;
+        case "toggle_chorus":
+          input.handleChorusToggle();
+          break;
+        case "pan_left":
         case "pan_left":
           input.handlePan("left");
           break;

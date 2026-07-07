@@ -371,6 +371,35 @@ button:active {
   gap: 0.75rem;
 }
 
+.playback-features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.feature-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+  height: 75px;
+  background: rgba(137, 207, 240, 0.08);
+  border-color: rgba(137, 207, 240, 0.2);
+  color: var(--primary);
+  padding: 0.5rem;
+}
+
+.feature-btn ion-icon {
+  font-size: 1.6rem;
+  margin-bottom: 0.1rem;
+}
+
+.feature-btn:active {
+  background: rgba(137, 207, 240, 0.2);
+  border-color: var(--primary);
+}
+
 .library-header {
   display: flex;
   flex-direction: column;
