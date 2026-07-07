@@ -114,6 +114,15 @@ export class FortePlayback {
       Math.min(this.state.playback.smoothedTime, duration),
     );
 
+    const hasGuide =
+      this.state.playback.guideNotes &&
+      this.state.playback.guideNotes.length > 0;
+    const shouldShowPianoRoll = hasGuide || this.state.playback.isAnalyzing;
+
+    if (shouldShowPianoRoll !== this.state.ui.pianoRollVisible) {
+      this.pianoRoll.toggleVisibility(shouldShowPianoRoll);
+    }
+
     if (this.state.ui.pianoRollVisible) {
       this.pianoRoll.render(currentTime);
     }
@@ -1082,8 +1091,9 @@ export class FortePlayback {
       }
 
       if (
-        this.state.playback.guideNotes &&
-        this.state.playback.guideNotes.length > 0
+        (this.state.playback.guideNotes &&
+          this.state.playback.guideNotes.length > 0) ||
+        this.state.playback.isAnalyzing
       ) {
         this.pianoRoll.toggleVisibility(true);
       }
@@ -1114,8 +1124,9 @@ export class FortePlayback {
       this.audioElement.preservesPitch = false;
 
       if (
-        this.state.playback.guideNotes &&
-        this.state.playback.guideNotes.length > 0
+        (this.state.playback.guideNotes &&
+          this.state.playback.guideNotes.length > 0) ||
+        this.state.playback.isAnalyzing
       ) {
         this.pianoRoll.toggleVisibility(true);
       }
