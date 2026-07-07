@@ -87,6 +87,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let navState = { mobileLibraryOpen: false };
 
   function getFormatBadge(song) {
+    if (song.chorusPath) {
+      return { label: "CHR", color: "#FFD700" };
+    }
     if (
       song.isYouTube ||
       song.type === "youtube" ||

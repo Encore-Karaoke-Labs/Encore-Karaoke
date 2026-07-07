@@ -486,6 +486,7 @@ export default class NetworkManager {
               type: s.type,
               path: s.path,
               videoPath: s.videoPath,
+              chorusPath: s.chorusPath,
             }));
             this.socket.emit("sendData", {
               identity: cmd.identity,
@@ -509,6 +510,7 @@ export default class NetworkManager {
             type: s.type,
             path: s.path,
             videoPath: s.videoPath,
+            chorusPath: s.chorusPath,
           }));
 
           this.socket.emit("sendData", {
