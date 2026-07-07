@@ -529,6 +529,12 @@ const createWindow = () => {
 
   const handleSpecialKeys = (event, input) => {
     if (input.type === "keyDown") {
+      if (input.alt && input.key === "F4") {
+        event.preventDefault();
+        app.quit();
+        return;
+      }
+
       if (
         input.key === "F12" ||
         (input.control && input.shift && input.key.toLowerCase() === "i")
