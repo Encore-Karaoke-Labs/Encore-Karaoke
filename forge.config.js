@@ -10,23 +10,35 @@ module.exports = {
     icon: "dist/resources/icon.ico",
     extraResource: ["dist/resources/static", "dist/resources/icon.png"],
     linux: {
-      target: 'deb',
+      target: "deb",
     },
     ignore: (file) => {
-      if (!file || file === '/' || file === '') return false; 
+      if (!file || file === "/" || file === "") return false;
 
-      const normalizedPath = file.replace(/\\/g, '/');
+      let normalizedPath = file.replace(/\\/g, "/");
+      if (normalizedPath.endsWith("/")) {
+        normalizedPath = normalizedPath.slice(0, -1);
+      }
 
-      if (normalizedPath.startsWith('/dist/resources/static')) return true;
-      if (normalizedPath === '/dist/resources/icon.png') return true;
+      if (
+        normalizedPath === "/dist/resources/static" ||
+        normalizedPath === "/dist/resources/static/assets" ||
+        normalizedPath.startsWith("/dist/resources/static/assets/fonts")
+      ) {
+        return false;
+      }
 
-      if (normalizedPath === '/package.json') return false;     
-      if (normalizedPath.startsWith('/dist')) return false;     
-      if (normalizedPath.startsWith('/node_modules')) return false;
+      if (normalizedPath.startsWith("/dist/resources/static")) return true;
 
-      return true; 
+      if (normalizedPath === "/dist/resources/icon.png") return true;
+
+      if (normalizedPath === "/package.json") return false;
+      if (normalizedPath.startsWith("/dist")) return false;
+      if (normalizedPath.startsWith("/node_modules")) return false;
+
+      return true;
     },
-    executableName: "encore-karaoke"
+    executableName: "encore-karaoke",
   },
   hooks: {},
   rebuildConfig: {},
@@ -34,21 +46,21 @@ module.exports = {
     {
       name: "@electron-forge/maker-squirrel",
       config: {
-        "authors": 'Encore Karaoke Labs',
-        "description": 'Encore Karaoke app',
+        authors: "Encore Karaoke Labs",
+        description: "Encore Karaoke app",
       },
     },
     {
       name: "@electron-forge/maker-zip",
-      platforms: ['darwin'],
+      platforms: ["darwin"],
     },
     {
       name: "@electron-forge/maker-deb",
       config: {
-        "authors": 'Encore Karaoke Labs',
-        "description": 'Encore Karaoke for Linux',
-        "name": "Encore",
-        "category": "Games"
+        authors: "Encore Karaoke Labs",
+        description: "Encore Karaoke for Linux",
+        name: "Encore",
+        category: "Games",
       },
     },
   ],
