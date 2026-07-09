@@ -20,6 +20,7 @@ export default class NetworkManager {
     this.danmakuRafId = null;
     this.MAX_DANMAKU = 200;
     this.danmakuCtx = null;
+    this.isDanmakuDirty = false;
 
     this.resizeDanmakuCanvas = this.resizeDanmakuCanvas.bind(this);
   }
@@ -175,9 +176,27 @@ export default class NetworkManager {
       speed,
       fontSize,
     });
+
+    if (!this.danmakuRafId) {
+      this.lastDanmakuTime = performance.now(); // Reset time to prevent massive dt jump
+      this.drawDanmakuFrame();
+    }
   }
 
   drawDanmakuFrame() {
+    if (this.activeDanmaku.length === 0) {
+      if (this.danmakuCtx && this.isDanmakuDirty) {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        this.danmakuCtx.clearRect(0, 0, w, h);
+        this.isDanmakuDirty = false;
+      }
+      this.danmakuRafId = null;
+      return;
+    }
+
+    this.isDanmakuDirty = true;
+
     const now = performance.now();
     let dt = (now - this.lastDanmakuTime) / 1000;
     if (dt > 0.1) dt = 0.1; // Clamp DT to prevent instant bounds teleportation
@@ -190,33 +209,31 @@ export default class NetworkManager {
 
       this.danmakuCtx.clearRect(0, 0, w, h);
 
-      if (this.activeDanmaku.length > 0) {
-        this.danmakuCtx.textBaseline = "middle";
-        this.danmakuCtx.lineJoin = "round";
+      this.danmakuCtx.textBaseline = "middle";
+      this.danmakuCtx.lineJoin = "round";
 
-        for (let i = this.activeDanmaku.length - 1; i >= 0; i--) {
-          const d = this.activeDanmaku[i];
-          d.x -= d.speed * dt;
+      for (let i = this.activeDanmaku.length - 1; i >= 0; i--) {
+        const d = this.activeDanmaku[i];
+        d.x -= d.speed * dt;
 
-          if (d.x + d.totalWidth < 0) {
-            this.activeDanmaku.splice(i, 1);
-            continue;
-          }
-
-          this.danmakuCtx.font = `900 ${d.fontSize}px "Radio Canada", sans-serif`;
-          this.danmakuCtx.lineWidth = d.fontSize * 0.18;
-
-          this.danmakuCtx.strokeStyle = "#000000";
-          this.danmakuCtx.strokeText(d.sender, d.x, d.y);
-          this.danmakuCtx.fillStyle = "#ffd700";
-          this.danmakuCtx.fillText(d.sender, d.x, d.y);
-
-          const msgX = d.x + d.senderWidth;
-          this.danmakuCtx.strokeStyle = "#000000";
-          this.danmakuCtx.strokeText(d.message, msgX, d.y);
-          this.danmakuCtx.fillStyle = "#ffffff";
-          this.danmakuCtx.fillText(d.message, msgX, d.y);
+        if (d.x + d.totalWidth < 0) {
+          this.activeDanmaku.splice(i, 1);
+          continue;
         }
+
+        this.danmakuCtx.font = `900 ${d.fontSize}px "Radio Canada", sans-serif`;
+        this.danmakuCtx.lineWidth = d.fontSize * 0.18;
+
+        this.danmakuCtx.strokeStyle = "#000000";
+        this.danmakuCtx.strokeText(d.sender, d.x, d.y);
+        this.danmakuCtx.fillStyle = "#ffd700";
+        this.danmakuCtx.fillText(d.sender, d.x, d.y);
+
+        const msgX = d.x + d.senderWidth;
+        this.danmakuCtx.strokeStyle = "#000000";
+        this.danmakuCtx.strokeText(d.message, msgX, d.y);
+        this.danmakuCtx.fillStyle = "#ffffff";
+        this.danmakuCtx.fillText(d.message, msgX, d.y);
       }
     }
     this.danmakuRafId = requestAnimationFrame(() => this.drawDanmakuFrame());
