@@ -2437,7 +2437,6 @@ p + .flex-list button {
 .rec-control-btn:hover {
   color: #89cff0;
   background: rgba(137, 207, 240, 0.15);
-  transform: scale(1.1);
 }
 
 .rec-progress-wrapper {
