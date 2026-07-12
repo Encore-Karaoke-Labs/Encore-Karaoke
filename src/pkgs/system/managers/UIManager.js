@@ -618,6 +618,7 @@ export default class UIManager {
 
       const onMouseUp = () => {
         isDragging = false;
+        dom.recVideoProgressFill.styleJs({ transition: "" });
         if (wasPlaying) vid.play();
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
