@@ -565,38 +565,145 @@ export default class UIManager {
     dom.recVideoProgressFill = new Html("div")
       .classOn("rec-progress-fill")
       .appendTo(progressBar);
+
+    let isDragging = false;
+    let wasPlaying = false;
+
+    const formatTime = (secs) => {
+      if (isNaN(secs)) return "00:00";
+      const m = Math.floor(secs / 60)
+        .toString()
+        .padStart(2, "0");
+      const s = Math.floor(secs % 60)
+        .toString()
+        .padStart(2, "0");
+      return `${m}:${s}`;
+    };
+
+    const updateSeek = (e) => {
+      const rect = progressWrapper.elm.getBoundingClientRect();
+      let pos = (e.clientX - rect.left) / rect.width;
+      pos = Math.max(0, Math.min(1, pos));
+
+      const vid = dom.recVideoPlayer.elm;
+      const tot = vid.duration || 1;
+      const curr = pos * tot;
+
+      dom.recVideoProgressFill.styleJs({
+        width: `${pos * 100}%`,
+        transition: "none",
+      });
+      if (dom.recVideoTime)
+        dom.recVideoTime.text(`${formatTime(curr)} / ${formatTime(tot)}`);
+
+      vid.currentTime = curr;
+    };
+
+    progressWrapper.on("mousedown", (e) => {
+      e.stopPropagation();
+      isDragging = true;
+
+      const vid = dom.recVideoPlayer.elm;
+      wasPlaying = !vid.paused;
+      if (wasPlaying) vid.pause();
+
+      updateSeek(e);
+
+      const onMouseMove = (moveEvent) => {
+        if (isDragging) {
+          updateSeek(moveEvent);
+          this.ctx.root.recordings.triggerRecOsd();
+        }
+      };
+
+      const onMouseUp = () => {
+        isDragging = false;
+        if (wasPlaying) vid.play();
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+      };
+
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    });
+
     const osdBottom = new Html("div")
       .classOn("rec-osd-bottom")
       .appendTo(dom.recVideoOsd);
+
+    const controlsLeft = new Html("div")
+      .styleJs({ display: "flex", alignItems: "center", gap: "1rem" })
+      .appendTo(osdBottom);
+
+    dom.recPlayBtn = new Html("button")
+      .classOn("rec-control-btn")
+      .html('<ion-icon name="pause"></ion-icon>')
+      .appendTo(controlsLeft)
+      .on("click", (e) => {
+        e.stopPropagation();
+        const v = dom.recVideoPlayer.elm;
+        v.paused ? v.play() : v.pause();
+      });
+
     dom.recVideoTime = new Html("div")
       .classOn("rec-video-time")
       .text("00:00 / 00:00")
+      .appendTo(controlsLeft);
+
+    const controlsRight = new Html("div")
+      .styleJs({ display: "flex", alignItems: "center", gap: "0.5rem" })
       .appendTo(osdBottom);
-    new Html("div")
-      .text("Play/Pause: Space | Seek: ←/→ | Vol: -/= | Close: ESC")
-      .styleJs({
-        color: "#ffd700",
-        fontWeight: "600",
-        fontSize: "1rem",
-        opacity: "0.6",
-      })
-      .appendTo(osdBottom);
+
+    new Html("button")
+      .classOn("rec-control-btn")
+      .html('<ion-icon name="volume-low"></ion-icon>')
+      .appendTo(controlsRight)
+      .on("click", (e) => {
+        e.stopPropagation();
+        this.ctx.root.input.handleVolume("down");
+        dom.recVideoPlayer.elm.volume = this.ctx.state.volume;
+      });
+
+    new Html("button")
+      .classOn("rec-control-btn")
+      .html('<ion-icon name="volume-high"></ion-icon>')
+      .appendTo(controlsRight)
+      .on("click", (e) => {
+        e.stopPropagation();
+        this.ctx.root.input.handleVolume("up");
+        dom.recVideoPlayer.elm.volume = this.ctx.state.volume;
+      });
+
+    new Html("button")
+      .classOn("rec-control-btn")
+      .styleJs({ marginLeft: "1rem", color: "#ff5555" })
+      .html('<ion-icon name="close"></ion-icon>')
+      .appendTo(controlsRight)
+      .on("click", (e) => {
+        e.stopPropagation();
+        this.ctx.root.recordings.closeRecordingPlayer();
+      });
+
+    dom.recPlayerOverlay.on("mousemove", () => {
+      if (this.ctx.state.isPlayingRecording) {
+        this.ctx.root.recordings.triggerRecOsd();
+      }
+    });
+
+    dom.recVideoPlayer.on("play", () =>
+      dom.recPlayBtn.html('<ion-icon name="pause"></ion-icon>'),
+    );
+    dom.recVideoPlayer.on("pause", () =>
+      dom.recPlayBtn.html('<ion-icon name="play"></ion-icon>'),
+    );
 
     dom.recVideoPlayer.on("timeupdate", () => {
+      if (isDragging) return;
+
       const curr = dom.recVideoPlayer.elm.currentTime;
       const tot = dom.recVideoPlayer.elm.duration || 1;
-      dom.recVideoProgressFill.styleJs({ width: `${(curr / tot) * 100}%` });
 
-      const formatTime = (secs) => {
-        if (isNaN(secs)) return "00:00";
-        const m = Math.floor(secs / 60)
-          .toString()
-          .padStart(2, "0");
-        const s = Math.floor(secs % 60)
-          .toString()
-          .padStart(2, "0");
-        return `${m}:${s}`;
-      };
+      dom.recVideoProgressFill.styleJs({ width: `${(curr / tot) * 100}%` });
       dom.recVideoTime.text(`${formatTime(curr)} / ${formatTime(tot)}`);
     });
 
