@@ -559,6 +559,9 @@ export default class UIManager {
     const progressWrapper = new Html("div")
       .classOn("rec-progress-wrapper")
       .appendTo(dom.recVideoOsd);
+    dom.recProgressTooltip = new Html("div")
+      .classOn("rec-progress-tooltip", "hidden")
+      .appendTo(progressWrapper);
     const progressBar = new Html("div")
       .classOn("rec-progress-bar")
       .appendTo(progressWrapper);
@@ -579,6 +582,33 @@ export default class UIManager {
         .padStart(2, "0");
       return `${m}:${s}`;
     };
+
+    const updateTooltip = (e) => {
+      const rect = progressWrapper.elm.getBoundingClientRect();
+      let pos = (e.clientX - rect.left) / rect.width;
+      pos = Math.max(0, Math.min(1, pos));
+
+      const vid = dom.recVideoPlayer.elm;
+      const hoverTime = pos * (vid.duration || 1);
+
+      dom.recProgressTooltip.text(formatTime(hoverTime));
+      dom.recProgressTooltip.styleJs({ left: `${pos * 100}%` });
+    };
+
+    progressWrapper.on("mouseenter", (e) => {
+      if (!isDragging) {
+        dom.recProgressTooltip.classOff("hidden");
+        updateTooltip(e);
+      }
+    });
+
+    progressWrapper.on("mousemove", (e) => {
+      if (!isDragging) updateTooltip(e);
+    });
+
+    progressWrapper.on("mouseleave", () => {
+      if (!isDragging) dom.recProgressTooltip.classOn("hidden");
+    });
 
     const updateSeek = (e) => {
       const rect = progressWrapper.elm.getBoundingClientRect();
@@ -607,18 +637,33 @@ export default class UIManager {
       wasPlaying = !vid.paused;
       if (wasPlaying) vid.pause();
 
+      dom.recProgressTooltip.classOff("hidden");
+      updateTooltip(e);
       updateSeek(e);
 
       const onMouseMove = (moveEvent) => {
         if (isDragging) {
+          updateTooltip(moveEvent);
           updateSeek(moveEvent);
           this.ctx.root.recordings.triggerRecOsd();
         }
       };
 
-      const onMouseUp = () => {
+      const onMouseUp = (upEvent) => {
         isDragging = false;
+
+        const rect = progressWrapper.elm.getBoundingClientRect();
+        if (
+          upEvent.clientY < rect.top ||
+          upEvent.clientY > rect.bottom ||
+          upEvent.clientX < rect.left ||
+          upEvent.clientX > rect.right
+        ) {
+          dom.recProgressTooltip.classOn("hidden");
+        }
+
         dom.recVideoProgressFill.styleJs({ transition: "" });
+
         if (wasPlaying) vid.play();
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
