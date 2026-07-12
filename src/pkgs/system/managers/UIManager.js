@@ -632,6 +632,7 @@ export default class UIManager {
     progressWrapper.on("mousedown", (e) => {
       e.stopPropagation();
       isDragging = true;
+      progressWrapper.classOn("is-dragging");
 
       const vid = dom.recVideoPlayer.elm;
       wasPlaying = !vid.paused;
@@ -651,6 +652,7 @@ export default class UIManager {
 
       const onMouseUp = (upEvent) => {
         isDragging = false;
+        progressWrapper.classOff("is-dragging");
 
         const rect = progressWrapper.elm.getBoundingClientRect();
         if (

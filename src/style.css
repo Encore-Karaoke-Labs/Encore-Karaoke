@@ -2443,12 +2443,12 @@ p + .flex-list button {
   position: relative;
   cursor: var(--cursor-pointer), pointer;
   padding: 1rem 0;
-  margin: -0.2rem 0;
+  margin: 0.3rem 0;
 }
 
 .rec-progress-tooltip {
   position: absolute;
-  bottom: calc(100% - 0.75rem);
+  bottom: calc(100% - 0.2rem);
   left: 0;
   transform: translateX(-50%);
   background: rgba(10, 10, 20, 0.95);
@@ -2477,6 +2477,31 @@ p + .flex-list button {
 
 .rec-progress-bar {
   transition: height 0.15s ease;
+  overflow: visible;
+}
+
+.rec-progress-fill::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translate(50%, -50%);
+  width: 14px;
+  height: 14px;
+  background: #89cff0;
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.rec-progress-wrapper:hover .rec-progress-fill::after,
+.rec-progress-wrapper.is-dragging .rec-progress-fill::after {
+  transform: translate(50%, -50%) scale(1.3);
+  box-shadow: 0 0 10px rgba(137, 207, 240, 0.8);
 }
 
 .song-list-container {
