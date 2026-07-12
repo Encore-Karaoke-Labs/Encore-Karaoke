@@ -2415,6 +2415,45 @@ p + .flex-list button {
   box-shadow: 0 0 10px rgba(137, 207, 240, 0.5);
 }
 
+.rec-control-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #fff;
+  font-size: 2rem;
+  cursor: var(--cursor-pointer), pointer;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease,
+    background 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  min-width: unset;
+  height: auto;
+}
+
+.rec-control-btn:hover {
+  color: #89cff0;
+  background: rgba(137, 207, 240, 0.15);
+  transform: scale(1.1);
+}
+
+.rec-progress-wrapper {
+  cursor: var(--cursor-pointer), pointer;
+  padding: 1rem 0;
+  margin: -0.5rem 0;
+}
+
+.rec-progress-wrapper:hover .rec-progress-bar {
+  height: 12px;
+}
+
+.rec-progress-bar {
+  transition: height 0.15s ease;
+}
+
 .song-list-container {
   width: 90%;
   max-width: 1400px;
