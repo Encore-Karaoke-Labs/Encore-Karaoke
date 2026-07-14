@@ -63,6 +63,8 @@ export default class SetupManager {
       buildingLibrary: false,
       buildProgress: { current: 0, total: 0, percentage: 0 },
       showingVersionCard: false,
+      showingLicenses: false,
+      licensesData: null,
     };
 
     this.previewVideoEl = null;
@@ -668,6 +670,31 @@ export default class SetupManager {
             },
           },
           {
+            id: "oss_licenses",
+            label: "Open Source Licenses",
+            type: "info-action",
+            get: () => "Press Enter to view",
+            action: async () => {
+              if (!this.setupState.licensesData) {
+                try {
+                  const res = await fetch("/assets/licenses.json");
+                  const data = await res.json();
+                  this.setupState.licensesData = Object.keys(data).map(
+                    (key) => ({
+                      name: key,
+                      ...data[key],
+                    }),
+                  );
+                } catch (e) {
+                  this.showToast("FAILED TO LOAD LICENSES", "error");
+                  return;
+                }
+              }
+              this.setupState.showingLicenses = true;
+              this.renderView();
+            },
+          },
+          {
             id: "check_on_startup",
             label: "Notify Updates on Startup",
             type: "select",
@@ -790,6 +817,23 @@ export default class SetupManager {
           this.updateCalibrationDelay();
         } else if (e.key === "Enter") this.saveManualCalibration();
         else if (e.key === "Escape") this.exitManualCalibration();
+      }
+      return;
+    }
+
+    if (this.setupState.showingLicenses) {
+      if (e.key === "Escape" || e.key === "Enter") {
+        this.setupState.showingLicenses = false;
+        this.licensesListEl = null;
+        this.renderView();
+      } else if (e.key === "ArrowDown" && this.licensesListEl) {
+        this.licensesListEl.scrollTop += 75;
+      } else if (e.key === "ArrowUp" && this.licensesListEl) {
+        this.licensesListEl.scrollTop -= 75;
+      } else if (e.key === "PageDown" && this.licensesListEl) {
+        this.licensesListEl.scrollTop += 400;
+      } else if (e.key === "PageUp" && this.licensesListEl) {
+        this.licensesListEl.scrollTop -= 400;
       }
       return;
     }
@@ -1827,6 +1871,8 @@ export default class SetupManager {
     new Html("p").text(hint).appendTo(footer);
 
     if (this.setupState.dialog) this.renderDialog(this.ctx.dom.setupContainer);
+    if (this.setupState.showingLicenses)
+      this.renderLicensesOverlay(this.ctx.dom.setupContainer);
   }
 
   renderLoadingScreen(container) {
@@ -2004,6 +2050,123 @@ export default class SetupManager {
     new Html("p")
       .classOn("setup-dialog-hint")
       .text("Press ENTER or ESC to close")
+      .appendTo(box);
+  }
+
+  renderLicensesOverlay(container) {
+    const overlay = new Html("div")
+      .classOn("setup-dialog-overlay")
+      .appendTo(container);
+
+    const box = new Html("div")
+      .classOn("setup-dialog-box")
+      .styleJs({ maxWidth: "1000px", height: "85vh", maxHeight: "850px" })
+      .appendTo(overlay);
+
+    new Html("h2").text("OPEN SOURCE LICENSES").appendTo(box);
+
+    const listContainer = new Html("div")
+      .styleJs({
+        flexGrow: "1",
+        overflowY: "auto",
+        position: "relative",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        borderRadius: "8px",
+        background: "rgba(0, 0, 0, 0.3)",
+      })
+      .appendTo(box);
+
+    this.licensesListEl = listContainer.elm;
+
+    const data = this.setupState.licensesData || [];
+    const ITEM_HEIGHT = 75;
+    const totalHeight = data.length * ITEM_HEIGHT;
+
+    new Html("div")
+      .styleJs({
+        height: `${totalHeight}px`,
+        width: "100%",
+        position: "absolute",
+        top: "0",
+        left: "0",
+        zIndex: "-1",
+      })
+      .appendTo(listContainer);
+
+    const renderWindow = new Html("div")
+      .styleJs({
+        position: "absolute",
+        top: "0",
+        left: "0",
+        width: "100%",
+      })
+      .appendTo(listContainer);
+
+    const renderItems = () => {
+      const scrollTop = listContainer.elm.scrollTop;
+      const clientHeight = listContainer.elm.clientHeight || 600;
+
+      const startIndex = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - 2);
+      const endIndex = Math.min(
+        data.length,
+        Math.ceil((scrollTop + clientHeight) / ITEM_HEIGHT) + 2,
+      );
+
+      renderWindow.clear();
+
+      renderWindow.styleJs({
+        transform: `translateY(${startIndex * ITEM_HEIGHT}px)`,
+      });
+
+      for (let i = startIndex; i < endIndex; i++) {
+        const itemData = data[i];
+        const itemRow = new Html("div")
+          .styleJs({
+            height: `${ITEM_HEIGHT}px`,
+            padding: "10px 20px",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            boxSizing: "border-box",
+          })
+          .appendTo(renderWindow);
+
+        new Html("div")
+          .styleJs({
+            color: "#89cff0",
+            fontWeight: "bold",
+            fontSize: "1.4rem",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          })
+          .text(itemData.name)
+          .appendTo(itemRow);
+
+        new Html("div")
+          .styleJs({
+            color: "rgba(255, 255, 255, 0.6)",
+            fontSize: "1.1rem",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          })
+          .text(
+            `License: ${itemData.licenses || "Unknown"} | ${itemData.repository || "No repository"}`,
+          )
+          .appendTo(itemRow);
+      }
+    };
+
+    listContainer.on("scroll", renderItems);
+
+    requestAnimationFrame(() => renderItems());
+
+    new Html("p")
+      .classOn("setup-dialog-hint")
+      .styleJs({ marginTop: "1.5rem" })
+      .text("Press ESC or ENTER to close | Arrows or Page Up/Down to scroll")
       .appendTo(box);
   }
 
