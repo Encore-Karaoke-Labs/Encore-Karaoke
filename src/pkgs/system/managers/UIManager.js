@@ -235,6 +235,12 @@ export default class UIManager {
       .on("click", () => this.ctx.root.sessions.toggleSessionModal())
       .appendTo(dom.bottomActions);
 
+    new Html("div")
+      .classOn("action-button")
+      .html('<ion-icon name="settings"></ion-icon> <span>Setup (F2)</span>')
+      .on("click", () => this.setMode("setup"))
+      .appendTo(dom.bottomActions);
+
     const vi = this.ctx.root.versionInformation || {
       channel: "Unknown",
       number: "0.0.0",
