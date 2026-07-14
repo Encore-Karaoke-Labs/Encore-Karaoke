@@ -16,6 +16,7 @@ export class FortePianoRoll {
     this.pageCtx = null;
     this.cachedPageIndex = -1;
     this.cachedNotesLength = -1;
+    this.cachedNotes = null;
     this.lastTime = -1;
 
     this.noteStartIndex = 0;
@@ -214,7 +215,8 @@ export class FortePianoRoll {
 
     const notes = this.state.playback.guideNotes || [];
 
-    if (this.cachedNotesLength !== notes.length) {
+    if (this.cachedNotes !== notes || this.cachedNotesLength !== notes.length) {
+      this.cachedNotes = notes;
       this.cachedPageIndex = -1;
       this.cachedNotesLength = notes.length;
       this.noteStartIndex = 0;
@@ -222,6 +224,7 @@ export class FortePianoRoll {
 
     if (currentTime < this.lastTime) {
       this.noteStartIndex = 0;
+      this.cachedPageIndex = -1;
     }
     this.lastTime = currentTime;
 
