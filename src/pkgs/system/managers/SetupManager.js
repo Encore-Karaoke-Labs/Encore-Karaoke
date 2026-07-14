@@ -62,6 +62,7 @@ export default class SetupManager {
       syncProgress: { current: 0, total: 0, filename: "" },
       buildingLibrary: false,
       buildProgress: { current: 0, total: 0, percentage: 0 },
+      showingVersionCard: false,
     };
 
     this.previewVideoEl = null;
@@ -657,6 +658,16 @@ export default class SetupManager {
         title: "About & Update",
         items: [
           {
+            id: "about_encore",
+            label: "About Encore",
+            type: "info-action",
+            get: () => "Press Enter to view",
+            action: () => {
+              this.setupState.showingVersionCard = true;
+              this.renderView();
+            },
+          },
+          {
             id: "check_on_startup",
             label: "Notify Updates on Startup",
             type: "select",
@@ -779,6 +790,21 @@ export default class SetupManager {
           this.updateCalibrationDelay();
         } else if (e.key === "Enter") this.saveManualCalibration();
         else if (e.key === "Escape") this.exitManualCalibration();
+      }
+      return;
+    }
+
+    if (this.setupState.showingVersionCard) {
+      if (e.key === "Enter" || e.key === "Escape") {
+        const card = document.querySelector(".setup-version-card-overlay");
+        if (card && !card.classList.contains("fadeOut")) {
+          card.classList.remove("fadeIn");
+          card.classList.add("fadeOut");
+          setTimeout(() => {
+            this.setupState.showingVersionCard = false;
+            this.renderView();
+          }, 450);
+        }
       }
       return;
     }
@@ -1732,8 +1758,23 @@ export default class SetupManager {
     if (!this.ctx.dom.setupContainer) return;
     this.ctx.dom.setupContainer.clear();
 
+    const existingCard = document.querySelector(".setup-version-card-overlay");
+    if (existingCard) existingCard.remove();
+
+    if (this.setupState.showingVersionCard) {
+      this.ctx.dom.setupContainer.styleJs({ display: "none" });
+      this.renderVersionCardOverlay(this.ctx.wrapper);
+      return;
+    }
+
+    this.ctx.dom.setupContainer.styleJs({ display: "" });
+
     if (this.setupState.manualCalib?.active) {
       this.renderManualCalibrationOverlay(this.ctx.dom.setupContainer);
+      return;
+    }
+    if (this.setupState.showingVersionCard) {
+      this.renderVersionCardOverlay(this.ctx.dom.setupContainer);
       return;
     }
     if (this.setupState.previewingVideo) {
@@ -1920,6 +1961,34 @@ export default class SetupManager {
       .text(`OFFSET: ${currentOffset > 0 ? "+" : ""}${currentOffset} ms`)
       .appendTo(hud);
     new Html("p").text("◀ / ▶ to adjust | ENTER / ESC to save").appendTo(hud);
+  }
+
+  renderVersionCardOverlay(container) {
+    const overlay = new Html("div")
+      .classOn("setup-version-card-overlay", "fadeIn")
+      .styleJs({
+        position: "fixed",
+        top: "0",
+        left: "0",
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "#000",
+        zIndex: "5000",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      })
+      .appendTo(container);
+
+    new Html("img")
+      .attr({ src: "/assets/img/about/version_card.svg" })
+      .styleJs({
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+        display: "block",
+      })
+      .appendTo(overlay);
   }
 
   renderDialog(container) {
