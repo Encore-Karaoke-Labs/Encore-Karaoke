@@ -492,31 +492,35 @@ export default class LyricsEngine {
           );
           calculatedStart = Math.max(cur.endTime + 0.1, calculatedStart);
 
-          if (calculatedStart < calculatedEnd)
+          if (
+            calculatedStart < calculatedEnd &&
+            calculatedEnd - calculatedStart >= 4.0
+          ) {
             this.interludes.push({
               start: calculatedStart,
               end: calculatedEnd,
             });
 
-          if (!hasSunplusCountdowns) {
-            this.countdowns.push({
-              t3: getSecondsForTick(
-                next.tick - 3 * ppqm,
-                midiInfo.tempoChanges,
-                ppqm,
-              ),
-              t2: getSecondsForTick(
-                next.tick - 2 * ppqm,
-                midiInfo.tempoChanges,
-                ppqm,
-              ),
-              t1: getSecondsForTick(
-                next.tick - 1 * ppqm,
-                midiInfo.tempoChanges,
-                ppqm,
-              ),
-              t0: getSecondsForTick(next.tick, midiInfo.tempoChanges, ppqm),
-            });
+            if (!hasSunplusCountdowns) {
+              this.countdowns.push({
+                t3: getSecondsForTick(
+                  next.tick - 3 * ppqm,
+                  midiInfo.tempoChanges,
+                  ppqm,
+                ),
+                t2: getSecondsForTick(
+                  next.tick - 2 * ppqm,
+                  midiInfo.tempoChanges,
+                  ppqm,
+                ),
+                t1: getSecondsForTick(
+                  next.tick - 1 * ppqm,
+                  midiInfo.tempoChanges,
+                  ppqm,
+                ),
+                t0: getSecondsForTick(next.tick, midiInfo.tempoChanges, ppqm),
+              });
+            }
           }
         }
       }
