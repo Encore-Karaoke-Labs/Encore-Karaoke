@@ -105,6 +105,16 @@ export default class SetupManager {
     this.setupState.dashboardIndex = 0;
     this.setupState.isDataLoaded = false;
 
+    if (this.ctx.dom.setupContainer) {
+      this.ctx.dom.setupContainer.classOn("fadeIn");
+
+      setTimeout(() => {
+        if (this.ctx.dom.setupContainer) {
+          this.ctx.dom.setupContainer.classOff("fadeIn");
+        }
+      }, 500);
+    }
+
     this.renderView();
     this._loadInitialData();
   }
