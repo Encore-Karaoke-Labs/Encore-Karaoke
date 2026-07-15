@@ -257,7 +257,12 @@ export default class PlaybackManager {
       });
 
       if (!state.currentSongIsYouTube) {
-        modules.scoreHud.show(0);
+        if (
+          this.ctx.config.audioConfig?.enableScoring !== false ||
+          state.isSessionActive
+        ) {
+          modules.scoreHud.show(0);
+        }
         Forte.togglePianoRollVisibility(
           state.currentSongIsMultiplexed || state.currentSongIsMIDI,
         );
@@ -349,7 +354,11 @@ export default class PlaybackManager {
         }
       }
 
-      if (!state.currentSongIsYouTube) {
+      if (
+        !state.currentSongIsYouTube &&
+        (this.ctx.config.audioConfig?.enableScoring !== false ||
+          state.isSessionActive)
+      ) {
         this.boundScoreUpdate = (e) =>
           modules.scoreHud.show(e.detail.finalScore);
         document.addEventListener(
@@ -476,24 +485,31 @@ export default class PlaybackManager {
       this.stopPlayer();
 
       if (wasLocalAudio) {
-        const finalScore = this.ctx.services.Forte.getPlaybackState().score;
+        const isScoringEnabled =
+          this.ctx.config.audioConfig?.enableScoring !== false ||
+          state.isSessionActive;
 
-        if (
-          state.isSessionActive &&
-          this.ctx.services.SessionsSvc.state.mode === "performance" &&
-          this.ctx.services.SessionsSvc.state.singerId ===
-            this.ctx.services.SessionsSvc.peer.id
-        ) {
-          const songTitle =
-            this.ctx.services.SessionsSvc.state.nowPlaying?.title ||
-            "Unknown Song";
-          state.currentScoreEntryId = this.ctx.services.SessionsSvc.submitScore(
-            finalScore.finalScore,
-            songTitle,
-          );
+        if (isScoringEnabled) {
+          const finalScore = this.ctx.services.Forte.getPlaybackState().score;
+
+          if (
+            state.isSessionActive &&
+            this.ctx.services.SessionsSvc.state.mode === "performance" &&
+            this.ctx.services.SessionsSvc.state.singerId ===
+              this.ctx.services.SessionsSvc.peer.id
+          ) {
+            const songTitle =
+              this.ctx.services.SessionsSvc.state.nowPlaying?.title ||
+              "Unknown Song";
+            state.currentScoreEntryId =
+              this.ctx.services.SessionsSvc.submitScore(
+                finalScore.finalScore,
+                songTitle,
+              );
+          }
+
+          await this.showPostSongScreen(finalScore);
         }
-
-        await this.showPostSongScreen(finalScore);
         state.currentScoreEntryId = null;
       }
       this.transitionAfterSong();

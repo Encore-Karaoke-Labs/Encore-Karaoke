@@ -171,6 +171,14 @@ class EncoreController {
       await this.services.Forte.setLatency(this.config.audioConfig.micLatency);
     }
 
+    if (this.config.audioConfig?.enableScoring !== undefined) {
+      this.services.Forte.setScoringEnabled(
+        this.config.audioConfig.enableScoring,
+      );
+    } else {
+      this.services.Forte.setScoringEnabled(true);
+    }
+
     this.state.actualPort = await NetworkingUtility.getPort();
     try {
       this.state.windowsVolume = await window.volume.getVolume();

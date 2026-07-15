@@ -130,6 +130,9 @@ const pkg = {
 
     getScoringState: () => scoring.getScoringState(),
     getPlaybackState: () => playback.getPlaybackState(),
+    setScoringEnabled: (enabled) => {
+      state.scoring.userDisabled = !Boolean(enabled);
+    },
 
     initializeScoringEngine: async () => {
       if (!audioCore.context) return;

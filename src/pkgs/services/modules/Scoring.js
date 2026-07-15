@@ -121,6 +121,7 @@ export class ForteScoring {
   updateScore(currentTime) {
     if (
       !this.state.scoring.enabled ||
+      this.state.scoring.userDisabled ||
       !this.state.scoring.pitchDetector ||
       !this.state.scoring.micAnalyser
     ) {

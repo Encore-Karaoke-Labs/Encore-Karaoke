@@ -596,7 +596,7 @@ export default class SetupManager {
         items: [
           {
             id: "device",
-            label: "Scoring Input Device",
+            label: "Microphone",
             type: "select",
             options: micOptions,
             get: () =>
@@ -613,7 +613,7 @@ export default class SetupManager {
           },
           {
             id: "enable_monitor",
-            label: "Enable Real-time Monitoring",
+            label: "Enable Monitoring",
             type: "select",
             options: [
               { value: false, label: "Disabled" },
@@ -626,6 +626,24 @@ export default class SetupManager {
               window.config.setItem("audioConfig.enableMicMonitor", v);
               if (this.ctx.services.Forte.setMicMonitorEnabled)
                 this.ctx.services.Forte.setMicMonitorEnabled(v);
+            },
+          },
+          {
+            id: "enable_scoring",
+            label: "Enable Scoring",
+            type: "select",
+            options: [
+              { value: false, label: "Disabled" },
+              { value: true, label: "Enabled" },
+            ],
+            get: () => this.ctx.config.audioConfig?.enableScoring ?? true,
+            set: (v) => {
+              this.ctx.config.audioConfig ??= {};
+              this.ctx.config.audioConfig.enableScoring = v;
+              window.config.setItem("audioConfig.enableScoring", v);
+              if (this.ctx.services.Forte.setScoringEnabled) {
+                this.ctx.services.Forte.setScoringEnabled(v);
+              }
             },
           },
           {

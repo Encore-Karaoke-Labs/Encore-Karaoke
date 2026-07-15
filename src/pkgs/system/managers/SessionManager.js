@@ -349,6 +349,11 @@ export default class SessionManager {
       this.ctx.services.Forte.playSfx("/assets/audio/session_end.wav");
     }
 
+    if (this.ctx.services.Forte.setScoringEnabled) {
+      const userPref = this.ctx.config.audioConfig?.enableScoring !== false;
+      this.ctx.services.Forte.setScoringEnabled(userPref);
+    }
+
     state.isSessionActive = false;
     state.sessionRoomId = null;
     state.knownParticipants = [];
@@ -665,6 +670,11 @@ export default class SessionManager {
             }
 
             this.ctx.services.Forte.playSfx("/assets/audio/session_start.wav");
+
+            // Force scoring to be enabled during a session for leaderboards
+            if (this.ctx.services.Forte.setScoringEnabled) {
+              this.ctx.services.Forte.setScoringEnabled(true);
+            }
 
             state.sessionMode = "lounge";
             if (dom.sessionChatContainer)
