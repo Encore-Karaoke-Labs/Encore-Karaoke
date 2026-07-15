@@ -1051,27 +1051,29 @@ export class FortePlayback {
 
     this.state.scoring.enabled = true;
 
-    Object.assign(this.state.scoring, {
-      finalScore: 0,
-      totalScorableNotes: 0,
-      notesHit: 0,
-      micPitchHistory: [],
-      singingGraceFrames: 0,
-      smoothedMicMidi: 0,
-      currentOctaveOffset: 0,
-      wasVisuallySinging: false,
-      isVocalGuideNoteActive: false,
-      hasHitCurrentNote: false,
-      totalFramesSinging: 0,
-      framesInKey: 0,
-      rollingChroma: new Array(12).fill(0),
-      currentKeyName: null,
-      allowedPitchClasses: [],
-      keyHistory: [],
-      frameCount: 0,
-      activeMidiNotes: new Set(),
-      details: { accuracy: 0 },
-    });
+    if (this.state.playback.status !== "paused") {
+      Object.assign(this.state.scoring, {
+        finalScore: 0,
+        totalScorableNotes: 0,
+        notesHit: 0,
+        micPitchHistory: [],
+        singingGraceFrames: 0,
+        smoothedMicMidi: 0,
+        currentOctaveOffset: 0,
+        wasVisuallySinging: false,
+        isVocalGuideNoteActive: false,
+        hasHitCurrentNote: false,
+        totalFramesSinging: 0,
+        framesInKey: 0,
+        rollingChroma: new Array(12).fill(0),
+        currentKeyName: null,
+        allowedPitchClasses: [],
+        keyHistory: [],
+        frameCount: 0,
+        activeMidiNotes: new Set(),
+        details: { accuracy: 0 },
+      });
+    }
 
     if (this.state.playback.isMidi) {
       if (
@@ -1098,11 +1100,15 @@ export class FortePlayback {
         this.pianoRoll.toggleVisibility(true);
       }
 
-      this.state.playback.sequencer.currentTime = 0;
+      if (this.state.playback.status !== "paused") {
+        this.state.playback.sequencer.currentTime = 0;
+      }
       this.state.playback.sequencer.play();
 
       if (this.state.playback.hasChorus && this.chorusElement) {
-        this.chorusElement.currentTime = 0;
+        if (this.state.playback.status !== "paused") {
+          this.chorusElement.currentTime = 0;
+        }
         this.chorusElement
           .play()
           .catch((e) => console.error("Chorus play error:", e));

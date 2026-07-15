@@ -189,7 +189,7 @@ export default class PlaybackManager {
       dom.bgvContainer.classOn("hidden");
       dom.ytContainer.classOff("hidden");
       dom.ytIframe.attr({
-        src: `https://cdpn.io/pen/debug/oNPzxKo?v=${song.path.substring(5)}&autoplay=1`,
+        src: `https://cdpn.io/pen/debug/oNPzxKo?v=${song.path.substring(5)}&autoplay=1&cc_load_policy=3`,
         allow:
           "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
       });
@@ -206,12 +206,12 @@ export default class PlaybackManager {
       });
       state.isTransitioning = false;
     } else {
-      let mvPlayer = null;
+      this.mvPlayer = null;
       dom.lyricsCanvas.styleJs({ opacity: "0" }).classOff("hidden");
 
       if (state.currentSongIsMV) {
         const videoUrl = await NetworkingUtility.getFileLink(song.videoPath);
-        mvPlayer = await modules.bgv.playSingleVideo(videoUrl.href);
+        this.mvPlayer = await modules.bgv.playSingleVideo(videoUrl.href);
       } else {
         modules.bgv.resumePlaylist();
       }
@@ -294,7 +294,7 @@ export default class PlaybackManager {
 
       if (root.lyrics) {
         await root.lyrics.setupLyrics(song, pbState);
-        root.lyrics.setupTimeUpdate(mvPlayer);
+        root.lyrics.setupTimeUpdate(this.mvPlayer);
       }
 
       if (song.cdgPath) {
@@ -373,13 +373,54 @@ export default class PlaybackManager {
           return;
         }
         dom.introCard.classOff("visible");
-        if (mvPlayer) mvPlayer.play().catch(console.error);
+        if (this.mvPlayer) this.mvPlayer.play().catch(console.error);
         Forte.playTrack();
         state.isTransitioning = false;
         setTimeout(() => {
           if (state.scoreSkipped) state.scoreSkipped = false;
         }, 5000);
       }, 2500);
+    }
+  }
+
+  togglePause() {
+    const state = this.ctx.state;
+    const Forte = this.ctx.services.Forte;
+    const modules = this.ctx.modules;
+
+    if (state.mode !== "player" || state.isTransitioning) return;
+
+    if (state.currentSongIsYouTube) {
+      modules.infoBar.showTemp(
+        "PAUSE",
+        "Cannot pause on YouTube tracks.",
+        3000,
+      );
+      return;
+    }
+
+    const pbState = Forte.getPlaybackState();
+
+    if (pbState.status === "playing") {
+      Forte.pauseTrack();
+
+      if (state.currentSongIsMV && this.mvPlayer) {
+        this.mvPlayer.pause();
+      }
+
+      modules.infoBar.show(
+        "PAUSED",
+        "<span class='info-bar-title'>Playback is paused</span>",
+      );
+      modules.infoBar.showBar();
+    } else if (pbState.status === "paused") {
+      if (state.currentSongIsMV && this.mvPlayer) {
+        this.mvPlayer.play();
+      }
+
+      Forte.playTrack();
+
+      modules.infoBar.showDefault();
     }
   }
 
@@ -467,7 +508,8 @@ export default class PlaybackManager {
 
     if (
       state.mode.startsWith("player") &&
-      state.lastPlaybackStatus === "playing" &&
+      (state.lastPlaybackStatus === "playing" ||
+        state.lastPlaybackStatus === "paused") &&
       status === "stopped"
     ) {
       if (state.isTransitioning) return;

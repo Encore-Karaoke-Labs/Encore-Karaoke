@@ -94,7 +94,11 @@ export default class InputManager {
 
     if (e.key === "F2") {
       e.preventDefault();
-      if (state.mode === "player" && state.lastPlaybackStatus === "playing") {
+      if (
+        state.mode === "player" &&
+        (state.lastPlaybackStatus === "playing" ||
+          state.lastPlaybackStatus === "paused")
+      ) {
         modules.infoBar.showTemp(
           "SETUP",
           "Please stop playback to enter Setup.",
@@ -382,6 +386,16 @@ export default class InputManager {
     else if (e.key.toLowerCase() === "c") this.handleChorusToggle();
     else if (e.key.toLowerCase() === "g") this.cycleGuideMelody();
     else if (e.key.toLowerCase() === "y") this.handleYKey();
+    else if (e.key === " ") this.handleSpace();
+  }
+
+  /**
+   * Toggles pause when the space bar is pressed.
+   */
+  handleSpace() {
+    if (this.ctx.state.mode === "player") {
+      this.ctx.root.playback.togglePause();
+    }
   }
 
   /**
@@ -597,7 +611,7 @@ export default class InputManager {
     } else if (state.mode === "player" && state.reservationNumber) {
       state.reservationNumber = state.reservationNumber.slice(0, -1);
       if (state.reservationNumber.length === 0) {
-        infoBar.showDefault();
+        this._restoreInfoBar();
         this._updateReservationUI(true);
       } else {
         this._updateReservationUI(false);
@@ -608,6 +622,21 @@ export default class InputManager {
       ui.updateMenuUI();
     } else if (state.mode === "yt-search" && !dom.searchInput.getValue()) {
       ui.setMode("menu");
+    }
+  }
+
+  /**
+   * Restores the InfoBar persistent state
+   */
+  _restoreInfoBar() {
+    if (this.ctx.state.lastPlaybackStatus === "paused") {
+      this.ctx.modules.infoBar.show(
+        "PAUSED",
+        "<span class='info-bar-title'>Playback is paused</span>",
+      );
+      this.ctx.modules.infoBar.showBar();
+    } else {
+      this.ctx.modules.infoBar.showDefault();
     }
   }
 
@@ -767,7 +796,7 @@ export default class InputManager {
           if (state.isSessionActive) root.sessions.reserveSongInSession(song);
           else {
             state.reservationQueue.push(song);
-            this.ctx.modules.infoBar.showDefault();
+            this._restoreInfoBar();
           }
         }
         state.reservationNumber = "";
@@ -844,7 +873,7 @@ export default class InputManager {
     if (state.mode.startsWith("player")) {
       if (state.reservationNumber) {
         state.reservationNumber = "";
-        this.ctx.modules.infoBar.showDefault();
+        this._restoreInfoBar();
       } else if (state.currentSongIsYouTube) {
         this.ctx.root.playback.stopPlayer();
         this.ctx.modules.bgv.start();
