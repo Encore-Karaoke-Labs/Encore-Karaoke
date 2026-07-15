@@ -94,6 +94,34 @@ export default class SetupManager {
   }
 
   /**
+   * Transitions between views
+   */
+  async transitionTo(newView, stateUpdates = {}) {
+    this.setupState.transitionId = (this.setupState.transitionId || 0) + 1;
+    const currentId = this.setupState.transitionId;
+
+    this.setupState.isTransitioning = true;
+    this.setupState.view = newView;
+    Object.assign(this.setupState, stateUpdates);
+
+    const body = this.ctx.dom.setupContainer?.qs(".setup-body");
+    if (body) {
+      body.classOn("setup-animate-out");
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    if (this.setupState.transitionId !== currentId) return;
+
+    this.renderView(true);
+
+    setTimeout(() => {
+      if (this.setupState.transitionId === currentId) {
+        this.setupState.isTransitioning = false;
+      }
+    }, 50);
+  }
+
+  /**
    * Triggers the setup mode, taking over the screen and loading initial configurations.
    */
   open() {
@@ -145,8 +173,7 @@ export default class SetupManager {
       this.setupState.isDataLoaded = true;
 
       if (this.setupState.view === "loading") {
-        this.setupState.view = "dashboard";
-        this.renderView();
+        this.transitionTo("dashboard");
       }
     }
   }
@@ -784,6 +811,8 @@ export default class SetupManager {
   }
 
   handleKeyDown(e) {
+    if (this.setupState.isTransitioning) return;
+
     if (this.setupState.view === "loading") {
       if (e.key === "Escape") this.exitSetup();
       return;
@@ -898,8 +927,7 @@ export default class SetupManager {
         this.setupState.view === "pin_change"
       ) {
         this.ctx.services.Forte.stopSfx();
-        this.setupState.view = "dashboard";
-        this.renderView();
+        this.transitionTo("dashboard");
       } else if (
         this.setupState.view === "dashboard" ||
         this.setupState.view === "auth" ||
@@ -951,8 +979,22 @@ export default class SetupManager {
       }
 
       if (idx !== this.setupState.dashboardIndex) {
+        const tiles = document.querySelectorAll(".setup-tile");
+        if (tiles[this.setupState.dashboardIndex]) {
+          tiles[this.setupState.dashboardIndex].classList.remove("active");
+        }
+        if (tiles[idx]) {
+          tiles[idx].classList.add("active");
+          if (idx >= 2) {
+            tiles[idx].scrollIntoView({ block: "nearest", behavior: "auto" });
+          } else {
+            const scrollWrapper = document.querySelector(
+              ".dashboard-scroll-wrapper",
+            );
+            if (scrollWrapper) scrollWrapper.scrollTop = 0;
+          }
+        }
         this.setupState.dashboardIndex = idx;
-        this.renderView();
       }
       return;
     }
@@ -965,17 +1007,13 @@ export default class SetupManager {
       const listEl = document.querySelector(".submenu-list");
       if (listEl) this.setupState.submenuScrollTop = listEl.scrollTop;
 
-      if (e.key === "ArrowDown")
-        this.setupState.submenuIndex = Math.min(
-          items.length - 1,
-          this.setupState.submenuIndex + 1,
-        );
-      else if (e.key === "ArrowUp")
-        this.setupState.submenuIndex = Math.max(
-          0,
-          this.setupState.submenuIndex - 1,
-        );
-      else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      let newIndex = this.setupState.submenuIndex;
+
+      if (e.key === "ArrowDown") {
+        newIndex = Math.min(items.length - 1, this.setupState.submenuIndex + 1);
+      } else if (e.key === "ArrowUp") {
+        newIndex = Math.max(0, this.setupState.submenuIndex - 1);
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         if (currentItem.type === "range") {
           const dir = e.key === "ArrowRight" ? 1 : -1;
           const newVal = Math.max(
@@ -997,13 +1035,31 @@ export default class SetupManager {
             currentItem.options.length;
           currentItem.set(currentItem.options[nextIndex].value);
         }
+        this.renderView();
+        return;
       } else if (
         e.key === "Enter" &&
         (currentItem.type === "action" || currentItem.type === "info-action")
       ) {
         currentItem.action();
+        return;
       }
-      this.renderView();
+
+      if (newIndex !== this.setupState.submenuIndex) {
+        const rows = document.querySelectorAll(".submenu-item");
+        if (rows[this.setupState.submenuIndex]) {
+          rows[this.setupState.submenuIndex].classList.remove("active");
+        }
+        if (rows[newIndex]) {
+          rows[newIndex].classList.add("active");
+          rows[newIndex].scrollIntoView({
+            block: "nearest",
+            behavior: "smooth",
+          });
+        }
+        this.setupState.submenuIndex = newIndex;
+      }
+      return;
     }
   }
 
@@ -1663,27 +1719,33 @@ export default class SetupManager {
     if (this.setupState.view === "auth") {
       const isValid = await this.verifyPin(this.setupState.authInput);
       if (isValid) {
-        this.setupState.view = this.setupState.isDataLoaded
-          ? "dashboard"
-          : "loading";
+        this.transitionTo(
+          this.setupState.isDataLoaded ? "dashboard" : "loading",
+        );
       } else {
         this.showToast("INCORRECT PIN", "error");
+        this.setupState.authInput = "";
+        this.renderView();
       }
-      this.setupState.authInput = "";
     } else if (this.setupState.view === "pin_change") {
       if (this.setupState.pinChangeStep === 0) {
         const isValid = await this.verifyPin(this.setupState.authInput);
         if (isValid) this.setupState.pinChangeStep = 1;
         else {
           this.setupState.pinChangeStep = 0;
-          this.setupState.view = "dashboard";
           this.showToast("AUTHORIZATION FAILED", "error");
+          this.transitionTo("dashboard");
+          this.setupState.authInput = "";
+          this.setupState.isVerifying = false;
+          return;
         }
         this.setupState.authInput = "";
+        this.renderView();
       } else if (this.setupState.pinChangeStep === 1) {
         this.setupState.newPinTemp = this.setupState.authInput;
         this.setupState.pinChangeStep = 2;
         this.setupState.authInput = "";
+        this.renderView();
       } else if (this.setupState.pinChangeStep === 2) {
         if (this.setupState.authInput === this.setupState.newPinTemp) {
           const newPinData = await this.createPinHash(
@@ -1696,32 +1758,25 @@ export default class SetupManager {
             this.showToast("PIN UPDATED", "success");
           } else this.showToast("HASHING FAILED", "error");
         } else this.showToast("PIN MISMATCH", "error");
-        this.setupState.view = "dashboard";
-        this.setupState.authInput = "";
+
+        this.transitionTo("dashboard", { authInput: "" });
       }
     }
     this.setupState.isVerifying = false;
-    this.renderView();
   }
 
   async executeAction(id) {
     if (id === "exit") {
       this.exitSetup();
     } else if (id === "security") {
-      this.setupState.view = "pin_change";
-      this.setupState.pinChangeStep = 0;
-      this.setupState.authInput = "";
-      this.renderView();
+      this.transitionTo("pin_change", { pinChangeStep: 0, authInput: "" });
     } else if (this.SUBMENUS[id]) {
       if (id === "sync") {
         this.updateServers =
           await window.desktopIntegration.ipc.invoke("get-update-servers");
         this.buildSettingsMap();
       }
-      this.setupState.activeMenuId = id;
-      this.setupState.submenuIndex = 0;
-      this.setupState.view = "submenu";
-      this.renderView();
+      this.transitionTo("submenu", { activeMenuId: id, submenuIndex: 0 });
     }
   }
 
@@ -1808,7 +1863,7 @@ export default class SetupManager {
     this.ctx.modules.infoBar.showTemp("SETUP", msg, 3000);
   }
 
-  renderView() {
+  renderView(isTransition = false) {
     if (!this.ctx.dom.setupContainer) return;
     this.ctx.dom.setupContainer.clear();
 
@@ -1852,6 +1907,10 @@ export default class SetupManager {
     const body = new Html("div")
       .classOn("setup-body")
       .appendTo(this.ctx.dom.setupContainer);
+
+    if (isTransition) {
+      body.classOn("setup-animate-in");
+    }
 
     if (
       this.setupState.view === "auth" ||

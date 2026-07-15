@@ -1312,8 +1312,7 @@ p + .flex-list button {
   gap: 0.5rem;
   overflow-y: auto;
   flex-grow: 1;
-  padding-right: 0.75rem;
-  padding-bottom: 1rem;
+  padding: 0.5rem 1.25rem 1rem 1rem;
 }
 
 .submenu-list::-webkit-scrollbar {
@@ -1463,11 +1462,45 @@ p + .flex-list button {
   border-left: 5px solid transparent;
   font-size: 1.5rem;
   font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .submenu-item.active {
   background: rgba(137, 207, 240, 0.15);
   border-left-color: #89cff0;
+  transform: scale(1.02);
+  transform-origin: center;
+  box-shadow: 0 5px 15px rgba(137, 207, 240, 0.1);
+}
+
+.setup-animate-in {
+  animation: setupFadeIn 0.3s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.setup-animate-out {
+  animation: setupFadeOut 0.2s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+@keyframes setupFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes setupFadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-15px) scale(0.98);
+  }
 }
 
 .submenu-value {
