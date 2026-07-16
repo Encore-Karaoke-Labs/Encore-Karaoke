@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld("desktopIntegration", {
     on: (channel, callback) => {
       ipcRenderer.on(channel, callback);
     },
+    off: (channel, callback) => {
+      ipcRenderer.removeListener(channel, callback);
+    },
   },
 });
 

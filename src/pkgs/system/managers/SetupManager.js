@@ -84,12 +84,27 @@ export default class SetupManager {
         this.buildProgressBar.styleJs({ width: `${e.detail.percentage}%` });
       }
     };
+    this.boundFullscreenChange = (event, isFullscreen) => {
+      this.setupState.fullscreenEnabled = isFullscreen;
+      this.ctx.config.fullscreenEnabled = isFullscreen;
+
+      if (
+        this.setupState.view === "submenu" &&
+        this.setupState.activeMenuId === "video"
+      ) {
+        this.renderView();
+      }
+    };
   }
 
   init() {
     document.addEventListener(
       "CherryTree.FsSvc.SongList.Progress",
       this.boundBuildProgress,
+    );
+    window.desktopIntegration.ipc.on(
+      "fullscreen-state-changed",
+      this.boundFullscreenChange,
     );
   }
 
@@ -2450,6 +2465,12 @@ export default class SetupManager {
       "CherryTree.FsSvc.SongList.Progress",
       this.boundBuildProgress,
     );
+    if (window.desktopIntegration.ipc.off) {
+      window.desktopIntegration.ipc.off(
+        "fullscreen-state-changed",
+        this.boundFullscreenChange,
+      );
+    }
     if (this.previewSyncFrame) cancelAnimationFrame(this.previewSyncFrame);
     if (this.setupState.manualCalib?.active) this.exitManualCalibration();
   }
