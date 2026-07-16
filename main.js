@@ -392,8 +392,27 @@ server.post("/auth/verify-hash", (req, res) => {
 });
 
 const titleBarHeight = 55;
-let zoomFactor = Config.getItem("zoomLevel") || 0.85;
+let zoomFactor =
+  Config.getItem("zoomLevel") ?? Config.getItem("zoomFactor") ?? 0.85;
 let appViewWebContents = null;
+
+const applyZoomFactor = (nextZoomFactor) => {
+  zoomFactor = nextZoomFactor;
+  Config.setItem("zoomLevel", zoomFactor);
+  if (appViewWebContents && !appViewWebContents.isDestroyed()) {
+    appViewWebContents.setZoomFactor(zoomFactor);
+  }
+  return zoomFactor;
+};
+
+const resetZoom = () => applyZoomFactor(0.85);
+const addZoom = () => applyZoomFactor(zoomFactor + 0.15);
+const reduceZoom = () => {
+  if (zoomFactor > 0.26) {
+    return applyZoomFactor(zoomFactor - 0.15);
+  }
+  return zoomFactor;
+};
 
 // Main App Startup
 const createWindow = () => {
@@ -458,29 +477,6 @@ const createWindow = () => {
   );
   appView.webContents.loadURL(`http://127.0.0.1:${PORT}/index.html`);
   appView.webContents.setZoomFactor(zoomFactor);
-
-  const resetZoom = () => {
-    zoomFactor = 0.85;
-    Config.setItem("zoomFactor", zoomFactor);
-    appView.webContents.setZoomFactor(zoomFactor);
-    return;
-  };
-
-  const addZoom = () => {
-    zoomFactor = zoomFactor + 0.15;
-    Config.setItem("zoomFactor", zoomFactor);
-    appView.webContents.setZoomFactor(zoomFactor);
-    return;
-  };
-
-  const reduceZoom = () => {
-    if (zoomFactor > 0.26) {
-      zoomFactor = zoomFactor - 0.15;
-      Config.setItem("zoomFactor", zoomFactor);
-      appView.webContents.setZoomFactor(zoomFactor);
-    }
-    return;
-  };
 
   const reloadPage = () => {
     if (!kioskEnabled) appView.webContents.reload();
@@ -692,6 +688,10 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle("get-volume", async () => getVolume());
   ipcMain.handle("get-port", () => PORT);
+  ipcMain.handle("zoom-get", () => zoomFactor);
+  ipcMain.handle("zoom-reset", () => resetZoom());
+  ipcMain.handle("zoom-in", () => addZoom());
+  ipcMain.handle("zoom-out", () => reduceZoom());
   ipcMain.handle("romanize", async (event, rawJapanese) => {
     if (!rawJapanese || typeof rawJapanese !== "string") return "";
 

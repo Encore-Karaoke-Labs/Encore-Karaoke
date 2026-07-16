@@ -41,3 +41,10 @@ contextBridge.exposeInMainWorld("version", {
 contextBridge.exposeInMainWorld("kiosk", {
   isEnabled: async () => ipcRenderer.invoke("get-kiosk-enabled"),
 });
+
+contextBridge.exposeInMainWorld("zoom", {
+  get: async () => ipcRenderer.invoke("zoom-get"),
+  reset: async () => ipcRenderer.invoke("zoom-reset"),
+  in: async () => ipcRenderer.invoke("zoom-in"),
+  out: async () => ipcRenderer.invoke("zoom-out"),
+});
