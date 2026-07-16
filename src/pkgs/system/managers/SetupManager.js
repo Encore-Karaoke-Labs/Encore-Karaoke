@@ -157,6 +157,10 @@ export default class SetupManager {
       this.updateServers =
         await window.desktopIntegration.ipc.invoke("get-update-servers");
       this.versionInformation = await window.version.getVersionInformation();
+      this.setupState.fullscreenEnabled =
+        (await window.fullscreen.get()) ??
+        this.ctx.config.fullscreenEnabled ??
+        false;
 
       const foundLibs = await this.ctx.services.FsSvc.findEncoreLibraries();
       const activeLib = foundLibs.find(
@@ -704,6 +708,33 @@ export default class SetupManager {
             },
           },
           {
+            id: "preview",
+            label: "Preview & Calibrate Sync",
+            type: "action",
+            action: () => this.startVideoPreview(),
+          },
+          {
+            id: "fullscreen",
+            label: "Fullscreen Mode",
+            type: "select",
+            options: [
+              { value: false, label: "Windowed" },
+              { value: true, label: "Fullscreen" },
+            ],
+            get: () =>
+              this.setupState.fullscreenEnabled ??
+              this.ctx.config.fullscreenEnabled ??
+              false,
+            set: async (v) => {
+              const fullscreenEnabled = Boolean(v);
+              this.setupState.fullscreenEnabled = fullscreenEnabled;
+              this.ctx.config.fullscreenEnabled = fullscreenEnabled;
+              window.config.setItem("fullscreenEnabled", fullscreenEnabled);
+              await window.fullscreen.set(fullscreenEnabled);
+              this.renderView();
+            },
+          },
+          {
             id: "zoom",
             label: "Display Zoom (%)",
             type: "range",
@@ -723,12 +754,6 @@ export default class SetupManager {
               await window.zoom.set(zoomValue);
               this.renderView();
             },
-          },
-          {
-            id: "preview",
-            label: "Preview & Calibrate Sync",
-            type: "action",
-            action: () => this.startVideoPreview(),
           },
         ],
       },

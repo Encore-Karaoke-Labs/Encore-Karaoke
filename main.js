@@ -398,6 +398,9 @@ if (zoomFactor == null) {
 }
 let appViewWebContents = null;
 
+const getBooleanSetting = (value) =>
+  value === true || value === 1 || value === "true" || value === "1";
+
 const applyZoomFactor = (nextZoomFactor) => {
   zoomFactor = Math.max(0.26, Math.min(2, Number(nextZoomFactor) || 0.85));
   Config.setItem("zoomLevel", zoomFactor);
@@ -418,6 +421,10 @@ const reduceZoom = () => {
 
 // Main App Startup
 const createWindow = () => {
+  const shouldStartFullscreen = getBooleanSetting(
+    Config.getItem("fullscreenEnabled"),
+  );
+
   const win = new BrowserWindow({
     title: `Encore Karaoke ${versionInformation.channel} ${versionInformation.number} (${versionInformation.codename})`,
     width: 1280,
@@ -473,6 +480,10 @@ const createWindow = () => {
   win.on("restore", () => setTimeout(updateBounds, 50));
   win.on("show", () => setTimeout(updateBounds, 50));
   updateBounds();
+
+  if (shouldStartFullscreen && !kioskEnabled) {
+    win.setFullScreen(true);
+  }
 
   win.loadURL(
     `file://${__dirname}/resources/titlebar.html?platform=${process.platform}`,
