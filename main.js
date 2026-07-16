@@ -406,6 +406,7 @@ const applyZoomFactor = (nextZoomFactor) => {
   Config.setItem("zoomLevel", zoomFactor);
   if (appViewWebContents && !appViewWebContents.isDestroyed()) {
     appViewWebContents.setZoomFactor(zoomFactor);
+    appViewWebContents.send("zoom-level-changed", zoomFactor);
   }
   return zoomFactor;
 };

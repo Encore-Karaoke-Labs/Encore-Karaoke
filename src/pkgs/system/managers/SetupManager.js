@@ -95,6 +95,16 @@ export default class SetupManager {
         this.renderView();
       }
     };
+    this.boundZoomChange = (event, newZoom) => {
+      this.ctx.config.zoomLevel = newZoom;
+
+      if (
+        this.setupState.view === "submenu" &&
+        this.setupState.activeMenuId === "video"
+      ) {
+        this.renderView();
+      }
+    };
   }
 
   init() {
@@ -105,6 +115,10 @@ export default class SetupManager {
     window.desktopIntegration.ipc.on(
       "fullscreen-state-changed",
       this.boundFullscreenChange,
+    );
+    window.desktopIntegration.ipc.on(
+      "zoom-level-changed",
+      this.boundZoomChange,
     );
   }
 
@@ -2469,6 +2483,12 @@ export default class SetupManager {
       window.desktopIntegration.ipc.off(
         "fullscreen-state-changed",
         this.boundFullscreenChange,
+      );
+    }
+    if (window.desktopIntegration.ipc.off) {
+      window.desktopIntegration.ipc.off(
+        "zoom-level-changed",
+        this.boundZoomChange,
       );
     }
     if (this.previewSyncFrame) cancelAnimationFrame(this.previewSyncFrame);
