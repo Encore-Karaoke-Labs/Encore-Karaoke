@@ -672,6 +672,23 @@ app.whenReady().then(async () => {
 
   ipcMain.handle("get-version", () => versionInformation);
   ipcMain.handle("get-kiosk-enabled", () => kioskEnabled);
+  ipcMain.handle("fullscreen-get", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return win ? win.isFullScreen() : false;
+  });
+  ipcMain.handle("fullscreen-set", (event, fullscreen) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return false;
+    win.setFullScreen(Boolean(fullscreen));
+    return win.isFullScreen();
+  });
+  ipcMain.handle("fullscreen-toggle", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return false;
+    const nextState = !win.isFullScreen();
+    win.setFullScreen(nextState);
+    return nextState;
+  });
   ipcMain.handle("get-file-token", () => fileToken);
   ipcMain.handle("config-get-all", () => Config.getAll());
   ipcMain.handle("config-get-item", (event, key) => {

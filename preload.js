@@ -42,6 +42,12 @@ contextBridge.exposeInMainWorld("kiosk", {
   isEnabled: async () => ipcRenderer.invoke("get-kiosk-enabled"),
 });
 
+contextBridge.exposeInMainWorld("fullscreen", {
+  get: async () => ipcRenderer.invoke("fullscreen-get"),
+  set: async (value) => ipcRenderer.invoke("fullscreen-set", value),
+  toggle: async () => ipcRenderer.invoke("fullscreen-toggle"),
+});
+
 contextBridge.exposeInMainWorld("zoom", {
   get: async () => ipcRenderer.invoke("zoom-get"),
   set: async (value) => ipcRenderer.invoke("zoom-set", value),
