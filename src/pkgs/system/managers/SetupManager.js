@@ -704,6 +704,27 @@ export default class SetupManager {
             },
           },
           {
+            id: "zoom",
+            label: "Display Zoom (%)",
+            type: "range",
+            min: 50,
+            max: 180,
+            step: 5,
+            get: () =>
+              Math.round(
+                (this.ctx.config.zoomLevel ??
+                  this.ctx.config.zoomFactor ??
+                  0.85) * 100,
+              ),
+            set: async (v) => {
+              const zoomPercent = Math.max(50, Math.min(180, v));
+              const zoomValue = zoomPercent / 100;
+              this.ctx.config.zoomLevel = zoomValue;
+              await window.zoom.set(zoomValue);
+              this.renderView();
+            },
+          },
+          {
             id: "preview",
             label: "Preview & Calibrate Sync",
             type: "action",

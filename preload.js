@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld("kiosk", {
 
 contextBridge.exposeInMainWorld("zoom", {
   get: async () => ipcRenderer.invoke("zoom-get"),
+  set: async (value) => ipcRenderer.invoke("zoom-set", value),
   reset: async () => ipcRenderer.invoke("zoom-reset"),
   in: async () => ipcRenderer.invoke("zoom-in"),
   out: async () => ipcRenderer.invoke("zoom-out"),

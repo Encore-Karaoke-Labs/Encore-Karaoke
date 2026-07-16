@@ -392,12 +392,14 @@ server.post("/auth/verify-hash", (req, res) => {
 });
 
 const titleBarHeight = 55;
-let zoomFactor =
-  Config.getItem("zoomLevel") ?? Config.getItem("zoomFactor") ?? 0.85;
+let zoomFactor = Config.getItem("zoomLevel");
+if (zoomFactor == null) {
+  zoomFactor = Config.getItem("zoomFactor") ?? 0.85;
+}
 let appViewWebContents = null;
 
 const applyZoomFactor = (nextZoomFactor) => {
-  zoomFactor = nextZoomFactor;
+  zoomFactor = Math.max(0.26, Math.min(2, Number(nextZoomFactor) || 0.85));
   Config.setItem("zoomLevel", zoomFactor);
   if (appViewWebContents && !appViewWebContents.isDestroyed()) {
     appViewWebContents.setZoomFactor(zoomFactor);
@@ -689,6 +691,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("get-volume", async () => getVolume());
   ipcMain.handle("get-port", () => PORT);
   ipcMain.handle("zoom-get", () => zoomFactor);
+  ipcMain.handle("zoom-set", (event, value) => applyZoomFactor(value));
   ipcMain.handle("zoom-reset", () => resetZoom());
   ipcMain.handle("zoom-in", () => addZoom());
   ipcMain.handle("zoom-out", () => reduceZoom());
