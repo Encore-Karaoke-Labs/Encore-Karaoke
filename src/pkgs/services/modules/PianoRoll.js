@@ -341,7 +341,12 @@ export class FortePianoRoll {
     }
 
     const history = this.state.scoring.micPitchHistory;
-    if (history && history.length > 0 && playheadX >= 0) {
+    if (
+      !this.state.scoring.userDisabled &&
+      history &&
+      history.length > 0 &&
+      playheadX >= 0
+    ) {
       ctx.beginPath();
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
@@ -380,6 +385,7 @@ export class FortePianoRoll {
     }
 
     if (
+      !this.state.scoring.userDisabled &&
       this.state.scoring.isSinging &&
       this.state.scoring.currentMicMidi > 0 &&
       playheadX >= 0
