@@ -309,7 +309,11 @@ export class FortePianoRoll {
       if (isActive) {
         this.drawNote(ctx, note, startX, y, noteWidth, true);
 
-        if (note.hitStatus === "hit" && this.state.scoring.isSinging) {
+        if (
+          note.hitStatus === "hit" &&
+          this.state.scoring.isSinging &&
+          !this.state.scoring.userDisabled
+        ) {
           ctx.save();
           ctx.translate(playheadX, y);
           ctx.fillStyle = this.gradSpark;
