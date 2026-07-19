@@ -680,6 +680,24 @@ export default class SetupManager {
             },
           },
           {
+            id: "guide_channel",
+            label: "Guide Melody Channel",
+            type: "select",
+            options: [
+              { value: "auto", label: "Smart" },
+              ...Array.from({ length: 16 }, (_, i) => ({
+                value: i,
+                label: `Channel ${i + 1}`,
+              })),
+            ],
+            get: () => this.ctx.config.audioConfig?.guideChannel ?? "auto",
+            set: (v) => {
+              this.ctx.config.audioConfig ??= {};
+              this.ctx.config.audioConfig.guideChannel = v;
+              window.config.setItem("audioConfig.guideChannel", v);
+            },
+          },
+          {
             id: "latency",
             label: "Mic Latency Override (ms)",
             type: "range",

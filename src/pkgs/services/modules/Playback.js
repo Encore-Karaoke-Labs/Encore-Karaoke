@@ -686,50 +686,32 @@ export class FortePlayback {
             const channels = parsedMidi.getNoteTimes();
             let validChannels = [];
 
-            // PLATINUM likes to put their guides on Channel 1
-            if (isPlatinum && channels[0] && channels[0].length > 0) {
-              logVerbose("This is a PLATINUM file");
-              validChannels.push({
-                index: 0,
-                notes: channels[0],
-                program: 0,
-              });
-            } else {
-              const candidateChannels = [];
+            let manualChannel = "auto";
+            try {
+              if (
+                window.config &&
+                typeof window.config.getItem === "function"
+              ) {
+                const val = await window.config.getItem(
+                  "audioConfig.guideChannel",
+                );
+                if (val !== undefined && val !== null) {
+                  manualChannel = val;
+                }
+              }
+            } catch (e) {}
+            if (manualChannel !== "auto") {
+              const chIndex = parseInt(manualChannel, 10);
+              const notes = channels[chIndex];
 
-              // Choirs, Voice Oohs, Synth Voice / Solo Vox
-              // Oboe, Clarinet, Piccolo, Flute, Recorder, Pan Flute, Whistle, Ocarina
-              // Square Lead, Saw Wave Lead, Voice Lead
-              const highPriorityInstruments = [
-                52, 53, 54, 68, 71, 72, 73, 74, 75, 78, 79, 80, 81, 85,
-              ];
-
-              // Nylon/Steel Acoustic Guitars (often mock-melody)
-              // Muted Trumpet
-              // Soprano, Alto, Tenor Saxes
-              const medPriorityInstruments = [24, 25, 59, 64, 65, 66];
-
-              // Acoustic, Electric, and Synth Basses
-              // String Ensembles / Synth Strings (usually chords/pads)
-              const penalizedInstruments = [
-                32, 33, 34, 35, 36, 37, 38, 39, 48, 49, 50, 51,
-              ];
-
-              for (let i = 0; i < 16; i++) {
-                if (i === 9) continue;
-                const notes = channels[i];
-                if (!notes || notes.length === 0) continue;
-
-                if (notes.length < lyricTimes.length * 0.05) continue;
-                if (notes.length > lyricTimes.length * 5) continue;
-
+              if (notes && notes.length > 0) {
                 let program = 0;
                 if (parsedMidi && parsedMidi.tracks) {
                   for (const track of parsedMidi.tracks) {
                     const pcEvent = track.events.find(
                       (e) =>
                         (e.statusByte & 0xf0) === 0xc0 &&
-                        (e.statusByte & 0x0f) === i,
+                        (e.statusByte & 0x0f) === chIndex,
                     );
                     if (pcEvent && pcEvent.data && pcEvent.data.length > 0) {
                       program = pcEvent.data[0];
@@ -738,147 +720,221 @@ export class FortePlayback {
                   }
                 }
 
-                let overlaps = 0;
-                let pitchSum = notes[0].midiNote;
-                let totalInterval = 0;
-                let shortNotes = notes[0].length < 0.25 ? 1 : 0;
-
-                for (let n = 1; n < notes.length; n++) {
-                  const prevNote = notes[n - 1];
-                  const prevNoteEnd = prevNote.start + prevNote.length;
-
-                  if (notes[n].start < prevNoteEnd - 0.05) overlaps++;
-
-                  pitchSum += notes[n].midiNote;
-                  totalInterval += Math.abs(
-                    notes[n].midiNote - prevNote.midiNote,
-                  );
-                  if (notes[n].length < 0.25) shortNotes++;
-                }
-
-                const polyphonyRatio = overlaps / notes.length;
-                if (polyphonyRatio > 0.25) continue;
-
-                const avgInterval =
-                  totalInterval / Math.max(1, notes.length - 1);
-                const shortNoteRatio = shortNotes / notes.length;
-
-                let matches = 0;
-                for (let l = 0; l < lyricTimes.length; l++) {
-                  const lTime = lyricTimes[l];
-                  const noteForLyric = notes.find(
-                    (n) =>
-                      Math.abs(n.start - lTime) < 0.15 ||
-                      (n.start <= lTime && n.start + n.length >= lTime + 0.05),
-                  );
-                  if (noteForLyric) matches++;
-                }
-
-                const matchRatio = matches / lyricTimes.length;
-                const densityRatio = notes.length / lyricTimes.length;
-                const avgPitch = pitchSum / notes.length;
-
-                let primaryScore = matchRatio * 2.0 - polyphonyRatio * 4.0;
-
-                if (densityRatio > 1.3)
-                  primaryScore -= (densityRatio - 1.3) * 1.0;
-                else if (densityRatio < 0.7)
-                  primaryScore -= (0.7 - densityRatio) * 1.0;
-
-                let pitchPenalty = 0;
-                if (avgPitch < 50) pitchPenalty = (50 - avgPitch) * 0.15;
-                if (avgPitch > 85) pitchPenalty = (avgPitch - 85) * 0.15;
-                primaryScore -= pitchPenalty;
-
-                if (avgInterval > 3.5)
-                  primaryScore -= (avgInterval - 3.5) * 1.5;
-                if (shortNoteRatio > 0.8)
-                  primaryScore -= (shortNoteRatio - 0.8) * 3.0;
-
-                if (i === 3) primaryScore += 0.8;
-                else if (i === 4) primaryScore += 0.3;
-
-                if (highPriorityInstruments.includes(program)) {
-                  primaryScore += 1.0;
-                } else if (medPriorityInstruments.includes(program)) {
-                  primaryScore += 0.4;
-                } else if (penalizedInstruments.includes(program)) {
-                  primaryScore -= 1.5;
-                }
-
-                candidateChannels.push({
-                  index: i,
-                  notes,
-                  matchRatio,
-                  polyphonyRatio,
-                  avgPitch,
-                  avgInterval,
-                  shortNoteRatio,
-                  program,
-                  primaryScore,
+                validChannels.push({
+                  index: chIndex,
+                  notes: notes,
+                  program: program,
                 });
-              }
-
-              candidateChannels.sort((a, b) => b.primaryScore - a.primaryScore);
-
-              if (
-                candidateChannels.length > 0 &&
-                candidateChannels[0].matchRatio > 0.15
-              ) {
-                const mainChannel = candidateChannels[0];
-                validChannels = [mainChannel];
                 logVerbose(
-                  `Primary Vocal Guide on Channel ${mainChannel.index + 1} (${mainChannel.program})`,
+                  `Manual Guide Melody Channel selected: Channel ${chIndex + 1}`,
+                );
+              } else {
+                logVerbose(
+                  `Manual Channel ${chIndex + 1} has no notes. Falling back to Smart Detection.`,
+                );
+                manualChannel = "auto";
+              }
+            }
+
+            if (manualChannel === "auto") {
+              // PLATINUM likes to put their guides on Channel 1
+              if (isPlatinum && channels[0] && channels[0].length > 0) {
+                logVerbose("This is a PLATINUM file");
+                validChannels.push({
+                  index: 0,
+                  notes: channels[0],
+                  program: 0,
+                });
+              } else {
+                const candidateChannels = [];
+
+                // Choirs, Voice Oohs, Synth Voice / Solo Vox
+                // Oboe, Clarinet, Piccolo, Flute, Recorder, Pan Flute, Whistle, Ocarina
+                // Square Lead, Saw Wave Lead, Voice Lead
+                const highPriorityInstruments = [
+                  52, 53, 54, 68, 71, 72, 73, 74, 75, 78, 79, 80, 81, 85,
+                ];
+
+                // Nylon/Steel Acoustic Guitars (often mock-melody)
+                // Muted Trumpet
+                // Soprano, Alto, Tenor Saxes
+                const medPriorityInstruments = [24, 25, 59, 64, 65, 66];
+
+                // Acoustic, Electric, and Synth Basses
+                // String Ensembles / Synth Strings (usually chords/pads)
+                const penalizedInstruments = [
+                  32, 33, 34, 35, 36, 37, 38, 39, 48, 49, 50, 51,
+                ];
+
+                for (let i = 0; i < 16; i++) {
+                  if (i === 9) continue;
+                  const notes = channels[i];
+                  if (!notes || notes.length === 0) continue;
+
+                  if (notes.length < lyricTimes.length * 0.05) continue;
+                  if (notes.length > lyricTimes.length * 5) continue;
+
+                  let program = 0;
+                  if (parsedMidi && parsedMidi.tracks) {
+                    for (const track of parsedMidi.tracks) {
+                      const pcEvent = track.events.find(
+                        (e) =>
+                          (e.statusByte & 0xf0) === 0xc0 &&
+                          (e.statusByte & 0x0f) === i,
+                      );
+                      if (pcEvent && pcEvent.data && pcEvent.data.length > 0) {
+                        program = pcEvent.data[0];
+                        break;
+                      }
+                    }
+                  }
+
+                  let overlaps = 0;
+                  let pitchSum = notes[0].midiNote;
+                  let totalInterval = 0;
+                  let shortNotes = notes[0].length < 0.25 ? 1 : 0;
+
+                  for (let n = 1; n < notes.length; n++) {
+                    const prevNote = notes[n - 1];
+                    const prevNoteEnd = prevNote.start + prevNote.length;
+
+                    if (notes[n].start < prevNoteEnd - 0.05) overlaps++;
+
+                    pitchSum += notes[n].midiNote;
+                    totalInterval += Math.abs(
+                      notes[n].midiNote - prevNote.midiNote,
+                    );
+                    if (notes[n].length < 0.25) shortNotes++;
+                  }
+
+                  const polyphonyRatio = overlaps / notes.length;
+                  if (polyphonyRatio > 0.25) continue;
+
+                  const avgInterval =
+                    totalInterval / Math.max(1, notes.length - 1);
+                  const shortNoteRatio = shortNotes / notes.length;
+
+                  let matches = 0;
+                  for (let l = 0; l < lyricTimes.length; l++) {
+                    const lTime = lyricTimes[l];
+                    const noteForLyric = notes.find(
+                      (n) =>
+                        Math.abs(n.start - lTime) < 0.15 ||
+                        (n.start <= lTime &&
+                          n.start + n.length >= lTime + 0.05),
+                    );
+                    if (noteForLyric) matches++;
+                  }
+
+                  const matchRatio = matches / lyricTimes.length;
+                  const densityRatio = notes.length / lyricTimes.length;
+                  const avgPitch = pitchSum / notes.length;
+
+                  let primaryScore = matchRatio * 2.0 - polyphonyRatio * 4.0;
+
+                  if (densityRatio > 1.3)
+                    primaryScore -= (densityRatio - 1.3) * 1.0;
+                  else if (densityRatio < 0.7)
+                    primaryScore -= (0.7 - densityRatio) * 1.0;
+
+                  let pitchPenalty = 0;
+                  if (avgPitch < 50) pitchPenalty = (50 - avgPitch) * 0.15;
+                  if (avgPitch > 85) pitchPenalty = (avgPitch - 85) * 0.15;
+                  primaryScore -= pitchPenalty;
+
+                  if (avgInterval > 3.5)
+                    primaryScore -= (avgInterval - 3.5) * 1.5;
+                  if (shortNoteRatio > 0.8)
+                    primaryScore -= (shortNoteRatio - 0.8) * 3.0;
+
+                  if (i === 3) primaryScore += 0.8;
+                  else if (i === 4) primaryScore += 0.3;
+
+                  if (highPriorityInstruments.includes(program)) {
+                    primaryScore += 1.0;
+                  } else if (medPriorityInstruments.includes(program)) {
+                    primaryScore += 0.4;
+                  } else if (penalizedInstruments.includes(program)) {
+                    primaryScore -= 1.5;
+                  }
+
+                  candidateChannels.push({
+                    index: i,
+                    notes,
+                    matchRatio,
+                    polyphonyRatio,
+                    avgPitch,
+                    avgInterval,
+                    shortNoteRatio,
+                    program,
+                    primaryScore,
+                  });
+                }
+
+                candidateChannels.sort(
+                  (a, b) => b.primaryScore - a.primaryScore,
                 );
 
-                for (let i = 1; i < candidateChannels.length; i++) {
-                  const candidate = candidateChannels[i];
-
-                  if (Math.abs(mainChannel.avgPitch - candidate.avgPitch) > 18)
-                    continue;
-
-                  if (
-                    candidate.avgInterval > 4.0 ||
-                    candidate.shortNoteRatio > 0.85
-                  )
-                    continue;
-                  if (penalizedInstruments.includes(candidate.program))
-                    continue;
-
-                  const minimumMatches = Math.max(
-                    2,
-                    Math.floor(lyricTimes.length * 0.03),
+                if (
+                  candidateChannels.length > 0 &&
+                  candidateChannels[0].matchRatio > 0.15
+                ) {
+                  const mainChannel = candidateChannels[0];
+                  validChannels = [mainChannel];
+                  logVerbose(
+                    `Primary Vocal Guide on Channel ${mainChannel.index + 1} (${mainChannel.program})`,
                   );
-                  const rawMatches = Math.round(
-                    candidate.matchRatio * lyricTimes.length,
-                  );
-                  if (rawMatches < minimumMatches) {
-                    continue;
-                  }
 
-                  let overlapCount = 0;
-                  for (const cNote of candidate.notes) {
-                    const cEnd = cNote.start + cNote.length;
-                    const overlapsMain = mainChannel.notes.some((mNote) => {
-                      const mEnd = mNote.start + mNote.length;
-                      return (
-                        cNote.start < mEnd - 0.05 && cEnd - 0.05 > mNote.start
-                      );
-                    });
+                  for (let i = 1; i < candidateChannels.length; i++) {
+                    const candidate = candidateChannels[i];
 
-                    if (overlapsMain) overlapCount++;
-                  }
+                    if (
+                      Math.abs(mainChannel.avgPitch - candidate.avgPitch) > 18
+                    )
+                      continue;
 
-                  if (overlapCount / candidate.notes.length < 0.2) {
-                    validChannels.push(candidate);
-                    logVerbose(
-                      `Secondary Helper Guide found on Channel ${candidate.index + 1} (${candidate.program})`,
+                    if (
+                      candidate.avgInterval > 4.0 ||
+                      candidate.shortNoteRatio > 0.85
+                    )
+                      continue;
+                    if (penalizedInstruments.includes(candidate.program))
+                      continue;
+
+                    const minimumMatches = Math.max(
+                      2,
+                      Math.floor(lyricTimes.length * 0.03),
                     );
+                    const rawMatches = Math.round(
+                      candidate.matchRatio * lyricTimes.length,
+                    );
+                    if (rawMatches < minimumMatches) {
+                      continue;
+                    }
+
+                    let overlapCount = 0;
+                    for (const cNote of candidate.notes) {
+                      const cEnd = cNote.start + cNote.length;
+                      const overlapsMain = mainChannel.notes.some((mNote) => {
+                        const mEnd = mNote.start + mNote.length;
+                        return (
+                          cNote.start < mEnd - 0.05 && cEnd - 0.05 > mNote.start
+                        );
+                      });
+
+                      if (overlapsMain) overlapCount++;
+                    }
+
+                    if (overlapCount / candidate.notes.length < 0.2) {
+                      validChannels.push(candidate);
+                      logVerbose(
+                        `Secondary Helper Guide found on Channel ${candidate.index + 1} (${candidate.program})`,
+                      );
+                    }
                   }
                 }
               }
             }
-
             if (validChannels.length > 0) {
               this.state.playback.guideChannels = validChannels;
               document.dispatchEvent(
