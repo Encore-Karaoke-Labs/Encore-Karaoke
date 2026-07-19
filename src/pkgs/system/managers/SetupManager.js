@@ -271,7 +271,7 @@ export default class SetupManager {
       { id: "library", label: "Library & Storage", icon: "folder" },
       { id: "sync", label: "Network Sync", icon: "cloud-download" },
       { id: "audio", label: "Sound Settings", icon: "volume-high" },
-      { id: "mic", label: "Microphone Settings", icon: "mic" },
+      { id: "mic", label: "Mic & Scoring Settings", icon: "mic" },
       { id: "video", label: "Video Settings", icon: "tv" },
       { id: "security", label: "User Security", icon: "lock-closed" },
       {
@@ -625,7 +625,7 @@ export default class SetupManager {
         ],
       },
       mic: {
-        title: "Microphone Settings",
+        title: "Mic & Scoring Settings",
         items: [
           {
             id: "device",
