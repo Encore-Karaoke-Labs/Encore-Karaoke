@@ -478,7 +478,7 @@ export class FortePlayback {
           this.state.playback.synthesizer,
         );
         this.state.playback.sequencer.loop = false;
-        this.state.playback.synthesizer.setSystemParameter("keyShift", 0);
+        this.setTranspose(0);
 
         bindSpessaEvent(
           this.state.playback.sequencer.eventHandler,
@@ -1349,7 +1349,7 @@ export class FortePlayback {
     }
 
     if (this.state.playback.isMidi) {
-      this.state.playback.synthesizer.setSystemParameter("keyShift", 0);
+      this.setTranspose(0);
       if (this.state.playback.sequencer) {
         try {
           this.state.playback.sequencer.pause();
