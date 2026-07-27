@@ -475,8 +475,22 @@ const pkg = {
       const newSongList = [];
       const newlyAddedSongs = [];
 
-      const oldPaths = new Set(cachedList.map((s) => toRelative(s.path)));
-      let songCodeCounter = 1;
+      const previousList = embeddedCache?.songList || cachedList || [];
+      const codeMap = new Map();
+      let maxCode = 0;
+
+      for (const song of previousList) {
+        const relPath = toRelative(song.path);
+        if (!relPath) continue;
+
+        codeMap.set(relPath, song.code);
+
+        const numCode = parseInt(song.code, 10);
+        if (!isNaN(numCode) && numCode > maxCode) {
+          maxCode = numCode;
+        }
+      }
+
       const allFilenames = new Set(files.map((f) => f.name));
 
       const processableFiles = files.filter(
@@ -486,6 +500,8 @@ const pkg = {
             file.name.endsWith(".mid") ||
             file.name.endsWith(".kar")),
       );
+
+      processableFiles.sort((a, b) => a.name.localeCompare(b.name));
 
       const totalFiles = processableFiles.length;
       dispatchBuildProgress(0, totalFiles);
@@ -700,8 +716,16 @@ const pkg = {
         for (const parsedData of parsedFilesData) {
           if (!parsedData) continue;
 
+          let songCode;
+          if (codeMap.has(parsedData.path)) {
+            songCode = codeMap.get(parsedData.path);
+          } else {
+            maxCode++;
+            songCode = String(maxCode).padStart(5, "0");
+          }
+
           const newSongObj = {
-            code: String(songCodeCounter++).padStart(5, "0"),
+            code: songCode,
             artist: parsedData.artist,
             title: parsedData.title,
             type: parsedData.type,
@@ -714,15 +738,19 @@ const pkg = {
 
           newSongList.push(newSongObj);
 
-          if (cachedList.length > 0 && !oldPaths.has(parsedData.path)) {
+          if (previousList.length > 0 && !codeMap.has(parsedData.path)) {
             newlyAddedSongs.push(newSongObj);
           }
         }
 
+        newSongList.sort((a, b) => parseInt(a.code, 10) - parseInt(b.code, 10));
+
+        const previousNewSongs =
+          embeddedCache?.newSongs || cachedNewSongs || [];
         const relativeNewSongs =
           newlyAddedSongs.length > 0
             ? newlyAddedSongs
-            : cachedNewSongs.map((s) => ({
+            : previousNewSongs.map((s) => ({
                 ...s,
                 path: toRelative(s.path),
                 lrcPath: toRelative(s.lrcPath),
