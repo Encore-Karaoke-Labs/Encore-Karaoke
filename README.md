@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="Encore Header" src="readme-header.png" style="border-radius: 15px; margin-bottom: 20px;" />
+  <img alt="Encore Header" src="header.png" style="border-radius: 15px; margin-bottom: 20px;" />
 
 # Encore Karaoke Player
 
