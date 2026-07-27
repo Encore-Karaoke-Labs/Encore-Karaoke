@@ -591,7 +591,7 @@ export default class SessionManager {
               avatarBtn.text("Avatar Selected!");
             } catch (err) {
               this.ctx.modules.infoBar.showTemp(
-                "AVATAR ERROR",
+                "AVATAR",
                 "Failed to process image.",
                 3000,
               );
@@ -683,7 +683,7 @@ export default class SessionManager {
             root.ui.startLoungeBackground();
           } catch (e) {
             this.ctx.modules.infoBar.showTemp(
-              "SESSION ERROR",
+              "SESSIONS",
               isHost
                 ? "Failed to connect to signaling server."
                 : "Failed to join room. Check ID.",
