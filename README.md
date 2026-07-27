@@ -28,8 +28,8 @@
   - Queue tracks, send "Cheers", chat with the room, and turn your phone into a camera in one tap!
   - Works seamlessly on your local network, with a Cloud tunnel fallback for devices not on the same network.
 - **Versatile Media Support (MTVs & Multiplex)**
-  - Supports MIDI karaoke (`.mid`, `.kar`) with SoundFont (`.sf2`) playback.
-  - Supports RealSound tracks (`.mp3`, `.wav`, `.m4a`) combined with `.lrc` lyrics.
+  - Supports MIDI karaoke (`.mid`, `.kar`) with SoundFont (`.sf2`, `.sf3` & `.dls`) playback.
+  - Supports audio tracks (`.mp3`, `.wav`, `.m4a`, `.ogg`) paired with `.lrc` lyrics or CDG.
   - Supports high-quality MTVs (Music Videos) (`.mp4`, `.mkv`, `.webm`, `.avi`).
   - Full support for **Multiplex tracks** (pan left/right to toggle the guide vocal).
 - **Native YouTube Integration**
@@ -54,12 +54,16 @@
 > [!WARNING]
 > For legal reasons, Encore does not come with a Song Library by default. Learn more on how you can make your own libraries below, or contact us at [sky@encorekaraoke.org](mailto:sky@encorekaraoke.org).
 
-Encore automatically scans your local drives for a folder named **`EncoreLibrary`**.
+Encore automatically scans your local drives for a folder named **`EncoreLibrary`**, or you can use the Library Manager to import your library.
+
+<div align="center">
+  <img alt="Encore Library Manager" src="library-manager.png" style="border-radius: 15px; margin-bottom: 20px; margin-top: 20px;" />
+</div>
 
 To build your library, structure your files like this:
 
 ```text
-D:/EncoreLibrary/                                             # Also works on the C drive as well!
+D:/EncoreLibrary/                                             # Should work for any folder
  ├── manifest.json                                            # Metadata and BGV (Background Video) configs
  ├── [Your Artist] - [Song].mp3                               # Audio file (Compatible with ID3 tags)
  ├── [Your Artist] - [Song].lrc                               # Matching LRC lyrics file
