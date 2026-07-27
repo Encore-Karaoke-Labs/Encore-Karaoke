@@ -548,14 +548,6 @@ export class FortePlayback {
             }
 
             const cleanText = text.replace(/[\r\n\/\\]/g, "");
-
-            if (cleanText === "@IENCOREDUET") {
-              logVerbose("This is a duet");
-              document.dispatchEvent(
-                new CustomEvent("CherryTree.Forte.Playback.DuetDetected"),
-              );
-            }
-
             const trimmedClean = cleanText.trim();
             const isSunplusLyric =
               trimmedClean === "#" ||
@@ -700,6 +692,56 @@ export class FortePlayback {
                 }
               }
             } catch (e) {}
+            let isDuet = false;
+            let embeddedVocalChannel = null;
+
+            if (parsedMidi && parsedMidi.tracks) {
+              for (const track of parsedMidi.tracks) {
+                for (const e of track.events) {
+                  if (
+                    e.statusByte === midiMessageTypes.text ||
+                    e.statusByte === midiMessageTypes.lyric
+                  ) {
+                    if (e.data && e.data.length > 0) {
+                      const text = new TextDecoder("utf-8")
+                        .decode(e.data)
+                        .replace(/[\0\r\n\/\\]/g, "")
+                        .trim();
+
+                      if (text === "@IENCOREDUET") {
+                        isDuet = true;
+                      }
+
+                      const match = text.match(/@IVOCAL-CH=(\d+)/i);
+                      if (match) {
+                        embeddedVocalChannel = parseInt(match[1], 10) - 1;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            if (isDuet) {
+              logVerbose(
+                "Duet track detected via embedded meta text (pre-scan)",
+              );
+              document.dispatchEvent(
+                new CustomEvent("CherryTree.Forte.Playback.DuetDetected"),
+              );
+            }
+
+            if (
+              embeddedVocalChannel !== null &&
+              embeddedVocalChannel >= 0 &&
+              embeddedVocalChannel <= 15
+            ) {
+              manualChannel = embeddedVocalChannel;
+              logVerbose(
+                `Embedded Guide Melody tag detected: Forcing Channel ${embeddedVocalChannel + 1}`,
+              );
+            }
+
             if (manualChannel !== "auto") {
               const chIndex = parseInt(manualChannel, 10);
               const notes = channels[chIndex];
