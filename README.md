@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="Encore Header" src="header.png" style="border-radius: 15px; margin-bottom: 20px;" />
+  <img alt="Encore Header" src="readme/header.png" style="border-radius: 15px; margin-bottom: 20px;" />
 
 # Encore Karaoke Player
 
@@ -8,7 +8,7 @@
 </div>
 
 <div align="center">
-  <img alt="Encore Header" src="demo.gif" style="border-radius: 15px; margin-bottom: 20px; margin-top: 20px;" />
+  <img alt="Encore Header" src="readme/demo.gif" style="border-radius: 15px; margin-bottom: 20px; margin-top: 20px;" />
 </div>
 
 ---
@@ -57,7 +57,7 @@
 Encore automatically scans your local drives for a folder named **`EncoreLibrary`**, or you can use the Library Manager to import your library.
 
 <div align="center">
-  <img alt="Encore Library Manager" src="library-manager.png" style="border-radius: 15px; margin-bottom: 20px; margin-top: 20px;" />
+  <img alt="Encore Library Manager" src="readme/library-manager.png" style="border-radius: 15px; margin-bottom: 20px; margin-top: 20px;" />
 </div>
 
 To build your library, structure your files like this:
