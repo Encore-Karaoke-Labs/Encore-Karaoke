@@ -1712,6 +1712,31 @@ app.whenReady().then(async () => {
     return { success: true };
   });
 
+  ipcMain.handle("save-songbook-cache", async (event, payload) => {
+    try {
+      if (!payload || !payload.libraryPath) {
+        return { success: false, error: "No library path provided." };
+      }
+
+      const { libraryPath, songList, newSongs, signature } = payload;
+      const cachePath = path.join(libraryPath, "songdb.json");
+
+      // Write the payload straight to the library directory
+      const cacheData = JSON.stringify(
+        { signature, songList, newSongs },
+        null,
+        2,
+      );
+      await fs.promises.writeFile(cachePath, cacheData, "utf8");
+
+      logger.info("SYSTEM", `Successfully embedded cache to ${cachePath}`);
+      return { success: true };
+    } catch (e) {
+      logger.error("SYSTEM", `Failed to save embedded cache: ${e.message}`);
+      return { success: false, error: e.message };
+    }
+  });
+
   ipcMain.on("setRPC", (event, arg) => {
     currentRPCState = arg.state;
     discordClient.user?.setActivity({

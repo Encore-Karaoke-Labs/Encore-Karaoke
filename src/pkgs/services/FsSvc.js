@@ -368,7 +368,11 @@ const pkg = {
       ]);
 
       const currentSignature = [...files]
-        .filter((f) => validExts.has(f.name.split(".").pop().toLowerCase()))
+        .filter((f) => {
+          const name = f.name.toLowerCase();
+          if (name === "songdb.json" || name === "manifest.json") return false;
+          return validExts.has(name.split(".").pop());
+        })
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((f) => `${f.name}:${f.modified}`)
         .join("|");
@@ -377,17 +381,86 @@ const pkg = {
       const cachedList = (await localforage.getItem(cacheKey)) || [];
       const cachedNewSongs = (await localforage.getItem(newSongsKey)) || [];
 
-      // Check Cache
-      if (cachedSignature === currentSignature && cachedList.length > 0) {
-        console.log(
-          `[FsSvc] Cache is fresh. Loaded ${cachedList.length} songs.`,
+      let embeddedCache = null;
+      try {
+        const embeddedContent = await pkg.data.readFile(
+          `${libraryPath}songdb.json`,
         );
-        state.songList = cachedList;
-        state.newSongs = cachedNewSongs;
+        if (embeddedContent) embeddedCache = JSON.parse(embeddedContent);
+      } catch (e) {
+        // No embedded cache found
+      }
+
+      const toRelative = (p) =>
+        p && (p.includes("/") || p.includes("\\"))
+          ? p.replace(/\\/g, "/").split("/").pop()
+          : p;
+      const toAbsolute = (p) => (p ? `${libraryPath}${p}` : null);
+
+      // water up 💧💧💧
+      const hydrateSong = (song) => ({
+        ...song,
+        path: toAbsolute(toRelative(song.path)),
+        lrcPath: toAbsolute(toRelative(song.lrcPath)),
+        cdgPath: toAbsolute(toRelative(song.cdgPath)),
+        videoPath: toAbsolute(toRelative(song.videoPath)),
+        chorusPath: toAbsolute(toRelative(song.chorusPath)),
+      });
+
+      let validCacheList = null;
+      let validNewSongs = null;
+
+      if (
+        embeddedCache &&
+        embeddedCache.signature === currentSignature &&
+        embeddedCache.songList?.length > 0
+      ) {
+        validCacheList = embeddedCache.songList;
+        validNewSongs = embeddedCache.newSongs || [];
+        console.log(
+          `[FsSvc] Embedded cache is fresh. Loaded ${validCacheList.length} songs.`,
+        );
+      } else if (
+        cachedSignature === currentSignature &&
+        cachedList.length > 0
+      ) {
+        validCacheList = cachedList;
+        validNewSongs = cachedNewSongs;
+        console.log(
+          `[FsSvc] Local cache is fresh. Loaded ${validCacheList.length} songs.`,
+        );
+      }
+
+      if (validCacheList) {
+        state.songList = validCacheList.map(hydrateSong);
+        state.newSongs = validNewSongs.map(hydrateSong);
         state.currentLibraryPath = libraryPath;
         state.currentManifest = loadedManifest;
         state.isBuilding = false;
         dispatchSongListReady();
+
+        if (!embeddedCache || embeddedCache.signature !== currentSignature) {
+          const shrinkSong = (song) => ({
+            ...song,
+            path: toRelative(song.path),
+            lrcPath: toRelative(song.lrcPath),
+            cdgPath: toRelative(song.cdgPath),
+            videoPath: toRelative(song.videoPath),
+            chorusPath: toRelative(song.chorusPath),
+          });
+
+          window.desktopIntegration.ipc
+            .invoke("save-songbook-cache", {
+              libraryPath,
+              songList: validCacheList.map(shrinkSong),
+              newSongs: validNewSongs.map(shrinkSong),
+              signature: currentSignature,
+            })
+            .catch((e) =>
+              console.warn("[FsSvc] Failed to write embedded cache", e),
+            );
+        }
+
         return true;
       }
 
@@ -401,7 +474,8 @@ const pkg = {
 
       const newSongList = [];
       const newlyAddedSongs = [];
-      const oldPaths = new Set(cachedList.map((s) => s.path));
+
+      const oldPaths = new Set(cachedList.map((s) => toRelative(s.path)));
       let songCodeCounter = 1;
       const allFilenames = new Set(files.map((f) => f.name));
 
@@ -445,20 +519,20 @@ const pkg = {
                   : filename;
             }
 
-            let videoPath = null;
+            let videoName = null;
             for (const videoExt of videoExtensions) {
               const potentialVideoName = `${basename}.${videoExt}`;
               if (allFilenames.has(potentialVideoName)) {
-                videoPath = `${libraryPath}${potentialVideoName}`;
+                videoName = potentialVideoName;
                 break;
               }
             }
 
-            let chorusPath = null;
+            let chorusName = null;
             for (const audioExt of audioExtensions) {
               const potentialChorusName = `${basename}.chorus.${audioExt}`;
               if (allFilenames.has(potentialChorusName)) {
-                chorusPath = `${libraryPath}${potentialChorusName}`;
+                chorusName = potentialChorusName;
                 break;
               }
             }
@@ -476,8 +550,8 @@ const pkg = {
               }
               songData = {
                 type: isMultiplexed ? "multiplexed" : hasCdg ? "cdg" : "audio",
-                lrcPath: hasLrc ? `${libraryPath}${basename}.lrc` : null,
-                cdgPath: hasCdg ? `${libraryPath}${basename}.cdg` : null,
+                lrcPath: hasLrc ? `${basename}.lrc` : null,
+                cdgPath: hasCdg ? `${basename}.cdg` : null,
               };
               try {
                 const urlObj = await NetworkingUtility.getFileLink(fullPath);
@@ -515,30 +589,18 @@ const pkg = {
               if (state.buildAbortController?.signal.aborted) {
                 throw new Error("Build cancelled");
               }
-              songData = { type: extension, lrcPath: null };
+              songData = { type: extension, lrcPath: null, cdgPath: null };
               let parsedFromMidi = false;
 
-              // Process PLATINUM/MegaPro metadata
               if (filename.toLowerCase().endsWith(".xtsp.mid")) {
                 try {
-                  if (state.buildAbortController?.signal.aborted) {
+                  if (state.buildAbortController?.signal.aborted)
                     throw new Error("Build cancelled");
-                  }
                   const urlObj = await NetworkingUtility.getFileLink(fullPath);
                   const res = await fetch(urlObj.href);
 
-                  if (state.buildAbortController?.signal.aborted) {
-                    throw new Error("Build cancelled");
-                  }
-
                   if (res.ok) {
-                    if (state.buildAbortController?.signal.aborted) {
-                      throw new Error("Build cancelled");
-                    }
                     const arrayBuffer = await res.arrayBuffer();
-                    if (state.buildAbortController?.signal.aborted) {
-                      throw new Error("Build cancelled");
-                    }
                     const parsedMidi = BasicMIDI.fromArrayBuffer(arrayBuffer);
 
                     let bestTitle = null;
@@ -546,19 +608,12 @@ const pkg = {
                     let foundWithDollar = false;
 
                     for (const track of parsedMidi.tracks) {
-                      if (state.buildAbortController?.signal.aborted) {
-                        throw new Error("Build cancelled");
-                      }
                       for (const e of track.events) {
-                        if (state.buildAbortController?.signal.aborted) {
-                          throw new Error("Build cancelled");
-                        }
                         if (
                           e.data &&
                           e.data instanceof Uint8Array &&
                           e.data.length > 2
                         ) {
-                          // 0x40 = '@'
                           if (e.data[0] === 0x40) {
                             const encoding = detectEncoding(e.data);
                             const text = new TextDecoder(encoding)
@@ -584,16 +639,14 @@ const pkg = {
                                   segments[segments.length - 1].trim() ||
                                   "Unknown Artist";
                               }
-
                               foundWithDollar = true;
                               break;
                             } else {
-                              if (!bestTitle) {
+                              if (!bestTitle)
                                 bestTitle = text
                                   .substring(1)
                                   .replace(/@/g, " ")
                                   .trim();
-                              }
                             }
                           }
                         }
@@ -609,7 +662,7 @@ const pkg = {
                   }
                 } catch (err) {
                   console.warn(
-                    `[FsSvc] Failed to parse PLATINUM/MegaPro metadata for ${filename}:`,
+                    `[FsSvc] Failed to parse PLATINUM metadata for ${filename}:`,
                     err,
                   );
                 }
@@ -629,14 +682,14 @@ const pkg = {
                 artist,
                 title,
                 type: songData.type,
-                path: fullPath,
+                path: filename,
                 lrcPath: songData.lrcPath,
                 cdgPath: songData.cdgPath,
-                videoPath: videoPath,
-                chorusPath: chorusPath,
+                videoPath: videoName,
+                chorusPath: chorusName,
               };
             }
-            return null; // Ignore invalid files
+            return null;
           },
           (processed) => {
             dispatchBuildProgress(processed, totalFiles);
@@ -666,21 +719,39 @@ const pkg = {
           }
         }
 
-        state.songList = newSongList;
+        const relativeNewSongs =
+          newlyAddedSongs.length > 0
+            ? newlyAddedSongs
+            : cachedNewSongs.map((s) => ({
+                ...s,
+                path: toRelative(s.path),
+                lrcPath: toRelative(s.lrcPath),
+                cdgPath: toRelative(s.cdgPath),
+                videoPath: toRelative(s.videoPath),
+                chorusPath: toRelative(s.chorusPath),
+              }));
 
-        if (newlyAddedSongs.length > 0) {
-          state.newSongs = newlyAddedSongs;
-        } else {
-          state.newSongs = cachedNewSongs;
-        }
+        state.songList = newSongList.map(hydrateSong);
+        state.newSongs = relativeNewSongs.map(hydrateSong);
 
         console.log(
-          `[FsSvc] Build complete. Found ${state.songList.length} songs. ${state.newSongs.length} are marked as new.`,
+          `[FsSvc] Build complete. Found ${state.songList.length} songs. ${state.newSongs.length} new.`,
         );
 
         await localforage.setItem(cacheKey, newSongList);
         await localforage.setItem(signatureKey, currentSignature);
-        await localforage.setItem(newSongsKey, state.newSongs);
+        await localforage.setItem(newSongsKey, relativeNewSongs);
+
+        await window.desktopIntegration.ipc
+          .invoke("save-songbook-cache", {
+            libraryPath,
+            songList: newSongList,
+            newSongs: relativeNewSongs,
+            signature: currentSignature,
+          })
+          .catch((err) =>
+            console.warn("[FsSvc] Failed to write embedded cache", err),
+          );
 
         state.isBuilding = false;
         state.buildAbortController = null;
@@ -689,14 +760,8 @@ const pkg = {
       } catch (err) {
         if (err.message === "Build cancelled") {
           console.log("[FsSvc] Song list build was cancelled successfully.");
-          console.log("[FsSvc] Cancellation stats:", {
-            isBuilding: state.isBuilding,
-            libraryPath: state.currentLibraryPath,
-            songsSoFar: state.songList.length,
-          });
         } else {
           console.error("[FsSvc] Error during song list build:", err.message);
-          console.error("[FsSvc] Error stack:", err.stack);
         }
         state.isBuilding = false;
         state.buildAbortController = null;
