@@ -430,7 +430,7 @@ const createWindow = () => {
     title: `Encore Karaoke ${versionInformation.channel} ${versionInformation.number} (${versionInformation.codename})`,
     width: 1280,
     height: 774,
-    icon: "resources/icon.png",
+    icon: path.join(__dirname, "resources/icon.ico"),
     autoHideMenuBar: true,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
     trafficLightPosition: { x: 14, y: 20 },
