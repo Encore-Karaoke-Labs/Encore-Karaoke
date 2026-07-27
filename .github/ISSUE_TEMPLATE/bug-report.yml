@@ -88,7 +88,7 @@ body:
     id: media-info
     attributes:
       label: File / track info (if relevant)
-      description: If the bug relates to a specific song, please share a link (any file sharing/cloud storage service) to the song you're pertaining to.
+      description: If the bug relates to a specific song, please share the song you're pertaining to.
 
   - type: checkboxes
     id: offline
