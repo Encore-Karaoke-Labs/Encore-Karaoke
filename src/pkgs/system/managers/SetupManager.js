@@ -84,17 +84,6 @@ export default class SetupManager {
         this.buildProgressBar.styleJs({ width: `${e.detail.percentage}%` });
       }
     };
-    this.boundFullscreenChange = (event, isFullscreen) => {
-      this.setupState.fullscreenEnabled = isFullscreen;
-      this.ctx.config.fullscreenEnabled = isFullscreen;
-
-      if (
-        this.setupState.view === "submenu" &&
-        this.setupState.activeMenuId === "video"
-      ) {
-        this.renderView();
-      }
-    };
     this.boundZoomChange = (event, newZoom) => {
       this.ctx.config.zoomLevel = newZoom;
 
@@ -111,10 +100,6 @@ export default class SetupManager {
     document.addEventListener(
       "CherryTree.FsSvc.SongList.Progress",
       this.boundBuildProgress,
-    );
-    window.desktopIntegration.ipc.on(
-      "fullscreen-state-changed",
-      this.boundFullscreenChange,
     );
     window.desktopIntegration.ipc.on(
       "zoom-level-changed",
@@ -186,10 +171,6 @@ export default class SetupManager {
       this.updateServers =
         await window.desktopIntegration.ipc.invoke("get-update-servers");
       this.versionInformation = await window.version.getVersionInformation();
-      this.setupState.fullscreenEnabled =
-        (await window.fullscreen.get()) ??
-        this.ctx.config.fullscreenEnabled ??
-        false;
 
       const foundLibs = await this.ctx.services.FsSvc.findEncoreLibraries();
       const activeLib = foundLibs.find(
@@ -762,19 +743,15 @@ export default class SetupManager {
           },
           {
             id: "fullscreen",
-            label: "Fullscreen Mode",
+            label: "Window Mode on Boot",
             type: "select",
             options: [
               { value: false, label: "Windowed" },
               { value: true, label: "Fullscreen" },
             ],
-            get: () =>
-              this.setupState.fullscreenEnabled ??
-              this.ctx.config.fullscreenEnabled ??
-              false,
+            get: () => this.ctx.config.fullscreenEnabled ?? false,
             set: async (v) => {
-              const fullscreenEnabled = Boolean(v);
-              this.setupState.fullscreenEnabled = fullscreenEnabled;
+              const fullscreenEnabled = v;
               this.ctx.config.fullscreenEnabled = fullscreenEnabled;
               window.config.setItem("fullscreenEnabled", fullscreenEnabled);
               await window.fullscreen.set(fullscreenEnabled);
@@ -2497,12 +2474,6 @@ export default class SetupManager {
       "CherryTree.FsSvc.SongList.Progress",
       this.boundBuildProgress,
     );
-    if (window.desktopIntegration.ipc.off) {
-      window.desktopIntegration.ipc.off(
-        "fullscreen-state-changed",
-        this.boundFullscreenChange,
-      );
-    }
     if (window.desktopIntegration.ipc.off) {
       window.desktopIntegration.ipc.off(
         "zoom-level-changed",
