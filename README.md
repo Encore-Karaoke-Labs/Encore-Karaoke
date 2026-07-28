@@ -155,6 +155,8 @@ _To run in full-screen Kiosk mode (which disables Windows Explorer that may impr
 
 ### Contributing
 
+**Please refer to our [Contributing](CONTRIBUTING.md) document for more information.**
+
 For the best experience contributing towards Encore, we recommend using [Visual Studio Code](https://code.visualstudio.com) with the Prettier extension.
 
 ---
