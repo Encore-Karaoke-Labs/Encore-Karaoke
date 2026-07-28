@@ -19,6 +19,8 @@ export default class UIManager {
     this.loungeRafId = null;
     this._scrollRafId = null;
     this._menuUpdateRafId = null;
+    this._fullscreenListenerAttached = false;
+    this._isFullscreenDetected = false;
   }
 
   /**
@@ -32,6 +34,41 @@ export default class UIManager {
     this.buildSessionChatUI();
     this.buildQR();
     this.buildSetupUI();
+    this.monitorFullscreenState();
+  }
+
+  monitorFullscreenState() {
+    if (this._fullscreenListenerAttached) return;
+    this._fullscreenListenerAttached = true;
+
+    const handleFullscreenState = async (isFullscreen) => {
+      try {
+        const isKiosk = await window.kiosk.isEnabled();
+        if (isFullscreen && !this._isFullscreenDetected && !isKiosk) {
+          this._isFullscreenDetected = true;
+          this.ctx.modules.infoBar?.showTemp(
+            "FULLSCREEN",
+            "Press F11 to exit fullscreen.",
+            3000,
+          );
+        } else if (!isFullscreen) {
+          this._isFullscreenDetected = false;
+        }
+      } catch {
+        this._isFullscreenDetected = false;
+      }
+    };
+
+    window.desktopIntegration?.ipc?.on?.(
+      "fullscreen-state-changed",
+      (_event, isFullscreen) => {
+        void handleFullscreenState(Boolean(isFullscreen));
+      },
+    );
+
+    window.fullscreen.get().then((isFullscreen) => {
+      void handleFullscreenState(Boolean(isFullscreen));
+    });
   }
 
   buildSetupUI() {
