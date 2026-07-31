@@ -351,9 +351,10 @@ const pkg = {
         return false;
       }
 
-      const cacheKey = `encore-songlist:v2:${libraryPath}`;
-      const signatureKey = `encore-signature:v2:${libraryPath}`;
-      const newSongsKey = `encore-newsongs:v2:${libraryPath}`;
+      const cacheVersion = "v2"; // Case-insensitive sibling-matching, AppleDouble filtering & NFC normalization
+      const cacheKey = `encore-songlist:${cacheVersion}:${libraryPath}`;
+      const signatureKey = `encore-signature:${cacheVersion}:${libraryPath}`;
+      const newSongsKey = `encore-newsongs:${cacheVersion}:${libraryPath}`;
 
       // macOS readdir returns NFD; Windows/Linux return NFC
       const nfc = (s) => (typeof s === "string" ? s.normalize("NFC") : s);
