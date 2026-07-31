@@ -229,7 +229,8 @@ const pkg = {
      * @returns {Promise<Array<string>>}
      */
     getDrives: async () => {
-      const url = `http://localhost:${actualPort}/drives`;
+      let accessToken = await NetworkingUtility.getAccessToken();
+      const url = `http://localhost:${actualPort}/drives?token=${accessToken}`;
       try {
         const res = await fetch(url);
         return await res.json();
@@ -244,7 +245,8 @@ const pkg = {
      * @returns {Promise<Array<object>>}
      */
     getFolder: async (path) => {
-      const url = `http://localhost:${actualPort}/list`;
+      let accessToken = await NetworkingUtility.getAccessToken();
+      const url = `http://localhost:${actualPort}/list?token=${accessToken}`;
       try {
         const res = await fetch(url, {
           method: "POST",
