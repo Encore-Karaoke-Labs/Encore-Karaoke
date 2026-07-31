@@ -109,7 +109,11 @@ Promise.all([buildOS, buildWindows])
     const iconsDir = "src/icons";
     if (fs.existsSync(iconsDir)) {
       fs.readdirSync(iconsDir).forEach((file) => {
-        if (file.endsWith(".ico") || file.endsWith(".png")) {
+        if (
+          file.endsWith(".ico") ||
+          file.endsWith(".png") ||
+          file.endsWith(".icns")
+        ) {
           fs.copyFileSync(
             path.join(iconsDir, file),
             path.join("dist/resources", file),
