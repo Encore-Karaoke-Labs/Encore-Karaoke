@@ -82,13 +82,6 @@ export default class InputManager {
           "session-chat-mode mode-chat";
         dom.sessionChatInput.elm.focus();
         return;
-      } else if (e.key.toLowerCase() === "c") {
-        e.preventDefault();
-        state.chatInputMode = "cheer";
-        dom.sessionChatMode.text("CHEER").elm.className =
-          "session-chat-mode mode-cheer";
-        dom.sessionChatInput.elm.focus();
-        return;
       }
     }
 
