@@ -92,7 +92,7 @@ Encore can be fully controlled via a standard keyboard or through EnMoku.
 | `R`             | Toggle recording (during playback) / View recordings |
 | `S`             | Open Encore Sessions menu                            |
 | `T`             | Chat (In a session)                                  |
-| `C`             | Cheer (In a session)                                 |
+| `C`             | Toggle Chorus on/off                                 |
 | `- / =`         | Adjust volume                                        |
 | `Shift + - / =` | Adjust mic monitoring volume                         |
 | `Up / Down`     | Pitch shift (Transpose) up/down                      |
@@ -100,6 +100,7 @@ Encore can be fully controlled via a standard keyboard or through EnMoku.
 | `' / "`         | Change drum presets                                  |
 | `[ / ]`         | Cycle background videos (BGVs) / Video sync offset   |
 | `F2`            | Enter Setup Mode (in main menu)                      |
+| `Space`         | Pause playback                                       |
 
 ---
 
