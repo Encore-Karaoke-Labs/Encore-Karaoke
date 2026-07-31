@@ -320,6 +320,11 @@ server.post("/list", (req, res) => {
 
       const respData = [];
       for (const file of files) {
+        // macOS writes AppleDouble sidecars ("._Song.mp3") onto exFAT/FAT/SMB
+        // volumes. They carry a real media extension, so without this they get
+        // indexed as playable zero-byte songs and persisted into songdb.json
+        // inside the library -- which then travels back to Windows on the drive.
+        if (file.startsWith("._")) continue;
         const filePath = path.join(dir, file);
         try {
           const fileStats = await fs.promises.stat(filePath);
