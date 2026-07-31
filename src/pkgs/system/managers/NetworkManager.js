@@ -352,29 +352,20 @@ export default class NetworkManager {
             ? state.deviceRegistry[deviceId].nickname
             : "Guest";
 
-        const isAudience =
-          state.isSessionActive &&
-          this.ctx.services.SessionsSvc.state.mode === "performance" &&
-          this.ctx.services.SessionsSvc.state.singerId !==
-            this.ctx.services.SessionsSvc.peer.id;
-
-        if (!isAudience) {
+        if (state.isSessionActive) {
+          this.ctx.services.SessionsSvc.broadcastCheer(
+            sender,
+            d.value.substring(0, 50),
+          );
+        } else {
           state.cheerQueue.push({
             nickname: sender,
             message: d.value.substring(0, 50),
           });
           this.processCheerQueue();
         }
-
-        if (state.isSessionActive) {
-          this.ctx.services.SessionsSvc.broadcastCheer(
-            sender,
-            d.value.substring(0, 50),
-          );
-        }
         return;
       }
-
       if (d.type === "typing_state") {
         if (d.value) state.typingUsers.add(cmd.identity);
         else state.typingUsers.delete(cmd.identity);
