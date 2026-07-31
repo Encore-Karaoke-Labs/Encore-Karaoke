@@ -3,7 +3,7 @@
 
 # Encore Karaoke Player
 
-**Experience the ultimate Asian-style KTV experience right on your computer! Bring the arcade and KTV lounge straight to your living room, without buying an expensive machine!**
+**Experience the Asian karaoke box right on your computer, with your own music!**
 
 </div>
 
