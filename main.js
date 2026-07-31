@@ -261,6 +261,13 @@ server.get("/qr", (req, res) => {
 });
 
 server.get("/drives", async (req, res) => {
+  const fToken = req.query.token;
+  if (!fToken)
+    return res
+      .status(403)
+      .json({ error: "Provide an access token to continue." });
+  if (fToken != fileToken)
+    return res.status(403).json({ error: "Invalid access token" });
   logger.debug("FILE", "Requesting drives");
   try {
     const disks = await si.fsSize();
@@ -302,6 +309,13 @@ server.get("/user-bgv-list", async (req, res) => {
 
 server.post("/list", (req, res) => {
   const dir = req.body.dir;
+  const fToken = req.query.token;
+  if (!fToken)
+    return res
+      .status(403)
+      .json({ error: "Provide an access token to continue." });
+  if (fToken != fileToken)
+    return res.status(403).json({ error: "Invalid access token" });
   if (!dir)
     return res
       .status(400)
