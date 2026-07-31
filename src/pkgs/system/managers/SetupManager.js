@@ -2332,6 +2332,8 @@ export default class SetupManager {
     let title = "SYSTEM AUTHENTICATION",
       sub = "ENTER CURRENT PIN CODE";
 
+    const hasCustomPin = !!this.ctx.config.security?.pinData;
+
     if (this.setupState.view === "pin_change") {
       if (this.setupState.pinChangeStep === 1) {
         title = "CHANGE PIN";
@@ -2345,10 +2347,24 @@ export default class SetupManager {
 
     new Html("h2").text(title).appendTo(authBox);
     new Html("p").text(sub).appendTo(authBox);
+
     const dotsWrapper = new Html("div").classOn("auth-dots").appendTo(authBox);
     for (let i = 0; i < 4; i++) {
       const dot = new Html("div").classOn("auth-dot").appendTo(dotsWrapper);
       if (i < this.setupState.authInput.length) dot.classOn("filled");
+    }
+
+    if (!hasCustomPin && this.setupState.view === "auth") {
+      new Html("p")
+        .styleJs({
+          marginTop: "2rem",
+          color: "#ffd700",
+          fontWeight: "600",
+          fontSize: "1.1rem",
+          opacity: "0.9",
+        })
+        .text("Default PIN: 0000")
+        .appendTo(authBox);
     }
   }
 
