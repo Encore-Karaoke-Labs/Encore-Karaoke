@@ -320,20 +320,7 @@ export default class NetworkManager {
             ? state.deviceRegistry[deviceId].nickname
             : "Guest";
 
-        const msgObj = {
-          id: Date.now(),
-          sender,
-          text: d.value.substring(0, 200),
-          time: Date.now(),
-        };
-        state.chatHistory.push(msgObj);
-        if (state.chatHistory.length > 100) state.chatHistory.shift();
-
         state.typingUsers.delete(cmd.identity);
-        this.socket.emit("broadcastData", {
-          type: "new_chat",
-          message: msgObj,
-        });
         this.broadcastSocialState();
 
         if (state.isSessionActive) {
@@ -341,10 +328,23 @@ export default class NetworkManager {
             sender,
             d.value.substring(0, 200),
           );
+        } else {
+          const msgObj = {
+            id: Date.now(),
+            sender,
+            text: d.value.substring(0, 200),
+            time: Date.now(),
+          };
+          state.chatHistory.push(msgObj);
+          if (state.chatHistory.length > 100) state.chatHistory.shift();
+
+          this.socket.emit("broadcastData", {
+            type: "new_chat",
+            message: msgObj,
+          });
         }
         return;
       }
-
       if (d.type === "send_cheer") {
         const deviceId = state.activeSockets[cmd.identity];
         const sender =
