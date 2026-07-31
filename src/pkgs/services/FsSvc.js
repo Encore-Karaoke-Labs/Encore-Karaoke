@@ -351,22 +351,12 @@ const pkg = {
         return false;
       }
 
-      // Bumped when the scanner's matching rules change in a way that
-      // invalidates previously cached lists (v2: case-insensitive sibling
-      // matching, AppleDouble filtering, NFC normalization).
       const cacheKey = `encore-songlist:v2:${libraryPath}`;
       const signatureKey = `encore-signature:v2:${libraryPath}`;
       const newSongsKey = `encore-newsongs:v2:${libraryPath}`;
 
-      // macOS readdir returns NFD; Windows/Linux return NFC. songdb.json lives
-      // inside the library and travels with the drive, so every string that
-      // gets compared or used as a key is normalized to NFC first. Raw readdir
-      // names are still used for actual I/O -- APFS/HFS+/exFAT accept either.
+      // macOS readdir returns NFD; Windows/Linux return NFC
       const nfc = (s) => (typeof s === "string" ? s.normalize("NFC") : s);
-
-      // macOS writes AppleDouble sidecars ("._Song.mp3") onto exFAT/FAT/SMB
-      // volumes. They carry a real media extension and would otherwise be
-      // indexed as playable zero-byte songs.
       const isAppleDouble = (name) => name.startsWith("._");
 
       const audioExtensions = new Set(["wav", "mp3", "m4a", "ogg"]);
