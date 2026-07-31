@@ -69,7 +69,8 @@ D:/EncoreLibrary/                                             # Should work for 
  ├── [Your Artist] - [Song].lrc                               # Matching LRC lyrics file
  ├── [Your Artist] - [Song].cdg                               # or matching CDG file
  ├── [Your Artist] - [Song].mp4                               # Video files for MTV
- └── [Your Artist] - [Song].mid or [Your Artist] - [Song].kar # MIDI files
+ ├── [Your Artist] - [Song].mid or [Your Artist] - [Song].kar # MIDI files
+ └── [Your Artist] - [Song].chorus.ogg                        # Backing vocals for MIDI files (OGG is recommended)
 ```
 
 _Note: For Multiplex tracks (where vocals are on one channel and instrumentals on the other), add `.multiplexed.` to the filename before the extension (e.g., `Song.multiplexed.mp3`)._
