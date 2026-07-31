@@ -1810,6 +1810,9 @@ export default class SetupManager {
         this.transitionTo(
           this.setupState.isDataLoaded ? "dashboard" : "loading",
         );
+        if (!this.ctx.config.security?.pinData) {
+          this.showToast("Please change your default PIN in User Security.");
+        }
       } else {
         this.showToast("INCORRECT PIN", "error");
         this.setupState.authInput = "";
