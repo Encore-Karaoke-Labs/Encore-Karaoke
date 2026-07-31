@@ -351,9 +351,23 @@ const pkg = {
         return false;
       }
 
-      const cacheKey = `encore-songlist:${libraryPath}`;
-      const signatureKey = `encore-signature:${libraryPath}`;
-      const newSongsKey = `encore-newsongs:${libraryPath}`;
+      // Bumped when the scanner's matching rules change in a way that
+      // invalidates previously cached lists (v2: case-insensitive sibling
+      // matching, AppleDouble filtering, NFC normalization).
+      const cacheKey = `encore-songlist:v2:${libraryPath}`;
+      const signatureKey = `encore-signature:v2:${libraryPath}`;
+      const newSongsKey = `encore-newsongs:v2:${libraryPath}`;
+
+      // macOS readdir returns NFD; Windows/Linux return NFC. songdb.json lives
+      // inside the library and travels with the drive, so every string that
+      // gets compared or used as a key is normalized to NFC first. Raw readdir
+      // names are still used for actual I/O -- APFS/HFS+/exFAT accept either.
+      const nfc = (s) => (typeof s === "string" ? s.normalize("NFC") : s);
+
+      // macOS writes AppleDouble sidecars ("._Song.mp3") onto exFAT/FAT/SMB
+      // volumes. They carry a real media extension and would otherwise be
+      // indexed as playable zero-byte songs.
+      const isAppleDouble = (name) => name.startsWith("._");
 
       const audioExtensions = new Set(["wav", "mp3", "m4a", "ogg"]);
       const videoExtensions = new Set(["mp4", "mkv", "webm", "avi"]);
@@ -369,12 +383,13 @@ const pkg = {
 
       const currentSignature = [...files]
         .filter((f) => {
-          const name = f.name.toLowerCase();
+          if (isAppleDouble(f.name)) return false;
+          const name = nfc(f.name).toLowerCase();
           if (name === "songdb.json" || name === "manifest.json") return false;
           return validExts.has(name.split(".").pop());
         })
         .sort((a, b) => a.name.localeCompare(b.name))
-        .map((f) => `${f.name}:${f.modified}`)
+        .map((f) => `${nfc(f.name)}:${f.modified}`)
         .join("|");
 
       const cachedSignature = await localforage.getItem(signatureKey);
@@ -392,9 +407,11 @@ const pkg = {
       }
 
       const toRelative = (p) =>
-        p && (p.includes("/") || p.includes("\\"))
-          ? p.replace(/\\/g, "/").split("/").pop()
-          : p;
+        nfc(
+          p && (p.includes("/") || p.includes("\\"))
+            ? p.replace(/\\/g, "/").split("/").pop()
+            : p,
+        );
       const toAbsolute = (p) => (p ? `${libraryPath}${p}` : null);
 
       // water up 💧💧💧
@@ -491,15 +508,21 @@ const pkg = {
         }
       }
 
-      const allFilenames = new Set(files.map((f) => f.name));
-
-      const processableFiles = files.filter(
-        (file) =>
-          file.type === "file" &&
-          (audioExtensions.has(file.name.split(".").pop().toLowerCase()) ||
-            file.name.endsWith(".mid") ||
-            file.name.endsWith(".kar")),
+      // Case- and normalization-insensitive index of what's on disk. Commercial
+      // CDG libraries are typically all-uppercase ("SONG.MP3" + "SONG.CDG"),
+      // and an exact-case Set lookup silently fails to pair them. Maps the
+      // folded name back to the real on-disk name, which is what I/O needs.
+      const byLower = new Map(
+        files.map((f) => [nfc(f.name).toLowerCase(), f.name]),
       );
+      const findSibling = (name) =>
+        byLower.get(nfc(name).toLowerCase()) || null;
+
+      const processableFiles = files.filter((file) => {
+        if (file.type !== "file" || isAppleDouble(file.name)) return false;
+        const ext = nfc(file.name).split(".").pop().toLowerCase();
+        return audioExtensions.has(ext) || ext === "mid" || ext === "kar";
+      });
 
       processableFiles.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -537,28 +560,24 @@ const pkg = {
 
             let videoName = null;
             for (const videoExt of videoExtensions) {
-              const potentialVideoName = `${basename}.${videoExt}`;
-              if (allFilenames.has(potentialVideoName)) {
-                videoName = potentialVideoName;
-                break;
-              }
+              videoName = findSibling(`${basename}.${videoExt}`);
+              if (videoName) break;
             }
 
             let chorusName = null;
             for (const audioExt of audioExtensions) {
-              const potentialChorusName = `${basename}.chorus.${audioExt}`;
-              if (allFilenames.has(potentialChorusName)) {
-                chorusName = potentialChorusName;
-                break;
-              }
+              chorusName = findSibling(`${basename}.chorus.${audioExt}`);
+              if (chorusName) break;
             }
 
             let songData = null;
             let artist = "Unknown Artist";
             let title = basename.replace(/\[.*?\]/g, "").trim();
 
-            const hasLrc = allFilenames.has(`${basename}.lrc`);
-            const hasCdg = allFilenames.has(`${basename}.cdg`);
+            const lrcName = findSibling(`${basename}.lrc`);
+            const cdgName = findSibling(`${basename}.cdg`);
+            const hasLrc = Boolean(lrcName);
+            const hasCdg = Boolean(cdgName);
 
             if (audioExtensions.has(extension) && (hasLrc || hasCdg)) {
               if (state.buildAbortController?.signal.aborted) {
@@ -566,8 +585,8 @@ const pkg = {
               }
               songData = {
                 type: isMultiplexed ? "multiplexed" : hasCdg ? "cdg" : "audio",
-                lrcPath: hasLrc ? `${basename}.lrc` : null,
-                cdgPath: hasCdg ? `${basename}.cdg` : null,
+                lrcPath: lrcName,
+                cdgPath: cdgName,
               };
               try {
                 const urlObj = await NetworkingUtility.getFileLink(fullPath);
