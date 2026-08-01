@@ -184,6 +184,11 @@ For the best experience contributing towards Encore, we recommend using [Visual 
   - 3D BGV development
   - Voice provider for Encore's score sounds
   - Creator and designer behind Encore's mascot, Akiyama Hoshi
+- **[MTSyntho](https://github.com/MTSyntho)**
+  - Provided resources for Linux support
+- **[prjoni99](https://github.com/prjoni99)**:
+  - Provided resouces for Mac support
+  - Indicated the app's first potential security flaws
 - **[Spessasus](http://github.com/spessasus/)**:
   - Creator of SpessaSynth, the synthesizer that powers Encore
   - Has provided code suggestions & deeper insights to SpessaSynth
