@@ -189,7 +189,7 @@ For the best experience contributing towards Encore, we recommend using [Visual 
 - **[prjoni99](https://github.com/prjoni99)**:
   - Provided resouces for Mac support
   - Indicated the app's first potential security flaws
-- **[Spessasus](http://github.com/spessasus/)**:
+- **[Spessasus](https://github.com/spessasus/)**:
   - Creator of SpessaSynth, the synthesizer that powers Encore
   - Has provided code suggestions & deeper insights to SpessaSynth
 - **[Objecty](https://www.youtube.com/@objecty)**:
