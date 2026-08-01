@@ -23,8 +23,15 @@ This document covers how to get set up, what we expect from contributions, and h
 
 - Match the existing code style in the file/module you're editing rather than introducing a new convention. We recommend using [Visual Studio Code](https://code.visualstudio.com) with the Prettier extension.
 - Keep performance in mind. We all don't have the highest-spec computers, and regressions here affect real users on real hardware at real events.
-- Comment non-obvious logic, especially around timing, sync, and hardware-specific workarounds.
+- Comment non-obvious logic, especially around timing, sync, and hardware-specific workarounds. Be as concise as possible when writing comments.
 - Avoid adding new dependencies unless necessary. If you do, explain why in your PR. We're cautious about dependency bloat given our low-spec targets.
+
+## Contributing with AI
+
+We do not prohibit the use of artificial intelligence for your PRs, with the exception of these:
+
+- Media, including but not limited to illustrations, videos and music generated with atificial intelligence is prohibited and contributions that include them will immediately get rejected.
+- Contributions that are not transparent in their AI usage may get rejected.
 
 ## Commit messages
 
