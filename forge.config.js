@@ -49,19 +49,14 @@ module.exports = {
     asar: true,
     name: APP_NAME,
 
-    // Extensionless: packager appends .icns on darwin and .ico on win32. The
-    // previous "icon.ico" was silently ignored on macOS -- no error, the
-    // bundle just kept Electron's default atom icon.
+    // Extensionless: packager appends .icns on darwin and .ico on win32.
     icon: "dist/resources/icon",
 
-    // --- macOS bundle identity ---
     appBundleId: "org.encorekaraoke.desktop",
     appCategoryType: "public.app-category.music",
     appCopyright: "Copyright © 2026 Encore Karaoke Labs",
 
-    // Written as NS<Type>UsageDescription into the app plist and every helper
-    // plist. Without these, calling getUserMedia on macOS terminates the
-    // process rather than showing a denial.
+    // Makes features like getUserMedia work in Mac
     usageDescription: {
       Microphone:
         "Encore Karaoke uses your microphone to score your singing and record your performances.",
@@ -79,9 +74,7 @@ module.exports = {
     extendInfo: {
       NSLocalNetworkUsageDescription:
         "Encore Karaoke uses your local network so phones on the same Wi-Fi can act as remote controls, and to find Encore song-update servers.",
-      // Declaration hygiene per Apple TN3179. bonjour-service does raw 5353
-      // multicast rather than dns-sd, so this does not by itself unblock
-      // discovery -- keep it in sync with the service types used in main.js.
+      // Bonjour-service uses raw 5353 multicast, not dns-sd; keep synced with main.js.
       NSBonjourServices: ["_enmoku._tcp", "_encore-server._tcp"],
       NSRemovableVolumesUsageDescription:
         "Encore Karaoke reads your karaoke library from external drives.",
@@ -121,34 +114,15 @@ module.exports = {
 
       return true;
     },
-    // Windows/Linux want a lowercase binary name. macOS must NOT set this:
-    // packager derives CFBundleDisplayName from executableName, so setting it
-    // makes the microphone prompt read "encore-karaoke would like to access
-    // the microphone". Omitting it on darwin makes packager use the app name
-    // for CFBundleExecutable, CFBundleDisplayName and Contents/MacOS/ alike.
-    //
-    // This cannot be repaired in a postPackage hook: @electron/packager signs
-    // AND notarizes inside its own pipeline, so Forge's postPackage runs after
-    // both, and editing Info.plist there invalidates the signature
-    // ("invalid Info.plist (plist or signature have been modified)").
-    //
-    // process.platform is the build host, which is correct here -- macOS
-    // bundles can only be signed on macOS, and Windows/Linux artifacts are
-    // built on their own runners.
+    // macOS must omit executableName so packager derives CFBundle values from
+    // the app name; Windows/Linux use lowercase executableName.
+    // postPackage cannot fix this because signing/notarization happen earlier.
     ...(process.platform === "darwin"
       ? {}
       : { executableName: "encore-karaoke" }),
   },
   hooks: {
-    // osxNotarize notarizes the .app inside @electron/packager, which runs
-    // before the makers -- so the .dmg that users actually download carries no
-    // ticket of its own ("rejected, source=no usable signature"). The stapled
-    // app inside still validates on launch, but Apple's guidance is to
-    // notarize the distributed container, and an unticketed disk image can
-    // trip "can't be opened because Apple cannot check it" on mount.
-    //
-    // Unlike editing Info.plist post-signing, this is safe: stapling is
-    // designed to append a ticket to a finished artifact.
+    // Notarize and staple signed DMG after packaging.
     postMake: async (_forgeConfig, makeResults) => {
       const profile = process.env.APPLE_KEYCHAIN_PROFILE;
       if (process.platform !== "darwin" || !profile) return makeResults;
@@ -165,14 +139,7 @@ module.exports = {
       for (const dmg of dmgs) {
         const name = path.basename(dmg);
 
-        // Order matters and is not interchangeable: the disk image must be
-        // SIGNED first, then notarized, then stapled. Notarizing an unsigned
-        // .dmg does yield a ticket that `stapler validate` accepts, but spctl
-        // still reports "rejected, source=no usable signature" -- the ticket
-        // is meaningless without a signature to bind it to. And signing after
-        // notarizing rewrites the file, invalidating the ticket: re-stapling
-        // then fails with Error 65 because the notary has no record of the
-        // new hash.
+        // Must sign before notarizing, then staple; otherwise notarization or stapling fails.
         if (identity) {
           console.log(`\n[dmg] signing ${name}`);
           await execFile("codesign", [
