@@ -449,7 +449,13 @@ const createWindow = () => {
     title: `Encore Karaoke ${versionInformation.channel} ${versionInformation.number} (${versionInformation.codename})`,
     width: 1280,
     height: 774,
-    icon: path.join(__dirname, "resources/icon.ico"),
+    // .ico is a Windows format; on macOS the bundle's own .icns is used and on
+    // Linux the BrowserWindow icon should be the PNG.
+    ...(process.platform === "win32"
+      ? { icon: path.join(__dirname, "resources/icon.ico") }
+      : process.platform === "linux"
+        ? { icon: path.join(__dirname, "resources/icon.png") }
+        : {}),
     autoHideMenuBar: true,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
     trafficLightPosition: { x: 14, y: 20 },
@@ -1484,7 +1490,11 @@ app.whenReady().then(async () => {
       title: "Encore Library Manager",
       width: 1000,
       height: 700,
-      icon: "resources/icon.png",
+      // Was cwd-relative, so it resolved to nothing when launched from Finder
+      // or the Dock on any platform.
+      ...(process.platform === "darwin"
+        ? {}
+        : { icon: path.join(__dirname, "resources/icon.png") }),
       frame: process.platform !== "darwin" ? false : true,
       titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
       trafficLightPosition: { x: 14, y: 19 },
