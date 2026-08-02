@@ -579,6 +579,8 @@ export class BGVModule {
     this.isManualMode = true;
     if (this.videoElement) this.videoElement.onended = null;
 
+    if (this.transitionTimeout) clearTimeout(this.transitionTimeout);
+
     this.currentLoadId = Date.now();
     const loadId = this.currentLoadId;
 
