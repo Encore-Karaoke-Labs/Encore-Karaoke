@@ -215,9 +215,17 @@ export class BGVModule {
     let allVideos = [];
     const isAuto = this.selectedCategory === "Auto";
 
-    const catList = isAuto
+    let catList = isAuto
       ? this.categories
       : this.categories.filter((c) => c.BGV_CATEGORY === this.selectedCategory);
+
+    if (catList.length === 0 && !isAuto && this.categories.length > 0) {
+      console.warn(
+        `[BGV] Category "${this.selectedCategory}" not found. Falling back to "Auto".`,
+      );
+      this.selectedCategory = "Auto";
+      catList = this.categories;
+    }
 
     for (const cat of catList) {
       if (cat.isAbsolute) {
