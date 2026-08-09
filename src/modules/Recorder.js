@@ -249,11 +249,15 @@ export class RecorderModule {
 
   /**
    * Sets the current song information and pre-renders metadata.
-   * @param {Object} song - Song object with title and artist properties.
+   * @param {Object} song - Song object with title, artist, and format properties.
    */
   setSongInfo(song) {
     if (song) {
-      this.currentSongInfo = { title: song.title, artist: song.artist };
+      this.currentSongInfo = {
+        title: song.title,
+        artist: song.artist,
+        isCdg: !!song.cdgPath,
+      };
       this._preRenderMeta();
     }
   }
@@ -694,12 +698,14 @@ export class RecorderModule {
       );
     }
 
+    // 3. Composite background video buffer onto main context with crossfade opacity
     if (this.bgvCurrentOpacity > 0.01) {
       ctx.globalAlpha = this.bgvCurrentOpacity;
       ctx.drawImage(this.bgvCanvas, 0, 0, w, h);
       ctx.globalAlpha = 1.0;
     }
 
+    // 4. Render CD+G graphics layer directly on top at 100% full opacity (independent of BGV fading)
     const customCanvas = this.bgvPlayer.customCanvas;
     if (customCanvas && customCanvas.width > 0 && customCanvas.height > 0) {
       this._drawContain(
@@ -776,24 +782,27 @@ export class RecorderModule {
       if (this.lyricOpacity > 0.01) {
         ctx.globalAlpha = this.lyricOpacity;
 
-        ctx.fillStyle = this.lyricGradient;
-        ctx.fillRect(0, h * 0.4, w, h * 0.6);
+        if (!this.currentSongInfo?.isCdg) {
+          ctx.fillStyle = this.lyricGradient;
+          ctx.fillRect(0, h * 0.4, w, h * 0.6);
 
-        ctx.textAlign = "center";
-        ctx.textBaseline = "bottom";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
 
-        if (this.uiRefs.lyricsCanvas) {
-          const sourceCanvas = this.uiRefs.lyricsCanvas.elm;
+          if (this.uiRefs.lyricsCanvas) {
+            const sourceCanvas = this.uiRefs.lyricsCanvas.elm;
 
-          const targetWidth = w * 0.9;
-          const scaleRatio = targetWidth / sourceCanvas.width;
-          const drawHeight = sourceCanvas.height * scaleRatio;
+            const targetWidth = w * 0.9;
+            const scaleRatio = targetWidth / sourceCanvas.width;
+            const drawHeight = sourceCanvas.height * scaleRatio;
 
-          const drawX = (w - targetWidth) / 2;
-          const drawY = h - drawHeight + 60;
+            const drawX = (w - targetWidth) / 2;
+            const drawY = h - drawHeight + 60;
 
-          ctx.drawImage(sourceCanvas, drawX, drawY, targetWidth, drawHeight);
+            ctx.drawImage(sourceCanvas, drawX, drawY, targetWidth, drawHeight);
+          }
         }
+
         ctx.globalAlpha = 1.0;
       }
 
