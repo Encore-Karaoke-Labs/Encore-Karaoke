@@ -5,7 +5,8 @@
 
 **Experience the Asian karaoke box right on your computer, with your own music!**
 
-![Version badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fversioning.encorekaraoke.org%2FversionInfo&query=%24.number&label=version) ![Channel badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fversioning.encorekaraoke.org%2FversionInfo&query=%24.channel&label=channel&color=%23FFD700)
+![Version badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fversioning.encorekaraoke.org%2FversionInfo&query=%24.number&prefix=v&label=version&color=%2389CFF0)
+![Channel badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fversioning.encorekaraoke.org%2FversionInfo&query=%24.channel&label=channel&color=%23FFD700)
 
 </div>
 
