@@ -381,6 +381,9 @@ export default class PlaybackManager {
               ctx.clearRect(0, 0, logicalWidth, logicalHeight);
               ctx.imageSmoothingEnabled = false;
 
+              ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+              ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+
               const scale = Math.min(
                 logicalWidth / this.currentCdgBitmap.width,
                 logicalHeight / this.currentCdgBitmap.height,
