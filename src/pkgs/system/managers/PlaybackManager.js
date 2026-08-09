@@ -97,6 +97,51 @@ export default class PlaybackManager {
   }
 
   /**
+   * Samples four corners of the CD+G frame buffer to identify and remove the background color.
+   *
+   * @param {ImageData} imageData - Raw pixel buffer from cdgraphics.
+   * @returns {ImageData} - The modified ImageData with alpha transparency applied.
+   */
+  processCdgTransparency(imageData) {
+    if (!imageData || !imageData.data) return imageData;
+
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+
+    if (data.length < 16) return imageData;
+
+    const corners = [
+      0, // Top-Left (0, 0)
+      (width - 1) * 4, // Top-Right (width-1, 0)
+      (height - 1) * width * 4, // Bottom-Left (0, height-1)
+      ((height - 1) * width + (width - 1)) * 4, // Bottom-Right (width-1, height-1)
+    ];
+
+    const bgR = data[corners[0]];
+    const bgG = data[corners[0] + 1];
+    const bgB = data[corners[0] + 2];
+
+    let matchCount = 0;
+    for (const idx of corners) {
+      if (data[idx] === bgR && data[idx + 1] === bgG && data[idx + 2] === bgB) {
+        matchCount++;
+      }
+    }
+
+    if (matchCount < 2) return imageData;
+
+    // Set alpha = 0 for all exact matching background pixels
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] === bgR && data[i + 1] === bgG && data[i + 2] === bgB) {
+        data[i + 3] = 0; // Transparent
+      }
+    }
+
+    return imageData;
+  }
+
+  /**
    * Begins loading and processing of a track object, transitioning into playback mode.
    *
    * @param {Object} song - The target metadata object describing the media track.
@@ -313,6 +358,8 @@ export default class PlaybackManager {
             const frame = this.cdgRenderer.render(time);
 
             if (frame.isChanged) {
+              this.processCdgTransparency(frame.imageData);
+
               createImageBitmap(frame.imageData)
                 .then((bitmap) => {
                   this.currentCdgBitmap = bitmap;
