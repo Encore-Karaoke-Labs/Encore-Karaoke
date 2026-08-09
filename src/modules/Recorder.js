@@ -694,22 +694,22 @@ export class RecorderModule {
       );
     }
 
+    if (this.bgvCurrentOpacity > 0.01) {
+      ctx.globalAlpha = this.bgvCurrentOpacity;
+      ctx.drawImage(this.bgvCanvas, 0, 0, w, h);
+      ctx.globalAlpha = 1.0;
+    }
+
     const customCanvas = this.bgvPlayer.customCanvas;
     if (customCanvas && customCanvas.width > 0 && customCanvas.height > 0) {
       this._drawContain(
-        this.bgvCtx,
+        ctx,
         customCanvas,
         customCanvas.width,
         customCanvas.height,
         w,
         h,
       );
-    }
-
-    if (this.bgvCurrentOpacity > 0.01) {
-      ctx.globalAlpha = this.bgvCurrentOpacity;
-      ctx.drawImage(this.bgvCanvas, 0, 0, w, h);
-      ctx.globalAlpha = 1.0;
     }
 
     this.lyricOpacity +=
