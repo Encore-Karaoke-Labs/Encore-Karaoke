@@ -56,9 +56,9 @@ const logger = {
 
 // Initialization
 const versionInformation = {
-  number: "1.10.1",
-  channel: "RELEASE",
-  codename: "Virgo",
+  number: "1.11.0",
+  channel: "BETA",
+  codename: "Pisces",
 };
 
 const kioskEnabled = process.argv.includes("--kiosk");
