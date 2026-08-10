@@ -1,4 +1,5 @@
 const { contextBridge, ipcRenderer } = require("electron");
+
 contextBridge.exposeInMainWorld("desktopIntegration", {
   ipc: {
     send: (channel, data) => {
@@ -14,6 +15,15 @@ contextBridge.exposeInMainWorld("desktopIntegration", {
       ipcRenderer.removeListener(channel, callback);
     },
   },
+});
+
+contextBridge.exposeInMainWorld("deepLink", {
+  onDeepLink: (callback) => {
+    const listener = (event, url) => callback(url);
+    ipcRenderer.on("deep-link", listener);
+    return () => ipcRenderer.removeListener("deep-link", listener);
+  },
+  signalReady: () => ipcRenderer.send("deep-link-ready"),
 });
 
 contextBridge.exposeInMainWorld("config", {

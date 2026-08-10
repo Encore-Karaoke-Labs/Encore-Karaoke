@@ -18,6 +18,23 @@ const dgram = require("dgram");
 const { exec } = require("child_process");
 const os = require("os");
 
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+  process.exit(0);
+}
+
+const PROTOCOL_PREFIX = "encore";
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(PROTOCOL_PREFIX, process.execPath, [
+      path.resolve(process.argv[1]),
+    ]);
+  }
+} else {
+  app.setAsDefaultProtocolClient(PROTOCOL_PREFIX);
+}
+
 const Bonjour = require("bonjour-service").Bonjour;
 const express = require("express");
 const http = require("http");
@@ -53,6 +70,79 @@ const logger = {
   debug: (tag, msg) =>
     console.log(`[${new Date().toLocaleTimeString()}] [DBUG] [${tag}]`, msg),
 };
+
+let isRendererReady = false;
+let pendingDeepLinks = [];
+
+function extractDeepLink(argv) {
+  if (!Array.isArray(argv)) return null;
+  return argv.find(
+    (arg) => typeof arg === "string" && arg.startsWith("encore://"),
+  );
+}
+
+function handleDeepLink(url) {
+  if (!url || !url.startsWith("encore://")) return;
+  logger.info("DEEPLINK", `Received deep link: ${url}`);
+
+  if (
+    isRendererReady &&
+    appViewWebContents &&
+    !appViewWebContents.isDestroyed()
+  ) {
+    logger.info(
+      "DEEPLINK",
+      `Renderer is ready. Dispatching immediately: ${url}`,
+    );
+    appViewWebContents.send("deep-link", url);
+  } else {
+    logger.info(
+      "DEEPLINK",
+      `Renderer not ready yet. Queuing deep link: ${url}`,
+    );
+    pendingDeepLinks.push(url);
+  }
+}
+
+function flushPendingDeepLinks() {
+  if (
+    !isRendererReady ||
+    !appViewWebContents ||
+    appViewWebContents.isDestroyed()
+  )
+    return;
+
+  while (pendingDeepLinks.length > 0) {
+    const url = pendingDeepLinks.shift();
+    logger.info("DEEPLINK", `Flushing queued deep link: ${url}`);
+    appViewWebContents.send("deep-link", url);
+  }
+}
+
+// Windows/Linux Second Instance Handler
+app.on("second-instance", (event, commandLine) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) {
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  }
+
+  const deepLinkUrl = extractDeepLink(commandLine);
+  if (deepLinkUrl) {
+    handleDeepLink(deepLinkUrl);
+  }
+});
+
+// macOS Deep Link Handler
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  handleDeepLink(url);
+});
+
+const initialDeepLink = extractDeepLink(process.argv);
+if (initialDeepLink) {
+  pendingDeepLinks.push(initialDeepLink);
+}
 
 // Initialization
 const versionInformation = {
@@ -334,10 +424,6 @@ server.post("/list", (req, res) => {
 
       const respData = [];
       for (const file of files) {
-        // macOS writes AppleDouble sidecars ("._Song.mp3") onto exFAT/FAT/SMB
-        // volumes. They carry a real media extension, so without this they get
-        // indexed as playable zero-byte songs and persisted into songdb.json
-        // inside the library -- which then travels back to Windows on the drive.
         if (file.startsWith("._")) continue;
         const filePath = path.join(dir, file);
         try {
@@ -449,8 +535,6 @@ const createWindow = () => {
     title: `Encore Karaoke ${versionInformation.channel} ${versionInformation.number} (${versionInformation.codename})`,
     width: 1280,
     height: 774,
-    // .ico is a Windows format; on macOS the bundle's own .icns is used and on
-    // Linux the BrowserWindow icon should be the PNG.
     ...(process.platform === "win32"
       ? { icon: path.join(__dirname, "resources/icon.ico") }
       : process.platform === "linux"
@@ -475,6 +559,10 @@ const createWindow = () => {
 
   win.contentView.addChildView(appView);
   appViewWebContents = appView.webContents;
+
+  appView.webContents.on("did-start-loading", () => {
+    isRendererReady = false;
+  });
 
   const updateBounds = () => {
     const bounds = win.getContentBounds();
@@ -678,6 +766,15 @@ app.whenReady().then(async () => {
     });
   });
 
+  ipcMain.on("deep-link-ready", () => {
+    logger.info(
+      "DEEPLINK",
+      "Renderer signaled that the boot process is complete.",
+    );
+    isRendererReady = true;
+    flushPendingDeepLinks();
+  });
+
   ipcMain.on("window-minimize", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize();
   });
@@ -718,6 +815,11 @@ app.whenReady().then(async () => {
 
   ipcMain.handle("get-version", () => versionInformation);
   ipcMain.handle("get-kiosk-enabled", () => kioskEnabled);
+  ipcMain.handle("deep-link-get-initial", () => {
+    const url = pendingDeepLinkUrl;
+    pendingDeepLinkUrl = null;
+    return url;
+  });
   ipcMain.handle("fullscreen-get", (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     return win ? win.isFullScreen() : false;
@@ -1490,8 +1592,6 @@ app.whenReady().then(async () => {
       title: "Encore Library Manager",
       width: 1000,
       height: 700,
-      // Was cwd-relative, so it resolved to nothing when launched from Finder
-      // or the Dock on any platform.
       ...(process.platform === "darwin"
         ? {}
         : { icon: path.join(__dirname, "resources/icon.png") }),
@@ -1750,7 +1850,6 @@ app.whenReady().then(async () => {
       const { libraryPath, songList, newSongs, signature } = payload;
       const cachePath = path.join(libraryPath, "songdb.json");
 
-      // Write the payload straight to the library directory
       const cacheData = JSON.stringify(
         { signature, songList, newSongs },
         null,
