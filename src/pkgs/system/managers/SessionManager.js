@@ -34,6 +34,28 @@ export default class SessionManager {
   }
 
   /**
+   * Displays the Session invite prompt when an encore://session/<roomCode> URL is received.
+   * @param {string} roomCode - The target room ID
+   */
+  promptDeepLinkSession(roomCode) {
+    if (!roomCode) return;
+    const state = this.ctx.state;
+
+    if (state.isSessionActive && state.sessionRoomId === roomCode) {
+      this.ctx.modules.infoBar.showTemp(
+        "SESSION",
+        "Already connected to this Session.",
+        3000,
+      );
+      return;
+    }
+
+    this.ctx.state.isSessionModalOpen = true;
+    this.ctx.dom.sessionModal.classOff("hidden");
+    this.renderSessionView("deeplink-prompt", roomCode);
+  }
+
+  /**
    * Plays a navigation sound effect.
    * @param {string} sfxName - The name of the wav file (without extension)
    */
@@ -469,7 +491,7 @@ export default class SessionManager {
     );
   }
 
-  renderSessionView(view) {
+  renderSessionView(view, extraData = null) {
     const state = this.ctx.state;
     const dom = this.ctx.dom;
     const Identity = this.ctx.services.Identity;
@@ -480,7 +502,70 @@ export default class SessionManager {
     dom.sessionHeader.clear();
     dom.sessionContentArea.clear();
 
-    if (view === "select") {
+    if (view === "deeplink-prompt") {
+      const targetRoomCode = typeof extraData === "string" ? extraData : "";
+
+      new Html("h1").text("ENCORE SESSIONS").appendTo(dom.sessionHeader);
+      new Html("p").text("You received an invite").appendTo(dom.sessionHeader);
+
+      const container = new Html("div")
+        .styleJs({
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          gap: "1.5rem",
+          maxWidth: "600px",
+          margin: "auto 0",
+        })
+        .appendTo(dom.sessionContentArea);
+
+      new Html("div")
+        .classOn("session-tile-icon")
+        .append(
+          new Html("ion-icon")
+            .attr({ name: "people" })
+            .styleJs({ width: "70px", height: "70px", color: "#89cff0" }),
+        )
+        .appendTo(container);
+
+      new Html("div")
+        .classOn("session-tile-title")
+        .text("JOIN REMOTE SESSION?")
+        .appendTo(container);
+
+      new Html("div")
+        .classOn("session-tile-desc")
+        .text(
+          "You opened an invite link to join a Session. Click Continue to configure your profile and join the session.",
+        )
+        .appendTo(container);
+
+      const btnRow = new Html("div")
+        .classOn("session-btn-row")
+        .styleJs({ width: "100%", marginTop: "1rem" })
+        .appendTo(container);
+
+      new Html("button")
+        .classOn("session-btn", "danger")
+        .text("CANCEL")
+        .on("click", () => this.toggleSessionModal(false))
+        .appendTo(btnRow);
+
+      const continueBtn = new Html("button")
+        .classOn("session-btn", "primary")
+        .text("CONTINUE")
+        .on("click", () => {
+          if (state.isSessionActive) {
+            this.performSessionDisconnect();
+          }
+          this.renderSessionView("join", targetRoomCode);
+        })
+        .appendTo(btnRow);
+
+      setTimeout(() => continueBtn.elm.focus(), 50);
+    } else if (view === "select") {
       new Html("h1").text("ENCORE SESSIONS").appendTo(dom.sessionHeader);
       new Html("p")
         .text("Sing with friends anywhere in the world.")
@@ -607,9 +692,10 @@ export default class SessionManager {
 
       let roomInput = null;
       if (!isHost) {
+        const initialRoomValue = typeof extraData === "string" ? extraData : "";
         roomInput = new Html("input")
           .classOn("session-input")
-          .attr({ placeholder: "Room ID" })
+          .attr({ placeholder: "Room ID", value: initialRoomValue })
           .appendTo(inputCol);
       }
 
@@ -671,7 +757,6 @@ export default class SessionManager {
 
             this.ctx.services.Forte.playSfx("/assets/audio/session_start.wav");
 
-            // Force scoring to be enabled during a session for leaderboards
             if (this.ctx.services.Forte.setScoringEnabled) {
               this.ctx.services.Forte.setScoringEnabled(true);
             }
@@ -706,7 +791,13 @@ export default class SessionManager {
           if (nickInp) nickInp.focus();
         } else if (view === "join") {
           const roomInp = modalEl.querySelector('input[placeholder="Room ID"]');
-          if (roomInp) roomInp.focus();
+          if (roomInp) {
+            roomInp.focus();
+            if (extraData) {
+              const primaryBtn = modalEl.querySelector(".session-btn.primary");
+              if (primaryBtn) primaryBtn.focus();
+            }
+          }
         } else if (view === "active") {
           const firstBtn = modalEl.querySelector("button");
           if (firstBtn) firstBtn.focus();
@@ -1153,6 +1244,8 @@ export default class SessionManager {
         !state.isSessionActive
       ) {
         this.renderSessionView("select");
+      } else if (state.sessionModalView === "deeplink-prompt") {
+        this.toggleSessionModal(false);
       } else if (state.sessionModalView === "games") {
         this.renderSessionView("active");
       } else {

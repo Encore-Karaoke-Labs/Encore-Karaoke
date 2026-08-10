@@ -146,6 +146,33 @@ class EncoreController {
     this.boundKeydown = (e) => this.input.handleKeyDown(e);
   }
 
+  handleDeepLink(url) {
+    if (!url || typeof url !== "string") return;
+    console.log("[EncoreHome] Processing Deep Link URL:", url);
+
+    try {
+      let roomCode = null;
+      if (url.startsWith("encore://session/")) {
+        const raw = url.replace("encore://session/", "");
+        roomCode = raw.split("?")[0].split("/")[0].trim();
+      } else {
+        const normalized = url.replace(/^encore:\/\//, "https://");
+        const parsed = new URL(normalized);
+        if (parsed.hostname === "session") {
+          roomCode = parsed.pathname.replace(/^\//, "").split("/")[0].trim();
+        }
+      }
+
+      if (roomCode) {
+        this.sessions.promptDeepLinkSession(roomCode);
+      } else {
+        this.infoBar.showTemp("DEEP LINK", "Invalid session URL format.", 3000);
+      }
+    } catch (e) {
+      console.error("[EncoreHome] Failed to parse deep link URL:", url, e);
+    }
+  }
+
   async init() {
     this.context.wrapper = new Html("div").classOn("full-ui").appendTo("body");
     this.context.wrapper.classOn("loading");
@@ -239,6 +266,13 @@ class EncoreController {
 
     window.addEventListener("keydown", this.boundKeydown);
 
+    // Deep Link Listener Registration
+    if (window.deepLink?.onDeepLink) {
+      this._deepLinkCleanup = window.deepLink.onDeepLink((url) =>
+        this.handleDeepLink(url),
+      );
+    }
+
     const libraryInfo = this.library.libraryInfo;
     if (libraryInfo?.manifest?.additionalContents?.bgvCategories) {
       await this.bgv.loadManifestCategories();
@@ -311,11 +345,17 @@ class EncoreController {
         this.context.wrapper.classOff("loading");
         this.services.Ui.transition("fadeIn", this.context.wrapper);
         this.ui.setMode("menu");
+
+        // Signal Main Process that boot sequence is complete
+        if (window.deepLink?.signalReady) {
+          window.deepLink.signalReady();
+        }
       }, 100);
     }, 100);
   }
 
   destroy() {
+    if (this._deepLinkCleanup) this._deepLinkCleanup();
     if (this.boundKeydown)
       window.removeEventListener("keydown", this.boundKeydown);
     this.playback.cleanupPlayerEvents();

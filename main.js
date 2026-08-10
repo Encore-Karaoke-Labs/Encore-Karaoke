@@ -560,9 +560,14 @@ const createWindow = () => {
   win.contentView.addChildView(appView);
   appViewWebContents = appView.webContents;
 
-  appView.webContents.on("did-start-loading", () => {
-    isRendererReady = false;
-  });
+  appView.webContents.on(
+    "did-start-navigation",
+    (event, url, isInPlace, isMainFrame) => {
+      if (isMainFrame) {
+        isRendererReady = false;
+      }
+    },
+  );
 
   const updateBounds = () => {
     const bounds = win.getContentBounds();
