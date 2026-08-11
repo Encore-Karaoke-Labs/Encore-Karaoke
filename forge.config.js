@@ -56,6 +56,13 @@ module.exports = {
     appCategoryType: "public.app-category.music",
     appCopyright: "Copyright © 2026 Encore Karaoke Labs",
 
+    protocols: [
+      {
+        name: "Encore Karaoke Protocol",
+        schemes: ["encore"],
+      },
+    ],
+
     // Makes features like getUserMedia work in Mac
     usageDescription: {
       Microphone:
@@ -199,6 +206,7 @@ module.exports = {
         description: "Encore Karaoke for Linux",
         name: "Encore",
         category: "Games",
+        mimeType: ["x-scheme-handler/encore"],
       },
     },
   ],
