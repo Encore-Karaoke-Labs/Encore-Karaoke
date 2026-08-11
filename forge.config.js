@@ -19,15 +19,9 @@ const signing = process.env.APPLE_SIGNING_IDENTITY
           hardenedRuntime: true,
         }),
       },
-      // Notarization is separately gated: signing alone is useful locally,
-      // notarizing requires credentials and a network round-trip to Apple.
-      //
-      // Preferred: a notarytool keychain profile, created once with
-      //   xcrun notarytool store-credentials "encore-notary" \
-      //     --apple-id <id> --team-id 53MUTM55LC --password <app-specific-pw>
-      // so the app-specific password lives in the keychain and never appears
-      // in a shell env, a CI log, or this file. CI (which has no keychain
-      // profile) falls back to the explicit credential triple.
+      // Notarization requires Apple credentials/network. Prefer a notarytool
+      // keychain profile (stored via xcrun notarytool) so credentials aren't
+      // exposed; CI can fall back to explicit APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD.
       ...(process.env.APPLE_KEYCHAIN_PROFILE
         ? {
             osxNotarize: {
@@ -75,13 +69,11 @@ module.exports = {
         "Encore Karaoke connects to Bluetooth microphones and speakers.",
     },
 
-    // Do NOT add CFBundleIdentifier or LSApplicationCategoryType here --
-    // packager writes those from appBundleId/appCategoryType and duplicates
-    // can conflict.
+    // Do not add CFBundleIdentifier or LSApplicationCategoryType; packager derives them from appBundleId/appCategoryType.
     extendInfo: {
       NSLocalNetworkUsageDescription:
         "Encore Karaoke uses your local network so phones on the same Wi-Fi can act as remote controls, and to find Encore song-update servers.",
-      // Bonjour-service uses raw 5353 multicast, not dns-sd; keep synced with main.js.
+      // Bonjour-service uses raw 5353 multicast
       NSBonjourServices: ["_enmoku._tcp", "_encore-server._tcp"],
       NSRemovableVolumesUsageDescription:
         "Encore Karaoke reads your karaoke library from external drives.",
@@ -121,9 +113,6 @@ module.exports = {
 
       return true;
     },
-    // macOS must omit executableName so packager derives CFBundle values from
-    // the app name; Windows/Linux use lowercase executableName.
-    // postPackage cannot fix this because signing/notarization happen earlier.
     ...(process.platform === "darwin"
       ? {}
       : { executableName: "encore-karaoke" }),
@@ -189,12 +178,10 @@ module.exports = {
       platforms: ["darwin"],
     },
     {
-      // darwin hosts only -- appdmg shells out to hdiutil.
       name: "@electron-forge/maker-dmg",
       platforms: ["darwin"],
       config: {
         name: APP_NAME,
-        // Must exist or the maker throws; produced by build.js from src/icons.
         icon: "dist/resources/icon.icns",
         format: "ULFO",
       },
