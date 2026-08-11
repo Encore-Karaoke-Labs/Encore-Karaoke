@@ -150,6 +150,32 @@ class EncoreController {
     if (!url || typeof url !== "string") return;
     console.log("[EncoreHome] Processing Deep Link URL:", url);
 
+    const isSongPlaying =
+      this.state.mode === "player" ||
+      this.state.mode.startsWith("player") ||
+      this.state.isScoreScreenActive ||
+      this.state.lastPlaybackStatus === "playing" ||
+      this.state.lastPlaybackStatus === "paused";
+
+    if (isSongPlaying) {
+      this.infoBar.showTemp(
+        "SESSIONS",
+        "Cannot join a session while a song is playing.",
+        4000,
+      );
+      return;
+    }
+
+    const isInMainMenu = this.state.mode === "menu";
+    if (!isInMainMenu) {
+      this.infoBar.showTemp(
+        "SESSIONS",
+        "Please return to the Main Menu to join a session.",
+        4000,
+      );
+      return;
+    }
+
     try {
       let roomCode = null;
       if (url.startsWith("encore://session/")) {
