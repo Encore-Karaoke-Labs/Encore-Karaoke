@@ -808,7 +808,7 @@ export default class SessionManager {
         .text(state.isSessionHost ? "HOSTING SESSION" : "IN SESSION")
         .appendTo(dom.sessionHeader);
       new Html("p")
-        .text("Share this Room ID with your friends:")
+        .text("Invite your friends to sing along:")
         .appendTo(dom.sessionHeader);
 
       const layout = new Html("div")
@@ -817,65 +817,105 @@ export default class SessionManager {
       const leftCol = new Html("div")
         .classOn("session-active-col")
         .appendTo(layout);
-      const roomDisplayWrapper = new Html("div")
-        .classOn("session-room-compact")
+
+      const inviteCard = new Html("div")
+        .classOn("session-invite-card")
         .appendTo(leftCol);
-      const codeContainer = new Html("div")
-        .styleJs({ display: "flex", flexDirection: "column" })
-        .appendTo(roomDisplayWrapper);
+
+      const inviteHeader = new Html("div")
+        .classOn("invite-header")
+        .appendTo(inviteCard);
+
+      const iconWrapper = new Html("div")
+        .classOn("invite-icon-wrapper")
+        .appendTo(inviteHeader);
+
+      new Html("ion-icon")
+        .attr({ name: "share-social-outline" })
+        .appendTo(iconWrapper);
+
+      const textGroup = new Html("div")
+        .classOn("invite-text-group")
+        .appendTo(inviteHeader);
 
       new Html("span")
-        .text("ROOM ID")
-        .styleJs({
-          fontSize: "0.85rem",
-          color: "rgba(255,255,255,0.5)",
-          letterSpacing: "0.1em",
-          fontWeight: "700",
-        })
-        .appendTo(codeContainer);
+        .classOn("invite-title")
+        .text("SHARE THIS SESSION")
+        .appendTo(textGroup);
 
-      const roomText = new Html("span")
-        .classOn("room-code-text")
-        .text("••••••••••••")
-        .appendTo(codeContainer);
+      new Html("span")
+        .classOn("invite-subtitle")
+        .text("Share link or code to invite singers")
+        .appendTo(textGroup);
 
-      const actionBtns = new Html("div")
-        .classOn("room-action-btns")
-        .appendTo(roomDisplayWrapper);
+      const actionsRow = new Html("div")
+        .classOn("invite-actions-row")
+        .appendTo(inviteCard);
 
-      let isRevealed = false;
-      const revealBtn = new Html("button")
-        .classOn("room-action-btn")
-        .text("SHOW")
+      const copyLinkBtn = new Html("button")
+        .classOn("invite-action-btn", "primary")
+        .html(
+          '<ion-icon name="link-outline" style="font-size: 1.2rem;"></ion-icon><span>COPY LINK</span>',
+        )
         .on("click", () => {
-          isRevealed = !isRevealed;
-          roomText.text(isRevealed ? state.sessionRoomId : "••••••••••••");
-          revealBtn.text(isRevealed ? "HIDE" : "SHOW");
-          roomText[isRevealed ? "classOn" : "classOff"]("revealed");
-        })
-        .appendTo(actionBtns);
-
-      const copyBtn = new Html("button")
-        .classOn("room-action-btn", "copy-btn")
-        .text("COPY")
-        .on("click", () => {
+          const shareUrl = `https://sessions.encorekaraoke.org/join/${state.sessionRoomId}`;
           navigator.clipboard
-            .writeText(state.sessionRoomId)
+            .writeText(shareUrl)
             .then(() => {
-              copyBtn.text("COPIED!").classOn("success");
+              copyLinkBtn
+                .html(
+                  '<ion-icon name="checkmark-outline" style="font-size: 1.2rem;"></ion-icon><span>LINK COPIED!</span>',
+                )
+                .classOn("success");
               setTimeout(() => {
-                copyBtn.text("COPY").classOff("success");
+                copyLinkBtn
+                  .html(
+                    '<ion-icon name="link-outline" style="font-size: 1.2rem;"></ion-icon><span>COPY LINK</span>',
+                  )
+                  .classOff("success");
               }, 2000);
             })
             .catch(() => {
               this.ctx.modules.infoBar.showTemp(
                 "ERROR",
-                "Failed to copy",
+                "Failed to copy link",
                 3000,
               );
             });
         })
-        .appendTo(actionBtns);
+        .appendTo(actionsRow);
+
+      const copyCodeBtn = new Html("button")
+        .classOn("invite-action-btn", "secondary")
+        .html(
+          '<ion-icon name="code-working-outline" style="font-size: 1.2rem;"></ion-icon><span>COPY CODE</span>',
+        )
+        .on("click", () => {
+          navigator.clipboard
+            .writeText(state.sessionRoomId)
+            .then(() => {
+              copyCodeBtn
+                .html(
+                  '<ion-icon name="checkmark-outline" style="font-size: 1.2rem;"></ion-icon><span>CODE COPIED!</span>',
+                )
+                .classOn("success");
+              setTimeout(() => {
+                copyCodeBtn
+                  .html(
+                    '<ion-icon name="key-outline" style="font-size: 1.2rem;"></ion-icon><span>COPY CODE</span>',
+                  )
+                  .classOff("success");
+              }, 2000);
+            })
+            .catch(() => {
+              this.ctx.modules.infoBar.showTemp(
+                "ERROR",
+                "Failed to copy code",
+                3000,
+              );
+            });
+        })
+        .appendTo(actionsRow);
 
       if (state.isSessionHost && SessionsSvc.state.mode === "lounge") {
         new Html("button")
