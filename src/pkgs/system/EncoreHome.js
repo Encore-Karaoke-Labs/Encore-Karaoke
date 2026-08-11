@@ -191,8 +191,6 @@ class EncoreController {
 
       if (roomCode) {
         this.sessions.promptDeepLinkSession(roomCode);
-      } else {
-        this.infoBar.showTemp("DEEP LINK", "Invalid session URL format.", 3000);
       }
     } catch (e) {
       console.error("[EncoreHome] Failed to parse deep link URL:", url, e);
