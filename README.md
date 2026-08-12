@@ -72,7 +72,7 @@ D:/EncoreLibrary/                                             # Should work for 
  ├── [Your Artist] - [Song].lrc                               # Matching LRC lyrics file
  ├── [Your Artist] - [Song].cdg                               # or matching CDG file
  ├── [Your Artist] - [Song].mp4                               # Video files for MTV
- ├── [Your Artist] - [Song].mid or [Your Artist] - [Song].kar # MIDI files
+ ├── [Your Artist] - [Song].mid/.kar                          # MIDI files
  └── [Your Artist] - [Song].chorus.ogg                        # Backing vocals for MIDI files (OGG is recommended)
 ```
 
