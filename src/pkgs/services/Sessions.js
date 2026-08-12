@@ -76,7 +76,7 @@ const pkg = {
         [1 byte]   host name length
         [N bytes]  host name
         [16 bytes] Session ID
-    */
+      */
       const payload = new Uint8Array(
         2 + nameBytes.length + this.SESSION_ID_LENGTH,
       );
@@ -88,8 +88,8 @@ const pkg = {
       payload.set(sessionId, 2 + nameBytes.length);
 
       const hash = await this.sha256(payload);
-      const checksum = hash.slice(0, CHECKSUM_LENGTH);
-      const packet = new Uint8Array(payload.length + CHECKSUM_LENGTH);
+      const checksum = hash.slice(0, this.CHECKSUM_LENGTH);
+      const packet = new Uint8Array(payload.length + this.CHECKSUM_LENGTH);
 
       packet.set(payload);
       packet.set(checksum, payload.length);
@@ -113,11 +113,13 @@ const pkg = {
       return newSdp;
     },
 
-    initPeer: function (nickname) {
+    initPeer: function (nickname, customId = null) {
       this.isDisconnecting = false;
       this.nickname = nickname;
       return new Promise((resolve, reject) => {
-        this.peer = new Peer(this.peerOptions);
+        this.peer = customId
+          ? new Peer(customId, this.peerOptions)
+          : new Peer(this.peerOptions);
 
         this.peer.on("open", (id) => resolve(id));
         this.peer.on("error", (err) => reject(err));
@@ -159,7 +161,8 @@ const pkg = {
       this.isHost = true;
       this.collisionResolver = collisionResolverFn;
 
-      const myId = await this.initPeer(profile.nickname);
+      const { code } = await this.createSessionCode(profile.nickname);
+      const myId = await this.initPeer(profile.nickname, code);
       this.roomId = myId;
       this.state.participants.push({
         id: myId,
