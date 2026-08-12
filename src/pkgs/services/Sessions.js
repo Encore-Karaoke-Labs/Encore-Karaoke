@@ -19,6 +19,8 @@ const pkg = {
     // Increment this ONLY when network structures, event behaviors,
     // or state payloads change in a way that breaks compatibility.
     PROTOCOL_VERSION: 3,
+    SESSION_ID_LENGTH: 16,
+    CHECKSUM_LENGTH: 4,
 
     peer: null,
     roomId: null,
@@ -39,6 +41,64 @@ const pkg = {
     },
 
     peerOptions: { debug: 1 },
+
+    base64urlEncode: function (bytes) {
+      let binary = "";
+
+      for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+      }
+
+      return btoa(binary)
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+    },
+
+    sha256: async function (bytes) {
+      return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+    },
+
+    createSessionCode: async function (hostName) {
+      const encoder = new TextEncoder();
+      const nameBytes = encoder.encode(hostName);
+
+      if (nameBytes.length > 255) {
+        throw new Error("Host name is too long.");
+      }
+
+      const sessionId = crypto.getRandomValues(
+        new Uint8Array(this.SESSION_ID_LENGTH),
+      );
+
+      /*
+        [1 byte]   version
+        [1 byte]   host name length
+        [N bytes]  host name
+        [16 bytes] Session ID
+    */
+      const payload = new Uint8Array(
+        2 + nameBytes.length + this.SESSION_ID_LENGTH,
+      );
+
+      payload[0] = this.PROTOCOL_VERSION;
+      payload[1] = nameBytes.length;
+
+      payload.set(nameBytes, 2);
+      payload.set(sessionId, 2 + nameBytes.length);
+
+      const hash = await this.sha256(payload);
+      const checksum = hash.slice(0, CHECKSUM_LENGTH);
+      const packet = new Uint8Array(payload.length + CHECKSUM_LENGTH);
+
+      packet.set(payload);
+      packet.set(checksum, payload.length);
+
+      return {
+        code: `SES${this.PROTOCOL_VERSION}-${this.base64urlEncode(packet)}`,
+        sessionId,
+      };
+    },
 
     enhanceSDP: function (sdp) {
       let newSdp = sdp;
