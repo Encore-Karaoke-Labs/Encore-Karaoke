@@ -50,6 +50,15 @@ export default class SessionManager {
       return;
     }
 
+    if (state.isSessionActive) {
+      this.ctx.modules.infoBar.showTemp(
+        "SESSION",
+        "Already connected to a Session.",
+        3000,
+      );
+      return;
+    }
+
     this.ctx.state.isSessionModalOpen = true;
     this.ctx.dom.sessionModal.classOff("hidden");
     this.renderSessionView("deeplink-prompt", roomCode);
