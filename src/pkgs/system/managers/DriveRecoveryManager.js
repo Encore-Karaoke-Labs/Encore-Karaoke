@@ -219,6 +219,7 @@ export default class DriveRecoveryManager {
 
     if (type === "disconnected") {
       this.dom.modal.classOff("is-mismatch").classOn("is-disconnected");
+      this.dom.title.text(`OOPS, THE DRIVE IS GONE`);
       this.dom.icon.attr({ name: "cloud-offline-outline" });
       this.dom.message.html(
         `The storage device mounted at <strong>${driveLabel}</strong> was removed.<br>Please plug drive <strong>${driveLabel}</strong> back in to continue.`,
@@ -226,9 +227,9 @@ export default class DriveRecoveryManager {
     } else if (type === "mismatch") {
       this.dom.modal.classOff("is-disconnected").classOn("is-mismatch");
       this.dom.icon.attr({ name: "warning-outline" });
-      this.dom.title.text(`WRONG CONTENTS ON DRIVE ${driveLabel}`);
+      this.dom.title.text(`OOPS, THIS IS NOT THE RIGHT DRIVE`);
       this.dom.message.html(
-        `Drive <strong>${driveLabel}</strong> is mounted, but it contains <strong>${detectedTitle || "Different Files"}</strong> instead of the active session's library.`,
+        `Drive <strong>${driveLabel}</strong> is mounted, but it contains <strong>${detectedTitle || "different files"}</strong> instead of the active session's library.`,
       );
     }
   }
