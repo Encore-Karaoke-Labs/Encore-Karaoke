@@ -259,6 +259,9 @@ export default class DriveRecoveryManager {
       this.dom.message.html(
         `Drive <strong>${driveLabel}</strong> is mounted, but it contains <strong>${detectedTitle || "different files"}</strong> instead of the active session's library.`,
       );
+      this.dom.devMessage.html(
+        `<strong>${MESSAGES.mismatch[Math.floor(Math.random() * MESSAGES.mismatch.length)]}</strong>`,
+      );
     }
   }
 
