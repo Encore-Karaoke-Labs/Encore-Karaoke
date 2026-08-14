@@ -129,7 +129,7 @@ export default class DriveRecoveryManager {
 
     this.dom.title = new Html("h1")
       .classOn("drive-modal-title")
-      .text("STORAGE DRIVE DISCONNECTED")
+      .text("OOPS, THE DRIVE IS GONE")
       .appendTo(this.dom.modal);
 
     this.dom.message = new Html("p")
@@ -220,7 +220,6 @@ export default class DriveRecoveryManager {
     if (type === "disconnected") {
       this.dom.modal.classOff("is-mismatch").classOn("is-disconnected");
       this.dom.icon.attr({ name: "cloud-offline-outline" });
-      this.dom.title.text(`DRIVE ${driveLabel} DISCONNECTED`);
       this.dom.message.html(
         `The storage device mounted at <strong>${driveLabel}</strong> was removed.<br>Please plug drive <strong>${driveLabel}</strong> back in to continue.`,
       );
