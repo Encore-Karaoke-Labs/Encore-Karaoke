@@ -153,10 +153,30 @@ export default class PlaybackManager {
     const root = this.ctx.root;
     const Forte = this.ctx.services.Forte;
 
+    if (state.isDriveDisconnected) return;
+
     state.isTransitioning = true;
     modules.recorder.setSongInfo(song);
     if (root.games) root.games.broadcastPlaybackState("playing", song);
     this.cleanupPlayerEvents();
+
+    if (!song.path.startsWith("yt://")) {
+      try {
+        const testUrl = await NetworkingUtility.getFileLink(song.path);
+        const checkRes = await fetch(testUrl.href, { method: "HEAD" });
+        if (!checkRes.ok && checkRes.status !== 405) {
+          throw new Error(`Storage file unreadable: HTTP ${checkRes.status}`);
+        }
+      } catch (err) {
+        console.error(
+          "[PlaybackManager] Drive disconnected during track load:",
+          err,
+        );
+        state.isTransitioning = false;
+        modules.driveRecovery?.handleDriveDisconnected();
+        return;
+      }
+    }
 
     if (root.lyrics) root.lyrics.reset();
     if (root.input) root.input.currentDrumPresetIndex = -1;
@@ -257,8 +277,16 @@ export default class PlaybackManager {
       if (state.currentSongIsMV) {
         const videoUrl = await NetworkingUtility.getFileLink(song.videoPath);
         this.mvPlayer = await modules.bgv.playSingleVideo(videoUrl.href);
-      } else {
-        modules.bgv.resumePlaylist();
+
+        this.mvPlayer.onerror = (e) => {
+          if (
+            !state.currentSongIsYouTube &&
+            !this.ctx.state.isDriveDisconnected
+          ) {
+            console.error("[PlaybackManager] Video stream failed mid-song:", e);
+            modules.driveRecovery?.handleDriveDisconnected();
+          }
+        };
       }
 
       dom.bgvContainer.classOff("hidden");

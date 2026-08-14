@@ -464,6 +464,17 @@ export class BGVModule {
     if (this.imageTimeout) clearTimeout(this.imageTimeout);
     if (this.imageCleanupTimeout) clearTimeout(this.imageCleanupTimeout);
 
+    const handleLocalMediaError = (err) => {
+      if (url.includes("/getFile") && !this.canvasOnlyMode) {
+        fetch(url, { method: "HEAD" }).catch(() => {
+          document.dispatchEvent(
+            new CustomEvent("CherryTree.Storage.Disconnected"),
+          );
+        });
+      }
+      this.playNext();
+    };
+
     if (isImage) {
       this.videoElement.style.opacity = "0";
       if (!this.videoElement.paused) this.videoElement.pause();
@@ -492,8 +503,8 @@ export class BGVModule {
       };
       img.onerror = (e) => {
         if (this.currentLoadId !== loadId) return;
-        console.warn("[BGV] Image load error, skipping:", e);
-        this.playNext();
+        console.warn("[BGV] Image load error, checking drive:", e);
+        handleLocalMediaError(e);
       };
       img.src = url;
     } else {
@@ -520,8 +531,8 @@ export class BGVModule {
       v.onended = () => this.playNext();
       v.onerror = (e) => {
         if (this.currentLoadId !== loadId) return;
-        console.warn("[BGV] Video error, skipping:", e);
-        this.playNext();
+        console.warn("[BGV] Video error, checking drive:", e);
+        handleLocalMediaError(e);
       };
 
       const onCanPlay = () => {

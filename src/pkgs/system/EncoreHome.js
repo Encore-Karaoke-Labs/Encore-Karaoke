@@ -1,6 +1,7 @@
 import Html from "../../libs/html.js";
 import NetworkingUtility from "../../libs/networkingUtility.js";
 
+import DriveRecoveryManager from "./managers/DriveRecoveryManager.js";
 import UIManager from "./managers/UIManager.js";
 import LibraryManager from "./managers/LibraryManager.js";
 import InputManager from "./managers/InputManager.js";
@@ -132,6 +133,9 @@ class EncoreController {
       },
     };
 
+    this.driveRecovery = new DriveRecoveryManager(this.context);
+    this.context.modules.driveRecovery = this.driveRecovery;
+
     this.ui = new UIManager(this.context);
     this.library = new LibraryManager(this.context);
     this.lyrics = new LyricsEngine(this.context);
@@ -248,6 +252,9 @@ class EncoreController {
       "out_of_bounds.wav",
       "session_start.wav",
       "session_end.wav",
+      "drive_disconnected.wav",
+      "drive_mismatch.wav",
+      "drive_reconnected.wav",
       ...Array.from({ length: 10 }, (_, i) => `numbers/${i}.wav`),
     ];
     await Promise.all(
@@ -287,6 +294,9 @@ class EncoreController {
     this.lyrics.init();
     this.setup.init();
     this.games.init();
+
+    this.driveRecovery.buildUI();
+    this.driveRecovery.captureLibraryFingerprint();
 
     window.addEventListener("keydown", this.boundKeydown);
 
@@ -387,6 +397,7 @@ class EncoreController {
     this.sessions.destroy();
     this.setup.destroy();
     this.games.destroy();
+    this.driveRecovery.destroy();
     if (this.recorder.isRecording) this.recorder.stop();
     this.bgv.stop();
     this.services.Forte.stopTrack();

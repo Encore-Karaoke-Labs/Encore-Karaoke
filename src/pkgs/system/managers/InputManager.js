@@ -48,6 +48,11 @@ export default class InputManager {
     const recordings = this.ctx.root.recordings;
     const modules = this.ctx.modules;
 
+    if (state.isDriveDisconnected) {
+      e.preventDefault();
+      return;
+    }
+
     if (modules.mixer.isVisible) {
       modules.mixer.handleKeyDown(e);
       return;
