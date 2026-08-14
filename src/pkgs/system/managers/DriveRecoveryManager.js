@@ -154,6 +154,12 @@ export default class DriveRecoveryManager {
     this.dom.message = new Html("p")
       .classOn("drive-modal-message")
       .appendTo(this.dom.modal);
+
+    new Html("br").appendTo(this.dom.modal);
+
+    this.dom.devMessage = new Html("p")
+      .classOn("drive-modal-message")
+      .appendTo(this.dom.modal);
   }
 
   /**
@@ -242,6 +248,9 @@ export default class DriveRecoveryManager {
       this.dom.icon.attr({ name: "cloud-offline-outline" });
       this.dom.message.html(
         `The storage device mounted at <strong>${driveLabel}</strong> was removed.<br>Please plug drive <strong>${driveLabel}</strong> back in to continue.`,
+      );
+      this.dom.devMessage.html(
+        `<strong>${MESSAGES.gone[Math.floor(Math.random() * MESSAGES.gone.length)]}</strong>`,
       );
     } else if (type === "mismatch") {
       this.dom.modal.classOff("is-disconnected").classOn("is-mismatch");
