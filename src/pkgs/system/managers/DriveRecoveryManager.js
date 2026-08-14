@@ -1,6 +1,18 @@
 import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
 
+const MESSAGES = {
+  gone: [
+    "Don't worry, you probably didn't break everything <3",
+    "Encore needs that drive more than I need her, trust me",
+    "Sorry chief, we can't get freaky this time...",
+    "The angel has flown away from me, don't tell me the drive flew away too!",
+    "You'll be safe here until you plug that drive back in :)",
+    "Houston, we have a problem.",
+  ],
+  mismatch: [],
+};
+
 /**
  * Normalizes and joins path segments with forward slashes.
  */
