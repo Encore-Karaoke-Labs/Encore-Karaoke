@@ -5367,3 +5367,97 @@ p + .flex-list button {
 .session-chat-input::placeholder {
   color: rgba(255, 255, 255, 0.4);
 }
+
+/* ==========================================================================
+   External Drive Disconnect & Recovery Modal
+   ========================================================================== */
+.drive-disconnect-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(
+    circle at center,
+    rgba(15, 5, 5, 0.92) 0%,
+    rgba(5, 0, 0, 0.98) 100%
+  );
+  backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+  font-family: "Rajdhani", sans-serif;
+  color: #fff;
+}
+
+.drive-disconnect-modal {
+  width: 90vw;
+  max-width: 800px;
+  background: rgba(20, 10, 10, 0.9);
+  border: 2px solid #ff5555;
+  border-radius: 16px;
+  padding: 3rem 4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow:
+    0 0 50px rgba(255, 85, 85, 0.4),
+    inset 0 0 30px rgba(255, 85, 85, 0.1);
+  animation: animateIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.drive-disconnect-modal.is-mismatch {
+  border-color: #ffaa00;
+  box-shadow:
+    0 0 50px rgba(255, 170, 0, 0.4),
+    inset 0 0 30px rgba(255, 170, 0, 0.1);
+}
+
+.drive-modal-icon-wrap {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: rgba(255, 85, 85, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+  border: 1px solid rgba(255, 85, 85, 0.3);
+}
+
+.drive-disconnect-modal.is-mismatch .drive-modal-icon-wrap {
+  background: rgba(255, 170, 0, 0.15);
+  border-color: rgba(255, 170, 0, 0.3);
+}
+
+.drive-modal-icon {
+  font-size: 4.5rem;
+  color: #ff5555;
+}
+
+.drive-disconnect-modal.is-mismatch .drive-modal-icon {
+  color: #ffaa00;
+}
+
+.drive-modal-title {
+  font-size: 2.8rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #ff5555;
+  margin: 0 0 1rem 0;
+  text-shadow: 0 0 20px rgba(255, 85, 85, 0.5);
+}
+
+.drive-disconnect-modal.is-mismatch .drive-modal-title {
+  color: #ffaa00;
+  text-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+}
+
+.drive-modal-message {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1.35rem;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.5;
+  margin: 0 0 2rem 0;
+}
