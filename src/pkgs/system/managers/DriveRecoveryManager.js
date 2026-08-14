@@ -10,7 +10,14 @@ const MESSAGES = {
     "You'll be safe here until you plug that drive back in :)",
     "Houston, we have a problem.",
   ],
-  mismatch: [],
+  mismatch: [
+    "Hi, TikTok, YouTube, or whatever platform I'm on right now!",
+    "Did this screen answer your question? :)",
+    "Sorry, hun, just like my date, this isn't a match",
+    "Encore doesn't want that library, just like how I don't want anyone but her <3",
+    "You've found the secret screen!",
+    "Dang it, you've found the secret screen! Just don't tell her I like her, okay? Who is she? Not telling...",
+  ],
 };
 
 /**
