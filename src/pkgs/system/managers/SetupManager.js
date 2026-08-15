@@ -247,6 +247,15 @@ export default class SetupManager {
     }
   }
 
+  getSubmenuItems(menuId) {
+    const menu = this.SUBMENUS[menuId];
+    if (!menu) return [];
+    if (menu.groups) {
+      return menu.groups.flatMap((g) => g.items);
+    }
+    return menu.items || [];
+  }
+
   buildSettingsMap() {
     this.DASHBOARD_TILES = [
       { id: "library", label: "Library & Storage", icon: "folder" },
@@ -286,612 +295,699 @@ export default class SetupManager {
     this.SUBMENUS = {
       library: {
         title: "Library Configuration",
-        items: [
+        groups: [
           {
-            id: "title",
-            label: "Library Name",
-            type: "info",
-            get: () => this.currentManifest?.title || "Unknown",
+            title: "Library Information",
+            items: [
+              {
+                id: "title",
+                label: "Library Name",
+                type: "info",
+                get: () => this.currentManifest?.title || "Unknown",
+              },
+              {
+                id: "desc",
+                label: "Description",
+                type: "info-action",
+                get: () => this.currentManifest?.description || "N/A",
+                action: () => {
+                  this.setupState.dialog = {
+                    title: "Library Description",
+                    content:
+                      this.currentManifest?.description ||
+                      "No description provided by this library.",
+                  };
+                  this.renderView();
+                },
+              },
+              {
+                id: "path",
+                label: "Path",
+                type: "info",
+                get: () => this.ctx.config.libraryPath || "Not Set",
+              },
+            ],
           },
           {
-            id: "desc",
-            label: "Description",
-            type: "info-action",
-            get: () => this.currentManifest?.description || "N/A",
-            action: () => {
-              this.setupState.dialog = {
-                title: "Library Description",
-                content:
-                  this.currentManifest?.description ||
-                  "No description provided by this library.",
-              };
-              this.renderView();
-            },
-          },
-          {
-            id: "path",
-            label: "Path",
-            type: "info",
-            get: () => this.ctx.config.libraryPath || "Not Set",
-          },
-          {
-            id: "scan",
-            label: "Rescan & Change Library",
-            type: "action",
-            action: async () => await this.handleLibraryScan(),
+            title: "Storage Management",
+            items: [
+              {
+                id: "scan",
+                label: "Rescan & Change Library",
+                type: "action",
+                action: async () => await this.handleLibraryScan(),
+              },
+            ],
           },
         ],
       },
       sync: {
         title: "Network Sync",
-        items: [
+        groups: [
           {
-            id: "server_select",
-            label: "Target Update Server",
-            type: "select",
-            options: serverOptions,
-            get: () => this.setupState.selectedServerId,
-            set: (v) => (this.setupState.selectedServerId = v),
+            title: "Server Configuration",
+            items: [
+              {
+                id: "server_select",
+                label: "Target Update Server",
+                type: "select",
+                options: serverOptions,
+                get: () => this.setupState.selectedServerId,
+                set: (v) => (this.setupState.selectedServerId = v),
+              },
+              {
+                id: "refresh_servers",
+                label: "Refresh Server List",
+                type: "action",
+                action: async () => {
+                  this.showToast("REFRESHING...", "info");
+                  this.updateServers =
+                    await window.desktopIntegration.ipc.invoke(
+                      "get-update-servers",
+                    );
+                  this.buildSettingsMap();
+                  this.renderView();
+                },
+              },
+            ],
           },
           {
-            id: "refresh_servers",
-            label: "Refresh Server List",
-            type: "action",
-            action: async () => {
-              this.showToast("REFRESHING...", "info");
-              this.updateServers =
-                await window.desktopIntegration.ipc.invoke(
-                  "get-update-servers",
-                );
-              this.buildSettingsMap();
-              this.renderView();
-            },
-          },
-          {
-            id: "start_sync",
-            label: "Start Network Download",
-            type: "action",
-            action: () => this.startNetworkSync(),
+            title: "Sync Actions",
+            items: [
+              {
+                id: "start_sync",
+                label: "Start Network Download",
+                type: "action",
+                action: () => this.startNetworkSync(),
+              },
+            ],
           },
         ],
       },
       audio: {
         title: "Sound Settings",
-        items: [
+        groups: [
           {
-            id: "out_device",
-            label: "Main Audio Output",
-            type: "select",
-            options: playbackOptions,
-            get: () =>
-              this.ctx.config.audioConfig?.mix?.instrumental?.outputDevice ||
-              "default",
-            set: (v) => {
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.mix ??= {};
-              this.ctx.config.audioConfig.mix.instrumental ??= {};
-              this.ctx.config.audioConfig.mix.instrumental.outputDevice = v;
-              window.config.setItem(
-                "audioConfig.mix.instrumental.outputDevice",
-                v,
-              );
-              this.ctx.services.Forte.setPlaybackDevice(v);
-            },
-          },
-          {
-            id: "buffer_size",
-            label: "Buffer Size (ms) (restart required)",
-            type: "range",
-            min: 10,
-            max: 1000,
-            step: 10,
-            get: () =>
-              Math.round(
-                (this.ctx.config.audioConfig?.bufferSize ?? 0.1) * 1000,
-              ),
-            set: (v) => {
-              const val = v / 1000;
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.bufferSize = val;
-              window.config.setItem("audioConfig.bufferSize", val);
-            },
-          },
-          {
-            id: "vol",
-            label: "Master Volume",
-            type: "range",
-            min: 0,
-            max: 100,
-            step: 5,
-            get: () =>
-              Math.round(
-                (this.ctx.config.audioConfig?.mix?.instrumental?.volume ?? 1) *
-                  100,
-              ),
-            set: (v) => {
-              const val = v / 100;
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.mix ??= {};
-              this.ctx.config.audioConfig.mix.instrumental ??= {};
-              this.ctx.config.audioConfig.mix.instrumental.volume = val;
-              window.config.setItem("audioConfig.mix.instrumental.volume", val);
-              this.ctx.services.Forte.setTrackVolume(val);
-            },
-          },
-          {
-            id: "test",
-            label: "Test Audio Output",
-            type: "action",
-            action: () => {
-              this.ctx.services.Forte.stopSfx();
-              this.ctx.services.Forte.playSfx(
-                "/assets/audio/Uta wa I Love You (I Sing I Love You) [Encore Karaoke Jingle].mid",
-              );
-              this.showToast("PLAYING TEST SOUND...", "info");
-            },
-          },
-          {
-            id: "soundfont_mode",
-            label: "Soundfont Source",
-            type: "select",
-            options: [
-              { value: "default", label: "Internal Default" },
-              { value: "library", label: "Library Provided" },
-              { value: "custom", label: "Custom Path" },
-            ],
-            get: () => {
-              const ac = this.ctx.config.audioConfig;
-              if (ac?.soundfontMode) return ac.soundfontMode;
-              return ac?.useLibraryFont !== false ? "library" : "default";
-            },
-            set: async (v) => {
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.soundfontMode = v;
-              this.ctx.config.audioConfig.useLibraryFont = v === "library";
-
-              window.config.setItem("audioConfig.soundfontMode", v);
-              window.config.setItem(
-                "audioConfig.useLibraryFont",
-                v === "library",
-              );
-
-              let soundFontUrl = "/libs/soundfonts/SAM2634.sf3";
-              let shouldLoad = true;
-
-              if (
-                v === "library" &&
-                this.currentManifest?.additionalContents?.soundFont
-              ) {
-                const soundFontPath = pathJoin([
-                  this.ctx.config.libraryPath,
-                  this.currentManifest.additionalContents.soundFont,
-                ]);
-                const url = await NetworkingUtility.getFileLink(soundFontPath);
-                soundFontUrl = url.href;
-              } else if (v === "custom") {
-                if (this.ctx.config.audioConfig.customSoundfontPath) {
-                  const url = await NetworkingUtility.getFileLink(
-                    this.ctx.config.audioConfig.customSoundfontPath,
+            title: "Output & Engine",
+            items: [
+              {
+                id: "out_device",
+                label: "Main Audio Output",
+                type: "select",
+                options: playbackOptions,
+                get: () =>
+                  this.ctx.config.audioConfig?.mix?.instrumental
+                    ?.outputDevice || "default",
+                set: (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.mix ??= {};
+                  this.ctx.config.audioConfig.mix.instrumental ??= {};
+                  this.ctx.config.audioConfig.mix.instrumental.outputDevice = v;
+                  window.config.setItem(
+                    "audioConfig.mix.instrumental.outputDevice",
+                    v,
                   );
-                  soundFontUrl = url.href;
-                } else {
-                  this.showToast("PLEASE SET A CUSTOM PATH BELOW", "info");
-                  shouldLoad = false;
-                }
-              }
+                  this.ctx.services.Forte.setPlaybackDevice(v);
+                },
+              },
+              {
+                id: "buffer_size",
+                label: "Buffer Size (ms) (restart required)",
+                type: "range",
+                min: 10,
+                max: 1000,
+                step: 10,
+                get: () =>
+                  Math.round(
+                    (this.ctx.config.audioConfig?.bufferSize ?? 0.1) * 1000,
+                  ),
+                set: (v) => {
+                  const val = v / 1000;
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.bufferSize = val;
+                  window.config.setItem("audioConfig.bufferSize", val);
+                },
+              },
+              {
+                id: "vol",
+                label: "Master Volume",
+                type: "range",
+                min: 0,
+                max: 100,
+                step: 5,
+                get: () =>
+                  Math.round(
+                    (this.ctx.config.audioConfig?.mix?.instrumental?.volume ??
+                      1) * 100,
+                  ),
+                set: (v) => {
+                  const val = v / 100;
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.mix ??= {};
+                  this.ctx.config.audioConfig.mix.instrumental ??= {};
+                  this.ctx.config.audioConfig.mix.instrumental.volume = val;
+                  window.config.setItem(
+                    "audioConfig.mix.instrumental.volume",
+                    val,
+                  );
+                  this.ctx.services.Forte.setTrackVolume(val);
+                },
+              },
+              {
+                id: "test",
+                label: "Test Audio Output",
+                type: "action",
+                action: () => {
+                  this.ctx.services.Forte.stopSfx();
+                  this.ctx.services.Forte.playSfx(
+                    "/assets/audio/Uta wa I Love You (I Sing I Love You) [Encore Karaoke Jingle].mid",
+                  );
+                  this.showToast("PLAYING TEST SOUND...", "info");
+                },
+              },
+            ],
+          },
+          {
+            title: "SoundFont Synthesis",
+            items: [
+              {
+                id: "soundfont_mode",
+                label: "Soundfont Source",
+                type: "select",
+                options: [
+                  { value: "default", label: "Internal Default" },
+                  { value: "library", label: "Library Provided" },
+                  { value: "custom", label: "Custom Path" },
+                ],
+                get: () => {
+                  const ac = this.ctx.config.audioConfig;
+                  if (ac?.soundfontMode) return ac.soundfontMode;
+                  return ac?.useLibraryFont !== false ? "library" : "default";
+                },
+                set: async (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.soundfontMode = v;
+                  this.ctx.config.audioConfig.useLibraryFont = v === "library";
 
-              if (shouldLoad) {
-                this.showToast("LOADING SOUNDFONT...", "info");
-                try {
-                  const result =
-                    await this.ctx.services.Forte.loadSoundFont(soundFontUrl);
-                  if (result != false) {
-                    this.showToast("LOADED SUCCESSFULLY", "success");
+                  window.config.setItem("audioConfig.soundfontMode", v);
+                  window.config.setItem(
+                    "audioConfig.useLibraryFont",
+                    v === "library",
+                  );
+
+                  let soundFontUrl = "/libs/soundfonts/SAM2634.sf3";
+                  let shouldLoad = true;
+
+                  if (
+                    v === "library" &&
+                    this.currentManifest?.additionalContents?.soundFont
+                  ) {
+                    const soundFontPath = pathJoin([
+                      this.ctx.config.libraryPath,
+                      this.currentManifest.additionalContents.soundFont,
+                    ]);
+                    const url =
+                      await NetworkingUtility.getFileLink(soundFontPath);
+                    soundFontUrl = url.href;
+                  } else if (v === "custom") {
+                    if (this.ctx.config.audioConfig.customSoundfontPath) {
+                      const url = await NetworkingUtility.getFileLink(
+                        this.ctx.config.audioConfig.customSoundfontPath,
+                      );
+                      soundFontUrl = url.href;
+                    } else {
+                      this.showToast("PLEASE SET A CUSTOM PATH BELOW", "info");
+                      shouldLoad = false;
+                    }
                   }
-                } catch (err) {
-                  console.error("Soundfont change failed", err);
-                  this.showToast("FAILED TO LOAD SOUNDFONT", "error");
-                }
-              }
-              this.renderView();
-            },
-          },
-          {
-            id: "custom_soundfont_path",
-            label: "Custom Soundfont Path (Press Enter to Browse)",
-            type: "info-action",
-            get: () => {
-              const p = this.ctx.config.audioConfig?.customSoundfontPath;
-              if (!p) return "Not Set";
-              return p.length > 35 ? "..." + p.slice(-32) : p;
-            },
-            action: async () => {
-              const filePath = await window.desktopIntegration.ipc.invoke(
-                "select-soundfont-file",
-              );
 
-              if (filePath) {
-                this.ctx.config.audioConfig ??= {};
-                this.ctx.config.audioConfig.customSoundfontPath = filePath;
-                this.ctx.config.audioConfig.soundfontMode = "custom";
-                this.ctx.config.audioConfig.useLibraryFont = false;
-
-                window.config.setItem(
-                  "audioConfig.customSoundfontPath",
-                  filePath,
-                );
-                window.config.setItem("audioConfig.soundfontMode", "custom");
-                window.config.setItem("audioConfig.useLibraryFont", false);
-
-                this.showToast("LOADING CUSTOM SOUNDFONT...", "info");
-
-                const url = await NetworkingUtility.getFileLink(filePath);
-
-                try {
-                  await this.ctx.services.Forte.loadSoundFont(url.href);
-                  this.showToast("LOADED SUCCESSFULLY", "success");
+                  if (shouldLoad) {
+                    this.showToast("LOADING SOUNDFONT...", "info");
+                    try {
+                      const result =
+                        await this.ctx.services.Forte.loadSoundFont(
+                          soundFontUrl,
+                        );
+                      if (result != false) {
+                        this.showToast("LOADED SUCCESSFULLY", "success");
+                      }
+                    } catch (err) {
+                      console.error("Soundfont change failed", err);
+                      this.showToast("FAILED TO LOAD SOUNDFONT", "error");
+                    }
+                  }
                   this.renderView();
-                } catch (err) {
-                  console.error("Failed to load custom soundfont:", err);
-                  this.showToast("FAILED TO LOAD SOUNDFONT", "error");
-                }
-              }
-            },
+                },
+              },
+              {
+                id: "custom_soundfont_path",
+                label: "Custom Soundfont Path (Press Enter to Browse)",
+                type: "info-action",
+                get: () => {
+                  const p = this.ctx.config.audioConfig?.customSoundfontPath;
+                  if (!p) return "Not Set";
+                  return p.length > 35 ? "..." + p.slice(-32) : p;
+                },
+                action: async () => {
+                  const filePath = await window.desktopIntegration.ipc.invoke(
+                    "select-soundfont-file",
+                  );
+
+                  if (filePath) {
+                    this.ctx.config.audioConfig ??= {};
+                    this.ctx.config.audioConfig.customSoundfontPath = filePath;
+                    this.ctx.config.audioConfig.soundfontMode = "custom";
+                    this.ctx.config.audioConfig.useLibraryFont = false;
+
+                    window.config.setItem(
+                      "audioConfig.customSoundfontPath",
+                      filePath,
+                    );
+                    window.config.setItem(
+                      "audioConfig.soundfontMode",
+                      "custom",
+                    );
+                    window.config.setItem("audioConfig.useLibraryFont", false);
+
+                    this.showToast("LOADING CUSTOM SOUNDFONT...", "info");
+
+                    const url = await NetworkingUtility.getFileLink(filePath);
+
+                    try {
+                      await this.ctx.services.Forte.loadSoundFont(url.href);
+                      this.showToast("LOADED SUCCESSFULLY", "success");
+                      this.renderView();
+                    } catch (err) {
+                      console.error("Failed to load custom soundfont:", err);
+                      this.showToast("FAILED TO LOAD SOUNDFONT", "error");
+                    }
+                  }
+                },
+              },
+            ],
           },
           {
-            id: "enable_nav_sfx",
-            label: "Enable Navigation Sounds",
-            type: "select",
-            options: [
-              { value: false, label: "No" },
-              { value: true, label: "Yes" },
+            title: "Sound Effects & Audio Cues",
+            items: [
+              {
+                id: "enable_nav_sfx",
+                label: "Enable Navigation Sounds",
+                type: "select",
+                options: [
+                  { value: false, label: "No" },
+                  { value: true, label: "Yes" },
+                ],
+                get: () => this.ctx.config.audioConfig?.enableNavSfx ?? true,
+                set: (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.enableNavSfx = v;
+                  this.ctx.state.isNavSfxEnabled = v;
+                  window.config.setItem("audioConfig.enableNavSfx", v);
+                },
+              },
+              {
+                id: "enable_number_sfx",
+                label: "Enable Number Keypad Sounds",
+                type: "select",
+                options: [
+                  { value: false, label: "No" },
+                  { value: true, label: "Yes" },
+                ],
+                get: () => this.ctx.config.audioConfig?.enableNumberSfx ?? true,
+                set: (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.enableNumberSfx = v;
+                  this.ctx.state.isNumberSfxEnabled = v;
+                  window.config.setItem("audioConfig.enableNumberSfx", v);
+                },
+              },
+              {
+                id: "enable_score_fanfare",
+                label: "Enable Score Fanfare",
+                type: "select",
+                options: [
+                  { value: false, label: "No" },
+                  { value: true, label: "Yes" },
+                ],
+                get: () =>
+                  this.ctx.config.audioConfig?.enableScoreFanfare ?? true,
+                set: (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.enableScoreFanfare = v;
+                  this.ctx.state.isScoreFanfareEnabled = v;
+                  window.config.setItem("audioConfig.enableScoreFanfare", v);
+                },
+              },
+              {
+                id: "enable_score_narration",
+                label: "Enable Score Narration",
+                type: "select",
+                options: [
+                  { value: false, label: "No" },
+                  { value: true, label: "Yes" },
+                ],
+                get: () =>
+                  this.ctx.config.audioConfig?.enableScoreNarration ?? true,
+                set: (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.enableScoreNarration = v;
+                  this.ctx.state.isScoreNarrationEnabled = v;
+                  window.config.setItem("audioConfig.enableScoreNarration", v);
+                },
+              },
             ],
-            get: () => this.ctx.config.audioConfig?.enableNavSfx ?? true,
-            set: (v) => {
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.enableNavSfx = v;
-              this.ctx.state.isNavSfxEnabled = v;
-              window.config.setItem("audioConfig.enableNavSfx", v);
-            },
-          },
-          {
-            id: "enable_number_sfx",
-            label: "Enable Number Keypad Sounds",
-            type: "select",
-            options: [
-              { value: false, label: "No" },
-              { value: true, label: "Yes" },
-            ],
-            get: () => this.ctx.config.audioConfig?.enableNumberSfx ?? true,
-            set: (v) => {
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.enableNumberSfx = v;
-              this.ctx.state.isNumberSfxEnabled = v;
-              window.config.setItem("audioConfig.enableNumberSfx", v);
-            },
-          },
-          {
-            id: "enable_score_fanfare",
-            label: "Enable Score Fanfare",
-            type: "select",
-            options: [
-              { value: false, label: "No" },
-              { value: true, label: "Yes" },
-            ],
-            get: () => this.ctx.config.audioConfig?.enableScoreFanfare ?? true,
-            set: (v) => {
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.enableScoreFanfare = v;
-              this.ctx.state.isScoreFanfareEnabled = v;
-              window.config.setItem("audioConfig.enableScoreFanfare", v);
-            },
-          },
-          {
-            id: "enable_score_narration",
-            label: "Enable Score Narration",
-            type: "select",
-            options: [
-              { value: false, label: "No" },
-              { value: true, label: "Yes" },
-            ],
-            get: () =>
-              this.ctx.config.audioConfig?.enableScoreNarration ?? true,
-            set: (v) => {
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.enableScoreNarration = v;
-              this.ctx.state.isScoreNarrationEnabled = v;
-              window.config.setItem("audioConfig.enableScoreNarration", v);
-            },
           },
         ],
       },
       mic: {
         title: "Mic & Scoring Settings",
-        items: [
+        groups: [
           {
-            id: "device",
-            label: "Microphone",
-            type: "select",
-            options: micOptions,
-            get: () =>
-              this.ctx.config.audioConfig?.mix?.scoring?.inputDevice ||
-              "default",
-            set: (v) => {
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.mix ??= {};
-              this.ctx.config.audioConfig.mix.scoring ??= {};
-              this.ctx.config.audioConfig.mix.scoring.inputDevice = v;
-              window.config.setItem("audioConfig.mix.scoring.inputDevice", v);
-              this.ctx.services.Forte.setMicDevice(v);
-            },
-          },
-          {
-            id: "enable_monitor",
-            label: "Enable Monitoring",
-            type: "select",
-            options: [
-              { value: false, label: "Disabled" },
-              { value: true, label: "Enabled" },
+            title: "Microphone Input",
+            items: [
+              {
+                id: "device",
+                label: "Microphone",
+                type: "select",
+                options: micOptions,
+                get: () =>
+                  this.ctx.config.audioConfig?.mix?.scoring?.inputDevice ||
+                  "default",
+                set: (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.mix ??= {};
+                  this.ctx.config.audioConfig.mix.scoring ??= {};
+                  this.ctx.config.audioConfig.mix.scoring.inputDevice = v;
+                  window.config.setItem(
+                    "audioConfig.mix.scoring.inputDevice",
+                    v,
+                  );
+                  this.ctx.services.Forte.setMicDevice(v);
+                },
+              },
+              {
+                id: "enable_monitor",
+                label: "Enable Monitoring",
+                type: "select",
+                options: [
+                  { value: false, label: "Disabled" },
+                  { value: true, label: "Enabled" },
+                ],
+                get: () =>
+                  this.ctx.config.audioConfig?.enableMicMonitor ?? false,
+                set: (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.enableMicMonitor = v;
+                  window.config.setItem("audioConfig.enableMicMonitor", v);
+                  if (this.ctx.services.Forte.setMicMonitorEnabled)
+                    this.ctx.services.Forte.setMicMonitorEnabled(v);
+                },
+              },
             ],
-            get: () => this.ctx.config.audioConfig?.enableMicMonitor ?? false,
-            set: (v) => {
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.enableMicMonitor = v;
-              window.config.setItem("audioConfig.enableMicMonitor", v);
-              if (this.ctx.services.Forte.setMicMonitorEnabled)
-                this.ctx.services.Forte.setMicMonitorEnabled(v);
-            },
           },
           {
-            id: "enable_scoring",
-            label: "Enable Scoring",
-            type: "select",
-            options: [
-              { value: false, label: "Disabled" },
-              { value: true, label: "Enabled" },
+            title: "Scoring Engine",
+            items: [
+              {
+                id: "enable_scoring",
+                label: "Enable Scoring",
+                type: "select",
+                options: [
+                  { value: false, label: "Disabled" },
+                  { value: true, label: "Enabled" },
+                ],
+                get: () => this.ctx.config.audioConfig?.enableScoring ?? true,
+                set: (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.enableScoring = v;
+                  window.config.setItem("audioConfig.enableScoring", v);
+                  if (this.ctx.services.Forte.setScoringEnabled) {
+                    this.ctx.services.Forte.setScoringEnabled(v);
+                  }
+                },
+              },
+              {
+                id: "guide_channel",
+                label: "Guide Melody Channel",
+                type: "select",
+                options: [
+                  { value: "auto", label: "Smart" },
+                  ...Array.from({ length: 16 }, (_, i) => ({
+                    value: i,
+                    label: `Channel ${i + 1}`,
+                  })),
+                ],
+                get: () => this.ctx.config.audioConfig?.guideChannel ?? "auto",
+                set: (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.guideChannel = v;
+                  window.config.setItem("audioConfig.guideChannel", v);
+                },
+              },
             ],
-            get: () => this.ctx.config.audioConfig?.enableScoring ?? true,
-            set: (v) => {
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.enableScoring = v;
-              window.config.setItem("audioConfig.enableScoring", v);
-              if (this.ctx.services.Forte.setScoringEnabled) {
-                this.ctx.services.Forte.setScoringEnabled(v);
-              }
-            },
           },
           {
-            id: "guide_channel",
-            label: "Guide Melody Channel",
-            type: "select",
-            options: [
-              { value: "auto", label: "Smart" },
-              ...Array.from({ length: 16 }, (_, i) => ({
-                value: i,
-                label: `Channel ${i + 1}`,
-              })),
+            title: "Calibration & Latency",
+            items: [
+              {
+                id: "latency",
+                label: "Mic Latency Override (ms)",
+                type: "range",
+                min: 0,
+                max: 1000,
+                step: 10,
+                get: () =>
+                  Math.round(
+                    (this.ctx.config.audioConfig?.micLatency ?? 0) * 1000,
+                  ),
+                set: (v) => {
+                  const val = v / 1000;
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.micLatency = val;
+                  window.config.setItem("audioConfig.micLatency", val);
+                  this.ctx.services.Forte.setLatency(val);
+                },
+              },
+              {
+                id: "manual_calib",
+                label: "Manual Calibration (Sing & Sync)",
+                type: "action",
+                action: () => this.startManualCalibration(),
+              },
             ],
-            get: () => this.ctx.config.audioConfig?.guideChannel ?? "auto",
-            set: (v) => {
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.guideChannel = v;
-              window.config.setItem("audioConfig.guideChannel", v);
-            },
-          },
-          {
-            id: "latency",
-            label: "Mic Latency Override (ms)",
-            type: "range",
-            min: 0,
-            max: 1000,
-            step: 10,
-            get: () =>
-              Math.round((this.ctx.config.audioConfig?.micLatency ?? 0) * 1000),
-            set: (v) => {
-              const val = v / 1000;
-              this.ctx.config.audioConfig ??= {};
-              this.ctx.config.audioConfig.micLatency = val;
-              window.config.setItem("audioConfig.micLatency", val);
-              this.ctx.services.Forte.setLatency(val);
-            },
-          },
-          {
-            id: "manual_calib",
-            label: "Manual Calibration (Sing & Sync)",
-            type: "action",
-            action: () => this.startManualCalibration(),
           },
         ],
       },
       video: {
         title: "Video Settings",
-        items: [
+        groups: [
           {
-            id: "enable_extra_interludes",
-            label: "Easter Egg Interludes (Requires Restart)",
-            type: "select",
-            options: [
-              { value: false, label: "No" },
-              { value: true, label: "Yes" },
+            title: "Display & Window",
+            items: [
+              {
+                id: "fullscreen",
+                label: "Window Mode on Boot",
+                type: "select",
+                options: [
+                  { value: false, label: "Windowed" },
+                  { value: true, label: "Fullscreen" },
+                ],
+                get: () => this.ctx.config.fullscreenEnabled ?? false,
+                set: async (v) => {
+                  const fullscreenEnabled = v;
+                  this.ctx.config.fullscreenEnabled = fullscreenEnabled;
+                  window.config.setItem("fullscreenEnabled", fullscreenEnabled);
+                  await window.fullscreen.set(fullscreenEnabled);
+                  this.renderView();
+                },
+              },
+              {
+                id: "zoom",
+                label: "Display Zoom (%)",
+                type: "range",
+                min: 50,
+                max: 180,
+                step: 5,
+                get: () =>
+                  Math.round(
+                    (this.ctx.config.zoomLevel ??
+                      this.ctx.config.zoomFactor ??
+                      0.85) * 100,
+                  ),
+                set: async (v) => {
+                  const zoomPercent = Math.max(50, Math.min(180, v));
+                  const zoomValue = zoomPercent / 100;
+                  this.ctx.config.zoomLevel = zoomValue;
+                  await window.zoom.set(zoomValue);
+                  this.renderView();
+                },
+              },
             ],
-            get: () => this.ctx.config.enableEasterEggInterludes ?? false,
-            set: (v) => {
-              this.ctx.config.enableEasterEggInterludes = v;
-              this.ctx.state.isEasterEggInterludeEnabled = v;
-              window.config.setItem("enableEasterEggInterludes", v);
-            },
           },
           {
-            id: "sync",
-            label: "Video Sync Offset (ms)",
-            type: "range",
-            min: -1000,
-            max: 1000,
-            step: 10,
-            get: () => this.ctx.config.videoConfig?.syncOffset ?? 0,
-            set: (v) => {
-              this.ctx.config.videoConfig ??= {};
-              this.ctx.config.videoConfig.syncOffset = v;
-              window.config.setItem("videoConfig.syncOffset", v);
-            },
-          },
-          {
-            id: "preview",
-            label: "Preview & Calibrate Sync",
-            type: "action",
-            action: () => this.startVideoPreview(),
-          },
-          {
-            id: "fullscreen",
-            label: "Window Mode on Boot",
-            type: "select",
-            options: [
-              { value: false, label: "Windowed" },
-              { value: true, label: "Fullscreen" },
+            title: "Video Synchronization & Playback",
+            items: [
+              {
+                id: "enable_extra_interludes",
+                label: "Easter Egg Interludes (Requires Restart)",
+                type: "select",
+                options: [
+                  { value: false, label: "No" },
+                  { value: true, label: "Yes" },
+                ],
+                get: () => this.ctx.config.enableEasterEggInterludes ?? false,
+                set: (v) => {
+                  this.ctx.config.enableEasterEggInterludes = v;
+                  this.ctx.state.isEasterEggInterludeEnabled = v;
+                  window.config.setItem("enableEasterEggInterludes", v);
+                },
+              },
+              {
+                id: "sync",
+                label: "Video Sync Offset (ms)",
+                type: "range",
+                min: -1000,
+                max: 1000,
+                step: 10,
+                get: () => this.ctx.config.videoConfig?.syncOffset ?? 0,
+                set: (v) => {
+                  this.ctx.config.videoConfig ??= {};
+                  this.ctx.config.videoConfig.syncOffset = v;
+                  window.config.setItem("videoConfig.syncOffset", v);
+                },
+              },
+              {
+                id: "preview",
+                label: "Preview & Calibrate Sync",
+                type: "action",
+                action: () => this.startVideoPreview(),
+              },
             ],
-            get: () => this.ctx.config.fullscreenEnabled ?? false,
-            set: async (v) => {
-              const fullscreenEnabled = v;
-              this.ctx.config.fullscreenEnabled = fullscreenEnabled;
-              window.config.setItem("fullscreenEnabled", fullscreenEnabled);
-              await window.fullscreen.set(fullscreenEnabled);
-              this.renderView();
-            },
-          },
-          {
-            id: "zoom",
-            label: "Display Zoom (%)",
-            type: "range",
-            min: 50,
-            max: 180,
-            step: 5,
-            get: () =>
-              Math.round(
-                (this.ctx.config.zoomLevel ??
-                  this.ctx.config.zoomFactor ??
-                  0.85) * 100,
-              ),
-            set: async (v) => {
-              const zoomPercent = Math.max(50, Math.min(180, v));
-              const zoomValue = zoomPercent / 100;
-              this.ctx.config.zoomLevel = zoomValue;
-              await window.zoom.set(zoomValue);
-              this.renderView();
-            },
           },
         ],
       },
       firmware: {
         title: "About & Update",
-        items: [
+        groups: [
           {
-            id: "about_encore",
-            label: "About Encore",
-            type: "info-action",
-            get: () => "Press Enter to view",
-            action: () => {
-              this.setupState.showingVersionCard = true;
-              this.renderView();
-            },
-          },
-          {
-            id: "oss_licenses",
-            label: "Open Source Licenses",
-            type: "info-action",
-            get: () => "Press Enter to view",
-            action: async () => {
-              if (!this.setupState.licensesData) {
-                try {
-                  const res = await fetch("/assets/licenses.json");
-                  const data = await res.json();
-                  this.setupState.licensesData = Object.keys(data).map(
-                    (key) => ({
-                      name: key,
-                      ...data[key],
-                    }),
-                  );
-                } catch (e) {
-                  this.showToast("FAILED TO LOAD LICENSES", "error");
-                  return;
-                }
-              }
-              this.setupState.showingLicenses = true;
-              this.renderView();
-            },
-          },
-          {
-            id: "check_on_startup",
-            label: "Notify Updates on Startup",
-            type: "select",
-            options: [
-              { value: false, label: "No" },
-              { value: true, label: "Yes" },
+            title: "System Information",
+            items: [
+              {
+                id: "about_encore",
+                label: "About Encore",
+                type: "info-action",
+                get: () => "Press Enter to view",
+                action: () => {
+                  this.setupState.showingVersionCard = true;
+                  this.renderView();
+                },
+              },
+              {
+                id: "oss_licenses",
+                label: "Open Source Licenses",
+                type: "info-action",
+                get: () => "Press Enter to view",
+                action: async () => {
+                  if (!this.setupState.licensesData) {
+                    try {
+                      const res = await fetch("/assets/licenses.json");
+                      const data = await res.json();
+                      this.setupState.licensesData = Object.keys(data).map(
+                        (key) => ({
+                          name: key,
+                          ...data[key],
+                        }),
+                      );
+                    } catch (e) {
+                      this.showToast("FAILED TO LOAD LICENSES", "error");
+                      return;
+                    }
+                  }
+                  this.setupState.showingLicenses = true;
+                  this.renderView();
+                },
+              },
             ],
-            get: () => this.ctx.config.checkUpdatesOnStartup ?? true,
-            set: (v) => {
-              this.ctx.config.checkUpdatesOnStartup = v;
-              window.config.setItem("checkUpdatesOnStartup", v);
-            },
           },
           {
-            id: "release_channel",
-            label: "Release Channel",
-            type: "select",
-            options: [
-              { value: "RELEASE", label: "Stable" },
-              { value: "BETA", label: "Beta" },
+            title: "Software Updates",
+            items: [
+              {
+                id: "check_on_startup",
+                label: "Notify Updates on Startup",
+                type: "select",
+                options: [
+                  { value: false, label: "No" },
+                  { value: true, label: "Yes" },
+                ],
+                get: () => this.ctx.config.checkUpdatesOnStartup ?? true,
+                set: (v) => {
+                  this.ctx.config.checkUpdatesOnStartup = v;
+                  window.config.setItem("checkUpdatesOnStartup", v);
+                },
+              },
+              {
+                id: "release_channel",
+                label: "Release Channel",
+                type: "select",
+                options: [
+                  { value: "RELEASE", label: "Stable" },
+                  { value: "BETA", label: "Beta" },
+                ],
+                get: () =>
+                  this.ctx.config.releaseChannel ??
+                  this.versionInformation.channel,
+                set: (v) => {
+                  this.ctx.config.releaseChannel = v;
+                  window.config.setItem("releaseChannel", v);
+                },
+              },
+              {
+                id: "about_release_channels",
+                label: "About Release Channels",
+                type: "info-action",
+                get: () => "Press Enter to learn more",
+                action: () => {
+                  this.setupState.dialog = {
+                    title: "About Release Channels",
+                    content:
+                      "Encore has two release channels: The Beta (Pre-Release) channel, and the Stable channel. You get the latest features in Beta, while the Stable version gives you the most stability.",
+                  };
+                  this.renderView();
+                },
+              },
+              {
+                id: "check_for_updates",
+                label: "Check for Updates",
+                type: "info-action",
+                get: () => "Press Enter to check",
+                action: async () => {
+                  let infoBarTimeout = setTimeout(() => {
+                    this.showToast("Checking for updates...");
+                  }, 1000);
+                  await this.ctx.services.Updates.refreshUpdateInformation();
+                  let updateInfo =
+                    await this.ctx.services.Updates.getUpdateInformation();
+
+                  clearTimeout(infoBarTimeout);
+
+                  this.setupState.dialog = {
+                    title: "Check for Updates",
+                    content: "You are up to date.",
+                  };
+
+                  if (updateInfo.number != this.versionInformation.number) {
+                    if (
+                      this.ctx.config.releaseChannel == "BETA" ||
+                      updateInfo.channel == "RELEASE"
+                    ) {
+                      this.setupState.dialog.content = `You have a new update: v${updateInfo.number} ${updateInfo.channel} (${updateInfo.codename})`;
+                    }
+                  }
+                  this.renderView();
+                },
+              },
             ],
-            get: () =>
-              this.ctx.config.releaseChannel ?? this.versionInformation.channel,
-            set: (v) => {
-              this.ctx.config.releaseChannel = v;
-              window.config.setItem("releaseChannel", v);
-            },
-          },
-          {
-            id: "about_release_channels",
-            label: "About Release Channels",
-            type: "info-action",
-            get: () => "Press Enter to learn more",
-            action: () => {
-              this.setupState.dialog = {
-                title: "About Release Channels",
-                content:
-                  "Encore has two release channels: The Beta (Pre-Release) channel, and the Stable channel. You get the latest features in Beta, while the Stable version gives you the most stability.",
-              };
-              this.renderView();
-            },
-          },
-          {
-            id: "check_for_updates",
-            label: "Check for Updates",
-            type: "info-action",
-            get: () => "Press Enter to check",
-            action: async () => {
-              let infoBarTimeout = setTimeout(() => {
-                this.showToast("Checking for updates...");
-              }, 1000);
-              await this.ctx.services.Updates.refreshUpdateInformation();
-              let updateInfo =
-                await this.ctx.services.Updates.getUpdateInformation();
-
-              clearTimeout(infoBarTimeout);
-
-              this.setupState.dialog = {
-                title: "Check for Updates",
-                content: "You are up to date.",
-              };
-
-              if (updateInfo.number != this.versionInformation.number) {
-                if (
-                  this.ctx.config.releaseChannel == "BETA" ||
-                  updateInfo.channel == "RELEASE"
-                ) {
-                  this.setupState.dialog.content = `You have a new update: v${updateInfo.number} ${updateInfo.channel} (${updateInfo.codename})`;
-                }
-              }
-              this.renderView();
-            },
           },
         ],
       },
@@ -1088,8 +1184,7 @@ export default class SetupManager {
     }
 
     if (this.setupState.view === "submenu") {
-      const menu = this.SUBMENUS[this.setupState.activeMenuId];
-      const items = menu.items;
+      const items = this.getSubmenuItems(this.setupState.activeMenuId);
       const currentItem = items[this.setupState.submenuIndex];
 
       const listEl = document.querySelector(".submenu-list");
@@ -2450,38 +2545,54 @@ export default class SetupManager {
       .appendTo(panel);
     const list = new Html("div").classOn("submenu-list").appendTo(panel);
 
-    menuData.items.forEach((item, idx) => {
-      const row = new Html("div").classOn("submenu-item").appendTo(list);
-      if (idx === this.setupState.submenuIndex) row.classOn("active");
-      new Html("div").classOn("submenu-label").text(item.label).appendTo(row);
-      const valWrap = new Html("div").classOn("submenu-value").appendTo(row);
+    const groups = menuData.groups || [
+      { title: null, items: menuData.items || [] },
+    ];
 
-      if (item.type === "info")
-        valWrap.html(`<span class="info-text">${item.get()}</span>`);
-      else if (item.type === "info-action")
-        valWrap.html(
-          `<span class="info-text">${item.get()}</span> <span style="opacity: 0.5; font-size: 0.8em; margin-left: 10px;">↵</span>`,
-        );
-      else if (item.type === "action") valWrap.text("Press Enter to execute");
-      else if (item.type === "range") {
-        const val = item.get();
-        const p = ((val - item.min) / (item.max - item.min)) * 100;
-        valWrap.html(
-          `<div class="setup-slider-bar"><div class="setup-slider-fill" style="width: ${p}%"></div></div><span>${val}</span>`,
-        );
-      } else if (item.type === "select") {
-        const val = item.get();
-        const opt = item.options.find((o) => o.value === val);
-        valWrap.html(
-          `<span>◀</span> <span class="select-text">${opt ? opt.label : val}</span> <span>▶</span>`,
-        );
+    let globalItemIndex = 0;
+
+    groups.forEach((group) => {
+      if (group.title) {
+        new Html("div")
+          .classOn("submenu-group-header")
+          .text(group.title)
+          .appendTo(list);
       }
+
+      group.items.forEach((item) => {
+        const itemIdx = globalItemIndex++;
+        const row = new Html("div").classOn("submenu-item").appendTo(list);
+        if (itemIdx === this.setupState.submenuIndex) row.classOn("active");
+        new Html("div").classOn("submenu-label").text(item.label).appendTo(row);
+        const valWrap = new Html("div").classOn("submenu-value").appendTo(row);
+
+        if (item.type === "info")
+          valWrap.html(`<span class="info-text">${item.get()}</span>`);
+        else if (item.type === "info-action")
+          valWrap.html(
+            `<span class="info-text">${item.get()}</span> <span style="opacity: 0.5; font-size: 0.8em; margin-left: 10px;">↵</span>`,
+          );
+        else if (item.type === "action") valWrap.text("Press Enter to execute");
+        else if (item.type === "range") {
+          const val = item.get();
+          const p = ((val - item.min) / (item.max - item.min)) * 100;
+          valWrap.html(
+            `<div class="setup-slider-bar"><div class="setup-slider-fill" style="width: ${p}%"></div></div><span>${val}</span>`,
+          );
+        } else if (item.type === "select") {
+          const val = item.get();
+          const opt = item.options.find((o) => o.value === val);
+          valWrap.html(
+            `<span>◀</span> <span class="select-text">${opt ? opt.label : val}</span> <span>▶</span>`,
+          );
+        }
+      });
     });
 
     requestAnimationFrame(() => {
       if (list.elm) {
         list.elm.scrollTop = this.setupState.submenuScrollTop || 0;
-        const activeItem = list.elm.children[this.setupState.submenuIndex];
+        const activeItem = list.elm.querySelector(".submenu-item.active");
         if (activeItem)
           activeItem.scrollIntoView({ block: "nearest", behavior: "auto" });
       }
