@@ -1331,6 +1331,25 @@ p + .flex-list button {
   background: rgba(137, 207, 240, 0.6);
 }
 
+.submenu-group-header {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #ffd700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 1.25rem 0.5rem 0.4rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.25);
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+  opacity: 0.9;
+}
+
+.submenu-group-header:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+
 .setup-footer {
   background: rgba(0, 0, 0, 0.5);
   padding: 1rem 2rem;
