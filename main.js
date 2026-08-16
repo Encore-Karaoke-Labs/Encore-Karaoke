@@ -596,13 +596,11 @@ const createWindow = () => {
   win.on("maximize", updateBounds);
   win.on("enter-full-screen", () => {
     updateBounds();
-    Config.setItem("fullscreenEnabled", true);
     appView.webContents.send("fullscreen-state-changed", true);
   });
 
   win.on("leave-full-screen", () => {
     updateBounds();
-    Config.setItem("fullscreenEnabled", false);
     appView.webContents.send("fullscreen-state-changed", false);
   });
   win.on("restore", () => setTimeout(updateBounds, 50));
