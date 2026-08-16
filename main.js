@@ -88,6 +88,7 @@ function extractDeepLink(argv) {
 
   for (const arg of argv) {
     if (typeof arg !== "string") continue;
+    console.log(arg);
     if (arg.startsWith("encore://")) {
       return arg;
     }
@@ -334,7 +335,7 @@ function setupDiscordRPC() {
     });
   });
 
-  discordClient.on("activityJoin", (data) => {
+  discordClient.on("ACTIVITY_JOIN", (data) => {
     const secret = typeof data === "string" ? data : data?.secret;
     logger.info("DISCORD", `Received join secret from Discord: ${secret}`);
     if (secret) {
@@ -344,7 +345,7 @@ function setupDiscordRPC() {
     }
   });
 
-  discordClient.on("activityJoinRequest", (user) => {
+  discordClient.on("ACTIVITY_JOIN_REQUEST", (user) => {
     logger.info("DISCORD", `Join request received from: ${user.username}`);
   });
 
