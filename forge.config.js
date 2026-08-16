@@ -197,7 +197,10 @@ module.exports = {
         description: "Encore Karaoke for Linux",
         name: "Encore",
         category: "Games",
-        mimeType: ["x-scheme-handler/encore"],
+        mimeType: [
+          "x-scheme-handler/encore",
+          "x-scheme-handler/discord-1408795513397973052",
+        ],
       },
     },
   ],
