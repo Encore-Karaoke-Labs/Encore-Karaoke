@@ -302,6 +302,21 @@ function setupDiscordRPC() {
       largeImageText: "Encore Karaoke",
     });
   });
+
+  discordClient.on("activityJoin", (data) => {
+    const secret = typeof data === "string" ? data : data?.secret;
+    logger.info("DISCORD", `Received join secret from Discord: ${secret}`);
+    if (secret) {
+      handleDeepLink(
+        secret.startsWith("encore://") ? secret : `encore://session/${secret}`,
+      );
+    }
+  });
+
+  discordClient.on("activityJoinRequest", (user) => {
+    logger.info("DISCORD", `Join request received from: ${user.username}`);
+  });
+
   discordClient.on("disconnected", () => {
     if (isRpcReconnecting) return;
     logger.warn("DISCORD", "Disconnected. Reconnecting in 15s...");
