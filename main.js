@@ -293,9 +293,18 @@ let isRpcReconnecting = false;
 let currentRPCState = "Booting up...";
 
 function setupDiscordRPC() {
-  discordClient.on("ready", () => {
+  discordClient.on("ready", async () => {
     logger.info("DISCORD", "Encore Karaoke RPC is ready!");
     rpcReconnAttempts = 0;
+
+    try {
+      await discordClient.subscribe("ACTIVITY_JOIN");
+      await discordClient.subscribe("ACTIVITY_JOIN_REQUEST");
+      logger.info("DISCORD", "Subscribed to ACTIVITY_JOIN events.");
+    } catch (err) {
+      logger.error("DISCORD", "Failed to subscribe to join events:", err);
+    }
+
     discordClient.user?.setActivity({
       details: currentRPCState,
       largeImageKey: "hoshi",
@@ -1891,16 +1900,32 @@ app.whenReady().then(async () => {
 
   ipcMain.on("setRPC", (event, arg) => {
     currentRPCState = arg.state;
-    discordClient.user?.setActivity({
+
+    const activityPayload = {
       state: arg.state,
       details: arg.details,
+      startTimestamp: arg.startTimestamp,
       endTimestamp: arg.endTimestamp,
       largeImageKey: "hoshi",
       largeImageText: "Encore Karaoke",
-      buttons: arg.button1 && [
+    };
+
+    if (arg.joinSecret) {
+      activityPayload.partyId = arg.partyId;
+      activityPayload.partySize = arg.partySize;
+      activityPayload.partyMax = arg.partyMax;
+      activityPayload.joinSecret = arg.joinSecret;
+      activityPayload.instance = true;
+    }
+
+    if (arg.button1 && !arg.joinSecret) {
+      activityPayload.buttons = [
         { label: arg.button1.label, url: arg.button1.url },
-      ],
-    });
+      ];
+    }
+
+    discordClient.user?.setActivity(activityPayload);
+
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) win.webContents.send("update-now-playing", arg);
   });

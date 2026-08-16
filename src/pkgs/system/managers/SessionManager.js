@@ -34,6 +34,49 @@ export default class SessionManager {
   }
 
   /**
+   * Updates Discord Rich Presence with active Party and Session Join Secret
+   */
+  updateDiscordSessionRPC() {
+    const state = this.ctx.state;
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+
+    if (!state.isSessionActive || !state.sessionRoomId) {
+      window.desktopIntegration.ipc.send("setRPC", {
+        details: `Browsing ${state.songList.length} Songs...`,
+        state: "Main Menu",
+      });
+      return;
+    }
+
+    const participants = SessionsSvc?.state?.participants || [];
+    const currentCount = Math.max(1, participants.length);
+    const maxCapacity = 8;
+
+    let detailsText = "Session Lounge";
+    let stateText = state.isSessionHost
+      ? `Hosting a Session (${currentCount}/${maxCapacity})`
+      : `In a Session (${currentCount}/${maxCapacity})`;
+
+    if (
+      SessionsSvc.state.mode === "performance" &&
+      SessionsSvc.state.nowPlaying
+    ) {
+      detailsText = SessionsSvc.state.nowPlaying.title;
+      stateText = `Singing: ${SessionsSvc.state.nowPlaying.artist}`;
+    }
+
+    window.desktopIntegration.ipc.send("setRPC", {
+      details: detailsText,
+      state: stateText,
+      partyId: `party_${state.sessionRoomId}`,
+      partySize: currentCount,
+      partyMax: maxCapacity,
+      joinSecret: state.sessionRoomId,
+      instance: true,
+    });
+  }
+
+  /**
    * Displays the Session invite prompt when an encore://session/<roomCode> URL is received.
    * @param {string} roomCode - The target room ID
    */
@@ -172,6 +215,7 @@ export default class SessionManager {
     });
 
     state.knownParticipants = [...newParticipants];
+    this.updateDiscordSessionRPC();
 
     if (state.isSessionModalOpen && state.sessionModalView === "active") {
       this.renderSessionView("active");
@@ -253,6 +297,7 @@ export default class SessionManager {
           );
         }
       }
+      this.updateDiscordSessionRPC();
     } else if (sState.mode === "lounge" && prevMode !== "lounge") {
       dom.sessionRemoteContainer.classOn("hidden");
       dom.sessionRemoteVideo.elm.srcObject = null;
@@ -269,6 +314,7 @@ export default class SessionManager {
       });
 
       if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
+      this.updateDiscordSessionRPC();
     }
 
     if (infoBar.isTempVisible) {
@@ -388,6 +434,7 @@ export default class SessionManager {
     state.isSessionActive = false;
     state.sessionRoomId = null;
     state.knownParticipants = [];
+    this.updateDiscordSessionRPC();
 
     root.ui.stopLoungeBackground();
     this.ctx.services.Forte.clearRemoteStreams();
@@ -756,12 +803,14 @@ export default class SessionManager {
               state.isSessionActive = true;
               state.isSessionHost = true;
               state.sessionRoomId = roomId;
+              this.updateDiscordSessionRPC();
             } else {
               const room = roomInput.getValue().trim();
               await SessionsSvc.joinRoom(room, sessionProfile);
               state.isSessionActive = true;
               state.isSessionHost = false;
               state.sessionRoomId = room;
+              this.updateDiscordSessionRPC();
             }
 
             this.ctx.services.Forte.playSfx("/assets/audio/session_start.wav");
