@@ -1904,11 +1904,12 @@ app.whenReady().then(async () => {
     const activityPayload = {
       state: arg.state,
       details: arg.details,
-      startTimestamp: arg.startTimestamp,
-      endTimestamp: arg.endTimestamp,
       largeImageKey: "hoshi",
       largeImageText: "Encore Karaoke",
     };
+
+    if (arg.startTimestamp) activityPayload.startTimestamp = arg.startTimestamp;
+    if (arg.endTimestamp) activityPayload.endTimestamp = arg.endTimestamp;
 
     if (arg.joinSecret) {
       activityPayload.partyId = arg.partyId;

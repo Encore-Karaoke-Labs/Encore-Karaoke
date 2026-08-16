@@ -41,11 +41,16 @@ export default class SessionManager {
     const SessionsSvc = this.ctx.services.SessionsSvc;
 
     if (!state.isSessionActive || !state.sessionRoomId) {
+      this._sessionStartTime = null;
       window.desktopIntegration.ipc.send("setRPC", {
         details: `Browsing ${state.songList.length} Songs...`,
         state: "Main Menu",
       });
       return;
+    }
+
+    if (!this._sessionStartTime) {
+      this._sessionStartTime = Date.now();
     }
 
     const participants = SessionsSvc?.state?.participants || [];
@@ -65,10 +70,13 @@ export default class SessionManager {
       stateText = `Singing: ${SessionsSvc.state.nowPlaying.artist}`;
     }
 
+    const safePartyId = `party${state.sessionRoomId.replace(/[^a-zA-Z0-9]/g, "")}`;
+
     window.desktopIntegration.ipc.send("setRPC", {
       details: detailsText,
       state: stateText,
-      partyId: `party_${state.sessionRoomId}`,
+      startTimestamp: this._sessionStartTime,
+      partyId: safePartyId,
       partySize: currentCount,
       partyMax: maxCapacity,
       joinSecret: state.sessionRoomId,
