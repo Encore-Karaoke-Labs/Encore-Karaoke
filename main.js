@@ -24,16 +24,22 @@ if (!gotTheLock) {
   process.exit(0);
 }
 
-const PROTOCOL_PREFIX = "encore";
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient(PROTOCOL_PREFIX, process.execPath, [
-      path.resolve(process.argv[1]),
-    ]);
-  }
-} else {
-  app.setAsDefaultProtocolClient(PROTOCOL_PREFIX);
+const protocols = ["encore", "discord-1408795513397973052"];
+
+function registerProtocols() {
+  protocols.forEach((proto) => {
+    if (process.defaultApp) {
+      if (process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient(proto, process.execPath, [
+          path.resolve(process.argv[1]),
+        ]);
+      }
+    } else {
+      app.setAsDefaultProtocolClient(proto);
+    }
+  });
 }
+registerProtocols();
 
 const Bonjour = require("bonjour-service").Bonjour;
 const express = require("express");
