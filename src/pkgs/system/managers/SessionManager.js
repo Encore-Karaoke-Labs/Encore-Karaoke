@@ -58,16 +58,16 @@ export default class SessionManager {
     const maxCapacity = 8;
 
     let detailsText = "Session Lounge";
-    let stateText = state.isSessionHost
-      ? `Hosting a Session (${currentCount}/${maxCapacity})`
-      : `In a Session (${currentCount}/${maxCapacity})`;
+    let stateText = state.isSessionHost ? `Hosting a Session` : `In a Session`;
 
     if (
       SessionsSvc.state.mode === "performance" &&
       SessionsSvc.state.nowPlaying
     ) {
+      let singerName =
+        SessionsSvc.state.nowPlaying.requesterNickname || "Singer";
       detailsText = SessionsSvc.state.nowPlaying.title;
-      stateText = `Singing: ${SessionsSvc.state.nowPlaying.artist}`;
+      stateText = `Singing: ${singerName}`;
     }
 
     const safePartyId = `party${state.sessionRoomId.replace(/[^a-zA-Z0-9]/g, "")}`;
@@ -269,10 +269,6 @@ export default class SessionManager {
 
           if (sState.nowPlaying) {
             const singerName = sState.nowPlaying.requesterNickname || "Singer";
-            window.desktopIntegration.ipc.send("setRPC", {
-              details: sState.nowPlaying.title,
-              state: `${sState.nowPlaying.artist} (Singer: ${singerName})`,
-            });
 
             if ("mediaSession" in navigator) {
               navigator.mediaSession.metadata = new MediaMetadata({
@@ -315,11 +311,6 @@ export default class SessionManager {
       state.isTransitioning = false;
       root.ui.setMode("menu");
       root.ui.startLoungeBackground();
-
-      window.desktopIntegration.ipc.send("setRPC", {
-        details: `Browsing ${state.songList.length} Songs...`,
-        state: `Session Lounge`,
-      });
 
       if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
       this.updateDiscordSessionRPC();

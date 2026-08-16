@@ -215,10 +215,17 @@ export default class PlaybackManager {
       this.ctx.wrapper.classOn("mode-player-cdg");
     }
 
-    window.desktopIntegration.ipc.send("setRPC", {
-      details: song.title,
-      state: song.artist,
-    });
+    if (!state.isSessionActive) {
+      window.desktopIntegration.ipc.send("setRPC", {
+        details: song.title,
+        state: song.artist,
+      });
+    } else if (
+      root.sessions &&
+      typeof root.sessions.updateDiscordSessionRPC === "function"
+    ) {
+      root.sessions.updateDiscordSessionRPC();
+    }
 
     if (root.network && root.network.socket) {
       root.network.socket.emit("broadcastData", {

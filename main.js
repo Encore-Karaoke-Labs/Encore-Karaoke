@@ -24,9 +24,13 @@ if (!gotTheLock) {
   process.exit(0);
 }
 
-const protocols = ["encore", "discord-1408795513397973052"];
+const PROTOCOL_PREFIX = "encore";
+const DISCORD_CLIENT_ID = "1408795513397973052";
+const DISCORD_PROTOCOL_PREFIX = `discord-${DISCORD_CLIENT_ID}`;
 
 function registerProtocols() {
+  const protocols = [PROTOCOL_PREFIX, DISCORD_PROTOCOL_PREFIX];
+
   protocols.forEach((proto) => {
     if (process.defaultApp) {
       if (process.argv.length >= 2) {
@@ -39,7 +43,6 @@ function registerProtocols() {
     }
   });
 }
-registerProtocols();
 
 const Bonjour = require("bonjour-service").Bonjour;
 const express = require("express");
@@ -82,9 +85,28 @@ let pendingDeepLinks = [];
 
 function extractDeepLink(argv) {
   if (!Array.isArray(argv)) return null;
-  return argv.find(
-    (arg) => typeof arg === "string" && arg.startsWith("encore://"),
-  );
+
+  for (const arg of argv) {
+    if (typeof arg !== "string") continue;
+    if (arg.startsWith("encore://")) {
+      return arg;
+    }
+
+    if (arg.startsWith(DISCORD_PROTOCOL_PREFIX)) {
+      let raw = arg.replace(
+        new RegExp(`^${DISCORD_PROTOCOL_PREFIX}:(//)?`),
+        "",
+      );
+      raw = raw.replace(/^(join|activity-join)\//, "").replace(/^\//, "");
+      const sessionCode = raw.split("?")[0].split("/")[0].trim();
+
+      if (sessionCode) {
+        return `encore://session/${sessionCode}`;
+      }
+    }
+  }
+
+  return null;
 }
 
 function handleDeepLink(url) {
