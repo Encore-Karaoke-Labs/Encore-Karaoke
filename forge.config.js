@@ -55,6 +55,10 @@ module.exports = {
         name: "Encore Karaoke Protocol",
         schemes: ["encore"],
       },
+      {
+        name: "Encore Karaoke Discord Integration",
+        schemes: ["discord-1408795513397973052"],
+      },
     ],
 
     // Makes features like getUserMedia work in Mac
