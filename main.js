@@ -769,7 +769,7 @@ app.whenReady().then(async () => {
     .catch((e) => logger.error("DISCORD", "Initial login failed"));
 
   const CLOUD_URL = "https://olive.nxw.pw:8443";
-  const RELAY_URL = "https://enmoku.encorekaraoke.org/1.10.0/";
+  const RELAY_URL = "https://enmoku.encorekaraoke.org/1.11.0/";
   const cloudSocket = ioClient(CLOUD_URL, {
     query: { clientType: "host" },
     reconnectionAttempts: 5,
