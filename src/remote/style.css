@@ -630,6 +630,18 @@ button:active {
   visibility: visible;
 }
 
+#instrument-view {
+  z-index: 60;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  visibility: hidden;
+}
+
+#instrument-view.active {
+  transform: translateY(0);
+  visibility: visible;
+}
+
 @media (min-width: 768px) {
   .view-container {
     display: flex;

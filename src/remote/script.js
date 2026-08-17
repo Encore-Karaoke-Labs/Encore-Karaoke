@@ -160,6 +160,11 @@ document.addEventListener("DOMContentLoaded", () => {
   let videoDevices = [];
   let currentFacingMode = "environment";
 
+  let isShakerActive = false;
+  let instrumentPeer = null;
+  let instrumentConn = null;
+  let lastShakeTime = 0;
+
   function setCameraStatus(msg, isError = false) {
     camStatusOverlay.style.display = "block";
     cameraPreview.classList.remove("active");
@@ -353,6 +358,26 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("[CAMERA] Peer error:", err);
         showToast("Connection to TV failed", true);
         stopCamera();
+      });
+    }
+
+    if (payload.type === "instrument_peer_id") {
+      if (typeof Peer === "undefined") return;
+
+      instrumentPeer = new Peer({ debug: 2 });
+      instrumentPeer.on("open", () => {
+        instrumentConn = instrumentPeer.connect(payload.peerId, {
+          reliable: false,
+        });
+
+        instrumentConn.on("open", () => {
+          showToast("Shaker connected to TV!");
+        });
+      });
+
+      instrumentPeer.on("error", (err) => {
+        console.error("[INSTRUMENT] Peer error:", err);
+        showToast("Shaker connection failed.", true);
       });
     }
   });
@@ -640,6 +665,93 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   switchCamBtn.onclick = switchCamera;
+
+  const toggleShakerBtn = document.getElementById("toggle-shaker-btn");
+
+  function handleMotion(event) {
+    if (!isShakerActive || !instrumentConn || !instrumentConn.open) return;
+
+    const acc = event.accelerationIncludingGravity;
+    if (!acc) return;
+
+    const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+
+    if (magnitude > 20) {
+      const now = Date.now();
+
+      if (now - lastShakeTime > 150) {
+        lastShakeTime = now;
+        if (navigator.vibrate) navigator.vibrate(40);
+
+        let velocity = Math.min(127, Math.floor((magnitude - 20) * 3) + 60);
+
+        instrumentConn.send({
+          type: "note_on",
+          channel: 9,
+          note: 69,
+          velocity: velocity,
+        });
+
+        setTimeout(() => {
+          if (instrumentConn && instrumentConn.open) {
+            instrumentConn.send({
+              type: "note_off",
+              channel: 9,
+              note: 69,
+              velocity: 0,
+            });
+          }
+        }, 50);
+      }
+    }
+  }
+
+  toggleShakerBtn.onclick = async () => {
+    if (!EncoreEnv.isSecure) {
+      showToast("Shaker requires a secure connection (HTTPS).", true);
+      return;
+    }
+
+    if (
+      typeof DeviceMotionEvent !== "undefined" &&
+      typeof DeviceMotionEvent.requestPermission === "function"
+    ) {
+      try {
+        const permissionState = await DeviceMotionEvent.requestPermission();
+        if (permissionState !== "granted") {
+          showToast("Motion sensor permission denied.", true);
+          return;
+        }
+      } catch (e) {
+        console.error("DeviceMotion error:", e);
+      }
+    }
+
+    isShakerActive = !isShakerActive;
+
+    if (isShakerActive) {
+      toggleShakerBtn.classList.add("btn-primary");
+      toggleShakerBtn.classList.remove("btn-secondary");
+      toggleShakerBtn.querySelector("span").textContent = "SHAKER ACTIVE";
+
+      socket.emit("remote-command", { type: "request_instrument_peer" });
+      window.addEventListener("devicemotion", handleMotion);
+    } else {
+      toggleShakerBtn.classList.remove("btn-primary");
+      toggleShakerBtn.classList.add("btn-secondary");
+      toggleShakerBtn.querySelector("span").textContent = "VIRTUAL SHAKER";
+
+      window.removeEventListener("devicemotion", handleMotion);
+      if (instrumentConn) {
+        instrumentConn.close();
+        instrumentConn = null;
+      }
+      if (instrumentPeer) {
+        instrumentPeer.destroy();
+        instrumentPeer = null;
+      }
+    }
+  };
 
   document.getElementById("chat-send-btn").onclick = () => {
     const v = chatInput.value.trim();
