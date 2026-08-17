@@ -1,4 +1,5 @@
 import Html from "../../../libs/html.js";
+import { Peer } from "peerjs";
 
 export default class NetworkManager {
   /**
@@ -629,6 +630,43 @@ export default class NetworkManager {
                 identity: cmd.identity,
                 data: { type: "camera_peer_id", peerId },
               });
+            });
+          }
+          break;
+        case "request_instrument_peer":
+          if (!this.ctx.state.instrumentPeer) {
+            this.ctx.state.instrumentPeer = new Peer({ debug: 2 });
+
+            this.ctx.state.instrumentPeer.on("open", (id) => {
+              this.socket.emit("sendData", {
+                identity: cmd.identity,
+                data: { type: "instrument_peer_id", peerId: id },
+              });
+            });
+
+            this.ctx.state.instrumentPeer.on("connection", (conn) => {
+              conn.on("data", (data) => {
+                if (
+                  data &&
+                  (data.type === "note_on" || data.type === "note_off")
+                ) {
+                  console.log(
+                    `[INSTRUMENT] ${data.type.toUpperCase()} | Channel: ${data.channel} | Note: ${data.note} | Velocity: ${data.velocity}`,
+                  );
+                }
+              });
+            });
+
+            this.ctx.state.instrumentPeer.on("error", (err) => {
+              console.error("[INSTRUMENT] PeerJS Host Error:", err);
+            });
+          } else {
+            this.socket.emit("sendData", {
+              identity: cmd.identity,
+              data: {
+                type: "instrument_peer_id",
+                peerId: this.ctx.state.instrumentPeer.id,
+              },
             });
           }
           break;
