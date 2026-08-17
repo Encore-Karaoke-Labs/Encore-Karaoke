@@ -681,7 +681,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (now - lastShakeTime > 150) {
         lastShakeTime = now;
-        if (navigator.vibrate) navigator.vibrate(40);
+        if (window.navigator && window.navigator.vibrate) {
+          window.navigator.vibrate([50]);
+        }
 
         let velocity = Math.min(127, Math.floor((magnitude - 20) * 3) + 60);
 
@@ -733,6 +735,12 @@ document.addEventListener("DOMContentLoaded", () => {
       toggleShakerBtn.classList.add("btn-primary");
       toggleShakerBtn.classList.remove("btn-secondary");
       toggleShakerBtn.querySelector("span").textContent = "SHAKER ACTIVE";
+
+      if (window.navigator && window.navigator.vibrate) {
+        window.navigator.vibrate([50, 50, 50]);
+      } else {
+        console.warn("Vibration API not supported on this browser.");
+      }
 
       socket.emit("remote-command", { type: "request_instrument_peer" });
       window.addEventListener("devicemotion", handleMotion);
