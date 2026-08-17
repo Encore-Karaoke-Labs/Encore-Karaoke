@@ -393,6 +393,26 @@ export class ForteSynthesizer {
   }
 
   /**
+   * Plays a note
+   * @param {number} channelNumber - The MIDI channel (0-15)
+   * @param {number} midiNote - The MIDI note value
+   * @param {number} velocity - The MIDI velocity
+   */
+  playNote(channelNumber, midiNote, velocity) {
+    if (!this.state.playback.synthesizer) return;
+    this.state.playback.synthesizer.noteOn(channelNumber, midiNote, velocity);
+  }
+
+  /**
+   * Stops a note
+   * @param {number} channelNumber - The MIDI channel (0-15)
+   * @param {number} midiNote - The MIDI note value
+   **/
+  stopNote(channelNumber, midiNote) {
+    this.state.playback.synthesizer.noteOff(channelNumber, midiNote);
+  }
+
+  /**
    * Resets the preset locks on all 16 MIDI channels.
    * This ensures the next track can properly assign its own instruments and volumes.
    */

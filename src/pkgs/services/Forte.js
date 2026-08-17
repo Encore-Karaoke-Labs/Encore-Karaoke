@@ -127,6 +127,12 @@ const pkg = {
     getAvailableDrumPresets: () => synthesizer.getAvailableDrumPresets(),
     getCurrentDrumPreset: (channelNumber) =>
       synthesizer.getCurrentDrumPreset(channelNumber),
+    playNote: (channelNumber, midiNote, velocity) => {
+      synthesizer.playNote(channelNumber, midiNote, velocity);
+    },
+    stopNote: (channelNumber, midiNote) => {
+      synthesizer.stopNote(channelNumber, midiNote);
+    },
 
     getScoringState: () => scoring.getScoringState(),
     getPlaybackState: () => playback.getPlaybackState(),
