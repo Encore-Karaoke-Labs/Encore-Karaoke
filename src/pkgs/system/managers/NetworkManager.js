@@ -653,6 +653,15 @@ export default class NetworkManager {
                   console.log(
                     `[INSTRUMENT] ${data.type.toUpperCase()} | Channel: ${data.channel} | Note: ${data.note} | Velocity: ${data.velocity}`,
                   );
+                  if (data.type == "note_on") {
+                    this.ctx.services.Forte.playNote(
+                      data.channel,
+                      data.note,
+                      data.velocity,
+                    );
+                  } else if (data.type == "note_off") {
+                    this.ctx.services.Forte.stopNote(data.channel, data.note);
+                  }
                 }
               });
             });
