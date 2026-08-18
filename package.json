@@ -68,8 +68,8 @@
     "qrcode": "^1.5.3",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
-    "spessasynth_core": "^4.3.18",
-    "spessasynth_lib": "^4.3.13",
+    "spessasynth_core": "^4.3.20",
+    "spessasynth_lib": "^4.3.14",
     "youtube-search-api": "^2.0.1"
   }
 }
