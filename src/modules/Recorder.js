@@ -698,14 +698,14 @@ export class RecorderModule {
       );
     }
 
-    // 3. Composite background video buffer onto main context with crossfade opacity
+    // Composite background video buffer onto main context with crossfade opacity
     if (this.bgvCurrentOpacity > 0.01) {
       ctx.globalAlpha = this.bgvCurrentOpacity;
       ctx.drawImage(this.bgvCanvas, 0, 0, w, h);
       ctx.globalAlpha = 1.0;
     }
 
-    // 4. Render CD+G graphics layer directly on top at 100% full opacity (independent of BGV fading)
+    // Render CD+G graphics layer directly on top at 100% full opacity (independent of BGV fading)
     const customCanvas = this.bgvPlayer.customCanvas;
     if (customCanvas && customCanvas.width > 0 && customCanvas.height > 0) {
       this._drawContain(
