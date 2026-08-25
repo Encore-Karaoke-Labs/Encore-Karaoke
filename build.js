@@ -38,7 +38,15 @@ const buildBackend = esbuild.build({
   target: "node24",
   format: "esm",
   banner: {
-    js: `import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);`,
+    js: `
+import { fileURLToPath as __fileURLToPath } from 'node:url';
+import { dirname as __dirnameFunc } from 'node:path';
+import { createRequire as __createRequire } from 'node:module';
+
+const require = __createRequire(import.meta.url);
+const __filename = __fileURLToPath(import.meta.url);
+const __dirname = __dirnameFunc(__filename);
+    `,
   },
   external: [
     "electron",
