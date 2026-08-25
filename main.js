@@ -1,28 +1,38 @@
-import electronSquirrelStartup from "electron-squirrel-startup";
-import PDFDocument from "pdfkit";
-import { app, BrowserWindow, WebContentsView, ipcMain, globalShortcut, dialog, shell } from "electron";
-import path from "path";
-import fs from "fs";
+import { Client } from "@xhayper/discord-rpc";
+import { Bonjour } from "bonjour-service";
+import { exec } from "child_process";
+import cors from "cors";
 import crypto from "crypto";
 import dgram from "dgram";
-import { exec } from "child_process";
-import os from "os";
-import { Bonjour } from "bonjour-service";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  globalShortcut,
+  ipcMain,
+  shell,
+  WebContentsView,
+} from "electron";
+import electronSquirrelStartup from "electron-squirrel-startup";
 import express from "express";
+import fs from "fs";
 import http from "http";
-import cors from "cors";
+import _Kuroshiro from "kuroshiro";
+import _KuromojiAnalyzer from "kuroshiro-analyzer-kuromoji";
+import loudness from "loudness";
+import mime from "mime-types";
+import os from "os";
+import path from "path";
+import PDFDocument from "pdfkit";
+import qrcode from "qrcode";
 import { Server } from "socket.io";
 import { io as ioClient } from "socket.io-client";
-import qrcode from "qrcode";
-import { setVolume, getVolume } from "loudness";
-import KuromojiAnalyzer from "kuroshiro-analyzer-kuromoji";
-import Kuroshiro from "kuroshiro";
-import youtubesearchapi from "youtube-search-api";
 import si from "systeminformation";
-import mime from "mime-types";
-import { Client } from "@xhayper/discord-rpc";
-import Config from "./config-manager";
-import { log } from "console";
+import youtubesearchapi from "youtube-search-api";
+
+const Kuroshiro = _Kuroshiro.default ?? _Kuroshiro;
+const KuromojiAnalyzer = _KuromojiAnalyzer.default ?? _KuromojiAnalyzer;
+const { getVolume, setVolume } = loudness;
 
 if (electronSquirrelStartup) app.quit();
 
@@ -51,7 +61,6 @@ function registerProtocols() {
     }
   });
 }
-
 
 const krRegex = /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/; // Hangul (Korean)
 const kanaRegex = /[\u3040-\u30ff\u31f0-\u31ff]/; // Hiragana & Katakana (Japanese)
