@@ -30,8 +30,8 @@ function copyRecursiveSync(src, dest) {
   }
 }
 
-const buildBackend = esbuild.build({
-  entryPoints: ["main.js", "preload.js"],
+const buildMain = esbuild.build({
+  entryPoints: ["main.js"],
   bundle: true,
   outdir: "dist",
   platform: "node",
@@ -55,6 +55,18 @@ const __dirname = __dirnameFunc(__filename);
     "kuroshiro-analyzer-kuromoji",
     "electron-squirrel-startup",
   ],
+  minify: !isDev,
+  sourcemap: isDev,
+});
+
+const buildPreload = esbuild.build({
+  entryPoints: ["preload.js"],
+  bundle: true,
+  outdir: "dist",
+  platform: "node",
+  target: "node24",
+  format: "cjs",
+  external: ["electron"],
   minify: !isDev,
   sourcemap: isDev,
 });
@@ -92,7 +104,7 @@ if (windowEntryPoints.length > 0) {
   });
 }
 
-Promise.all([buildBackend, buildOS, buildWindows])
+Promise.all([buildMain, buildPreload, buildOS, buildWindows])
   .then(() => {
     console.log("Copying static assets...");
     copyRecursiveSync("src/libs", "dist/resources/static/libs");
