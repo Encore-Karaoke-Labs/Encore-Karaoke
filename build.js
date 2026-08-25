@@ -37,6 +37,9 @@ const buildBackend = esbuild.build({
   platform: "node",
   target: "node24",
   format: "esm",
+  banner: {
+    js: `import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);`,
+  },
   external: [
     "electron",
     "loudness",
