@@ -118,16 +118,10 @@ function handleDeepLink(url) {
     appViewWebContents &&
     !appViewWebContents.isDestroyed()
   ) {
-    logger.info(
-      "DEEPLINK",
-      `Renderer is ready. Dispatching immediately: ${url}`,
-    );
+    logger.info("DEEPLINK", `Dispatching: ${url}`);
     appViewWebContents.send("deep-link", url);
   } else {
-    logger.info(
-      "DEEPLINK",
-      `Renderer not ready yet. Queuing deep link: ${url}`,
-    );
+    logger.info("DEEPLINK", `Queuing: ${url}`);
     pendingDeepLinks.push(url);
   }
 }
@@ -822,10 +816,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on("deep-link-ready", () => {
-    logger.info(
-      "DEEPLINK",
-      "Renderer signaled that the boot process is complete.",
-    );
+    logger.info("DEEPLINK", "Boot process is complete.");
     isRendererReady = true;
     flushPendingDeepLinks();
   });
