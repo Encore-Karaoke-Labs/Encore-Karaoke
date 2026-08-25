@@ -30,6 +30,24 @@ function copyRecursiveSync(src, dest) {
   }
 }
 
+const buildBackend = esbuild.build({
+  entryPoints: ["main.js", "preload.js"],
+  bundle: true,
+  outdir: "dist",
+  platform: "node",
+  target: "node24",
+  format: "esm",
+  external: [
+    "electron",
+    "loudness",
+    "systeminformation",
+    "kuroshiro-analyzer-kuromoji",
+    "electron-squirrel-startup",
+  ],
+  minify: !isDev,
+  sourcemap: isDev,
+});
+
 const osEntryPoints = ["src/core.js", ...getEntryPoints("src/pkgs")];
 const buildOS = esbuild.build({
   entryPoints: osEntryPoints,
