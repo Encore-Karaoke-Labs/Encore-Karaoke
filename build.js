@@ -1,6 +1,6 @@
-const esbuild = require("esbuild");
-const fs = require("fs");
-const path = require("path");
+import * as esbuild from "esbuild";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 const isDev = process.argv.includes("--dev");
 
@@ -30,13 +30,24 @@ function copyRecursiveSync(src, dest) {
   }
 }
 
-const buildBackend = esbuild.build({
-  entryPoints: ["main.js", "preload.js"],
+const buildMain = esbuild.build({
+  entryPoints: ["main.js"],
   bundle: true,
   outdir: "dist",
   platform: "node",
   target: "node24",
-  format: "cjs",
+  format: "esm",
+  banner: {
+    js: `
+import { fileURLToPath as __fileURLToPath } from 'node:url';
+import { dirname as __dirnameFunc } from 'node:path';
+import { createRequire as __createRequire } from 'node:module';
+
+const require = __createRequire(import.meta.url);
+const __filename = __fileURLToPath(import.meta.url);
+const __dirname = __dirnameFunc(__filename);
+    `,
+  },
   external: [
     "electron",
     "loudness",
@@ -44,6 +55,18 @@ const buildBackend = esbuild.build({
     "kuroshiro-analyzer-kuromoji",
     "electron-squirrel-startup",
   ],
+  minify: !isDev,
+  sourcemap: isDev,
+});
+
+const buildPreload = esbuild.build({
+  entryPoints: ["preload.js"],
+  bundle: true,
+  outdir: "dist",
+  platform: "node",
+  target: "node24",
+  format: "cjs",
+  external: ["electron"],
   minify: !isDev,
   sourcemap: isDev,
 });
@@ -81,7 +104,7 @@ if (windowEntryPoints.length > 0) {
   });
 }
 
-Promise.all([buildOS, buildWindows])
+Promise.all([buildMain, buildPreload, buildOS, buildWindows])
   .then(() => {
     console.log("Copying static assets...");
     copyRecursiveSync("src/libs", "dist/resources/static/libs");

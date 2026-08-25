@@ -1,22 +1,41 @@
-if (require("electron-squirrel-startup")) app.quit();
-
-const PDFDocument = require("pdfkit");
-
-const {
+import { Client } from "@xhayper/discord-rpc";
+import { Bonjour } from "bonjour-service";
+import { exec } from "child_process";
+import cors from "cors";
+import crypto from "crypto";
+import dgram from "dgram";
+import {
   app,
   BrowserWindow,
-  WebContentsView,
-  ipcMain,
-  globalShortcut,
   dialog,
+  globalShortcut,
+  ipcMain,
   shell,
-} = require("electron");
-const path = require("path");
-const fs = require("fs");
-const crypto = require("crypto");
-const dgram = require("dgram");
-const { exec } = require("child_process");
-const os = require("os");
+  WebContentsView,
+} from "electron";
+import electronSquirrelStartup from "electron-squirrel-startup";
+import express from "express";
+import fs from "fs";
+import http from "http";
+import _Kuroshiro from "kuroshiro";
+import _KuromojiAnalyzer from "kuroshiro-analyzer-kuromoji";
+import loudness from "loudness";
+import mime from "mime-types";
+import os from "os";
+import path from "path";
+import PDFDocument from "pdfkit";
+import qrcode from "qrcode";
+import { Server } from "socket.io";
+import { io as ioClient } from "socket.io-client";
+import si from "systeminformation";
+import youtubesearchapi from "youtube-search-api";
+import Config from "./config-manager.js";
+
+const Kuroshiro = _Kuroshiro.default ?? _Kuroshiro;
+const KuromojiAnalyzer = _KuromojiAnalyzer.default ?? _KuromojiAnalyzer;
+const { getVolume, setVolume } = loudness;
+
+if (electronSquirrelStartup) app.quit();
 
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -43,26 +62,6 @@ function registerProtocols() {
     }
   });
 }
-
-const Bonjour = require("bonjour-service").Bonjour;
-const express = require("express");
-const http = require("http");
-const cors = require("cors");
-const { Server } = require("socket.io");
-const { io: ioClient } = require("socket.io-client");
-const qrcode = require("qrcode");
-
-const { setVolume, getVolume } = require("loudness");
-
-const KuromojiAnalyzer = require("kuroshiro-analyzer-kuromoji");
-const Kuroshiro = require("kuroshiro").default;
-const youtubesearchapi = require("youtube-search-api");
-const si = require("systeminformation");
-const mime = require("mime-types");
-
-const { Client } = require("@xhayper/discord-rpc");
-const Config = require("./config-manager");
-const { log } = require("console");
 
 const krRegex = /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/; // Hangul (Korean)
 const kanaRegex = /[\u3040-\u30ff\u31f0-\u31ff]/; // Hiragana & Katakana (Japanese)
@@ -1048,10 +1047,7 @@ app.whenReady().then(async () => {
 
       await Promise.all(writePromises);
 
-      logger.info(
-        "SYSTEM",
-        `Recording session exported silently to: ${sessionPath}`,
-      );
+      logger.info("SYSTEM", `Recording session exported: ${sessionPath}`);
       return { success: true, path: sessionPath };
     } catch (error) {
       logger.error(

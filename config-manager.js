@@ -1,5 +1,5 @@
-const fs = require("fs");
-const path = require("path");
+import fs from "node:fs";
+import path from "node:path";
 
 const DEFAULT_CONFIG = {
   setupComplete: false,
@@ -30,16 +30,16 @@ class ConfigManager {
     this.load();
   }
 
-  _getValueByPath(obj, path) {
-    const keys = path.split(".");
+  _getValueByPath(obj, pathStr) {
+    const keys = pathStr.split(".");
     return keys.reduce(
-      (acc, key) => (acc && acc[key] !== "undefined" ? acc[key] : undefined),
+      (acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined),
       obj,
     );
   }
 
-  _setValueByPath(obj, path, value) {
-    const keys = path.split(".");
+  _setValueByPath(obj, pathStr, value) {
+    const keys = pathStr.split(".");
     const lastKey = keys.pop();
     const parent = keys.reduce((acc, key) => {
       if (typeof acc[key] === "undefined" || acc[key] === null) {
@@ -142,4 +142,5 @@ class ConfigManager {
   }
 }
 
-module.exports = new ConfigManager();
+export { ConfigManager };
+export default new ConfigManager();
