@@ -4,7 +4,7 @@
     "useDefineForClassFields": true,
     "module": "es2022",
     "skipLibCheck": true,
-    "allowJs": false,
+    "allowJs": true,
     /* Bundler mode */
     "moduleResolution": "bundler",
     "moduleDetection": "force",
@@ -26,5 +26,5 @@
     "verbatimModuleSyntax": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "*.ts"]
+  "include": ["src/**/*", "*.ts", "*.js"]
 }
