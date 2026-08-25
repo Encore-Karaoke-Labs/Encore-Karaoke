@@ -1,7 +1,8 @@
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import { execFile as execFileCb } from "node:child_process";
-import path from "path";
+import path from "node:path";
+import { promisify } from "node:util";
 
 const APP_NAME = "Encore Karaoke";
 
@@ -38,7 +39,7 @@ const signing = process.env.APPLE_SIGNING_IDENTITY
     }
   : {};
 
-module.exports = {
+export default {
   packagerConfig: {
     asar: true,
     name: APP_NAME,
