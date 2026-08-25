@@ -81,7 +81,7 @@ if (windowEntryPoints.length > 0) {
   });
 }
 
-Promise.all([buildOS, buildWindows])
+Promise.all([buildBackend, buildOS, buildWindows])
   .then(() => {
     console.log("Copying static assets...");
     copyRecursiveSync("src/libs", "dist/resources/static/libs");
