@@ -1047,10 +1047,7 @@ app.whenReady().then(async () => {
 
       await Promise.all(writePromises);
 
-      logger.info(
-        "SYSTEM",
-        `Recording session exported silently to: ${sessionPath}`,
-      );
+      logger.info("SYSTEM", `Recording session exported: ${sessionPath}`);
       return { success: true, path: sessionPath };
     } catch (error) {
       logger.error(
