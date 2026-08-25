@@ -1,7 +1,7 @@
-const { FusesPlugin } = require("@electron-forge/plugin-fuses");
-const { FuseV1Options, FuseVersion } = require("@electron/fuses");
-const path = require("path");
-const fs = require("fs");
+import { FusesPlugin } from "@electron-forge/plugin-fuses";
+import { FuseV1Options, FuseVersion } from "@electron/fuses";
+import { execFile as execFileCb } from "node:child_process";
+import path from "path";
 
 const APP_NAME = "Encore Karaoke";
 
@@ -127,8 +127,7 @@ module.exports = {
       const profile = process.env.APPLE_KEYCHAIN_PROFILE;
       if (process.platform !== "darwin" || !profile) return makeResults;
 
-      const { promisify } = require("node:util");
-      const execFile = promisify(require("node:child_process").execFile);
+      const execFile = promisify(execFileCb);
 
       const dmgs = makeResults
         .flatMap((r) => r.artifacts)

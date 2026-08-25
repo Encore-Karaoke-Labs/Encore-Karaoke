@@ -1,6 +1,6 @@
-const esbuild = require("esbuild");
-const fs = require("fs");
-const path = require("path");
+import * as esbuild from "esbuild";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 const isDev = process.argv.includes("--dev");
 
@@ -29,24 +29,6 @@ function copyRecursiveSync(src, dest) {
     fs.copyFileSync(src, dest);
   }
 }
-
-const buildBackend = esbuild.build({
-  entryPoints: ["main.js", "preload.js"],
-  bundle: true,
-  outdir: "dist",
-  platform: "node",
-  target: "node24",
-  format: "cjs",
-  external: [
-    "electron",
-    "loudness",
-    "systeminformation",
-    "kuroshiro-analyzer-kuromoji",
-    "electron-squirrel-startup",
-  ],
-  minify: !isDev,
-  sourcemap: isDev,
-});
 
 const osEntryPoints = ["src/core.js", ...getEntryPoints("src/pkgs")];
 const buildOS = esbuild.build({

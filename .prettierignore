@@ -1,0 +1,12 @@
+**/*.min.*
+**/*.d.ts
+dist/
+.husky
+*.wav
+*.opus
+*.mid
+*.png
+*.jpg
+*.gif
+*.ttf
+*.woff2

@@ -3,9 +3,7 @@
   "version": "1.11.0",
   "description": "Turn your PC into a karaoke machine, complete with scoring and recording features. For karaoke fans, by karaoke fans. Runs offline.",
   "main": "dist/main.js",
-  "engines": {
-    "node": ">=22 <26"
-  },
+  "type": "module",
   "scripts": {
     "build": "node build.js",
     "build:dev": "node build.js --dev",
@@ -80,5 +78,12 @@
   "allowScripts": {
     "esbuild@0.28.2": true,
     "electron-winstaller@5.4.4": true
+  },
+  "lint-staged": {
+    "*.ts": [
+      "prettier --write",
+      "eslint --cache --fix"
+    ],
+    "*.{json,md,yml,yaml}": "prettier --write"
   }
 }
