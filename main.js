@@ -1,30 +1,22 @@
-import electronSquirrelStartup from "electron-squirrel-startup";
-import PDFDocument from "pdfkit";
-import { app, BrowserWindow, WebContentsView, ipcMain, globalShortcut, dialog, shell } from "electron";
-import path from "path";
-import fs from "fs";
-import crypto from "crypto";
-import dgram from "dgram";
-import { exec } from "child_process";
-import os from "os";
-import { Bonjour } from "bonjour-service";
-import express from "express";
-import http from "http";
-import cors from "cors";
-import { Server } from "socket.io";
-import { io as ioClient } from "socket.io-client";
-import qrcode from "qrcode";
-import { setVolume, getVolume } from "loudness";
-import KuromojiAnalyzer from "kuroshiro-analyzer-kuromoji";
-import Kuroshiro from "kuroshiro";
-import youtubesearchapi from "youtube-search-api";
-import si from "systeminformation";
-import mime from "mime-types";
-import { Client } from "@xhayper/discord-rpc";
-import Config from "./config-manager";
-import { log } from "console";
+if (require("electron-squirrel-startup")) app.quit();
 
-if (electronSquirrelStartup) app.quit();
+const PDFDocument = require("pdfkit");
+
+const {
+  app,
+  BrowserWindow,
+  WebContentsView,
+  ipcMain,
+  globalShortcut,
+  dialog,
+  shell,
+} = require("electron");
+const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
+const dgram = require("dgram");
+const { exec } = require("child_process");
+const os = require("os");
 
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -52,6 +44,25 @@ function registerProtocols() {
   });
 }
 
+const Bonjour = require("bonjour-service").Bonjour;
+const express = require("express");
+const http = require("http");
+const cors = require("cors");
+const { Server } = require("socket.io");
+const { io: ioClient } = require("socket.io-client");
+const qrcode = require("qrcode");
+
+const { setVolume, getVolume } = require("loudness");
+
+const KuromojiAnalyzer = require("kuroshiro-analyzer-kuromoji");
+const Kuroshiro = require("kuroshiro").default;
+const youtubesearchapi = require("youtube-search-api");
+const si = require("systeminformation");
+const mime = require("mime-types");
+
+const { Client } = require("@xhayper/discord-rpc");
+const Config = require("./config-manager");
+const { log } = require("console");
 
 const krRegex = /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/; // Hangul (Korean)
 const kanaRegex = /[\u3040-\u30ff\u31f0-\u31ff]/; // Hiragana & Katakana (Japanese)
