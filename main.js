@@ -29,6 +29,7 @@ import { Server } from "socket.io";
 import { io as ioClient } from "socket.io-client";
 import si from "systeminformation";
 import youtubesearchapi from "youtube-search-api";
+import Config from "./config-manager.js";
 
 const Kuroshiro = _Kuroshiro.default ?? _Kuroshiro;
 const KuromojiAnalyzer = _KuromojiAnalyzer.default ?? _KuromojiAnalyzer;
