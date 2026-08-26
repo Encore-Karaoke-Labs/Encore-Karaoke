@@ -31,7 +31,7 @@ function copyRecursiveSync(src, dest) {
 }
 
 const buildMain = esbuild.build({
-  entryPoints: ["main.js"],
+  entryPoints: ["main.ts"],
   bundle: true,
   outdir: "dist",
   platform: "node",
@@ -44,8 +44,6 @@ import { dirname as __dirnameFunc } from 'node:path';
 import { createRequire as __createRequire } from 'node:module';
 
 const require = __createRequire(import.meta.url);
-const __filename = __fileURLToPath(import.meta.url);
-const __dirname = __dirnameFunc(__filename);
     `,
   },
   external: [
