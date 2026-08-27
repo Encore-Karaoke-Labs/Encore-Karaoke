@@ -35,7 +35,7 @@ import { Server as SocketIOServer, type Socket } from "socket.io";
 import { io as ioClient, type Socket as ClientSocket } from "socket.io-client";
 import si from "systeminformation";
 import youtubesearchapi from "youtube-search-api";
-import Config from "./config-manager.js";
+import Config from "./config-manager";
 
 // Types & Interfaces
 export interface VersionInformation {
