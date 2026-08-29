@@ -1,6 +1,6 @@
+import CDGraphics from "cdgraphics";
 import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
-import CDGraphics from "cdgraphics";
 
 export default class PlaybackManager {
   /**
@@ -322,15 +322,16 @@ export default class PlaybackManager {
         Forte.togglePianoRollVisibility(false);
       }
 
-      let icon = state.currentSongIsMV
-        ? "mtv.png"
+      let icon = pbState.hasChorus
+        ? "chr.png"
         : state.currentSongIsMultiplexed
           ? "mp.png"
-          : pbState.hasChorus
-            ? "chr.png"
-            : pbState.isMidi
-              ? "midi.png"
+          : pbState.isMidi
+            ? "midi.png"
+            : state.currentSongIsMV
+              ? "mtv.png"
               : "rs.png";
+
       dom.formatIndicator.styleJs({
         backgroundImage: `url("/assets/img/icons/${icon}")`,
         opacity: "1",
