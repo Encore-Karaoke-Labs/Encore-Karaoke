@@ -70,10 +70,6 @@ export default class LibraryManager {
       return { label: "YT", color: colors.YouTube };
     }
 
-    if (song.videoPath) {
-      return { label: "MTV", color: colors.MTV };
-    }
-
     if (
       song.type === "multiplexed" ||
       (song.path && song.path.toLowerCase().includes("multiplex"))
@@ -87,6 +83,10 @@ export default class LibraryManager {
       (song.path && (song.path.endsWith(".mid") || song.path.endsWith(".kar")))
     ) {
       return { label: "MIDI", color: colors.MIDI };
+    }
+
+    if (song.videoPath) {
+      return { label: "MTV", color: colors.MTV };
     }
 
     return { label: "RS", color: colors.RealSound };
