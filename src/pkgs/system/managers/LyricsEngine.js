@@ -259,27 +259,36 @@ export default class LyricsEngine {
     this.reset();
     const dom = this.ctx.dom;
 
+    let cachedTempoChanges = null;
+
     const getSecondsForTick = (targetTick, tempoChanges, ppqm) => {
       if (targetTick <= 0) return 0;
       let time = 0,
         currentTick = 0,
         currentBpm = 120;
-      if (tempoChanges && tempoChanges.length > 0) {
-        let chronologicalChanges = tempoChanges
-          .map((tc, index) => {
-            let tick = tc.ticks !== undefined ? tc.ticks : tc.tick;
-            let val = tc.tempo || tc.bpm || 120;
-            let bpm = val > 1000 ? Math.round(60000000 / val) : val;
-            if (bpm <= 0) bpm = 120;
-            return { tick, bpm, _originalIndex: index };
-          })
-          .sort((a, b) =>
-            a.tick !== b.tick
-              ? a.tick - b.tick
-              : b._originalIndex - a._originalIndex,
-          );
 
-        for (let tc of chronologicalChanges) {
+      if (!cachedTempoChanges) {
+        if (tempoChanges && tempoChanges.length > 0) {
+          cachedTempoChanges = tempoChanges
+            .map((tc, index) => {
+              let tick = tc.ticks !== undefined ? tc.ticks : tc.tick;
+              let val = tc.tempo || tc.bpm || 120;
+              let bpm = val > 1000 ? Math.round(60000000 / val) : val;
+              if (bpm <= 0) bpm = 120;
+              return { tick, bpm, _originalIndex: index };
+            })
+            .sort((a, b) =>
+              a.tick !== b.tick
+                ? a.tick - b.tick
+                : b._originalIndex - a._originalIndex,
+            );
+        } else {
+          cachedTempoChanges = [];
+        }
+      }
+
+      if (cachedTempoChanges.length > 0) {
+        for (let tc of cachedTempoChanges) {
           if (tc.tick >= targetTick) break;
           if (tc.tick > currentTick) {
             time += ((tc.tick - currentTick) / ppqm) * (60 / currentBpm);
@@ -288,6 +297,7 @@ export default class LyricsEngine {
           currentBpm = tc.bpm;
         }
       }
+
       let remainingTicks = targetTick - currentTick;
       if (remainingTicks > 0)
         time += (remainingTicks / ppqm) * (60 / currentBpm);
