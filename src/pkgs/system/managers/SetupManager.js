@@ -840,6 +840,24 @@ export default class SetupManager {
                   this.renderView();
                 },
               },
+              {
+                id: "display_qr",
+                label: "Show Remote QR Code",
+                type: "select",
+                options: [
+                  { value: false, label: "Hidden" },
+                  { value: true, label: "Visible" },
+                ],
+                get: () => this.ctx.config.displayQrCode ?? true,
+                set: (v) => {
+                  this.ctx.config.displayQrCode = v;
+                  window.config.setItem("displayQrCode", v);
+
+                  if (this.ctx.root.network) {
+                    this.ctx.root.network.refreshQRCode();
+                  }
+                },
+              },
             ],
           },
           {
