@@ -456,6 +456,19 @@ export default class UIManager {
     } else {
       dom.batteryDisplay.classOn("hidden");
     }
+
+    this.updateSystemIndicatorsVisibility();
+  }
+
+  updateSystemIndicatorsVisibility() {
+    const dom = this.ctx.dom;
+    if (!dom.systemIndicators) return;
+
+    if (this.ctx.config.displaySystemIndicators === false) {
+      dom.systemIndicators.classOn("hidden");
+    } else {
+      dom.systemIndicators.classOff("hidden");
+    }
   }
 
   buildPostSongScreen() {
