@@ -1302,12 +1302,17 @@ export default class LyricsEngine {
       if (mvPlayer) {
         const target = currentTime + this.ctx.state.videoSyncOffset / 1000;
         const drift = (target - mvPlayer.currentTime) * 1000;
+
         if (Math.abs(drift) > 500) {
           mvPlayer.currentTime = target;
-          mvPlayer.playbackRate = 1;
-        } else if (Math.abs(drift) > 50)
-          mvPlayer.playbackRate = drift > 0 ? 1.05 : 0.95;
-        else mvPlayer.playbackRate = 1;
+          if (mvPlayer.playbackRate !== 1) mvPlayer.playbackRate = 1;
+        } else if (Math.abs(drift) > 150) {
+          const newRate = drift > 0 ? 1.05 : 0.95;
+          if (mvPlayer.playbackRate !== newRate)
+            mvPlayer.playbackRate = newRate;
+        } else if (Math.abs(drift) < 50) {
+          if (mvPlayer.playbackRate !== 1) mvPlayer.playbackRate = 1;
+        }
       }
 
       if (this.interludes && this.interludes.length > 0) {
