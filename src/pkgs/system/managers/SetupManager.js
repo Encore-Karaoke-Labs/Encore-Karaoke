@@ -858,6 +858,27 @@ export default class SetupManager {
                   }
                 },
               },
+              {
+                id: "display_indicators",
+                label: "Show System Indicators",
+                type: "select",
+                options: [
+                  { value: false, label: "Hidden" },
+                  { value: true, label: "Visible" },
+                ],
+                get: () => this.ctx.config.displaySystemIndicators ?? true,
+                set: (v) => {
+                  this.ctx.config.displaySystemIndicators = v;
+                  window.config.setItem("displaySystemIndicators", v);
+
+                  if (
+                    this.ctx.root.ui &&
+                    this.ctx.root.ui.updateSystemIndicatorsVisibility
+                  ) {
+                    this.ctx.root.ui.updateSystemIndicatorsVisibility();
+                  }
+                },
+              },
             ],
           },
           {
