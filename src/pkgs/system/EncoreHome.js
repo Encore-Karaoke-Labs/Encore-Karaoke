@@ -2,23 +2,23 @@ import Html from "../../libs/html.js";
 import NetworkingUtility from "../../libs/networkingUtility.js";
 
 import DriveRecoveryManager from "./managers/DriveRecoveryManager.js";
-import UIManager from "./managers/UIManager.js";
-import LibraryManager from "./managers/LibraryManager.js";
+import GamesManager from "./managers/GamesManager.js";
 import InputManager from "./managers/InputManager.js";
-import PlaybackManager from "./managers/PlaybackManager.js";
+import LibraryManager from "./managers/LibraryManager.js";
 import LyricsEngine from "./managers/LyricsEngine.js";
 import NetworkManager from "./managers/NetworkManager.js";
-import SessionManager from "./managers/SessionManager.js";
+import PlaybackManager from "./managers/PlaybackManager.js";
 import RecordingsManager from "./managers/RecordingsManager.js";
+import SessionManager from "./managers/SessionManager.js";
 import SetupManager from "./managers/SetupManager.js";
-import GamesManager from "./managers/GamesManager.js";
+import UIManager from "./managers/UIManager.js";
 
-import { MixerModule } from "../../modules/Mixer.js";
 import { BGVModule } from "../../modules/BGVPlayer.js";
-import { ScoreHUDModule } from "../../modules/ScoreHUD.js";
-import { InfoBarModule } from "../../modules/InfoBar.js";
-import { RecorderModule } from "../../modules/Recorder.js";
 import generateDialog from "../../modules/Dialog.js";
+import { InfoBarModule } from "../../modules/InfoBar.js";
+import { MixerModule } from "../../modules/Mixer.js";
+import { RecorderModule } from "../../modules/Recorder.js";
+import { ScoreHUDModule } from "../../modules/ScoreHUD.js";
 
 /**
  * Joins path parts with a given separator, normalizing leading and trailing slashes.
@@ -84,6 +84,7 @@ class EncoreController {
       showSongList: false,
 
       isEasterEggInterludeEnabled: config.enableEasterEggInterludes ?? false,
+      displayGuideMelody: config.displayGuide ?? true,
 
       songList: [],
       songMap: new Map(),

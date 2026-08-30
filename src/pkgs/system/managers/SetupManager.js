@@ -744,6 +744,21 @@ export default class SetupManager {
                   window.config.setItem("audioConfig.guideChannel", v);
                 },
               },
+              {
+                id: "display_guide",
+                label: "Display Guide Melody",
+                type: "select",
+                options: [
+                  { value: false, label: "No" },
+                  { value: true, label: "Yes" },
+                ],
+                get: () => this.ctx.config.displayGuide ?? true,
+                set: (v) => {
+                  this.ctx.config.displayGuide = v;
+                  this.ctx.state.displayGuideMelody = v;
+                  window.config.setItem("displayGuide", v);
+                },
+              },
             ],
           },
           {
