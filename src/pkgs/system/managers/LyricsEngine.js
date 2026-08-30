@@ -742,6 +742,34 @@ export default class LyricsEngine {
         flatSyllables.push({ ...s });
       }
 
+      let lastRole = null;
+      for (let i = 0; i < flatSyllables.length; i++) {
+        const s = flatSyllables[i];
+
+        if (
+          this.ctx.state.isDuet &&
+          s.duetRole &&
+          s.duetRole !== lastRole &&
+          s.duetRole !== "default"
+        ) {
+          s.showRoleIndicator = true;
+          const roleLabels = { m: "M1", f: "F1", m2: "M2", f2: "F2", a: "ALL" };
+          const rLabel = roleLabels[s.duetRole] || s.duetRole.toUpperCase();
+          s.indicatorText = rLabel;
+
+          ctx.font = `800 ${subFontSize * 0.85}px "Radio Canada", sans-serif`;
+          const textW = ctx.measureText(rLabel).width;
+          const pad = subFontSize * 0.6;
+          const pillPadding = subFontSize * 1.2;
+          s.indicatorWidth = textW + pillPadding + pad;
+
+          lastRole = s.duetRole;
+        } else {
+          s.showRoleIndicator = false;
+          s.indicatorWidth = 0;
+        }
+      }
+
       const words = [];
       let currentWord = [];
 
@@ -786,14 +814,15 @@ export default class LyricsEngine {
           const s = word[j];
           if (requiresExpansion) {
             s.origW = s.standaloneW;
-            s.blockWidth = Math.max(s.origW, s.furiW, s.romW);
+            s.blockWidth =
+              Math.max(s.origW, s.furiW, s.romW) + (s.indicatorWidth || 0);
             s.isPartOfContinuousWord = false;
           } else {
             accText += s.text || "";
             const currentSubWidth = ctx.measureText(accText).width;
             s.origW = Math.max(0, currentSubWidth - previousSubWidth);
             previousSubWidth = currentSubWidth;
-            s.blockWidth = s.origW;
+            s.blockWidth = s.origW + (s.indicatorWidth || 0);
             s.isPartOfContinuousWord = true;
           }
           s.isContinuousWordStart = false;
@@ -1000,12 +1029,67 @@ export default class LyricsEngine {
       cache.mainCtx.textBaseline = "alphabetic";
       cache.dimCtx.lineJoin = "round";
       cache.mainCtx.lineJoin = "round";
+
       line.syllables.forEach((s) => {
         if (s.isHidden) return;
-        const centerX = s.layoutX + s.blockWidth / 2;
+
+        const textStartX = s.layoutX + (s.indicatorWidth || 0);
+        const textBlockWidth = s.blockWidth - (s.indicatorWidth || 0);
+        const centerX = textStartX + textBlockWidth / 2;
+
         const colors = this.ctx.state.isDuet
           ? this.getDuetColors(s.duetRole)
           : this.getDuetColors("default");
+
+        if (s.showRoleIndicator && s.indicatorText) {
+          const indHeight = mainFontSize * 0.65;
+          const indY = s.layoutY - mainFontSize * 0.35;
+          const indX = s.layoutX;
+          const pad = subFontSize * 0.6;
+          const pillW = (s.indicatorWidth || 0) - pad;
+          const fontSize = subFontSize * 0.85;
+
+          const drawPill = (c, isMain) => {
+            c.save();
+            c.fillStyle = isMain ? colors.main : colors.dim;
+            c.strokeStyle = isMain ? colors.stroke : colors.dimStroke;
+            c.lineWidth = mainFontSize * 0.04;
+            c.beginPath();
+
+            if (c.roundRect) {
+              c.roundRect(
+                indX,
+                indY - indHeight / 2,
+                pillW,
+                indHeight,
+                indHeight / 2,
+              );
+            } else {
+              const r = indHeight / 2;
+              c.moveTo(indX + r, indY - r);
+              c.lineTo(indX + pillW - r, indY - r);
+              c.arc(indX + pillW - r, indY, r, -Math.PI / 2, Math.PI / 2);
+              c.lineTo(indX + r, indY + r);
+              c.arc(indX + r, indY, r, Math.PI / 2, Math.PI * 1.5);
+            }
+            c.fill();
+            c.stroke();
+
+            c.fillStyle = isMain ? colors.stroke : colors.dimStroke;
+            c.font = `800 ${fontSize}px "Radio Canada", sans-serif`;
+            c.textAlign = "center";
+            c.textBaseline = "middle";
+            c.fillText(
+              s.indicatorText,
+              indX + pillW / 2,
+              indY + fontSize * 0.05,
+            );
+            c.restore();
+          };
+
+          drawPill(cache.dimCtx, false);
+          drawPill(cache.mainCtx, true);
+        }
 
         const renderTextToCtx = (
           ctx,
@@ -1054,7 +1138,7 @@ export default class LyricsEngine {
 
         if (s.isPartOfContinuousWord) {
           if (s.isContinuousWordStart && s.continuousWordText) {
-            const wordX = s.layoutX;
+            const wordX = textStartX;
             cache.dimCtx.font = `900 ${mainFontSize}px "Radio Canada", sans-serif`;
             cache.dimCtx.fillStyle = colors.dim;
             cache.dimCtx.strokeStyle = colors.dimStroke;
@@ -1216,7 +1300,6 @@ export default class LyricsEngine {
 
         line.syllables.forEach((s) => {
           if (s.isHidden) return;
-          const centerX = s.layoutX + s.blockWidth / 2;
           let progress = 0;
 
           if (isLrcMode) {
@@ -1236,8 +1319,16 @@ export default class LyricsEngine {
 
             if (s.furigana) clipTop -= mainFontSize * 0.6;
 
-            let clipLeft = centerX - s.blockWidth / 2 - 5;
-            let clipWidth = (s.blockWidth + 10) * progress;
+            let clipLeft = s.layoutX - 5;
+            let clipWidth = 0;
+
+            if (isLrcMode) {
+              clipWidth = s.blockWidth + 10;
+            } else {
+              let indW = s.indicatorWidth || 0;
+              let textWipe = (s.blockWidth - indW) * progress;
+              clipWidth = indW + textWipe + 10;
+            }
 
             ctx.rect(clipLeft, clipTop, clipWidth, clipBottom - clipTop);
           }
