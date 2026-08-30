@@ -313,10 +313,11 @@ export default class PlaybackManager {
       state.currentSongIsMultiplexed = pbState.isMultiplexed;
       state.currentSongIsMIDI = pbState.isMidi;
 
-      if (
+      const trackHasNotes =
         state.currentSongIsMultiplexed ||
-        (state.currentSongIsMIDI && pbState.hasGuideNotes)
-      ) {
+        (state.currentSongIsMIDI && pbState.hasGuideNotes);
+
+      if (state.displayGuideMelody && trackHasNotes) {
         Forte.togglePianoRollVisibility(true);
       } else {
         Forte.togglePianoRollVisibility(false);
@@ -344,9 +345,6 @@ export default class PlaybackManager {
         ) {
           modules.scoreHud.show(0);
         }
-        Forte.togglePianoRollVisibility(
-          state.currentSongIsMultiplexed || state.currentSongIsMIDI,
-        );
       }
 
       dom.introTitle.text(this.truncateTitleIfNeeded(song.title));
