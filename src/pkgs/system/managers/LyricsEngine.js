@@ -455,6 +455,21 @@ export default class LyricsEngine {
       }
       if (currentLineSyllables.length > 0) lines.push(currentLineSyllables);
 
+      let trackedDuetRole = null;
+      for (let s of allSyllables) {
+        if (s.isHidden) continue;
+        if (
+          s.duetRole &&
+          s.duetRole !== trackedDuetRole &&
+          s.duetRole !== "default"
+        ) {
+          s.isRoleSwitch = true;
+          trackedDuetRole = s.duetRole;
+        } else {
+          s.isRoleSwitch = false;
+        }
+      }
+
       if (
         !hasSunplusCountdowns &&
         allSyllables.length > 0 &&
@@ -653,25 +668,47 @@ export default class LyricsEngine {
   async _resolveRomajiForLine(lineIndex) {
     if (!this.midiLines || lineIndex >= this.midiLines.length) return;
     const line = this.midiLines[lineIndex];
+    if (!line || line.length === 0) return;
 
-    const fullText = line.map((s) => s.furigana || s.text || "").join("");
+    let currentRole = null;
+    let currentChunkText = "";
+    const chunksToResolve = [];
 
-    if (this.asianRegex.test(fullText)) {
-      if (
-        this.romajiCache[fullText] === undefined &&
-        !this.pendingRomajiFetches.has(fullText)
-      ) {
-        this.pendingRomajiFetches.add(fullText);
-        const res = await Romanizer.romanize(fullText);
-        this.romajiCache[fullText] = res || "";
-        this.pendingRomajiFetches.delete(fullText);
+    for (let s of line) {
+      const role = s.duetRole || "default";
+      const txt = s.furigana || s.text || "";
+      if (role !== currentRole) {
+        if (currentChunkText.trim()) {
+          chunksToResolve.push(currentChunkText.trim());
+        }
+        currentRole = role;
+        currentChunkText = txt;
+      } else {
+        currentChunkText += txt;
+      }
+    }
+    if (currentChunkText.trim()) {
+      chunksToResolve.push(currentChunkText.trim());
+    }
 
+    for (let chunkText of chunksToResolve) {
+      if (this.asianRegex.test(chunkText)) {
         if (
-          lineIndex === this.currentSongLineIndex ||
-          lineIndex === this.currentSongLineIndex + 1
+          this.romajiCache[chunkText] === undefined &&
+          !this.pendingRomajiFetches.has(chunkText)
         ) {
-          this.calculateLyricLayout();
-          this.requestCanvasCacheUpdate = true;
+          this.pendingRomajiFetches.add(chunkText);
+          Romanizer.romanize(chunkText).then((res) => {
+            this.romajiCache[chunkText] = res || "";
+            this.pendingRomajiFetches.delete(chunkText);
+            if (
+              lineIndex === this.currentSongLineIndex ||
+              lineIndex === this.currentSongLineIndex + 1
+            ) {
+              this.calculateLyricLayout();
+              this.requestCanvasCacheUpdate = true;
+            }
+          });
         }
       }
     }
@@ -729,6 +766,7 @@ export default class LyricsEngine {
                   : totDur / parts.length;
               flatSyllables.push({
                 ...s,
+                isRoleSwitch: j === 0 ? s.isRoleSwitch : false,
                 text: p,
                 rawText: p,
                 absoluteTime: curAbs,
@@ -742,14 +780,12 @@ export default class LyricsEngine {
         flatSyllables.push({ ...s });
       }
 
-      let lastRole = null;
       for (let i = 0; i < flatSyllables.length; i++) {
         const s = flatSyllables[i];
 
         if (
           this.ctx.state.isDuet &&
-          s.duetRole &&
-          s.duetRole !== lastRole &&
+          s.isRoleSwitch &&
           s.duetRole !== "default"
         ) {
           s.showRoleIndicator = true;
@@ -766,8 +802,6 @@ export default class LyricsEngine {
           s.indicatorLeftMargin = isFirstSyllable ? 0 : subFontSize * 1.5;
 
           s.indicatorWidth = s.indicatorLeftMargin + textW + pillPadding + pad;
-
-          lastRole = s.duetRole;
         } else {
           s.showRoleIndicator = false;
           s.indicatorWidth = 0;
@@ -889,26 +923,54 @@ export default class LyricsEngine {
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
 
-        let rowText = r.map((s) => s.furigana || s.text || "").join("");
+        const romajiChunks = [];
+        let currentChunk = null;
 
-        if (this.asianRegex.test(rowText)) {
-          if (this.romajiCache[rowText] !== undefined) {
-            r.rowRomaji = this.romajiCache[rowText];
+        for (let j = 0; j < r.length; j++) {
+          const s = r[j];
+          const role = s.duetRole || "default";
+          if (!currentChunk || currentChunk.role !== role) {
+            if (currentChunk) romajiChunks.push(currentChunk);
+            currentChunk = {
+              role: role,
+              syllables: [s],
+            };
           } else {
-            r.rowRomaji = "";
-            if (!this.pendingRomajiFetches.has(rowText)) {
-              this.pendingRomajiFetches.add(rowText);
-              Romanizer.romanize(rowText).then((res) => {
-                this.romajiCache[rowText] = res || "";
-                this.pendingRomajiFetches.delete(rowText);
-                this.calculateLyricLayout();
-                this.requestCanvasCacheUpdate = true;
-              });
-            }
+            currentChunk.syllables.push(s);
           }
-        } else {
-          r.rowRomaji = "";
         }
+        if (currentChunk) romajiChunks.push(currentChunk);
+
+        let hasRomaji = false;
+        romajiChunks.forEach((chunk) => {
+          const chunkText = chunk.syllables
+            .map((s) => s.furigana || s.text || "")
+            .join("")
+            .trim();
+          chunk.text = chunkText;
+
+          if (this.asianRegex.test(chunkText)) {
+            hasRomaji = true;
+            if (this.romajiCache[chunkText] !== undefined) {
+              chunk.romaji = this.romajiCache[chunkText];
+            } else {
+              chunk.romaji = "";
+              if (!this.pendingRomajiFetches.has(chunkText)) {
+                this.pendingRomajiFetches.add(chunkText);
+                Romanizer.romanize(chunkText).then((res) => {
+                  this.romajiCache[chunkText] = res || "";
+                  this.pendingRomajiFetches.delete(chunkText);
+                  this.calculateLyricLayout();
+                  this.requestCanvasCacheUpdate = true;
+                });
+              }
+            }
+          } else {
+            chunk.romaji = "";
+          }
+        });
+
+        r.romajiChunks = romajiChunks;
 
         let rowWidth = 0,
           hasFurigana = false;
@@ -919,7 +981,7 @@ export default class LyricsEngine {
 
         const startX = (logicalWidth - rowWidth) / 2;
         const extraTop = hasFurigana ? mainFontSize * 0.6 : 0;
-        const extraBottom = r.rowRomaji ? mainFontSize * 0.6 : 0;
+        const extraBottom = hasRomaji ? mainFontSize * 0.6 : 0;
 
         if (hasFurigana) currentY += extraTop;
         r.layoutY = currentY;
@@ -1182,22 +1244,30 @@ export default class LyricsEngine {
       cache.dimCtx.textAlign = "center";
 
       line.rows.forEach((r) => {
-        if (r.rowRomaji) {
-          const dominantRole = r[0]?.duetRole || "default";
-          const colors = this.ctx.state.isDuet
-            ? this.getDuetColors(dominantRole)
-            : this.getDuetColors("default");
+        if (r.romajiChunks && r.romajiChunks.length > 0) {
+          r.romajiChunks.forEach((chunk) => {
+            if (!chunk.romaji) return;
 
-          const romajiY = r.layoutY + mainFontSize * 0.6;
-          const romajiX = logicalWidth / 2;
+            const colors = this.ctx.state.isDuet
+              ? this.getDuetColors(chunk.role)
+              : this.getDuetColors("default");
 
-          cache.dimCtx.font = `700 ${subFontSize}px "Radio Canada"`;
-          cache.dimCtx.fillStyle = colors.romaji.text;
-          cache.dimCtx.strokeStyle = colors.romaji.stroke;
-          cache.dimCtx.lineWidth = subFontSize * 0.12;
+            const firstS = chunk.syllables[0];
+            const lastS = chunk.syllables[chunk.syllables.length - 1];
 
-          cache.dimCtx.strokeText(r.rowRomaji, romajiX, romajiY);
-          cache.dimCtx.fillText(r.rowRomaji, romajiX, romajiY);
+            const firstX = firstS.layoutX + (firstS.indicatorWidth || 0);
+            const lastX = lastS.layoutX + lastS.blockWidth;
+            const chunkCenterX = (firstX + lastX) / 2;
+            const romajiY = r.layoutY + mainFontSize * 0.6;
+
+            cache.dimCtx.font = `700 ${subFontSize}px "Radio Canada"`;
+            cache.dimCtx.fillStyle = colors.romaji.text;
+            cache.dimCtx.strokeStyle = colors.romaji.stroke;
+            cache.dimCtx.lineWidth = subFontSize * 0.12;
+
+            cache.dimCtx.strokeText(chunk.romaji, chunkCenterX, romajiY);
+            cache.dimCtx.fillText(chunk.romaji, chunkCenterX, romajiY);
+          });
         }
       });
 
