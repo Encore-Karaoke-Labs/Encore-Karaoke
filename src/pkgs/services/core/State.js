@@ -90,6 +90,7 @@ export const state = {
   },
   ui: {
     pianoRollVisible: true,
+    displayGuideMelody: true,
   },
   verbose: true,
 };

@@ -235,6 +235,16 @@ class EncoreController {
       this.services.Forte.setScoringEnabled(true);
     }
 
+    if (this.config.displayGuide !== undefined) {
+      if (this.services.Forte.setDisplayGuideMelody) {
+        this.services.Forte.setDisplayGuideMelody(this.config.displayGuide);
+      }
+    } else {
+      if (this.services.Forte.setDisplayGuideMelody) {
+        this.services.Forte.setDisplayGuideMelody(true);
+      }
+    }
+
     this.state.actualPort = await NetworkingUtility.getPort();
     try {
       this.state.windowsVolume = await window.volume.getVolume();

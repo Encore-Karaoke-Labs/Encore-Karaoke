@@ -757,6 +757,9 @@ export default class SetupManager {
                   this.ctx.config.displayGuide = v;
                   this.ctx.state.displayGuideMelody = v;
                   window.config.setItem("displayGuide", v);
+                  if (this.ctx.services.Forte.setDisplayGuideMelody) {
+                    this.ctx.services.Forte.setDisplayGuideMelody(v);
+                  }
                 },
               },
             ],

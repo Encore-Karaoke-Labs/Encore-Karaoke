@@ -1,11 +1,11 @@
-import { state, logVerbose } from "./core/State.js";
 import { ForteAudioCore } from "./core/AudioCore.js";
-import { FortePianoRoll } from "./modules/PianoRoll.js";
-import { ForteSynthesizer } from "./modules/Synthesizer.js";
+import { logVerbose, state } from "./core/State.js";
 import { ForteMicrophone } from "./modules/Microphone.js";
-import { ForteScoring } from "./modules/Scoring.js";
+import { FortePianoRoll } from "./modules/PianoRoll.js";
 import { FortePlayback } from "./modules/Playback.js";
+import { ForteScoring } from "./modules/Scoring.js";
 import { ForteSFX } from "./modules/SFX.js";
+import { ForteSynthesizer } from "./modules/Synthesizer.js";
 
 let root;
 
@@ -46,6 +46,7 @@ const pkg = {
     root = Root;
 
     const config = await window.config.getAll();
+    state.ui.displayGuideMelody = config.displayGuide ?? true;
 
     audioCore = new ForteAudioCore(state, config);
     await audioCore.initialize();
@@ -138,6 +139,12 @@ const pkg = {
     getPlaybackState: () => playback.getPlaybackState(),
     setScoringEnabled: (enabled) => {
       state.scoring.userDisabled = !Boolean(enabled);
+    },
+    setDisplayGuideMelody: (enabled) => {
+      state.ui.displayGuideMelody = Boolean(enabled);
+      if (!enabled && pianoRoll) {
+        pianoRoll.toggleVisibility(false);
+      }
     },
 
     initializeScoringEngine: async () => {

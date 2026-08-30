@@ -1,10 +1,10 @@
-import { Sequencer } from "spessasynth_lib";
+import { PitchDetector } from "pitchy";
 import {
   BasicMIDI,
-  MIDIMessageTypes as midiMessageTypes,
   MIDIControllers as midiControllers,
+  MIDIMessageTypes as midiMessageTypes,
 } from "spessasynth_core";
-import { PitchDetector } from "pitchy";
+import { Sequencer } from "spessasynth_lib";
 import { logVerbose } from "../core/State.js";
 import { bindSpessaEvent } from "./Synthesizer.js";
 
@@ -117,7 +117,9 @@ export class FortePlayback {
     const hasGuide =
       this.state.playback.guideNotes &&
       this.state.playback.guideNotes.length > 0;
-    const shouldShowPianoRoll = hasGuide || this.state.playback.isAnalyzing;
+    const shouldShowPianoRoll =
+      (hasGuide || this.state.playback.isAnalyzing) &&
+      this.state.ui.displayGuideMelody;
 
     if (shouldShowPianoRoll !== this.state.ui.pianoRollVisible) {
       this.pianoRoll.toggleVisibility(shouldShowPianoRoll);
@@ -1191,9 +1193,10 @@ export class FortePlayback {
       }
 
       if (
-        (this.state.playback.guideNotes &&
+        ((this.state.playback.guideNotes &&
           this.state.playback.guideNotes.length > 0) ||
-        this.state.playback.isAnalyzing
+          this.state.playback.isAnalyzing) &&
+        this.state.ui.displayGuideMelody
       ) {
         this.pianoRoll.toggleVisibility(true);
       }
@@ -1228,9 +1231,10 @@ export class FortePlayback {
       this.audioElement.preservesPitch = false;
 
       if (
-        (this.state.playback.guideNotes &&
+        ((this.state.playback.guideNotes &&
           this.state.playback.guideNotes.length > 0) ||
-        this.state.playback.isAnalyzing
+          this.state.playback.isAnalyzing) &&
+        this.state.ui.displayGuideMelody
       ) {
         this.pianoRoll.toggleVisibility(true);
       }
