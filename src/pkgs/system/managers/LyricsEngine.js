@@ -761,12 +761,17 @@ export default class LyricsEngine {
           const textW = ctx.measureText(rLabel).width;
           const pad = subFontSize * 0.6;
           const pillPadding = subFontSize * 1.2;
-          s.indicatorWidth = textW + pillPadding + pad;
+
+          const isFirstSyllable = i === 0;
+          s.indicatorLeftMargin = isFirstSyllable ? 0 : subFontSize * 1.5;
+
+          s.indicatorWidth = s.indicatorLeftMargin + textW + pillPadding + pad;
 
           lastRole = s.duetRole;
         } else {
           s.showRoleIndicator = false;
           s.indicatorWidth = 0;
+          s.indicatorLeftMargin = 0;
         }
       }
 
@@ -1044,15 +1049,16 @@ export default class LyricsEngine {
         if (s.showRoleIndicator && s.indicatorText) {
           const indHeight = mainFontSize * 0.65;
           const indY = s.layoutY - mainFontSize * 0.35;
-          const indX = s.layoutX;
+          const indX = s.layoutX + (s.indicatorLeftMargin || 0);
           const pad = subFontSize * 0.6;
-          const pillW = (s.indicatorWidth || 0) - pad;
+          const pillW =
+            (s.indicatorWidth || 0) - (s.indicatorLeftMargin || 0) - pad;
           const fontSize = subFontSize * 0.85;
 
-          const drawPill = (c, isMain) => {
+          const drawPill = (c) => {
             c.save();
-            c.fillStyle = isMain ? colors.main : colors.dim;
-            c.strokeStyle = isMain ? colors.stroke : colors.dimStroke;
+            c.fillStyle = colors.main;
+            c.strokeStyle = colors.stroke;
             c.lineWidth = mainFontSize * 0.04;
             c.beginPath();
 
@@ -1075,7 +1081,7 @@ export default class LyricsEngine {
             c.fill();
             c.stroke();
 
-            c.fillStyle = isMain ? colors.stroke : colors.dimStroke;
+            c.fillStyle = colors.stroke;
             c.font = `800 ${fontSize}px "Radio Canada", sans-serif`;
             c.textAlign = "center";
             c.textBaseline = "middle";
@@ -1087,8 +1093,8 @@ export default class LyricsEngine {
             c.restore();
           };
 
-          drawPill(cache.dimCtx, false);
-          drawPill(cache.mainCtx, true);
+          drawPill(cache.dimCtx);
+          drawPill(cache.mainCtx);
         }
 
         const renderTextToCtx = (
