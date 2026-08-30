@@ -1,5 +1,5 @@
-import Html from "../../../libs/html.js";
 import { Peer } from "peerjs";
+import Html from "../../../libs/html.js";
 
 export default class NetworkManager {
   /**
@@ -82,6 +82,12 @@ export default class NetworkManager {
   refreshQRCode() {
     const dom = this.ctx.dom;
     if (!dom.qrContainer) return;
+
+    if (this.ctx.config.displayQrCode === false) {
+      dom.qrContainer.classOn("hidden");
+      return;
+    }
+
     const img = dom.qrContainer.elm.querySelector("img");
     if (!img) return;
 

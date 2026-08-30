@@ -904,27 +904,31 @@ export default class UIManager {
       .appendTo(dom.qrContainer);
     const img = new Html("img").appendTo(imgWrapper);
 
-    fetch(`http://127.0.0.1:${this.ctx.state.actualPort}/cloud_info`)
-      .then((r) => r.json())
-      .then((info) => {
-        if (!info.roomCode) {
-          fetch(`http://127.0.0.1:${this.ctx.state.actualPort}/local_ip`)
-            .then((r) => r.text())
-            .then((ip) => {
-              const remoteUrl = `http://${ip}:${this.ctx.state.actualPort}/remote`;
-              img.attr({
-                src: `http://127.0.0.1:${this.ctx.state.actualPort}/qr?url=${encodeURIComponent(remoteUrl)}`,
-              });
-            })
-            .catch((e) => dom.qrContainer.classOn("hidden"));
-          return;
-        }
-        const remoteUrl = `${info.relayUrl}/?room=${info.roomCode}`;
-        img.attr({
-          src: `http://127.0.0.1:${this.ctx.state.actualPort}/qr?url=${encodeURIComponent(remoteUrl)}`,
-        });
-      })
-      .catch((e) => dom.qrContainer.classOn("hidden"));
+    if (this.ctx.config.displayQrCode === false) {
+      dom.qrContainer.classOn("hidden");
+    } else {
+      fetch(`http://127.0.0.1:${this.ctx.state.actualPort}/cloud_info`)
+        .then((r) => r.json())
+        .then((info) => {
+          if (!info.roomCode) {
+            fetch(`http://127.0.0.1:${this.ctx.state.actualPort}/local_ip`)
+              .then((r) => r.text())
+              .then((ip) => {
+                const remoteUrl = `http://${ip}:${this.ctx.state.actualPort}/remote`;
+                img.attr({
+                  src: `http://127.0.0.1:${this.ctx.state.actualPort}/qr?url=${encodeURIComponent(remoteUrl)}`,
+                });
+              })
+              .catch((e) => dom.qrContainer.classOn("hidden"));
+            return;
+          }
+          const remoteUrl = `${info.relayUrl}/?room=${info.roomCode}`;
+          img.attr({
+            src: `http://127.0.0.1:${this.ctx.state.actualPort}/qr?url=${encodeURIComponent(remoteUrl)}`,
+          });
+        })
+        .catch((e) => dom.qrContainer.classOn("hidden"));
+    }
 
     this.ctx.root.network.updateRemoteCount();
   }
