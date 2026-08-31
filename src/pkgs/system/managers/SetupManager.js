@@ -32,7 +32,7 @@ const LYRIC_ROLES = [
   { id: "m", label: "Male 1", defaultColor: "blue" },
   { id: "f", label: "Female 1", defaultColor: "yellow" },
   { id: "m2", label: "Male 2", defaultColor: "red" },
-  { id: "f2", label: "Female", defaultColor: "green" },
+  { id: "f2", label: "Female 2", defaultColor: "green" },
   { id: "a", label: "Duet / All", defaultColor: "orange" },
 ];
 
