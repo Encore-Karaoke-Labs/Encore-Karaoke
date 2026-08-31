@@ -17,6 +17,145 @@ const EXPERIMENTAL_INTERLUDES = [
   "”it had to wait 9 months” - Austin, Encore Karaoke Labs\n”Who's the mother? Electron Forge” - Austin, Encore Karaoke Labs\n”It's a girl! Who's the father? SkySorcerer!” - ”Dave”, Encore Karaoke Labs\n”ok 'dave'” - SkySorcerer, Founder @ Encore Karaoke Labs",
 ];
 
+export const COLOR_PALETTES = {
+  white: {
+    label: "White",
+    main: "#ffffff",
+    stroke: "#010141",
+    dim: "rgba(255, 255, 255, 0.4)",
+    dimStroke: "rgba(1, 1, 65, 0.6)",
+    ruby: {
+      main: "#f2f2ff",
+      stroke: "#01012b",
+      dim: "rgba(230, 230, 255, 0.35)",
+      dimStroke: "rgba(1, 1, 45, 0.5)",
+    },
+    romaji: {
+      text: "rgba(235, 238, 255, 0.88)",
+      stroke: "rgba(5, 5, 45, 0.85)",
+    },
+  },
+  red: {
+    label: "Red",
+    main: "#ff6666",
+    stroke: "#660000",
+    dim: "rgba(255, 102, 102, 0.35)",
+    dimStroke: "rgba(102, 0, 0, 0.6)",
+    ruby: {
+      main: "#ffe6e6",
+      stroke: "#4d0000",
+      dim: "rgba(255, 180, 180, 0.35)",
+      dimStroke: "rgba(77, 0, 0, 0.5)",
+    },
+    romaji: {
+      text: "rgba(255, 180, 180, 0.85)",
+      stroke: "rgba(60, 0, 0, 0.85)",
+    },
+  },
+  orange: {
+    label: "Orange",
+    main: "#ffb233",
+    stroke: "#804000",
+    dim: "rgba(255, 178, 51, 0.35)",
+    dimStroke: "rgba(128, 64, 0, 0.6)",
+    ruby: {
+      main: "#fff2e6",
+      stroke: "#663300",
+      dim: "rgba(255, 210, 150, 0.35)",
+      dimStroke: "rgba(102, 51, 0, 0.5)",
+    },
+    romaji: {
+      text: "rgba(255, 215, 160, 0.85)",
+      stroke: "rgba(70, 35, 0, 0.85)",
+    },
+  },
+  yellow: {
+    label: "Yellow",
+    main: "#ffff33",
+    stroke: "#665200",
+    dim: "rgba(255, 255, 51, 0.35)",
+    dimStroke: "rgba(102, 82, 0, 0.6)",
+    ruby: {
+      main: "#fffefa",
+      stroke: "#594700",
+      dim: "rgba(255, 255, 180, 0.35)",
+      dimStroke: "rgba(89, 71, 0, 0.5)",
+    },
+    romaji: {
+      text: "rgba(255, 255, 170, 0.85)",
+      stroke: "rgba(60, 45, 0, 0.85)",
+    },
+  },
+  green: {
+    label: "Green",
+    main: "#66ff66",
+    stroke: "#004d00",
+    dim: "rgba(102, 255, 102, 0.35)",
+    dimStroke: "rgba(0, 77, 0, 0.6)",
+    ruby: {
+      main: "#eafeea",
+      stroke: "#003800",
+      dim: "rgba(180, 255, 180, 0.35)",
+      dimStroke: "rgba(0, 56, 0, 0.5)",
+    },
+    romaji: {
+      text: "rgba(180, 255, 180, 0.85)",
+      stroke: "rgba(0, 40, 0, 0.85)",
+    },
+  },
+  blue: {
+    label: "Blue",
+    main: "#66e6ff",
+    stroke: "#004d66",
+    dim: "rgba(102, 230, 255, 0.35)",
+    dimStroke: "rgba(0, 77, 102, 0.6)",
+    ruby: {
+      main: "#e6faff",
+      stroke: "#00364d",
+      dim: "rgba(180, 240, 255, 0.35)",
+      dimStroke: "rgba(0, 54, 77, 0.5)",
+    },
+    romaji: {
+      text: "rgba(180, 242, 255, 0.85)",
+      stroke: "rgba(0, 45, 60, 0.85)",
+    },
+  },
+  purple: {
+    label: "Purple",
+    main: "#d966ff",
+    stroke: "#4d0066",
+    dim: "rgba(217, 102, 255, 0.35)",
+    dimStroke: "rgba(77, 0, 102, 0.6)",
+    ruby: {
+      main: "#f9e6ff",
+      stroke: "#33004d",
+      dim: "rgba(240, 180, 255, 0.35)",
+      dimStroke: "rgba(51, 0, 77, 0.5)",
+    },
+    romaji: {
+      text: "rgba(240, 180, 255, 0.85)",
+      stroke: "rgba(60, 0, 80, 0.85)",
+    },
+  },
+  pink: {
+    label: "Pink",
+    main: "#ff66b3",
+    stroke: "#660033",
+    dim: "rgba(255, 102, 179, 0.35)",
+    dimStroke: "rgba(102, 0, 51, 0.6)",
+    ruby: {
+      main: "#ffe6f2",
+      stroke: "#4d0026",
+      dim: "rgba(255, 180, 215, 0.35)",
+      dimStroke: "rgba(77, 0, 38, 0.5)",
+    },
+    romaji: {
+      text: "rgba(255, 180, 215, 0.85)",
+      stroke: "rgba(60, 0, 40, 0.85)",
+    },
+  },
+};
+
 export default class LyricsEngine {
   /**
    * @param {Object} context - The shared context
@@ -154,105 +293,17 @@ export default class LyricsEngine {
   }
 
   getDuetColors(role) {
-    const colors = {
-      f: {
-        main: "#ffff33",
-        stroke: "#665200",
-        dim: "rgba(255, 255, 51, 0.35)",
-        dimStroke: "rgba(102, 82, 0, 0.6)",
-        ruby: {
-          main: "#fffefa",
-          stroke: "#594700",
-          dim: "rgba(255, 255, 180, 0.35)",
-          dimStroke: "rgba(89, 71, 0, 0.5)",
-        },
-        romaji: {
-          text: "rgba(255, 255, 170, 0.85)",
-          stroke: "rgba(60, 45, 0, 0.85)",
-        },
-      },
-      f2: {
-        main: "#66ff66",
-        stroke: "#004d00",
-        dim: "rgba(102, 255, 102, 0.35)",
-        dimStroke: "rgba(0, 77, 0, 0.6)",
-        ruby: {
-          main: "#eafeea",
-          stroke: "#003800",
-          dim: "rgba(180, 255, 180, 0.35)",
-          dimStroke: "rgba(0, 56, 0, 0.5)",
-        },
-        romaji: {
-          text: "rgba(180, 255, 180, 0.85)",
-          stroke: "rgba(0, 40, 0, 0.85)",
-        },
-      },
-      m: {
-        main: "#66e6ff",
-        stroke: "#004d66",
-        dim: "rgba(102, 230, 255, 0.35)",
-        dimStroke: "rgba(0, 77, 102, 0.6)",
-        ruby: {
-          main: "#e6faff",
-          stroke: "#00364d",
-          dim: "rgba(180, 240, 255, 0.35)",
-          dimStroke: "rgba(0, 54, 77, 0.5)",
-        },
-        romaji: {
-          text: "rgba(180, 242, 255, 0.85)",
-          stroke: "rgba(0, 45, 60, 0.85)",
-        },
-      },
-      m2: {
-        main: "#ff6666",
-        stroke: "#660000",
-        dim: "rgba(255, 102, 102, 0.35)",
-        dimStroke: "rgba(102, 0, 0, 0.6)",
-        ruby: {
-          main: "#ffe6e6",
-          stroke: "#4d0000",
-          dim: "rgba(255, 180, 180, 0.35)",
-          dimStroke: "rgba(77, 0, 0, 0.5)",
-        },
-        romaji: {
-          text: "rgba(255, 180, 180, 0.85)",
-          stroke: "rgba(60, 0, 0, 0.85)",
-        },
-      },
-      a: {
-        main: "#ffb233",
-        stroke: "#804000",
-        dim: "rgba(255, 178, 51, 0.35)",
-        dimStroke: "rgba(128, 64, 0, 0.6)",
-        ruby: {
-          main: "#fff2e6",
-          stroke: "#663300",
-          dim: "rgba(255, 210, 150, 0.35)",
-          dimStroke: "rgba(102, 51, 0, 0.5)",
-        },
-        romaji: {
-          text: "rgba(255, 215, 160, 0.85)",
-          stroke: "rgba(70, 35, 0, 0.85)",
-        },
-      },
-      default: {
-        main: "#ffffff",
-        stroke: "#010141",
-        dim: "rgba(255, 255, 255, 0.4)",
-        dimStroke: "rgba(1, 1, 65, 0.6)",
-        ruby: {
-          main: "#f2f2ff",
-          stroke: "#01012b",
-          dim: "rgba(230, 230, 255, 0.35)",
-          dimStroke: "rgba(1, 1, 45, 0.5)",
-        },
-        romaji: {
-          text: "rgba(235, 238, 255, 0.88)",
-          stroke: "rgba(5, 5, 45, 0.85)",
-        },
-      },
+    const defaultMappings = {
+      default: "white",
+      m: "blue",
+      f: "yellow",
+      m2: "red",
+      f2: "green",
+      a: "orange",
     };
-    return colors[role] || colors["default"];
+    const configuredColors = this.ctx.config.videoConfig?.lyricColors || {};
+    const colorKey = configuredColors[role] || defaultMappings[role] || "white";
+    return COLOR_PALETTES[colorKey] || COLOR_PALETTES.white;
   }
 
   async setupLyrics(song, pbState) {
