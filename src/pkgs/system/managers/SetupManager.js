@@ -29,11 +29,11 @@ function pathJoin(parts, sep) {
 
 const LYRIC_ROLES = [
   { id: "default", label: "Solo / Main", defaultColor: "white" },
-  { id: "m", label: "Male 1 [M1]", defaultColor: "blue" },
-  { id: "f", label: "Female 1 [F1]", defaultColor: "yellow" },
-  { id: "m2", label: "Male 2 [M2]", defaultColor: "red" },
-  { id: "f2", label: "Female 2 [F2]", defaultColor: "green" },
-  { id: "a", label: "Duet / All [ALL]", defaultColor: "orange" },
+  { id: "m", label: "Male 1", defaultColor: "blue" },
+  { id: "f", label: "Female 1", defaultColor: "yellow" },
+  { id: "m2", label: "Male 2", defaultColor: "red" },
+  { id: "f2", label: "Female", defaultColor: "green" },
+  { id: "a", label: "Duet / All", defaultColor: "orange" },
 ];
 
 const COLOR_SWATCHES = Object.keys(COLOR_PALETTES).map((key) => ({
