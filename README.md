@@ -104,7 +104,6 @@ Encore can be fully controlled via a standard keyboard or through EnMoku.
 | `' / "`         | Change drum presets                                  |
 | `[ / ]`         | Cycle background videos (BGVs) / Video sync offset   |
 | `F2`            | Enter Setup Mode (in main menu)                      |
-| `Space`         | Pause playback                                       |
 
 ---
 
