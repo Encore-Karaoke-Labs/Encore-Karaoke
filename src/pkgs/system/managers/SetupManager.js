@@ -168,6 +168,25 @@ export default class SetupManager {
     try {
       this.micDevices = await this.ctx.services.Forte.getMicDevices();
       this.playbackDevices = await this.ctx.services.Forte.getPlaybackDevices();
+
+      this.systemFonts = [];
+      try {
+        if ("queryLocalFonts" in window) {
+          const fonts = await window.queryLocalFonts();
+          this.systemFonts = [...new Set(fonts.map((f) => f.family))].sort();
+        }
+      } catch (e) {
+        console.warn("Could not load local fonts:", e);
+        this.systemFonts = [
+          "Arial",
+          "Verdana",
+          "Tahoma",
+          "Trebuchet MS",
+          "Times New Roman",
+          "Georgia",
+        ];
+      }
+
       this.updateServers =
         await window.desktopIntegration.ipc.invoke("get-update-servers");
       this.versionInformation = await window.version.getVersionInformation();
@@ -876,6 +895,30 @@ export default class SetupManager {
                     this.ctx.root.ui.updateSystemIndicatorsVisibility
                   ) {
                     this.ctx.root.ui.updateSystemIndicatorsVisibility();
+                  }
+                },
+              },
+              {
+                id: "lyric_font",
+                label: "Lyric Font",
+                type: "select",
+                options: [
+                  { value: "Radio Canada", label: "Default (Radio Canada)" },
+                  ...this.systemFonts.map((f) => ({ value: f, label: f })),
+                ],
+                get: () =>
+                  this.ctx.config.videoConfig?.lyricFontFamily ||
+                  "Radio Canada",
+                set: (v) => {
+                  this.ctx.config.videoConfig ??= {};
+                  this.ctx.config.videoConfig.lyricFontFamily = v;
+                  window.config.setItem("videoConfig.lyricFontFamily", v);
+                  this.ctx.state.lyricFontFamily = v;
+
+                  if (this.ctx.modules.lyrics) {
+                    this.ctx.modules.lyrics.requestCanvasCacheUpdate = true;
+                    if (this.ctx.state.mode === "player")
+                      this.ctx.modules.lyrics.calculateLyricLayout();
                   }
                 },
               },

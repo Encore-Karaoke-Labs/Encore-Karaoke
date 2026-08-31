@@ -61,6 +61,8 @@ class EncoreController {
       volume: config.audioConfig?.mix?.instrumental?.volume ?? 1,
       videoSyncOffset: config.videoConfig?.syncOffset || 0,
 
+      lyricFontFamily: config.videoConfig?.lyricFontFamily || "Radio Canada",
+
       isTransitioning: false,
       isTypingNumber: false,
       currentSongIsYouTube: false,

@@ -737,8 +737,8 @@ export default class LyricsEngine {
 
     const mainFontSize = Math.floor(logicalWidth * 0.045);
     const subFontSize = Math.floor(logicalWidth * 0.018);
-    const mainFontStr = `900 ${mainFontSize}px "Radio Canada", sans-serif`;
-    const rubyFontStr = `700 ${subFontSize}px "Radio Canada", sans-serif`;
+    const mainFontStr = `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
+    const rubyFontStr = `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
     const lineSpacing = mainFontSize * 1.5;
     const paragraphGap = mainFontSize * 2.4;
     let currentY = mainFontSize * 1.5;
@@ -793,7 +793,7 @@ export default class LyricsEngine {
           const rLabel = roleLabels[s.duetRole] || s.duetRole.toUpperCase();
           s.indicatorText = rLabel;
 
-          ctx.font = `800 ${subFontSize * 0.85}px "Radio Canada", sans-serif`;
+          ctx.font = `800 ${subFontSize * 0.85}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
           const textW = ctx.measureText(rLabel).width;
           const pad = subFontSize * 0.6;
           const pillPadding = subFontSize * 1.2;
@@ -1144,7 +1144,7 @@ export default class LyricsEngine {
             c.stroke();
 
             c.fillStyle = colors.stroke;
-            c.font = `800 ${fontSize}px "Radio Canada", sans-serif`;
+            c.font = `800 ${fontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
             c.textAlign = "center";
             c.textBaseline = "middle";
             c.fillText(
@@ -1189,7 +1189,7 @@ export default class LyricsEngine {
           cache.dimCtx,
           s.furigana,
           s.layoutY - mainFontSize * 1.1,
-          `700 ${subFontSize}px "Radio Canada"`,
+          `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}"`,
           s.furiW,
           false,
           true,
@@ -1198,7 +1198,7 @@ export default class LyricsEngine {
           cache.mainCtx,
           s.furigana,
           s.layoutY - mainFontSize * 1.1,
-          `700 ${subFontSize}px "Radio Canada"`,
+          `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}"`,
           s.furiW,
           true,
           true,
@@ -1207,14 +1207,14 @@ export default class LyricsEngine {
         if (s.isPartOfContinuousWord) {
           if (s.isContinuousWordStart && s.continuousWordText) {
             const wordX = textStartX;
-            cache.dimCtx.font = `900 ${mainFontSize}px "Radio Canada", sans-serif`;
+            cache.dimCtx.font = `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
             cache.dimCtx.fillStyle = colors.dim;
             cache.dimCtx.strokeStyle = colors.dimStroke;
             cache.dimCtx.lineWidth = mainFontSize * 0.15;
             cache.dimCtx.strokeText(s.continuousWordText, wordX, s.layoutY);
             cache.dimCtx.fillText(s.continuousWordText, wordX, s.layoutY);
 
-            cache.mainCtx.font = `900 ${mainFontSize}px "Radio Canada", sans-serif`;
+            cache.mainCtx.font = `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
             cache.mainCtx.fillStyle = colors.main;
             cache.mainCtx.strokeStyle = colors.stroke;
             cache.mainCtx.lineWidth = mainFontSize * 0.15;
@@ -1226,7 +1226,7 @@ export default class LyricsEngine {
             cache.dimCtx,
             s.text || "",
             s.layoutY,
-            `900 ${mainFontSize}px "Radio Canada", sans-serif`,
+            `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`,
             s.origW,
             false,
           );
@@ -1234,7 +1234,7 @@ export default class LyricsEngine {
             cache.mainCtx,
             s.text || "",
             s.layoutY,
-            `900 ${mainFontSize}px "Radio Canada", sans-serif`,
+            `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`,
             s.origW,
             true,
           );
@@ -1260,7 +1260,7 @@ export default class LyricsEngine {
             const chunkCenterX = (firstX + lastX) / 2;
             const romajiY = r.layoutY + mainFontSize * 0.6;
 
-            cache.dimCtx.font = `700 ${subFontSize}px "Radio Canada"`;
+            cache.dimCtx.font = `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}"`;
             cache.dimCtx.fillStyle = colors.romaji.text;
             cache.dimCtx.strokeStyle = colors.romaji.stroke;
             cache.dimCtx.lineWidth = subFontSize * 0.12;
