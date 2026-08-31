@@ -14,6 +14,8 @@ export class FortePianoRoll {
 
     this.pageCanvas = null;
     this.pageCtx = null;
+    this.sparkCanvas = null;
+
     this.cachedPageIndex = -1;
     this.cachedNotesLength = -1;
     this.cachedNotes = null;
@@ -21,11 +23,14 @@ export class FortePianoRoll {
 
     this.noteStartIndex = 0;
 
+    // Cache to avoid evaluating typeof
+    this.hasRoundRect =
+      typeof CanvasRenderingContext2D.prototype.roundRect === "function";
+
     this.gradHit = null;
     this.gradMiss = null;
     this.gradNeutral = null;
     this.gradSweep = null;
-    this.gradSpark = null;
 
     this.resizeHandler = this.handleResize.bind(this);
   }
@@ -48,6 +53,10 @@ export class FortePianoRoll {
 
     this.pageCanvas = document.createElement("canvas");
     this.pageCtx = this.pageCanvas.getContext("2d", { alpha: true });
+
+    this.sparkCanvas = document.createElement("canvas");
+    this.sparkCanvas.width = 40;
+    this.sparkCanvas.height = 40;
 
     this.cachedWidth = window.innerWidth;
     window.addEventListener("resize", this.resizeHandler);
@@ -78,10 +87,14 @@ export class FortePianoRoll {
     this.gradSweep.addColorStop(0, "transparent");
     this.gradSweep.addColorStop(1, "rgba(255, 215, 0, 0.15)");
 
-    this.gradSpark = this.ctx.createRadialGradient(0, 0, 0, 0, 0, 20);
-    this.gradSpark.addColorStop(0, "rgba(255, 255, 255, 1)");
-    this.gradSpark.addColorStop(0.3, "rgba(163, 230, 53, 0.8)");
-    this.gradSpark.addColorStop(1, "rgba(163, 230, 53, 0)");
+    const sCtx = this.sparkCanvas.getContext("2d", { alpha: true });
+    sCtx.clearRect(0, 0, 40, 40);
+    const gradSpark = sCtx.createRadialGradient(20, 20, 0, 20, 20, 20);
+    gradSpark.addColorStop(0, "rgba(255, 255, 255, 1)");
+    gradSpark.addColorStop(0.3, "rgba(163, 230, 53, 0.8)");
+    gradSpark.addColorStop(1, "rgba(163, 230, 53, 0)");
+    sCtx.fillStyle = gradSpark;
+    sCtx.fillRect(0, 0, 40, 40);
   }
 
   handleResize() {
@@ -138,51 +151,55 @@ export class FortePianoRoll {
 
   drawNote(ctxToUse, note, startX, y, noteWidth, isActive) {
     ctxToUse.save();
-
-    // Bitwise OR 0 forces integer values, drastically speeding up canvas rendering
     ctxToUse.translate(startX | 0, y | 0);
+    const halfHeight = NOTE_HEIGHT / 2;
+
+    if (isActive) {
+      if (note.hitStatus === "hit") {
+        ctxToUse.fillStyle = "rgba(163, 230, 53, 0.4)"; // Green
+      } else if (note.hitStatus === "miss") {
+        ctxToUse.fillStyle = "rgba(248, 113, 113, 0.4)"; // Red
+      } else {
+        ctxToUse.fillStyle = "rgba(56, 189, 248, 0.4)"; // Blue
+      }
+
+      ctxToUse.beginPath();
+      if (this.hasRoundRect) {
+        ctxToUse.roundRect(
+          -4,
+          -halfHeight - 4,
+          noteWidth + 8,
+          NOTE_HEIGHT + 8,
+          halfHeight + 4,
+        );
+      } else {
+        ctxToUse.rect(-4, -halfHeight - 4, noteWidth + 8, NOTE_HEIGHT + 8);
+      }
+      ctxToUse.fill();
+    }
 
     if (note.hitStatus === "hit") {
       ctxToUse.fillStyle = this.gradHit;
-      ctxToUse.shadowColor = isActive ? "#a3e635" : "transparent";
-      ctxToUse.shadowBlur = isActive ? 15 : 0;
     } else if (note.hitStatus === "miss") {
       ctxToUse.fillStyle = this.gradMiss;
-      ctxToUse.shadowColor = "transparent";
-      ctxToUse.shadowBlur = 0;
     } else {
       ctxToUse.fillStyle = this.gradNeutral;
-      ctxToUse.shadowColor = isActive ? "#38bdf8" : "transparent";
-      ctxToUse.shadowBlur = isActive ? 10 : 0;
     }
 
     ctxToUse.beginPath();
-    if (typeof ctxToUse.roundRect === "function") {
-      ctxToUse.roundRect(
-        0,
-        -(NOTE_HEIGHT / 2),
-        noteWidth,
-        NOTE_HEIGHT,
-        NOTE_HEIGHT / 2,
-      );
+    if (this.hasRoundRect) {
+      ctxToUse.roundRect(0, -halfHeight, noteWidth, NOTE_HEIGHT, halfHeight);
     } else {
-      ctxToUse.rect(0, -(NOTE_HEIGHT / 2), noteWidth, NOTE_HEIGHT);
+      ctxToUse.rect(0, -halfHeight, noteWidth, NOTE_HEIGHT);
     }
     ctxToUse.fill();
-    ctxToUse.shadowBlur = 0;
 
     ctxToUse.fillStyle = "rgba(255, 255, 255, 0.25)";
     ctxToUse.beginPath();
-    if (typeof ctxToUse.roundRect === "function") {
-      ctxToUse.roundRect(
-        2,
-        -(NOTE_HEIGHT / 2) + 1,
-        noteWidth - 4,
-        NOTE_HEIGHT / 3,
-        3,
-      );
+    if (this.hasRoundRect) {
+      ctxToUse.roundRect(2, -halfHeight + 1, noteWidth - 4, NOTE_HEIGHT / 3, 3);
     } else {
-      ctxToUse.rect(2, -(NOTE_HEIGHT / 2) + 1, noteWidth - 4, NOTE_HEIGHT / 3);
+      ctxToUse.rect(2, -halfHeight + 1, noteWidth - 4, NOTE_HEIGHT / 3);
     }
     ctxToUse.fill();
 
@@ -295,6 +312,8 @@ export class FortePianoRoll {
       this.noteStartIndex++;
     }
 
+    let currentStatus = "neutral";
+
     for (let i = this.noteStartIndex; i < notes.length; i++) {
       const note = notes[i];
       if (note.startTime > pageRealEndTime) break;
@@ -307,6 +326,7 @@ export class FortePianoRoll {
       const isActive = playheadX >= startX && playheadX <= startX + noteWidth;
 
       if (isActive) {
+        currentStatus = note.hitStatus || "neutral";
         this.drawNote(ctx, note, startX, y, noteWidth, true);
 
         if (
@@ -314,11 +334,7 @@ export class FortePianoRoll {
           this.state.scoring.isSinging &&
           !this.state.scoring.userDisabled
         ) {
-          ctx.save();
-          ctx.translate(playheadX, y);
-          ctx.fillStyle = this.gradSpark;
-          ctx.fillRect(-20, -20, 40, 40);
-          ctx.restore();
+          ctx.drawImage(this.sparkCanvas, playheadX - 20, y - 20);
         }
       } else if (note.hitStatus !== note._cachedStatus) {
         this.drawNote(this.pageCtx, note, startX, y, noteWidth, false);
@@ -333,11 +349,29 @@ export class FortePianoRoll {
       ctx.fillRect(-120, 0, 120, height);
       ctx.restore();
 
+      ctx.fillStyle = "rgba(255, 215, 0, 0.3)";
+      ctx.fillRect(playheadX - 4, 0, 8, height);
+      ctx.fillStyle = "rgba(255, 215, 0, 0.6)";
+      ctx.fillRect(playheadX - 2, 0, 4, height);
       ctx.fillStyle = "#ffd700";
-      ctx.shadowColor = "#ffd700";
-      ctx.shadowBlur = 15;
       ctx.fillRect(playheadX - 1, 0, 2, height);
-      ctx.shadowBlur = 0;
+    }
+
+    let trailOutline = "rgba(56, 189, 248, 0.25)";
+    let trailCore = "rgba(137, 207, 240, 0.8)";
+    let dotOuter = "rgba(137, 207, 240, 0.3)";
+    let dotInner = "rgba(56, 189, 248, 0.5)";
+
+    if (currentStatus === "hit") {
+      trailOutline = "rgba(163, 230, 53, 0.25)";
+      trailCore = "rgba(190, 242, 100, 0.8)";
+      dotOuter = "rgba(163, 230, 53, 0.3)";
+      dotInner = "rgba(101, 163, 13, 0.5)";
+    } else if (currentStatus === "miss") {
+      trailOutline = "rgba(248, 113, 113, 0.25)";
+      trailCore = "rgba(252, 165, 165, 0.8)";
+      dotOuter = "rgba(248, 113, 113, 0.3)";
+      dotInner = "rgba(220, 38, 38, 0.5)";
     }
 
     const history = this.state.scoring.micPitchHistory;
@@ -347,28 +381,48 @@ export class FortePianoRoll {
       history.length > 0 &&
       playheadX >= 0
     ) {
+      let low = 0;
+      let high = history.length - 1;
+      let hStartIndex = 0;
+      const targetTime = pageRealStartTime - 1.0;
+
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (history[mid].time < targetTime) {
+          hStartIndex = mid + 1;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+
       ctx.beginPath();
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
 
       let isDrawing = false;
       let lastTime = 0;
+      let lastPx = -1000;
+      let lastPy = -1000;
 
-      for (let i = 0; i < history.length; i++) {
+      for (let i = hStartIndex; i < history.length; i++) {
         const pt = history[i];
-
-        if (pt.time < pageRealStartTime - 1.0) continue;
         if (pt.time > pageRealEndTime + 1.0) break;
 
         if (pt.isSinging && pt.pitch > 0) {
           const px = ((pt.time - pageRealStartTime) * PIXELS_PER_SECOND) | 0;
           const py = pitchToY(pt.pitch) | 0;
 
-          if (!isDrawing || pt.time - lastTime > 0.15) {
-            ctx.moveTo(px, py);
-          } else {
-            ctx.lineTo(px, py);
+          if (px !== lastPx || py !== lastPy) {
+            if (!isDrawing || pt.time - lastTime > 0.15) {
+              ctx.moveTo(px, py);
+            } else {
+              ctx.lineTo(px, py);
+            }
+            lastPx = px;
+            lastPy = py;
           }
+
           isDrawing = true;
           lastTime = pt.time;
         } else {
@@ -377,10 +431,10 @@ export class FortePianoRoll {
       }
 
       ctx.lineWidth = 10;
-      ctx.strokeStyle = "rgba(56, 189, 248, 0.25)";
+      ctx.strokeStyle = trailOutline;
       ctx.stroke();
       ctx.lineWidth = 4;
-      ctx.strokeStyle = "rgba(137, 207, 240, 0.8)";
+      ctx.strokeStyle = trailCore;
       ctx.stroke();
     }
 
@@ -396,16 +450,18 @@ export class FortePianoRoll {
 
         ctx.beginPath();
         ctx.arc(playheadX, userY, 12 + pulse, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(137, 207, 240, 0.3)";
+        ctx.fillStyle = dotOuter;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(playheadX, userY, 9, 0, Math.PI * 2);
+        ctx.fillStyle = dotInner;
         ctx.fill();
 
         ctx.beginPath();
         ctx.arc(playheadX, userY, 6, 0, Math.PI * 2);
         ctx.fillStyle = "#ffffff";
-        ctx.shadowColor = "#38bdf8";
-        ctx.shadowBlur = 15;
         ctx.fill();
-        ctx.shadowBlur = 0;
 
         ctx.beginPath();
         ctx.arc(playheadX, userY, 8, 0, Math.PI * 2);
