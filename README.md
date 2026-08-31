@@ -19,7 +19,7 @@
 ## Key Features
 
 - **Real-Time Scoring**
-  - Powered by our custom **Forte Audio Engine** (Web Audio API), Encore actively listens to your microphone.
+  - With our **Forte Audio Engine** powered by the Web Audio API, Encore actively listens to your microphone.
   - Features live pitch tracking, real-time key-modulation detection, and a visual piano roll overlay so you know exactly when to hit those high notes (only in Multiplex & MIDI tracks).
 - **Encore Sessions (Virtual Karaoke Rooms)**
   - Sing with friends and family across the world with Encore Sessions! Perfect for OFWs, LDRs, or remote karaoke hangouts with friends!
