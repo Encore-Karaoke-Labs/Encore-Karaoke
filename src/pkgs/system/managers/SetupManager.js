@@ -169,22 +169,18 @@ export default class SetupManager {
       this.micDevices = await this.ctx.services.Forte.getMicDevices();
       this.playbackDevices = await this.ctx.services.Forte.getPlaybackDevices();
 
-      this.systemFonts = [];
+      this.systemFonts = ["Radio Canada"];
       try {
         if ("queryLocalFonts" in window) {
           const fonts = await window.queryLocalFonts();
-          this.systemFonts = [...new Set(fonts.map((f) => f.family))].sort();
+          const uniqueFonts = [...new Set(fonts.map((f) => f.family))].sort();
+          this.systemFonts = [
+            "Radio Canada",
+            ...uniqueFonts.filter((f) => f !== "Radio Canada"),
+          ];
         }
       } catch (e) {
         console.warn("Could not load local fonts:", e);
-        this.systemFonts = [
-          "Arial",
-          "Verdana",
-          "Tahoma",
-          "Trebuchet MS",
-          "Times New Roman",
-          "Georgia",
-        ];
       }
 
       this.updateServers =
@@ -901,25 +897,18 @@ export default class SetupManager {
               {
                 id: "lyric_font",
                 label: "Lyric Font",
-                type: "select",
-                options: [
-                  { value: "Radio Canada", label: "Default (Radio Canada)" },
-                  ...this.systemFonts.map((f) => ({ value: f, label: f })),
-                ],
+                type: "info-action",
                 get: () =>
                   this.ctx.config.videoConfig?.lyricFontFamily ||
                   "Radio Canada",
-                set: (v) => {
-                  this.ctx.config.videoConfig ??= {};
-                  this.ctx.config.videoConfig.lyricFontFamily = v;
-                  window.config.setItem("videoConfig.lyricFontFamily", v);
-                  this.ctx.state.lyricFontFamily = v;
+                action: () => {
+                  const currentFont =
+                    this.ctx.config.videoConfig?.lyricFontFamily ||
+                    "Radio Canada";
+                  let idx = this.systemFonts.indexOf(currentFont);
+                  if (idx === -1) idx = 0;
 
-                  if (this.ctx.modules.lyrics) {
-                    this.ctx.modules.lyrics.requestCanvasCacheUpdate = true;
-                    if (this.ctx.state.mode === "player")
-                      this.ctx.modules.lyrics.calculateLyricLayout();
-                  }
+                  this.transitionTo("font_picker", { fontPickerIndex: idx });
                 },
               },
             ],
@@ -1157,6 +1146,58 @@ export default class SetupManager {
         this.licensesListEl.scrollTop += 400;
       } else if (e.key === "PageUp" && this.licensesListEl) {
         this.licensesListEl.scrollTop -= 400;
+      }
+      return;
+    }
+
+    if (this.setupState.view === "font_picker") {
+      const totalFonts = this.systemFonts.length;
+      let newIndex = this.setupState.fontPickerIndex;
+
+      if (e.key === "Escape") {
+        this.transitionTo("submenu");
+        return;
+      } else if (e.key === "Enter") {
+        const selectedFont = this.systemFonts[this.setupState.fontPickerIndex];
+        this.ctx.config.videoConfig ??= {};
+        this.ctx.config.videoConfig.lyricFontFamily = selectedFont;
+        window.config.setItem("videoConfig.lyricFontFamily", selectedFont);
+        this.ctx.state.lyricFontFamily = selectedFont;
+
+        if (this.ctx.modules.lyrics) {
+          this.ctx.modules.lyrics.requestCanvasCacheUpdate = true;
+          if (this.ctx.state.mode === "player")
+            this.ctx.modules.lyrics.calculateLyricLayout();
+        }
+        this.transitionTo("submenu");
+        return;
+      } else if (e.key === "ArrowDown") {
+        newIndex = Math.min(totalFonts - 1, newIndex + 1);
+      } else if (e.key === "ArrowUp") {
+        newIndex = Math.max(0, newIndex - 1);
+      } else if (e.key === "PageDown") {
+        newIndex = Math.min(totalFonts - 1, newIndex + 8);
+      } else if (e.key === "PageUp") {
+        newIndex = Math.max(0, newIndex - 8);
+      }
+
+      if (newIndex !== this.setupState.fontPickerIndex) {
+        this.setupState.fontPickerIndex = newIndex;
+        if (this.fontListEl) {
+          const ITEM_HEIGHT = 65;
+          const scrollY = this.fontListEl.scrollTop;
+          const viewportHeight = this.fontListEl.clientHeight;
+          const itemTop = newIndex * ITEM_HEIGHT;
+          const itemBottom = itemTop + ITEM_HEIGHT;
+
+          if (itemTop < scrollY) {
+            this.fontListEl.scrollTop = itemTop;
+          } else if (itemBottom > scrollY + viewportHeight) {
+            this.fontListEl.scrollTop = itemBottom - viewportHeight;
+          } else {
+            if (this.renderFontItems) this.renderFontItems();
+          }
+        }
       }
       return;
     }
@@ -2205,6 +2246,8 @@ export default class SetupManager {
       this.renderAuthScreen(body);
     else if (this.setupState.view === "loading") this.renderLoadingScreen(body);
     else if (this.setupState.view === "dashboard") this.renderDashboard(body);
+    else if (this.setupState.view === "font_picker")
+      this.renderFontPicker(body);
     else if (this.setupState.view === "submenu") {
       body.classOn("is-submenu");
       this.renderSubmenu(body);
@@ -2695,6 +2738,108 @@ export default class SetupManager {
         const activeItem = list.elm.querySelector(".submenu-item.active");
         if (activeItem)
           activeItem.scrollIntoView({ block: "nearest", behavior: "auto" });
+      }
+    });
+  }
+
+  renderFontPicker(container) {
+    const panel = new Html("div").classOn("submenu-panel").appendTo(container);
+    new Html("h2")
+      .classOn("submenu-title")
+      .text("Select Lyric Font")
+      .appendTo(panel);
+
+    const listContainer = new Html("div")
+      .styleJs({
+        flexGrow: "1",
+        overflowY: "auto",
+        position: "relative",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        borderRadius: "8px",
+        background: "rgba(0, 0, 0, 0.3)",
+        marginTop: "1rem",
+      })
+      .appendTo(panel);
+
+    this.fontListEl = listContainer.elm;
+
+    const ITEM_HEIGHT = 65;
+    const totalHeight = this.systemFonts.length * ITEM_HEIGHT;
+
+    new Html("div")
+      .styleJs({
+        height: `${totalHeight}px`,
+        width: "100%",
+        position: "absolute",
+        top: "0",
+        left: "0",
+        zIndex: "-1",
+      })
+      .appendTo(listContainer);
+
+    const renderWindow = new Html("div")
+      .styleJs({ position: "absolute", top: "0", left: "0", width: "100%" })
+      .appendTo(listContainer);
+
+    this.renderFontItems = () => {
+      if (!listContainer.elm) return;
+      const scrollTop = listContainer.elm.scrollTop;
+      const clientHeight = listContainer.elm.clientHeight || 600;
+
+      const startIndex = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - 2);
+      const endIndex = Math.min(
+        this.systemFonts.length,
+        Math.ceil((scrollTop + clientHeight) / ITEM_HEIGHT) + 2,
+      );
+
+      renderWindow.clear();
+      renderWindow.styleJs({
+        transform: `translateY(${startIndex * ITEM_HEIGHT}px)`,
+      });
+
+      for (let i = startIndex; i < endIndex; i++) {
+        const fontName = this.systemFonts[i];
+        const isActive = i === this.setupState.fontPickerIndex;
+
+        const itemRow = new Html("div")
+          .styleJs({
+            height: `${ITEM_HEIGHT}px`,
+            padding: "0 20px",
+            display: "flex",
+            alignItems: "center",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+            boxSizing: "border-box",
+            background: isActive ? "rgba(255, 255, 255, 0.1)" : "transparent",
+            borderLeft: isActive
+              ? "4px solid #89cff0"
+              : "4px solid transparent",
+          })
+          .appendTo(renderWindow);
+
+        new Html("div")
+          .styleJs({
+            fontFamily: `"${fontName}", "Radio Canada", sans-serif`,
+            fontSize: "1.8rem",
+            color: isActive ? "#89cff0" : "rgba(255, 255, 255, 0.8)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          })
+          .text(fontName)
+          .appendTo(itemRow);
+      }
+    };
+
+    listContainer.on("scroll", this.renderFontItems);
+
+    requestAnimationFrame(() => {
+      if (this.fontListEl) {
+        const targetScroll =
+          this.setupState.fontPickerIndex * ITEM_HEIGHT -
+          this.fontListEl.clientHeight / 2 +
+          ITEM_HEIGHT / 2;
+        this.fontListEl.scrollTop = Math.max(0, targetScroll);
+        this.renderFontItems();
       }
     });
   }
