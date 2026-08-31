@@ -7,6 +7,7 @@ import {
   dialog,
   globalShortcut,
   ipcMain,
+  session,
   shell,
   WebContentsView,
   type Event as ElectronEvent,
@@ -995,6 +996,19 @@ if (isLowLatency) {
 }
 
 void app.whenReady().then(() => {
+  session.defaultSession.setPermissionRequestHandler(
+    (_webContents, permission, callback) => {
+      if ((permission as string) === "local-fonts") callback(true);
+      else callback(true);
+    },
+  );
+
+  session.defaultSession.setPermissionCheckHandler(
+    (_webContents, permission) => {
+      if ((permission as string) === "local-fonts") return true;
+      return true;
+    },
+  );
   setTimeout(() => {
     logger.debug("GPU", app.getGPUFeatureStatus());
   }, 2000);
