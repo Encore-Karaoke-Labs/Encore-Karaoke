@@ -894,6 +894,11 @@ export default class SetupManager {
                   }
                 },
               },
+            ],
+          },
+          {
+            title: "Lyrics",
+            items: [
               {
                 id: "lyric_font",
                 label: "Lyric Font",
