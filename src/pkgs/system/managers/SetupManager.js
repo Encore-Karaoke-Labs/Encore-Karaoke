@@ -1,5 +1,6 @@
 import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
+import { COLOR_PALETTES } from "./LyricsEngine.js";
 
 /**
  * Joins path parts with a given separator, normalizing leading and trailing slashes.
@@ -25,6 +26,22 @@ function pathJoin(parts, sep) {
   });
   return parts.join(separator);
 }
+
+const LYRIC_ROLES = [
+  { id: "default", label: "Solo / Main", defaultColor: "white" },
+  { id: "m", label: "Male 1 [M1]", defaultColor: "blue" },
+  { id: "f", label: "Female 1 [F1]", defaultColor: "yellow" },
+  { id: "m2", label: "Male 2 [M2]", defaultColor: "red" },
+  { id: "f2", label: "Female 2 [F2]", defaultColor: "green" },
+  { id: "a", label: "Duet / All [ALL]", defaultColor: "orange" },
+];
+
+const COLOR_SWATCHES = Object.keys(COLOR_PALETTES).map((key) => ({
+  id: key,
+  label: COLOR_PALETTES[key].label,
+  hex: COLOR_PALETTES[key].main,
+  stroke: COLOR_PALETTES[key].stroke,
+}));
 
 /**
  * Controller for the Encore Setup environment embedded inside Encore Home.
@@ -300,6 +317,27 @@ export default class SetupManager {
       this.updateServers && this.updateServers.length > 0
         ? this.updateServers.map((s) => ({ label: s.host, value: s.id }))
         : [{ label: "No servers found", value: "none" }];
+
+    const colorOptions = [
+      { value: "white", label: "White" },
+      { value: "red", label: "Red" },
+      { value: "orange", label: "Orange" },
+      { value: "yellow", label: "Yellow" },
+      { value: "green", label: "Green" },
+      { value: "blue", label: "Blue" },
+      { value: "purple", label: "Purple" },
+      { value: "pink", label: "Pink" },
+    ];
+
+    const lyricColorRoles = [
+      { id: "default", label: "Solo / Main Color", def: "white" },
+      { id: "m", label: "Male 1 (M1) Color", def: "blue" },
+      { id: "f", label: "Female 1 (F1) Color", def: "yellow" },
+      { id: "m2", label: "Male 2 (M2) Color", def: "red" },
+      { id: "f2", label: "Female 2 (F2) Color", def: "green" },
+      { id: "a", label: "Duet (ALL) Color", def: "orange" },
+    ];
+
     if (
       !this.setupState.selectedServerId ||
       !serverOptions.find((o) => o.value === this.setupState.selectedServerId)
@@ -916,6 +954,19 @@ export default class SetupManager {
                   this.transitionTo("font_picker", { fontPickerIndex: idx });
                 },
               },
+              {
+                id: "lyric_colors",
+                label: "Lyric Colors",
+                type: "info-action",
+                get: () => "Customize Palette",
+                action: () => {
+                  this.transitionTo("color_picker", {
+                    colorRoleIdx: 0,
+                    colorSwatchIdx: 0,
+                    colorSection: "roles",
+                  });
+                },
+              },
             ],
           },
           {
@@ -1204,6 +1255,129 @@ export default class SetupManager {
           }
         }
       }
+      return;
+    }
+
+    if (this.setupState.view === "color_picker") {
+      const activeRole = LYRIC_ROLES[this.setupState.colorRoleIdx || 0];
+      const currentColorKey =
+        this.ctx.config.videoConfig?.lyricColors?.[activeRole.id] ||
+        activeRole.defaultColor;
+
+      const swatchIdx = COLOR_SWATCHES.findIndex(
+        (s) => s.id === currentColorKey,
+      );
+      if (
+        this.setupState.colorSwatchIdx === undefined ||
+        this.setupState.colorSwatchIdx === -1
+      ) {
+        this.setupState.colorSwatchIdx = swatchIdx >= 0 ? swatchIdx : 0;
+      }
+
+      if (e.key === "Escape") {
+        if (
+          this.setupState.colorSection === "swatches" ||
+          this.setupState.colorSection === "reset"
+        ) {
+          this.setupState.colorSection = "roles";
+        } else {
+          this.transitionTo("submenu");
+          return;
+        }
+      } else if (this.setupState.colorSection === "roles") {
+        if (e.key === "ArrowUp") {
+          this.setupState.colorRoleIdx = Math.max(
+            0,
+            (this.setupState.colorRoleIdx || 0) - 1,
+          );
+        } else if (e.key === "ArrowDown") {
+          if ((this.setupState.colorRoleIdx || 0) < LYRIC_ROLES.length - 1) {
+            this.setupState.colorRoleIdx++;
+          } else {
+            this.setupState.colorSection = "reset";
+          }
+        } else if (e.key === "ArrowRight" || e.key === "Enter") {
+          this.setupState.colorSection = "swatches";
+          const newRole = LYRIC_ROLES[this.setupState.colorRoleIdx];
+          const newRoleColor =
+            this.ctx.config.videoConfig?.lyricColors?.[newRole.id] ||
+            newRole.defaultColor;
+          this.setupState.colorSwatchIdx = Math.max(
+            0,
+            COLOR_SWATCHES.findIndex((s) => s.id === newRoleColor),
+          );
+        }
+      } else if (this.setupState.colorSection === "swatches") {
+        const total = COLOR_SWATCHES.length;
+
+        if (e.key === "ArrowLeft") {
+          if (this.setupState.colorSwatchIdx % 2 === 0) {
+            this.setupState.colorSection = "roles";
+          } else {
+            this.setupState.colorSwatchIdx--;
+          }
+        } else if (e.key === "ArrowRight") {
+          if (
+            this.setupState.colorSwatchIdx % 2 === 0 &&
+            this.setupState.colorSwatchIdx + 1 < total
+          ) {
+            this.setupState.colorSwatchIdx++;
+          }
+        } else if (e.key === "ArrowUp") {
+          if (this.setupState.colorSwatchIdx >= 2) {
+            this.setupState.colorSwatchIdx -= 2;
+          } else {
+            this.setupState.colorSection = "roles";
+          }
+        } else if (e.key === "ArrowDown") {
+          if (this.setupState.colorSwatchIdx + 2 < total) {
+            this.setupState.colorSwatchIdx += 2;
+          } else {
+            this.setupState.colorSection = "reset";
+          }
+        } else if (e.key === "Enter") {
+          const chosenSwatch = COLOR_SWATCHES[this.setupState.colorSwatchIdx];
+          this.ctx.config.videoConfig ??= {};
+          this.ctx.config.videoConfig.lyricColors ??= {};
+          this.ctx.config.videoConfig.lyricColors[activeRole.id] =
+            chosenSwatch.id;
+          window.config.setItem(
+            `videoConfig.lyricColors.${activeRole.id}`,
+            chosenSwatch.id,
+          );
+
+          if (this.ctx.modules.lyrics) {
+            this.ctx.modules.lyrics.requestCanvasCacheUpdate = true;
+          }
+        }
+      } else if (this.setupState.colorSection === "reset") {
+        if (e.key === "ArrowUp") {
+          this.setupState.colorSection = "roles";
+          this.setupState.colorRoleIdx = LYRIC_ROLES.length - 1;
+        } else if (e.key === "ArrowRight") {
+          this.setupState.colorSection = "swatches";
+          this.setupState.colorSwatchIdx = COLOR_SWATCHES.length - 2;
+        } else if (e.key === "Enter") {
+          this.ctx.config.videoConfig ??= {};
+          this.ctx.config.videoConfig.lyricColors = {
+            default: "white",
+            m: "blue",
+            f: "yellow",
+            m2: "red",
+            f2: "green",
+            a: "orange",
+          };
+          window.config.setItem(
+            "videoConfig.lyricColors",
+            this.ctx.config.videoConfig.lyricColors,
+          );
+          if (this.ctx.modules.lyrics) {
+            this.ctx.modules.lyrics.requestCanvasCacheUpdate = true;
+          }
+        }
+      }
+
+      this.renderView();
       return;
     }
 
@@ -2253,6 +2427,8 @@ export default class SetupManager {
     else if (this.setupState.view === "dashboard") this.renderDashboard(body);
     else if (this.setupState.view === "font_picker")
       this.renderFontPicker(body);
+    else if (this.setupState.view === "color_picker")
+      this.renderColorPicker(body);
     else if (this.setupState.view === "submenu") {
       body.classOn("is-submenu");
       this.renderSubmenu(body);
@@ -2845,6 +3021,228 @@ export default class SetupManager {
           ITEM_HEIGHT / 2;
         this.fontListEl.scrollTop = Math.max(0, targetScroll);
         this.renderFontItems();
+      }
+    });
+  }
+
+  renderColorPicker(container) {
+    const activeRoleIdx = this.setupState.colorRoleIdx || 0;
+    const activeRole = LYRIC_ROLES[activeRoleIdx];
+    const section = this.setupState.colorSection || "roles";
+
+    const savedColors = this.ctx.config.videoConfig?.lyricColors || {};
+    const selectedColorKey =
+      savedColors[activeRole.id] || activeRole.defaultColor;
+
+    const panel = new Html("div").classOn("submenu-panel").appendTo(container);
+    new Html("h2")
+      .classOn("submenu-title")
+      .text("Lyric Color Customization")
+      .appendTo(panel);
+
+    const layout = new Html("div")
+      .styleJs({
+        display: "grid",
+        gridTemplateColumns: "300px 1fr",
+        gap: "1.2rem",
+        height: "calc(100% - 70px)",
+        padding: "0.5rem 1rem",
+        boxSizing: "border-box",
+      })
+      .appendTo(panel);
+
+    const rolesCol = new Html("div")
+      .styleJs({
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.4rem",
+        background: "rgba(0, 0, 0, 0.4)",
+        padding: "1rem",
+        borderRadius: "8px",
+        border: "2px solid rgba(255, 255, 255, 0.1)",
+        boxSizing: "border-box",
+        overflowY: "auto",
+      })
+      .appendTo(layout);
+
+    new Html("div")
+      .styleJs({
+        color: "#89cff0",
+        fontWeight: "bold",
+        fontSize: "1.1rem",
+        marginBottom: "0.4rem",
+      })
+      .text("SELECT ROLE")
+      .appendTo(rolesCol);
+
+    LYRIC_ROLES.forEach((role, idx) => {
+      const isFocused = section === "roles" && idx === activeRoleIdx;
+      const isCurrentSelectedRole = idx === activeRoleIdx;
+      const assignedColorKey = savedColors[role.id] || role.defaultColor;
+      const palette = COLOR_PALETTES[assignedColorKey] || COLOR_PALETTES.white;
+
+      const row = new Html("div")
+        .styleJs({
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0.65rem 0.9rem",
+          borderRadius: "6px",
+          boxSizing: "border-box",
+          background: isFocused
+            ? "rgba(137, 207, 240, 0.25)"
+            : isCurrentSelectedRole
+              ? "rgba(255, 255, 255, 0.1)"
+              : "transparent",
+          border: `2px solid ${
+            isFocused
+              ? "#89cff0"
+              : isCurrentSelectedRole
+                ? "rgba(255, 255, 255, 0.2)"
+                : "transparent"
+          }`,
+        })
+        .appendTo(rolesCol);
+
+      new Html("span")
+        .styleJs({
+          fontWeight: isCurrentSelectedRole ? "bold" : "normal",
+          fontSize: "1.05rem",
+        })
+        .text(role.label)
+        .appendTo(row);
+
+      new Html("div")
+        .styleJs({
+          width: "18px",
+          height: "18px",
+          borderRadius: "50%",
+          backgroundColor: palette.main,
+          border: `2px solid ${palette.stroke}`,
+          boxShadow: `0 0 6px ${palette.main}88`,
+        })
+        .appendTo(row);
+    });
+
+    const isResetFocused = section === "reset";
+    const resetBtn = new Html("div")
+      .styleJs({
+        marginTop: "auto",
+        padding: "0.75rem",
+        borderRadius: "6px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "0.5rem",
+        fontWeight: "bold",
+        fontSize: "1.05rem",
+        boxSizing: "border-box",
+        color: isResetFocused ? "#ffffff" : "#ff7777",
+        background: isResetFocused ? "#ff4444" : "rgba(255, 0, 0, 0.15)",
+        border: `2px solid ${isResetFocused ? "#ffffff" : "#ff4444"}`,
+        boxShadow: isResetFocused ? "0 0 12px rgba(255, 68, 68, 0.5)" : "none",
+      })
+      .appendTo(rolesCol);
+
+    new Html("span")
+      .styleJs({ fontSize: "1.3rem", display: "flex", alignItems: "center" })
+      .html('<ion-icon name="refresh-outline"></ion-icon>')
+      .appendTo(resetBtn);
+
+    new Html("span").text("Restore Defaults").appendTo(resetBtn);
+
+    const rightCol = new Html("div")
+      .styleJs({
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.8rem",
+        background: "rgba(0, 0, 0, 0.4)",
+        padding: "1rem",
+        borderRadius: "8px",
+        border: "2px solid rgba(255, 255, 255, 0.1)",
+        boxSizing: "border-box",
+        overflowY: "auto",
+      })
+      .appendTo(layout);
+
+    new Html("div")
+      .styleJs({ color: "#89cff0", fontWeight: "bold", fontSize: "1.1rem" })
+      .text(`PALETTE FOR: ${activeRole.label.toUpperCase()}`)
+      .appendTo(rightCol);
+
+    const swatchGrid = new Html("div")
+      .styleJs({
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "0.6rem",
+        flex: "1",
+      })
+      .appendTo(rightCol);
+
+    const activeSwatchIdx = this.setupState.colorSwatchIdx || 0;
+
+    COLOR_SWATCHES.forEach((swatch, idx) => {
+      const isFocused = section === "swatches" && idx === activeSwatchIdx;
+      const isSelected = swatch.id === selectedColorKey;
+
+      const card = new Html("div")
+        .styleJs({
+          display: "flex",
+          alignItems: "center",
+          padding: "0.6rem 1.1rem",
+          borderRadius: "8px",
+          gap: "1rem",
+          boxSizing: "border-box",
+          background: isFocused
+            ? "rgba(255, 255, 255, 0.18)"
+            : isSelected
+              ? "rgba(255, 255, 255, 0.08)"
+              : "rgba(0, 0, 0, 0.4)",
+          border: `2px solid ${
+            isFocused
+              ? "#ffd700"
+              : isSelected
+                ? swatch.hex
+                : "rgba(255, 255, 255, 0.08)"
+          }`,
+          boxShadow: isFocused ? "0 0 10px rgba(255, 215, 0, 0.3)" : "none",
+        })
+        .appendTo(swatchGrid);
+
+      new Html("div")
+        .styleJs({
+          width: "40px",
+          height: "40px",
+          minWidth: "40px",
+          borderRadius: "6px",
+          backgroundColor: swatch.hex,
+          border: `2px solid ${swatch.stroke}`,
+          boxShadow:
+            isFocused || isSelected ? `0 0 10px ${swatch.hex}88` : "none",
+        })
+        .appendTo(card);
+
+      new Html("div")
+        .styleJs({
+          flex: "1",
+          fontSize: "1.2rem",
+          fontWeight: isSelected ? "bold" : "600",
+          color: isSelected ? swatch.hex : "#fff",
+          letterSpacing: "0.5px",
+        })
+        .text(swatch.label)
+        .appendTo(card);
+
+      if (isSelected) {
+        new Html("div")
+          .styleJs({
+            fontSize: "1.6rem",
+            color: swatch.hex,
+            display: "flex",
+            alignItems: "center",
+          })
+          .html('<ion-icon name="checkmark-circle"></ion-icon>')
+          .appendTo(card);
       }
     });
   }
