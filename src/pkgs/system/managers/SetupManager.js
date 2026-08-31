@@ -967,6 +967,30 @@ export default class SetupManager {
                   });
                 },
               },
+              {
+                id: "lyric_case",
+                label: "Lyric Text Case",
+                type: "select",
+                options: [
+                  { value: "original", label: "Original" },
+                  { value: "uppercase", label: "UPPERCASE" },
+                  { value: "lowercase", label: "lowercase" },
+                  { value: "sentence", label: "Sentence case" },
+                ],
+                get: () => this.ctx.config.videoConfig?.lyricCase || "original",
+                set: (v) => {
+                  this.ctx.config.videoConfig ??= {};
+                  this.ctx.config.videoConfig.lyricCase = v;
+                  window.config.setItem("videoConfig.lyricCase", v);
+
+                  if (this.ctx.modules.lyrics) {
+                    this.ctx.modules.lyrics.requestCanvasCacheUpdate = true;
+                    if (this.ctx.state.mode === "player") {
+                      this.ctx.modules.lyrics.calculateLyricLayout();
+                    }
+                  }
+                },
+              },
             ],
           },
           {

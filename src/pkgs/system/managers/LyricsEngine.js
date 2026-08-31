@@ -860,6 +860,69 @@ export default class LyricsEngine {
         }
       }
 
+      const lyricCase = this.ctx.config.videoConfig?.lyricCase || "original";
+
+      if (lyricCase !== "original") {
+        let capitalizeNext = true;
+        // Join the syllables to search for word boundaries accurately
+        let fullText = flatSyllables.map((s) => s.text || "").join("");
+        let isIChar = new Array(fullText.length).fill(false);
+
+        if (lyricCase === "sentence") {
+          const iRegex = /\b(I)(['’](?:m|ll|d|ve))?\b/gi;
+          let match;
+          while ((match = iRegex.exec(fullText)) !== null) {
+            isIChar[match.index] = true;
+          }
+        }
+
+        let globalIndex = 0;
+
+        for (let i = 0; i < flatSyllables.length; i++) {
+          const s = flatSyllables[i];
+          if (s.text) {
+            if (lyricCase === "uppercase") {
+              s.casedText = s.text.toUpperCase();
+              globalIndex += s.text.length;
+            } else if (lyricCase === "lowercase") {
+              s.casedText = s.text.toLowerCase();
+              globalIndex += s.text.length;
+            } else if (lyricCase === "sentence") {
+              let newText = "";
+              for (let j = 0; j < s.text.length; j++) {
+                let char = s.text[j];
+
+                if (isIChar[globalIndex]) {
+                  newText += char.toUpperCase();
+                  capitalizeNext = false;
+                } else if (/[.!?¿¡]/.test(char)) {
+                  newText += char;
+                  capitalizeNext = true;
+                } else if (/\p{L}/u.test(char)) {
+                  if (capitalizeNext) {
+                    newText += char.toUpperCase();
+                    capitalizeNext = false;
+                  } else {
+                    newText += char.toLowerCase();
+                  }
+                } else {
+                  newText += char;
+                }
+
+                globalIndex++;
+              }
+              s.casedText = newText;
+            }
+          } else {
+            s.casedText = s.text;
+          }
+        }
+      } else {
+        for (let i = 0; i < flatSyllables.length; i++) {
+          flatSyllables[i].casedText = flatSyllables[i].text;
+        }
+      }
+
       const words = [];
       let currentWord = [];
 
@@ -883,7 +946,7 @@ export default class LyricsEngine {
         s.furiW = s.furigana ? ctx.measureText(s.furigana).width : 0;
         s.romW = 0;
         ctx.font = mainFontStr;
-        s.standaloneW = s.text ? ctx.measureText(s.text).width : 0;
+        s.standaloneW = s.casedText ? ctx.measureText(s.casedText).width : 0;
         currentWord.push(s);
       }
       if (currentWord.length > 0) words.push({ syllables: currentWord });
@@ -908,7 +971,7 @@ export default class LyricsEngine {
               Math.max(s.origW, s.furiW, s.romW) + (s.indicatorWidth || 0);
             s.isPartOfContinuousWord = false;
           } else {
-            accText += s.text || "";
+            accText += s.casedText || "";
             const currentSubWidth = ctx.measureText(accText).width;
             s.origW = Math.max(0, currentSubWidth - previousSubWidth);
             previousSubWidth = currentSubWidth;
@@ -957,7 +1020,7 @@ export default class LyricsEngine {
               activeContinuousStart = s;
               s.isContinuousWordStart = true;
             }
-            activeContinuousText += s.text || "";
+            activeContinuousText += s.casedText || "";
           } else {
             if (activeContinuousStart) {
               activeContinuousStart.continuousWordText = activeContinuousText;
@@ -1275,7 +1338,7 @@ export default class LyricsEngine {
         } else {
           renderTextToCtx(
             cache.dimCtx,
-            s.text || "",
+            s.casedText || s.text || "",
             s.layoutY,
             `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`,
             s.origW,
@@ -1283,7 +1346,7 @@ export default class LyricsEngine {
           );
           renderTextToCtx(
             cache.mainCtx,
-            s.text || "",
+            s.casedText || s.text || "",
             s.layoutY,
             `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`,
             s.origW,
