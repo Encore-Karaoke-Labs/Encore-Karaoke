@@ -1,6 +1,6 @@
-import NetworkingUtility from "../../libs/networkingUtility.js";
 import localforage from "localforage";
 import { BasicMIDI } from "spessasynth_core";
+import NetworkingUtility from "../../libs/networkingUtility.js";
 const jsmediatags = window.jsmediatags;
 
 /**
