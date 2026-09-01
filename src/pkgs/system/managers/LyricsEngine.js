@@ -1423,6 +1423,11 @@ export default class LyricsEngine {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
 
+    if (this.ctx.state.isTransitioning) {
+      this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
+      return;
+    }
+
     const isLrcMode =
       !this.ctx.state.currentSongIsMIDI &&
       this.parsedLrc &&
