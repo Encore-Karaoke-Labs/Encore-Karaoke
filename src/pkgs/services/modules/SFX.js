@@ -1,7 +1,7 @@
-import { Sequencer } from "spessasynth_lib";
 import { BasicMIDI } from "spessasynth_core";
-import { bindSpessaEvent } from "./Synthesizer.js";
+import { Sequencer } from "spessasynth_lib";
 import { logVerbose } from "../core/State.js";
+import { bindSpessaEvent } from "./Synthesizer.js";
 
 export class ForteSFX {
   /**
