@@ -117,9 +117,20 @@ export class FortePlayback {
     const hasGuide =
       this.state.playback.guideNotes &&
       this.state.playback.guideNotes.length > 0;
+
+    let isPreludeWait = false;
+    if (hasGuide && this.state.playback.guideNotes[0]) {
+      const firstNoteTime = this.state.playback.guideNotes[0].startTime;
+      const maxLead = Math.min(firstNoteTime, 4.0);
+      if (currentTime < firstNoteTime - maxLead) {
+        isPreludeWait = true;
+      }
+    }
+
     const shouldShowPianoRoll =
       (hasGuide || this.state.playback.isAnalyzing) &&
-      this.state.ui.displayGuideMelody;
+      this.state.ui.displayGuideMelody &&
+      !isPreludeWait;
 
     if (shouldShowPianoRoll !== this.state.ui.pianoRollVisible) {
       this.pianoRoll.toggleVisibility(shouldShowPianoRoll);
@@ -1192,15 +1203,6 @@ export class FortePlayback {
           );
       }
 
-      if (
-        ((this.state.playback.guideNotes &&
-          this.state.playback.guideNotes.length > 0) ||
-          this.state.playback.isAnalyzing) &&
-        this.state.ui.displayGuideMelody
-      ) {
-        this.pianoRoll.toggleVisibility(true);
-      }
-
       if (this.state.playback.status !== "paused") {
         this.state.playback.sequencer.currentTime = 0;
       }
@@ -1229,15 +1231,6 @@ export class FortePlayback {
         this.state.playback.transpose / 12,
       );
       this.audioElement.preservesPitch = false;
-
-      if (
-        ((this.state.playback.guideNotes &&
-          this.state.playback.guideNotes.length > 0) ||
-          this.state.playback.isAnalyzing) &&
-        this.state.ui.displayGuideMelody
-      ) {
-        this.pianoRoll.toggleVisibility(true);
-      }
 
       if (this.state.playback.isMultiplexed) {
         const vocalGuideAnalyser = this.audioCore.context.createAnalyser();

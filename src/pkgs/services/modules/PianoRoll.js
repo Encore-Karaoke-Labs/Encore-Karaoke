@@ -147,12 +147,8 @@ export class FortePianoRoll {
    */
   toggleVisibility(bool) {
     this.state.ui.pianoRollVisible = bool;
-    if (bool && this.container) {
-      this.container.classOn("visible");
-    } else if (this.container) {
-      this.container.classOff("visible");
-      this.container.elm.style.opacity = "";
-    }
+    if (bool && this.container) this.container.classOn("visible");
+    else if (this.container) this.container.classOff("visible");
   }
 
   drawNote(ctxToUse, note, startX, y, noteWidth, isActive) {
@@ -308,28 +304,6 @@ export class FortePianoRoll {
 
     ctx.clearRect(0, 0, width, height);
     ctx.drawImage(this.pageCanvas, 0, 0);
-
-    let preludeAlpha = 1.0;
-    if (notes.length > 0) {
-      const firstNoteTime = notes[0].startTime;
-      const maxLead = Math.min(firstNoteTime, 4.0);
-      const fadeDuration = 0.5;
-      const fadeStart = firstNoteTime - maxLead;
-
-      if (currentTime < fadeStart) {
-        preludeAlpha = 0.0;
-      } else if (currentTime < fadeStart + fadeDuration) {
-        preludeAlpha = (currentTime - fadeStart) / fadeDuration;
-      }
-    }
-
-    if (
-      this.container &&
-      this.container.elm &&
-      this.state.ui.pianoRollVisible
-    ) {
-      this.container.elm.style.opacity = preludeAlpha;
-    }
 
     while (
       this.noteStartIndex < notes.length &&
