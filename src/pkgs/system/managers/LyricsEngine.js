@@ -620,7 +620,6 @@ export default class LyricsEngine {
       this._resolveRomajiForLine(2);
 
       this.resizeLyricsCanvas();
-      dom.lyricsCanvas.styleJs({ opacity: "1" });
 
       this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
     } else if (song.lrcPath) {
@@ -678,7 +677,6 @@ export default class LyricsEngine {
         this.nextLineFadeDurationMs = 500;
 
         this.resizeLyricsCanvas();
-        dom.lyricsCanvas.styleJs({ opacity: "1" });
         this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
 
         if (this.parsedLrc[0].time > 4.0)
@@ -1444,15 +1442,6 @@ export default class LyricsEngine {
         );
       }
 
-      this.renderableLines.forEach((line, lineIdx) => {
-        const cache = this.lineCaches[lineIdx];
-        if (!cache) return;
-        ctx.globalAlpha = line.isNextLine ? fadeProgress : 1.0;
-        ctx.drawImage(cache.dim, 0, 0, logicalWidth, logicalHeight);
-      });
-
-      ctx.globalAlpha = 1.0;
-
       let baseTime = this.currentMediaTime || 0;
       if (this.lastMediaTimeUpdate) {
         const diff = (performance.now() - this.lastMediaTimeUpdate) / 1000;
@@ -1463,6 +1452,47 @@ export default class LyricsEngine {
 
       const LYRICS_SYNC_OFFSET = 0.08;
       const currentTime = baseTime + LYRICS_SYNC_OFFSET;
+
+      const firstLineGroupStartTime =
+        this.renderableLines.length > 0 &&
+        this.renderableLines[0].syllables &&
+        this.renderableLines[0].syllables.length > 0
+          ? this.renderableLines[0].syllables[0].absoluteTime
+          : 0;
+
+      const lineAlphas = this.renderableLines.map((line, lineIdx) => {
+        let alpha = line.isNextLine ? fadeProgress : 1.0;
+        const isFirstLineGroup = isLrcMode
+          ? this.currentLrcIndex <= 0
+          : this.currentSongLineIndex === 0;
+
+        if (isFirstLineGroup) {
+          const maxLead = Math.min(firstLineGroupStartTime, 4.0);
+          const staggerDelay = Math.min(0.5, maxLead / 4);
+          const fadeDuration = 0.5;
+          let fadeStart = firstLineGroupStartTime - maxLead;
+
+          if (lineIdx === 1) fadeStart += staggerDelay;
+
+          if (currentTime < fadeStart) {
+            alpha = 0.0;
+          } else if (currentTime < fadeStart + fadeDuration) {
+            alpha = (currentTime - fadeStart) / fadeDuration;
+          } else {
+            alpha = 1.0;
+          }
+        }
+        return alpha;
+      });
+
+      this.renderableLines.forEach((line, lineIdx) => {
+        const cache = this.lineCaches[lineIdx];
+        if (!cache) return;
+        ctx.globalAlpha = lineAlphas[lineIdx];
+        ctx.drawImage(cache.dim, 0, 0, logicalWidth, logicalHeight);
+      });
+
+      ctx.globalAlpha = 1.0;
 
       this.renderableLines.forEach((line, lineIdx) => {
         if (
@@ -1478,7 +1508,13 @@ export default class LyricsEngine {
         if (!cache) return;
 
         ctx.save();
-        if (line.isNextLine) {
+        const isFirstLineGroup = isLrcMode
+          ? this.currentLrcIndex <= 0
+          : this.currentSongLineIndex === 0;
+
+        if (isFirstLineGroup) {
+          ctx.globalAlpha = lineAlphas[lineIdx];
+        } else if (line.isNextLine) {
           ctx.globalAlpha = fadeProgress;
         } else if (isLrcMode && this.lrcChangeTime) {
           ctx.globalAlpha = Math.min(

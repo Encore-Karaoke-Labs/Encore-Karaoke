@@ -317,11 +317,7 @@ export default class PlaybackManager {
         state.currentSongIsMultiplexed ||
         (state.currentSongIsMIDI && pbState.hasGuideNotes);
 
-      if (state.displayGuideMelody && trackHasNotes) {
-        Forte.togglePianoRollVisibility(true);
-      } else {
-        Forte.togglePianoRollVisibility(false);
-      }
+      Forte.togglePianoRollVisibility(false);
 
       let icon = pbState.hasChorus
         ? "chr.png"
@@ -350,7 +346,7 @@ export default class PlaybackManager {
       dom.introTitle.text(this.truncateTitleIfNeeded(song.title));
       dom.introArtist.text(song.artist);
       dom.introCard.classOn("visible");
-      dom.lyricsCanvas.styleJs({ opacity: "1" });
+      dom.lyricsCanvas.styleJs({ opacity: "0" });
 
       state.currentBpm = pbState.midiInfo
         ? pbState.midiInfo.initialBpm || 120
@@ -457,6 +453,7 @@ export default class PlaybackManager {
           return;
         }
         dom.introCard.classOff("visible");
+        dom.lyricsCanvas.styleJs({ opacity: "1" });
         if (this.mvPlayer) this.mvPlayer.play().catch(console.error);
         Forte.playTrack();
         state.isTransitioning = false;
