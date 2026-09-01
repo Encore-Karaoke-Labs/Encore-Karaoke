@@ -1,6 +1,6 @@
+import { defineCustomElements } from "ionicons/loader";
 import Html from "../../libs/html.js";
 import NetworkingUtility from "../../libs/networkingUtility.js";
-import { defineCustomElements } from "ionicons/loader";
 
 let wrapper, Ui, Pid, Sfx;
 let root;
