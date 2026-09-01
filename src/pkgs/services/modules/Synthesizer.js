@@ -1,9 +1,5 @@
+import { MIDIControllers as midiControllers } from "spessasynth_core";
 import { WorkletSynthesizer as Synthetizer } from "spessasynth_lib";
-import {
-  BasicMIDI,
-  MIDIMessageTypes as midiMessageTypes,
-  MIDIControllers as midiControllers,
-} from "spessasynth_core";
 import { logVerbose, logVerboseWarn } from "../core/State.js";
 
 /**
