@@ -788,8 +788,8 @@ export default class LyricsEngine {
     const subFontSize = Math.floor(logicalWidth * 0.018);
     const mainFontStr = `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
     const rubyFontStr = `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
-    const lineSpacing = mainFontSize * 1.5;
-    const paragraphGap = mainFontSize * 2.4;
+    const lineSpacing = mainFontSize * 1.25;
+    const paragraphGap = mainFontSize * 1.8;
     let currentY = mainFontSize * 1.5;
     this.renderableLines = [];
 
@@ -1140,7 +1140,13 @@ export default class LyricsEngine {
       this.pendingCanvasHeight = requiredHeight;
     }
 
-    const yOffset = Math.max(0, this.logicalHeight - currentY - mainFontSize);
+    const bottomHeadroom = mainFontSize * 0.5;
+
+    const yOffset = Math.max(
+      0,
+      this.logicalHeight - currentY - mainFontSize - bottomHeadroom,
+    );
+
     if (this.renderableLines) {
       for (let i = 0; i < this.renderableLines.length; i++) {
         const line = this.renderableLines[i];
