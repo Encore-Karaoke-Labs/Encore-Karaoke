@@ -1517,15 +1517,15 @@ export default class LyricsEngine {
           ? this.currentLrcIndex <= 0
           : this.currentSongLineIndex === 0;
 
-        if (isFirstLineGroup) {
-          ctx.globalAlpha = lineAlphas[lineIdx];
-        } else if (line.isNextLine) {
-          ctx.globalAlpha = fadeProgress;
-        } else if (isLrcMode && this.lrcChangeTime) {
+        if (isLrcMode && this.lrcChangeTime) {
           ctx.globalAlpha = Math.min(
             1.0,
             Math.max(0, (performance.now() - this.lrcChangeTime) / 300),
           );
+        } else if (isFirstLineGroup) {
+          ctx.globalAlpha = lineAlphas[lineIdx];
+        } else if (line.isNextLine) {
+          ctx.globalAlpha = fadeProgress;
         }
         ctx.beginPath();
 
