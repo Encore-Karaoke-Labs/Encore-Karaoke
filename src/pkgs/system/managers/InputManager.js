@@ -730,12 +730,15 @@ export default class InputManager {
       }
 
       if (state.isSessionActive) {
-        let song = state.songNumber
-          ? state.songMap.get(state.songNumber.padStart(5, "0"))
-          : state.highlightedIndex >= 0
-            ? state.songList[state.highlightedIndex]
-            : null;
-
+let song = state.songNumber
+  ? (
+      state.songMap.get(state.songNumber) ??
+      state.songMap.get(state.songNumber.padStart(5, "0"))
+    )
+  : state.highlightedIndex >= 0
+    ? state.songList[state.highlightedIndex]
+    : null;
+        
         if (song) {
           root.sessions.reserveSongInSession(song);
           state.songNumber = "";
@@ -747,11 +750,14 @@ export default class InputManager {
         if (state.reservationQueue.length) {
           root.playback.startPlayer(state.reservationQueue.shift());
         } else {
-          let song = state.songNumber
-            ? state.songMap.get(state.songNumber.padStart(5, "0"))
-            : state.highlightedIndex >= 0
-              ? state.songList[state.highlightedIndex]
-              : null;
+let song = state.songNumber
+  ? (
+      state.songMap.get(state.songNumber) ??
+      state.songMap.get(state.songNumber.padStart(5, "0"))
+    )
+  : state.highlightedIndex >= 0
+    ? state.songList[state.highlightedIndex]
+    : null;
           if (song) {
             state.songNumber = "";
             state.highlightedIndex = -1;
