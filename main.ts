@@ -1647,7 +1647,10 @@ void app.whenReady().then(() => {
               .font("Rajdhani-Bold")
               .fontSize(12)
               .fillColor("#000000")
-              .text(song.code, textX, textY, { width: 35, lineBreak: false });
+              .text(String(song.code).padStart(5, "0"), textX, textY, {
+                width: 35,
+                lineBreak: false,
+              });
 
             const maxInfoWidth = boxW - 40 - 8;
             doc.font("Rajdhani-Bold").fontSize(11);
