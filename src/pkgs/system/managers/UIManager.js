@@ -1263,7 +1263,7 @@ export default class UIManager {
       if (song.code) {
         new Html("span")
           .classOn("queue-code")
-          .text(song.code)
+          .text(String(song.code).padStart(5, "0"))
           .appendTo(titleRow);
       } else {
         new Html("span")
