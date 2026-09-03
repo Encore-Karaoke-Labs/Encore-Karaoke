@@ -733,7 +733,7 @@ const pkg = {
             songCode = codeMap.get(parsedData.path);
           } else {
             maxCode++;
-            songCode = String(maxCode).padStart(5, "0");
+            songCode = String(maxCode).padStart(6, "0");
           }
 
           const newSongObj = {
