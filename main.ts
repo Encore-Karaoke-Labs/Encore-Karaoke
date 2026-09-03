@@ -1505,25 +1505,7 @@ void app.whenReady().then(() => {
       };
 
       try {
-        const songsByArtist = [...songs].sort((a, b) => {
-  const artistCompare = (a.artist || "Unknown").localeCompare(
-    b.artist || "Unknown",
-    undefined,
-    { sensitivity: "base" },
-  );
-
-  if (artistCompare !== 0) return artistCompare;
-
-  return (a.title || "").localeCompare(b.title || "", undefined, {
-    sensitivity: "base",
-  });
-});
-
-const songsByTitle = [...songs].sort((a, b) =>
-  (a.title || "").localeCompare(b.title || "", undefined, {
-    sensitivity: "base",
-  }),
-);
+        songs.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
 
         const doc = new PDFDocument({
           margin: 40,
@@ -1575,51 +1557,29 @@ const songsByTitle = [...songs].sort((a, b) =>
 
         doc.addPage();
 
-        const margins = 30;
-const gutter = 12;
-const colWidth =
-  (doc.page.width - margins * 2 - gutter * 2) / 3;
+        const margins = 40;
+        const gutter = 20;
+        const colWidth = (doc.page.width - margins * 2 - gutter) / 2;
+        const bottomLimit = doc.page.height - margins;
 
         let col = 0;
-let currentY = margins;
-let currentGroup = "";
-
-let processedRows = 0;
-const totalRows = songs.length * 2;
+        let currentY = margins;
+        let currentLetter = "";
 
         const checkSpace = (requiredHeight: number): void => {
           if (currentY + requiredHeight > bottomLimit) {
-           col++;
-if (col > 2) {
-  col = 0;
-  doc.addPage();
-}
+            col++;
+            if (col > 1) {
+              col = 0;
+              doc.addPage();
+            }
             currentY = margins;
           }
         };
 
-        const processSongs = async (
-  sourceSongs: SongEntry[],
-  groupMode: "artist" | "title",
-  sectionTitle: string,
-): Promise<void> => {
-  col = 0;
-  currentY = margins;
-  currentGroup = "";
-
-  doc
-    .fillColor("#89cff0")
-    .font("Rajdhani-Bold")
-    .fontSize(18)
-    .text(sectionTitle, margins, currentY, {
-      width: doc.page.width - margins * 2,
-      align: "center",
-    });
-
-  currentY += 32;
-
-  for (let i = 0; i < sourceSongs.length; i++) {
-    const song = sourceSongs[i];
+        const processSongs = async (): Promise<void> => {
+          for (let i = 0; i < songs.length; i++) {
+            const song = songs[i];
             const safeTitle = (song.title || "Unknown").replace(
               /[\u0000-\x1F\x7F-\x9F]/g,
               "",
@@ -1630,42 +1590,28 @@ if (col > 2) {
             );
 
             const firstLetter = safeTitle.charAt(0).toUpperCase();
-const titleGroup = /^[A-Z]$/.test(firstLetter)
-  ? firstLetter
-  : "#";
+            const isLetter = /^[A-Z]$/.test(firstLetter);
+            const groupingLetter = isLetter ? firstLetter : "#";
 
-const groupLabel =
-  groupMode === "artist"
-    ? safeArtist.trim() || "Unknown Artist"
-    : titleGroup;
+            const needsHeader = groupingLetter !== currentLetter;
+            const requiredHeight = 34 + (needsHeader ? 30 : 0);
 
-const groupKey = groupLabel.toLocaleLowerCase();
+            checkSpace(requiredHeight);
 
-const needsHeader = groupKey !== currentGroup;
-const requiredHeight = 34 + (needsHeader ? 28 : 0);
+            const x = margins + col * (colWidth + gutter);
 
-checkSpace(requiredHeight);
+            if (needsHeader) {
+              currentLetter = groupingLetter;
 
-const x = margins + col * (colWidth + gutter);
+              doc.rect(x, currentY, colWidth, 22).fill("#89cff0");
+              doc
+                .fillColor("#080810")
+                .fontSize(16)
+                .font("Rajdhani-Bold")
+                .text(currentLetter, x + 8, currentY + 3.5);
 
-if (needsHeader) {
-  currentGroup = groupKey;
-
-  doc.rect(x, currentY, colWidth, 20).fill("#89cff0");
-
-  doc
-    .fillColor("#080810")
-    .font(groupMode === "artist" ? getFontForText(groupLabel, "Rajdhani-Bold") : "Rajdhani-Bold")
-    .fontSize(groupMode === "artist" ? 9 : 13)
-    .text(groupLabel, x + 6, currentY + 3, {
-      width: colWidth - 12,
-      height: 15,
-      lineBreak: false,
-      ellipsis: true,
-    });
-
-  currentY += 28;
-}
+              currentY += 30;
+            }
 
             const boxX = x;
             const boxY = currentY;
@@ -1699,12 +1645,9 @@ if (needsHeader) {
 
             doc
               .font("Rajdhani-Bold")
-              .fontSize(7)
+              .fontSize(12)
               .fillColor("#000000")
-              .text(song.code, textX, textY, {
-              width: 28,
-                  lineBreak: false,
-       });
+              .text(song.code, textX, textY, { width: 35, lineBreak: false });
 
             const maxInfoWidth = boxW - 40 - 8;
             doc.font("Rajdhani-Bold").fontSize(11);
@@ -1719,7 +1662,7 @@ if (needsHeader) {
 
             let displayTitle = safeTitle;
             const titleFont = getFontForText(displayTitle, "Rajdhani-Bold");
-           doc.font(titleFont).fontSize(8.5);
+            doc.font(titleFont).fontSize(11);
 
             if (doc.widthOfString(displayTitle) > availableTitleWidth) {
               while (
@@ -1735,72 +1678,46 @@ if (needsHeader) {
               .fillColor("#000000")
               .text(displayTitle, titleStartX, textY, { lineBreak: false });
 
-            if (groupMode === "title") {
-  const artistFont = getFontForText(safeArtist, "RadioCanada");
-
-  doc
-    .font(artistFont)
-    .fontSize(7)
-    .fillColor("#555555")
-    .text(safeArtist, infoBlockX, textY + 11, {
-      width: maxInfoWidth,
-      height: 9,
-      lineBreak: false,
-      ellipsis: true,
-    });
-}
+            const artistFont = getFontForText(safeArtist, "RadioCanada");
+            doc
+              .font(artistFont)
+              .fontSize(9)
+              .fillColor("#555555")
+              .text(safeArtist, infoBlockX, textY + 12, {
+                width: maxInfoWidth,
+                height: 11,
+                lineBreak: false,
+                ellipsis: true,
+              });
 
             currentY += 34;
 
-           processedRows++;
-
-if (processedRows % 50 === 0 || processedRows === totalRows) {
-  BrowserWindow.getAllWindows().forEach((w) =>
-    w.webContents.send("songbook-export-progress", {
-      phase: "Generating PDF...",
-      current: processedRows,
-      total: totalRows,
-      percentage: Math.round((processedRows / totalRows) * 100),
-    }),
-  );
-
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
+            if (i % 50 === 0 || i === songs.length - 1) {
+              const currentCount = i + 1;
+              BrowserWindow.getAllWindows().forEach((w) =>
+                w.webContents.send("songbook-export-progress", {
+                  phase: "Generating PDF...",
+                  current: currentCount,
+                  total: songs.length,
+                  percentage: Math.round((currentCount / songs.length) * 100),
+                }),
+              );
+              await new Promise((resolve) => setTimeout(resolve, 0));
+            }
           }
 
-};
+          doc.end();
+        };
 
-const buildSongbook = async (): Promise<void> => {
-  // 1st section: ARTIST
-  await processSongs(
-    songsByArtist,
-    "artist",
-    "SONGS BY ARTIST",
-  );
-
-  // Start TITLE section on a new page
-  doc.addPage();
-
-  // 2nd section: TITLE
-  await processSongs(
-    songsByTitle,
-    "title",
-    "SONGS BY TITLE",
-  );
-
-  // Finish PDF only after BOTH sections are complete
-  doc.end();
-};
-
-buildSongbook().catch((err: Error) => {
-  logger.error("SYSTEM", `PDF Loop Error: ${err.message}`);
-  BrowserWindow.getAllWindows().forEach((w) =>
-    w.webContents.send("songbook-export-complete", {
-      success: false,
-      reason: err.message,
-    }),
-  );
-});
+        processSongs().catch((err: Error) => {
+          logger.error("SYSTEM", `PDF Loop Error: ${err.message}`);
+          BrowserWindow.getAllWindows().forEach((w) =>
+            w.webContents.send("songbook-export-complete", {
+              success: false,
+              reason: err.message,
+            }),
+          );
+        });
 
         stream.on("finish", () => {
           BrowserWindow.getAllWindows().forEach((w) =>
