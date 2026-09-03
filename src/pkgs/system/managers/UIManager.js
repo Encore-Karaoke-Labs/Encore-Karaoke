@@ -1053,13 +1053,17 @@ export default class UIManager {
         "is-typing",
       );
 
-      const code = state.songNumber.padStart(5, "0");
-      let activeSong =
-        state.songNumber.length > 0
-          ? state.songMap.get(code)
-          : state.highlightedIndex >= 0
-            ? state.songList[state.highlightedIndex]
-            : null;
+      const code = state.songNumber;
+
+let activeSong =
+  state.songNumber.length > 0
+    ? (
+        state.songMap.get(code) ??
+        state.songMap.get(code.padStart(5, "0"))
+      )
+    : state.highlightedIndex >= 0
+      ? state.songList[state.highlightedIndex]
+      : null;
 
       dom.numberDisplay.text(
         state.songNumber.length > 0 ? code : activeSong ? activeSong.code : "",
