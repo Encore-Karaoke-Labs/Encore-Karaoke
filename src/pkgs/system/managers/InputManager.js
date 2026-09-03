@@ -647,8 +647,10 @@ export default class InputManager {
     const state = this.ctx.state;
     const infoBar = this.ctx.modules.infoBar;
 
-    const displayCode = state.reservationNumber.padStart(5, "0");
-    const song = state.songMap.get(displayCode);
+    const displayCode = state.reservationNumber;
+    const song =
+  state.songMap.get(state.reservationNumber) ??
+  state.songMap.get(state.reservationNumber.padStart(5, "0"));
 
     let fmtBadge = "";
     if (song) {
@@ -728,12 +730,15 @@ export default class InputManager {
       }
 
       if (state.isSessionActive) {
-        let song = state.songNumber
-          ? state.songMap.get(state.songNumber.padStart(5, "0"))
-          : state.highlightedIndex >= 0
-            ? state.songList[state.highlightedIndex]
-            : null;
-
+let song = state.songNumber
+  ? (
+      state.songMap.get(state.songNumber) ??
+      state.songMap.get(state.songNumber.padStart(5, "0"))
+    )
+  : state.highlightedIndex >= 0
+    ? state.songList[state.highlightedIndex]
+    : null;
+        
         if (song) {
           root.sessions.reserveSongInSession(song);
           state.songNumber = "";
@@ -745,11 +750,14 @@ export default class InputManager {
         if (state.reservationQueue.length) {
           root.playback.startPlayer(state.reservationQueue.shift());
         } else {
-          let song = state.songNumber
-            ? state.songMap.get(state.songNumber.padStart(5, "0"))
-            : state.highlightedIndex >= 0
-              ? state.songList[state.highlightedIndex]
-              : null;
+let song = state.songNumber
+  ? (
+      state.songMap.get(state.songNumber) ??
+      state.songMap.get(state.songNumber.padStart(5, "0"))
+    )
+  : state.highlightedIndex >= 0
+    ? state.songList[state.highlightedIndex]
+    : null;
           if (song) {
             state.songNumber = "";
             state.highlightedIndex = -1;
