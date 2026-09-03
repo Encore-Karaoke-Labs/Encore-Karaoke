@@ -534,7 +534,7 @@ export default class SessionManager {
 
   showReservationNotification(song) {
     const codeSpan = song.code
-      ? `<span class="info-bar-code">${String(song.code).padStart(5, "0")}</span>`
+      ? `<span class="info-bar-code">${String(song.code).padStart(6, "0")}</span>`
       : `<span class="info-bar-code is-youtube">YT</span>`;
     const fmt = this.ctx.root.library.getFormatInfo(song);
     const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
