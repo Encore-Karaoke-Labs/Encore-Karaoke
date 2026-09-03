@@ -1942,7 +1942,7 @@ p + .flex-list button {
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 500px;
+  width: 550px;
   height: 180px;
   margin: 0 auto;
 }
