@@ -100,7 +100,7 @@ export class InfoBarModule {
       const extra =
         reservationQueue.length > 1 ? ` (+${reservationQueue.length - 1})` : "";
       const codeSpan = nextSong.code
-        ? `<span class="info-bar-code">${String(nextSong.code).padStart(5, "0")}</span>`
+        ? `<span class="info-bar-code">${String(nextSong.code).padStart(6, "0")}</span>`
         : `<span class="info-bar-code is-youtube">YT</span>`;
 
       let fmtBadge = "";
@@ -125,12 +125,14 @@ export class InfoBarModule {
    * @param {string} reservationNumber - The song code being reserved
    */
   showReservation(reservationNumber) {
-    const { songMap } = this.getState();
-    const displayCode = reservationNumber.padStart(5, "0");
-    const song = songMap.get(reservationNumber) ?? songMap.get(displayCode);
+    const displayCode = reservationNumber.padStart(6, "0");
+    const song =
+      songMap.get(reservationNumber) ??
+      songMap.get(reservationNumber.padStart(5, "0")) ??
+      songMap.get(displayCode);
     let songInfo = song
       ? `<span class="info-bar-title">${song.title}</span><span class="info-bar-artist">- ${song.artist}</span>`
-      : reservationNumber.length === 5
+      : reservationNumber.length === 6
         ? `<span style="opacity: 0.5;">No song found.</span>`
         : "";
     this.showTemp(
