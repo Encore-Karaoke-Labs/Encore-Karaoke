@@ -1055,18 +1055,20 @@ export default class UIManager {
 
       const code = state.songNumber;
 
-let activeSong =
-  state.songNumber.length > 0
-    ? (
-        state.songMap.get(code) ??
-        state.songMap.get(code.padStart(5, "0"))
-      )
-    : state.highlightedIndex >= 0
-      ? state.songList[state.highlightedIndex]
-      : null;
+      let activeSong =
+        state.songNumber.length > 0
+          ? (state.songMap.get(code) ??
+            state.songMap.get(code.padStart(5, "0")))
+          : state.highlightedIndex >= 0
+            ? state.songList[state.highlightedIndex]
+            : null;
 
       dom.numberDisplay.text(
-        state.songNumber.length > 0 ? code : activeSong ? activeSong.code : "",
+        state.songNumber.length > 0
+          ? code.padStart(5, "0")
+          : activeSong
+            ? String(activeSong.code).padStart(5, "0")
+            : "",
       );
       dom.numberDisplay[activeSong ? "classOn" : "classOff"]("active");
       dom.songTitle.clear();
@@ -1175,7 +1177,7 @@ let activeSong =
 
         new Html("div")
           .classOn("song-item-code")
-          .text(song.code)
+          .text(String(song.code).padStart(5, "0"))
           .appendTo(item);
         const fmt = this.ctx.root.library.getFormatInfo(song);
         const titleContainer = new Html("div")
@@ -1266,8 +1268,7 @@ let activeSong =
       } else {
         new Html("span")
           .classOn("queue-code")
-          .styleJs({ color: "rgba(255, 85, 85, 0.5)" })
-          .text("-----")
+          .text(String(song.code).padStart(5, "0"))
           .appendTo(titleRow);
       }
 
@@ -1400,7 +1401,7 @@ let activeSong =
       if (res.type === "local") {
         new Html("div")
           .classOn("search-result-local-code")
-          .text(res.code)
+          .text(String(res.code).padStart(5, "0"))
           .appendTo(item);
         const titleRow = new Html("div").classOn("search-title").appendTo(info);
         new Html("span")
@@ -1545,7 +1546,10 @@ let activeSong =
             row.styleJs({ animationDelay: `${idx * 0.08}s` });
             const fmt = this.ctx.root.library.getFormatInfo(song);
 
-            new Html("div").classOn("ns-code").text(song.code).appendTo(row);
+            new Html("div")
+              .classOn("ns-code")
+              .text(String(song.code).padStart(5, "0"))
+              .appendTo(row);
             const titleCol = new Html("div")
               .classOn("ns-title-col")
               .appendTo(row);
