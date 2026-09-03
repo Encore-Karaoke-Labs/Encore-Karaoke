@@ -1623,7 +1623,7 @@ void app.whenReady().then(() => {
 
             const textX = boxX + 8;
             const textY = boxY + 5;
-            const infoBlockX = textX + 38;
+            const infoBlockX = textX + 46;
 
             let formatText = "[RS]";
             let formatColor = "#B02FD1";
@@ -1645,14 +1645,14 @@ void app.whenReady().then(() => {
 
             doc
               .font("Rajdhani-Bold")
-              .fontSize(12)
+              .fontSize(11.5)
               .fillColor("#000000")
-              .text(String(song.code).padStart(5, "0"), textX, textY, {
-                width: 35,
+              .text(String(song.code).padStart(6, "0"), textX, textY, {
+                width: 44,
                 lineBreak: false,
               });
 
-            const maxInfoWidth = boxW - 40 - 8;
+            const maxInfoWidth = boxW - 46 - 8;
             doc.font("Rajdhani-Bold").fontSize(11);
             const formatWidth = doc.widthOfString(formatText);
             const gap = 4;

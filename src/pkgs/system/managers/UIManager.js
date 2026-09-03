@@ -1058,16 +1058,17 @@ export default class UIManager {
       let activeSong =
         state.songNumber.length > 0
           ? (state.songMap.get(code) ??
-            state.songMap.get(code.padStart(5, "0")))
+            state.songMap.get(code.padStart(5, "0")) ??
+            state.songMap.get(code.padStart(6, "0")))
           : state.highlightedIndex >= 0
             ? state.songList[state.highlightedIndex]
             : null;
 
       dom.numberDisplay.text(
         state.songNumber.length > 0
-          ? code.padStart(5, "0")
+          ? code.padStart(6, "0")
           : activeSong
-            ? String(activeSong.code).padStart(5, "0")
+            ? String(activeSong.code).padStart(6, "0")
             : "",
       );
       dom.numberDisplay[activeSong ? "classOn" : "classOff"]("active");
@@ -1094,7 +1095,7 @@ export default class UIManager {
           .text(activeSong.title)
           .styleJs({ verticalAlign: "middle" })
           .appendTo(dom.songTitle);
-      } else if (state.songNumber.length === 5) {
+      } else if (state.songNumber.length === 6) {
         dom.songTitle.text("Song Not Found");
       }
       dom.songArtist.text(activeSong ? activeSong.artist : "");
@@ -1177,7 +1178,7 @@ export default class UIManager {
 
         new Html("div")
           .classOn("song-item-code")
-          .text(String(song.code).padStart(5, "0"))
+          .text(String(song.code).padStart(6, "0"))
           .appendTo(item);
         const fmt = this.ctx.root.library.getFormatInfo(song);
         const titleContainer = new Html("div")
@@ -1263,12 +1264,12 @@ export default class UIManager {
       if (song.code) {
         new Html("span")
           .classOn("queue-code")
-          .text(String(song.code).padStart(5, "0"))
+          .text(String(song.code).padStart(6, "0"))
           .appendTo(titleRow);
       } else {
         new Html("span")
           .classOn("queue-code")
-          .text(String(song.code).padStart(5, "0"))
+          .text(String(song.code).padStart(6, "0"))
           .appendTo(titleRow);
       }
 
