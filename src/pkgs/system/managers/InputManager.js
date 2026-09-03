@@ -647,8 +647,10 @@ export default class InputManager {
     const state = this.ctx.state;
     const infoBar = this.ctx.modules.infoBar;
 
-    const displayCode = state.reservationNumber.padStart(5, "0");
-    const song = state.songMap.get(displayCode);
+    const displayCode = state.reservationNumber;
+    const song =
+  state.songMap.get(state.reservationNumber) ??
+  state.songMap.get(state.reservationNumber.padStart(5, "0"));
 
     let fmtBadge = "";
     if (song) {
