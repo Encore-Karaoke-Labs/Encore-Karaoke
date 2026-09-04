@@ -397,6 +397,9 @@ export class FortePlayback {
     this.state.playback.hasChorus = false;
 
     if (this.state.playback.sequencer) {
+      this.synthesizer.disconnectSequencerFromMidiOutput(
+        this.state.playback.sequencer,
+      );
       try {
         this.state.playback.sequencer.pause();
       } catch (e) {}
@@ -492,6 +495,10 @@ export class FortePlayback {
         );
         this.state.playback.sequencer.loop = false;
         this.setTranspose(0);
+
+        this.synthesizer.connectSequencerToMidiOutput(
+          this.state.playback.sequencer,
+        );
 
         bindSpessaEvent(
           this.state.playback.sequencer.eventHandler,
@@ -1607,6 +1614,8 @@ export class FortePlayback {
       currentTime: Math.min(currentTime, duration),
       duration,
       currentDeviceId: this.state.playback.currentDeviceId,
+      currentMidiDeviceId: this.state.playback.currentMidiDeviceId,
+      midiOutputs: this.state.playback.midiOutputs,
       isMidi: this.state.playback.isMidi,
       isMultiplexed: this.state.playback.isMultiplexed,
       hasChorus: this.state.playback.hasChorus,

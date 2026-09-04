@@ -1,5 +1,8 @@
 import { MIDIControllers as midiControllers } from "spessasynth_core";
-import { WorkletSynthesizer as Synthetizer } from "spessasynth_lib";
+import {
+  MIDIDeviceHandler,
+  WorkletSynthesizer as Synthetizer,
+} from "spessasynth_lib";
 import { logVerbose, logVerboseWarn } from "../core/State.js";
 
 /**
@@ -41,6 +44,7 @@ export class ForteSynthesizer {
     this.audioCore = audioCore;
     this.dispatchUpdate = dispatchUpdate;
     this.currentLoadController = null;
+    this.midiDeviceHandler = null;
   }
 
   /**
@@ -67,6 +71,18 @@ export class ForteSynthesizer {
       logVerbose("Preset list", this.state.playback.synthesizer.presetList);
 
       console.log("[FORTE SVC] MIDI Synthesizer initialized successfully.");
+
+      try {
+        this.midiDeviceHandler =
+          await MIDIDeviceHandler.createMIDIDeviceHandler();
+        logVerbose("MIDIDeviceHandler initialized successfully.");
+      } catch (midiErr) {
+        logVerboseWarn(
+          "Web MIDI / MIDIDeviceHandler could not be initialized:",
+          midiErr,
+        );
+        this.midiDeviceHandler = null;
+      }
     } catch (synthError) {
       console.error(
         "[FORTE SVC] FATAL: Could not initialize MIDI Synthesizer.",
@@ -74,6 +90,143 @@ export class ForteSynthesizer {
       );
       this.state.playback.synthesizer = null;
     }
+  }
+
+  /**
+   * Retrieves all available MIDI output ports (including internal SoundFont synth).
+   * @returns {Array<{id: string, name: string, manufacturer: string}>}
+   */
+  getMidiOutputDevices() {
+    const devices = [
+      {
+        id: "internal",
+        name: "Internal Synthesizer",
+        manufacturer: "SpessaSynth",
+      },
+    ];
+
+    if (this.midiDeviceHandler && this.midiDeviceHandler.outputs) {
+      for (const [id, output] of this.midiDeviceHandler.outputs.entries()) {
+        devices.push({
+          id: output.id || id,
+          name: output.name || `External MIDI Device (${id})`,
+          manufacturer: output.manufacturer || "Generic",
+        });
+      }
+    }
+
+    this.state.playback.midiOutputs = devices;
+    return devices;
+  }
+
+  /**
+   * Connects an active sequencer to the currently selected MIDI output.
+   * @param {Object} sequencer - Active SpessaSynth Sequencer instance.
+   */
+  connectSequencerToMidiOutput(sequencer) {
+    if (!sequencer || !this.midiDeviceHandler) return;
+
+    const deviceId = this.state.playback.currentMidiDeviceId;
+    if (!deviceId || deviceId === "internal") return;
+
+    const output = this.midiDeviceHandler.outputs.get(deviceId);
+    if (output) {
+      try {
+        output.connect(sequencer);
+        logVerbose(
+          `Connected sequencer to external MIDI output: ${output.name || deviceId}`,
+        );
+      } catch (e) {
+        console.error(
+          "[FORTE SVC] Failed to connect sequencer to MIDI output:",
+          e,
+        );
+      }
+    }
+  }
+
+  /**
+   * Disconnects a sequencer from an external MIDI output, returning it to internal synth.
+   * @param {Object} sequencer - Active SpessaSynth Sequencer instance.
+   */
+  disconnectSequencerFromMidiOutput(sequencer) {
+    if (!sequencer || !this.midiDeviceHandler) return;
+
+    const deviceId = this.state.playback.currentMidiDeviceId;
+    if (!deviceId || deviceId === "internal") return;
+
+    const output = this.midiDeviceHandler.outputs.get(deviceId);
+    if (output) {
+      try {
+        output.disconnect(sequencer);
+        logVerbose(
+          `Disconnected sequencer from external MIDI output: ${output.name || deviceId}`,
+        );
+      } catch (e) {
+        console.warn(
+          "[FORTE SVC] Failed to disconnect sequencer from MIDI output:",
+          e,
+        );
+      }
+    }
+  }
+
+  /**
+   * Sets the active MIDI output destination.
+   * @param {string} deviceId - Hardware port ID or "internal".
+   * @returns {boolean} Success status.
+   */
+  setMidiOutputDevice(deviceId) {
+    const prevDeviceId = this.state.playback.currentMidiDeviceId;
+    if (prevDeviceId === deviceId) return true;
+
+    const currentSequencer = this.state.playback.sequencer;
+
+    // 1. Disconnect from previous external device if currently connected
+    if (
+      prevDeviceId &&
+      prevDeviceId !== "internal" &&
+      this.midiDeviceHandler &&
+      currentSequencer
+    ) {
+      const prevOutput = this.midiDeviceHandler.outputs.get(prevDeviceId);
+      if (prevOutput) {
+        try {
+          prevOutput.disconnect(currentSequencer);
+        } catch (e) {
+          console.warn(
+            "[FORTE SVC] Error disconnecting previous MIDI output:",
+            e,
+          );
+        }
+      }
+    }
+
+    this.state.playback.currentMidiDeviceId = deviceId;
+
+    // 2. Connect to new external output, or remain on internal synth
+    if (
+      deviceId &&
+      deviceId !== "internal" &&
+      this.midiDeviceHandler &&
+      currentSequencer
+    ) {
+      const newOutput = this.midiDeviceHandler.outputs.get(deviceId);
+      if (newOutput) {
+        try {
+          newOutput.connect(currentSequencer);
+          logVerbose(`Switched MIDI output to: ${newOutput.name || deviceId}`);
+        } catch (e) {
+          console.error("[FORTE SVC] Failed to connect to MIDI output:", e);
+          return false;
+        }
+      }
+    } else {
+      logVerbose("Switched MIDI output to Internal Synthesizer.");
+    }
+
+    this.dispatchUpdate();
+    return true;
   }
 
   /**
@@ -445,6 +598,30 @@ export class ForteSynthesizer {
       typeof this.state.playback.synthesizer.reset === "function"
     ) {
       this.state.playback.synthesizer.reset();
+    }
+
+    // Send All Sound Off / All Notes Off / Reset All Controllers to external hardware
+    if (
+      this.state.playback.currentMidiDeviceId !== "internal" &&
+      this.midiDeviceHandler
+    ) {
+      const output = this.midiDeviceHandler.outputs.get(
+        this.state.playback.currentMidiDeviceId,
+      );
+      if (output?.port?.send) {
+        try {
+          for (let ch = 0; ch < 16; ch++) {
+            output.port.send([0xb0 | ch, 120, 0]); // All Sound Off
+            output.port.send([0xb0 | ch, 123, 0]); // All Notes Off
+            output.port.send([0xb0 | ch, 121, 0]); // Reset All Controllers
+          }
+        } catch (e) {
+          console.warn(
+            "[FORTE SVC] Failed to send MIDI reset to external port:",
+            e,
+          );
+        }
+      }
     }
   }
 

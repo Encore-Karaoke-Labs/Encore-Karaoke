@@ -60,6 +60,7 @@ const pkg = {
       dispatchPlaybackUpdate,
     );
     await synthesizer.initialize();
+    synthesizer.getMidiOutputDevices();
 
     microphone = new ForteMicrophone(state, audioCore);
     scoring = new ForteScoring(state, audioCore, pianoRoll);
@@ -95,6 +96,10 @@ const pkg = {
     getPlaybackDevices: () => audioCore.getPlaybackDevices(),
     setPlaybackDevice: (deviceId) =>
       audioCore.setPlaybackDevice(deviceId, dispatchPlaybackUpdate),
+
+    getMidiOutputDevices: () => synthesizer.getMidiOutputDevices(),
+    setMidiOutputDevice: (deviceId) =>
+      synthesizer.setMidiOutputDevice(deviceId),
 
     setPianoRollContainer: (containerSelector) =>
       pianoRoll.setContainer(containerSelector),
