@@ -331,17 +331,33 @@ export class ForteSynthesizer {
   }
 
   /**
+   * Sends raw MIDI message bytes to the currently active external MIDI device.
+   * @param {number[]|Uint8Array} message - Raw MIDI bytes.
+   */
+  sendExternalMidiMessage(message) {
+    const deviceId = this.state.playback.currentMidiDeviceId;
+    if (deviceId && deviceId !== "internal" && this.midiDeviceHandler) {
+      const output = this.midiDeviceHandler.outputs.get(deviceId);
+      if (output?.port?.send) {
+        try {
+          output.port.send(message);
+        } catch (e) {
+          logVerboseWarn(
+            "[FORTE SVC] Failed to send external MIDI message:",
+            e,
+          );
+        }
+      }
+    }
+  }
+
+  /**
    * Sets the volume for a specific MIDI channel via Control Change.
    *
    * @param {number} channelNumber - The MIDI channel (0-15).
    * @param {number} volume - Volume level (0-127).
    */
   setChannelVolume(channelNumber, volume) {
-    if (!this.state.playback.synthesizer) {
-      console.error("[FORTE SVC] Synthesizer not initialized");
-      return false;
-    }
-
     if (channelNumber < 0 || channelNumber > 15) {
       throw new Error(`Invalid MIDI channel: ${channelNumber}. Must be 0-15.`);
     }
@@ -350,29 +366,50 @@ export class ForteSynthesizer {
       throw new Error(`Invalid volume level: ${volume}. Must be 0-127.`);
     }
 
-    try {
-      let midiChannel =
-        this.state.playback.synthesizer.midiChannels[channelNumber];
+    const intVolume = Math.floor(volume);
 
-      midiChannel.setSystemParameter("presetLock", false);
+    if (this.state.playback.synthesizer) {
+      try {
+        const midiChannel =
+          this.state.playback.synthesizer.midiChannels?.[channelNumber];
 
-      this.state.playback.synthesizer.controllerChange(
-        channelNumber,
-        midiControllers.mainVolume,
-        Math.floor(volume),
-      );
+        if (
+          midiChannel &&
+          typeof midiChannel.setSystemParameter === "function"
+        ) {
+          midiChannel.setSystemParameter("presetLock", false);
+        }
 
-      midiChannel.setSystemParameter("presetLock", true);
+        this.state.playback.synthesizer.controllerChange(
+          channelNumber,
+          midiControllers.mainVolume,
+          intVolume,
+        );
 
-      logVerbose(
-        `Switched volume to ${Math.floor((volume / 127) * 100)}% (${volume}/127) on channel ${channelNumber + 1}`,
-      );
-    } catch (e) {
-      console.error(
-        `[FORTE SVC] Failed to change volume on channel ${channelNumber + 1}:`,
-        e,
-      );
+        if (
+          midiChannel &&
+          typeof midiChannel.setSystemParameter === "function"
+        ) {
+          midiChannel.setSystemParameter("presetLock", true);
+        }
+      } catch (e) {
+        console.error(
+          `[FORTE SVC] Failed to change volume on channel ${channelNumber + 1}:`,
+          e,
+        );
+      }
     }
+
+    this.sendExternalMidiMessage([
+      0xb0 | channelNumber,
+      midiControllers.mainVolume,
+      intVolume,
+    ]);
+
+    logVerbose(
+      `Switched volume to ${Math.floor((intVolume / 127) * 100)}% (${intVolume}/127) on channel ${channelNumber + 1}`,
+    );
+    return true;
   }
 
   /**
@@ -382,11 +419,6 @@ export class ForteSynthesizer {
    * @param {number} expression - Expression level (0-127).
    */
   setChannelExpression(channelNumber, expression) {
-    if (!this.state.playback.synthesizer) {
-      console.error("[FORTE SVC] Synthesizer not initialized");
-      return false;
-    }
-
     if (channelNumber < 0 || channelNumber > 15) {
       throw new Error(`Invalid MIDI channel: ${channelNumber}. Must be 0-15.`);
     }
@@ -397,29 +429,50 @@ export class ForteSynthesizer {
       );
     }
 
-    try {
-      let midiChannel =
-        this.state.playback.synthesizer.midiChannels[channelNumber];
+    const intExpression = Math.floor(expression);
 
-      midiChannel.setSystemParameter("presetLock", false);
+    if (this.state.playback.synthesizer) {
+      try {
+        const midiChannel =
+          this.state.playback.synthesizer.midiChannels?.[channelNumber];
 
-      this.state.playback.synthesizer.controllerChange(
-        channelNumber,
-        midiControllers.expression,
-        Math.floor(expression),
-      );
+        if (
+          midiChannel &&
+          typeof midiChannel.setSystemParameter === "function"
+        ) {
+          midiChannel.setSystemParameter("presetLock", false);
+        }
 
-      midiChannel.setSystemParameter("presetLock", true);
+        this.state.playback.synthesizer.controllerChange(
+          channelNumber,
+          midiControllers.expression,
+          intExpression,
+        );
 
-      logVerbose(
-        `Switched expression to ${Math.floor((expression / 127) * 100)}% (${expression}/127) on channel ${channelNumber + 1}`,
-      );
-    } catch (e) {
-      console.error(
-        `[FORTE SVC] Failed to change expression on channel ${channelNumber + 1}:`,
-        e,
-      );
+        if (
+          midiChannel &&
+          typeof midiChannel.setSystemParameter === "function"
+        ) {
+          midiChannel.setSystemParameter("presetLock", true);
+        }
+      } catch (e) {
+        console.error(
+          `[FORTE SVC] Failed to change expression on channel ${channelNumber + 1}:`,
+          e,
+        );
+      }
     }
+
+    this.sendExternalMidiMessage([
+      0xb0 | channelNumber,
+      midiControllers.expression,
+      intExpression,
+    ]);
+
+    logVerbose(
+      `Switched expression to ${Math.floor((intExpression / 127) * 100)}% (${intExpression}/127) on channel ${channelNumber + 1}`,
+    );
+    return true;
   }
 
   /**
