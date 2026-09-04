@@ -1225,6 +1225,24 @@ export class FortePlayback {
       }
 
       this.state.playback.status = "playing";
+      if (this.state.playback.guideVolume !== undefined) {
+        this.setGuideTrackVolume(this.state.playback.guideVolume);
+      }
+      if (this.state.playback.lockedDrumPresets) {
+        setTimeout(() => {
+          if (
+            this.state.playback.status === "playing" &&
+            this.state.playback.lockedDrumPresets
+          ) {
+            for (const [chStr, preset] of Object.entries(
+              this.state.playback.lockedDrumPresets,
+            )) {
+              const ch = parseInt(chStr, 10);
+              this.synthesizer.switchDrumPreset(ch, preset);
+            }
+          }
+        }, 50);
+      }
     } else {
       if (!this.audioElement || this.state.playback.status === "playing")
         return;
@@ -1412,6 +1430,7 @@ export class FortePlayback {
 
       logVerbose("Unlocking channels");
       this.synthesizer.unlockAllChannels();
+      this.state.playback.lockedDrumPresets = null;
 
       logVerbose("Resetting synth just in case");
       this.synthesizer.reset();

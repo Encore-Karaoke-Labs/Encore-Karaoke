@@ -5,6 +5,105 @@ import {
 } from "spessasynth_lib";
 import { logVerbose, logVerboseWarn } from "../core/State.js";
 
+export const STANDARD_GM_DRUM_PRESETS = [
+  {
+    program: 0,
+    bankMSB: 0,
+    bankLSB: 0,
+    name: "Standard Kit",
+    isGMGSDrum: true,
+    isAnyDrums: true,
+  },
+  {
+    program: 1,
+    bankMSB: 0,
+    bankLSB: 0,
+    name: "Standard 2 Kit",
+    isGMGSDrum: true,
+    isAnyDrums: true,
+  },
+  {
+    program: 8,
+    bankMSB: 0,
+    bankLSB: 0,
+    name: "Room Kit",
+    isGMGSDrum: true,
+    isAnyDrums: true,
+  },
+  {
+    program: 16,
+    bankMSB: 0,
+    bankLSB: 0,
+    name: "Power Kit",
+    isGMGSDrum: true,
+    isAnyDrums: true,
+  },
+  {
+    program: 24,
+    bankMSB: 0,
+    bankLSB: 0,
+    name: "Electronic Kit",
+    isGMGSDrum: true,
+    isAnyDrums: true,
+  },
+  {
+    program: 25,
+    bankMSB: 0,
+    bankLSB: 0,
+    name: "TR-808 / Analog Kit",
+    isGMGSDrum: true,
+    isAnyDrums: true,
+  },
+  {
+    program: 26,
+    bankMSB: 0,
+    bankLSB: 0,
+    name: "Dance Kit",
+    isGMGSDrum: true,
+    isAnyDrums: true,
+  },
+  {
+    program: 27,
+    bankMSB: 0,
+    bankLSB: 0,
+    name: "TR-909 Kit",
+    isGMGSDrum: true,
+    isAnyDrums: true,
+  },
+  {
+    program: 32,
+    bankMSB: 0,
+    bankLSB: 0,
+    name: "Jazz Kit",
+    isGMGSDrum: true,
+    isAnyDrums: true,
+  },
+  {
+    program: 40,
+    bankMSB: 0,
+    bankLSB: 0,
+    name: "Brush Kit",
+    isGMGSDrum: true,
+    isAnyDrums: true,
+  },
+  {
+    program: 48,
+    bankMSB: 0,
+    bankLSB: 0,
+    name: "Orchestra Kit",
+    isGMGSDrum: true,
+    isAnyDrums: true,
+  },
+  {
+    program: 56,
+    bankMSB: 0,
+    bankLSB: 0,
+    name: "SFX Kit",
+    isGMGSDrum: true,
+    isAnyDrums: true,
+  },
+];
+
 /**
  * Safely binds an event callback to a SpessaSynth v4 event handler.
  */
@@ -214,6 +313,51 @@ export class ForteSynthesizer {
         try {
           newOutput.connect(currentSequencer);
           logVerbose(`Switched MIDI output to: ${newOutput.name || deviceId}`);
+
+          if (
+            this.state.playback.guideVolume !== undefined &&
+            Array.isArray(this.state.playback.guideChannels)
+          ) {
+            for (const ch of this.state.playback.guideChannels) {
+              newOutput.port.send([
+                0xb0 | ch.index,
+                midiControllers.expression,
+                127,
+              ]);
+              newOutput.port.send([
+                0xb0 | ch.index,
+                midiControllers.mainVolume,
+                Math.floor(this.state.playback.guideVolume),
+              ]);
+            }
+          }
+
+          if (this.state.playback.lockedDrumPresets) {
+            for (const [chStr, preset] of Object.entries(
+              this.state.playback.lockedDrumPresets,
+            )) {
+              const ch = parseInt(chStr, 10);
+              const prog = Math.max(0, Math.min(127, preset.program ?? 0));
+              const rawB = Math.floor(preset.bankMSB ?? 0);
+              const bMSB = rawB >= 128 ? 0 : Math.max(0, Math.min(127, rawB));
+              const bLSB = Math.max(
+                0,
+                Math.min(127, Math.floor(preset.bankLSB ?? 0)),
+              );
+
+              newOutput.port.send([
+                0xb0 | ch,
+                midiControllers.bankSelect,
+                bMSB,
+              ]);
+              newOutput.port.send([
+                0xb0 | ch,
+                midiControllers.bankSelectLSB,
+                bLSB,
+              ]);
+              newOutput.port.send([0xc0 | ch, prog]);
+            }
+          }
         } catch (e) {
           console.error("[FORTE SVC] Failed to connect to MIDI output:", e);
           return false;
@@ -483,48 +627,95 @@ export class ForteSynthesizer {
    * @returns {boolean} Success indicator
    */
   switchDrumPreset(channelNumber, drumPreset) {
-    if (!this.state.playback.synthesizer) {
-      console.error("[FORTE SVC] Synthesizer not initialized");
-      return false;
-    }
-
     if (channelNumber < 0 || channelNumber > 15) {
       console.error("[FORTE SVC] Invalid channel number:", channelNumber);
       return false;
     }
 
+    if (!this.state.playback.lockedDrumPresets) {
+      this.state.playback.lockedDrumPresets = {};
+    }
+
+    if (!drumPreset) {
+      delete this.state.playback.lockedDrumPresets[channelNumber];
+      if (this.state.playback.synthesizer?.midiChannels?.[channelNumber]) {
+        try {
+          this.state.playback.synthesizer.midiChannels[
+            channelNumber
+          ].setSystemParameter("presetLock", false);
+        } catch (e) {}
+      }
+      this.dispatchUpdate();
+      return true;
+    }
+
+    this.state.playback.lockedDrumPresets[channelNumber] = drumPreset;
+
+    const program = Math.max(
+      0,
+      Math.min(127, Math.floor(drumPreset.program ?? 0)),
+    );
+    const rawBankMSB = Math.floor(drumPreset.bankMSB ?? 0);
+    const bankMSB =
+      rawBankMSB >= 128 ? 0 : Math.max(0, Math.min(127, rawBankMSB));
+    const bankLSB = Math.max(
+      0,
+      Math.min(127, Math.floor(drumPreset.bankLSB ?? 0)),
+    );
+
     try {
       logVerbose(`Switching drum preset on channel ${channelNumber + 1}`, {
         preset: drumPreset.name,
-        program: drumPreset.program,
-        bankMSB: drumPreset.bankMSB,
-        bankLSB: drumPreset.bankLSB,
+        program,
+        bankMSB,
+        bankLSB,
       });
 
-      let midiChannel =
-        this.state.playback.synthesizer.midiChannels[channelNumber];
+      if (this.state.playback.synthesizer) {
+        const midiChannel =
+          this.state.playback.synthesizer.midiChannels?.[channelNumber];
 
-      midiChannel.setSystemParameter("presetLock", false);
+        if (
+          midiChannel &&
+          typeof midiChannel.setSystemParameter === "function"
+        ) {
+          midiChannel.setSystemParameter("presetLock", false);
+        }
 
-      if (!drumPreset.isGMGSDrum) {
-        this.state.playback.synthesizer.controllerChange(
-          channelNumber,
-          midiControllers.bankSelect,
-          drumPreset.bankMSB,
-        );
-        this.state.playback.synthesizer.controllerChange(
-          channelNumber,
-          midiControllers.bankSelectLSB,
-          drumPreset.bankLSB,
-        );
+        if (!drumPreset.isGMGSDrum) {
+          this.state.playback.synthesizer.controllerChange(
+            channelNumber,
+            midiControllers.bankSelect,
+            rawBankMSB,
+          );
+          this.state.playback.synthesizer.controllerChange(
+            channelNumber,
+            midiControllers.bankSelectLSB,
+            bankLSB,
+          );
+        }
+
+        this.state.playback.synthesizer.programChange(channelNumber, program);
+
+        if (
+          midiChannel &&
+          typeof midiChannel.setSystemParameter === "function"
+        ) {
+          midiChannel.setSystemParameter("presetLock", true);
+        }
       }
 
-      this.state.playback.synthesizer.programChange(
-        channelNumber,
-        drumPreset.program,
-      );
-
-      midiChannel.setSystemParameter("presetLock", true);
+      this.sendExternalMidiMessage([
+        0xb0 | channelNumber,
+        midiControllers.bankSelect,
+        bankMSB,
+      ]);
+      this.sendExternalMidiMessage([
+        0xb0 | channelNumber,
+        midiControllers.bankSelectLSB,
+        bankLSB,
+      ]);
+      this.sendExternalMidiMessage([0xc0 | channelNumber, program]);
 
       logVerbose(
         `Drum preset switched successfully on channel ${channelNumber + 1}`,
@@ -545,6 +736,14 @@ export class ForteSynthesizer {
    * @returns {Array<Object>} Array of drum preset objects
    */
   getAvailableDrumPresets() {
+    const isExternal =
+      this.state.playback.currentMidiDeviceId &&
+      this.state.playback.currentMidiDeviceId !== "internal";
+
+    if (isExternal) {
+      return STANDARD_GM_DRUM_PRESETS;
+    }
+
     if (!this.state.playback.synthesizer) {
       console.error("[FORTE SVC] Synthesizer not initialized");
       return [];
@@ -565,11 +764,15 @@ export class ForteSynthesizer {
    * @returns {Object|null} Current drum preset or null if not available
    */
   getCurrentDrumPreset(channelNumber) {
+    if (this.state.playback.lockedDrumPresets?.[channelNumber]) {
+      return this.state.playback.lockedDrumPresets[channelNumber];
+    }
+
     if (!this.state.playback.synthesizer) return null;
 
     try {
       const channel =
-        this.state.playback.synthesizer.channelProperties[channelNumber];
+        this.state.playback.synthesizer.channelProperties?.[channelNumber];
       if (!channel) return null;
 
       return {
