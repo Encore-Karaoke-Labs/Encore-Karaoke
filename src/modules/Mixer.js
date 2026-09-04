@@ -259,7 +259,7 @@ export class MixerModule {
       .styleJs({ padding: "0" })
       .appendTo(this.chainSection);
     const customInput = new Html("input")
-      .attr({ type: "text", placeholder: "Custom Path (.js)..." })
+      .attr({ type: "text", placeholder: "Plugin URL (.js)..." })
       .styleJs({
         width: "100%",
         background: "transparent",
