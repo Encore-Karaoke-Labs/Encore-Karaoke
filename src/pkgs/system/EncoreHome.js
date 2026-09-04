@@ -408,6 +408,7 @@ class EncoreController {
     this.setup.destroy();
     this.games.destroy();
     this.driveRecovery.destroy();
+    this.library.destroy();
     if (this.recorder.isRecording) this.recorder.stop();
     this.bgv.stop();
     this.services.Forte.stopTrack();

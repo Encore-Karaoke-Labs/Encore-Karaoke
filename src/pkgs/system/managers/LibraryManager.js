@@ -1,4 +1,4 @@
-import Fuse from "fuse.js";
+import { FuseWorker } from "fuse.js/worker";
 import Romanizer from "../../../modules/Romanizer.js";
 
 export default class LibraryManager {
@@ -136,7 +136,20 @@ export default class LibraryManager {
       song._artistAcronym = getAcronym(song.artist);
     }
 
-    this.fuse = new Fuse(this.ctx.state.songList, fuseOptions);
+    const workerOptions = {
+      numWorkers: 4,
+      workerUrl: "./libs/fuse.worker.mjs",
+    };
+
+    if (this.fuse) {
+      this.fuse.terminate();
+    }
+
+    this.fuse = new FuseWorker(
+      this.ctx.state.songList,
+      fuseOptions,
+      workerOptions,
+    );
 
     for (let song of this.ctx.state.songList) {
       let needsRoma = false;
@@ -154,8 +167,14 @@ export default class LibraryManager {
         song._romaArtistAcronym = getAcronym(song._romaArtist);
       }
     }
-
-    this.fuse = new Fuse(this.ctx.state.songList, fuseOptions);
+    if (this.fuse) {
+      this.fuse.terminate();
+    }
+    this.fuse = new FuseWorker(
+      this.ctx.state.songList,
+      fuseOptions,
+      workerOptions,
+    );
     console.log("[Encore] Search index complete.");
   }
 
@@ -165,7 +184,7 @@ export default class LibraryManager {
    * @param {string} rawQuery - Text input to search.
    * @returns {Array} - Formatted and sorted local results.
    */
-  getLocalSearchResults(rawQuery) {
+  async getLocalSearchResults(rawQuery) {
     if (!rawQuery || !this.fuse) return [];
 
     const cleanQuery = rawQuery
@@ -208,7 +227,7 @@ export default class LibraryManager {
       };
     }
 
-    const fuseResults = this.fuse.search(fuseQuery);
+    const fuseResults = await this.fuse.search(fuseQuery);
 
     let localResults = fuseResults.slice(0, 75).map((result) => {
       const s = result.item;
@@ -268,9 +287,14 @@ export default class LibraryManager {
       return;
     }
 
+    this._searchId = (this._searchId || 0) + 1;
+    const currentSearchId = this._searchId;
+
     state.isSearching = true;
 
-    const localResults = this.getLocalSearchResults(rawQuery);
+    const localResults = await this.getLocalSearchResults(rawQuery);
+
+    if (this._searchId !== currentSearchId) return;
 
     state.searchResults = [...localResults];
     ui.renderSearchResults();
@@ -305,6 +329,19 @@ export default class LibraryManager {
       }
     } finally {
       state.isSearching = false;
+    }
+  }
+  /**
+   * Cleans up running worker threads and active controllers.
+   */
+  destroy() {
+    if (this.ytSearchAbortController) {
+      this.ytSearchAbortController.abort();
+      this.ytSearchAbortController = null;
+    }
+    if (this.fuse) {
+      this.fuse.terminate();
+      this.fuse = null;
     }
   }
 }
