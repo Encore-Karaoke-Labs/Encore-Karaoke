@@ -221,7 +221,7 @@ export class MixerModule {
     this.chainItems = [];
     new Html("h3")
       .classOn("chain-header")
-      .text("ACTIVE CHAIN")
+      .text("MICROPHONE EFFECTS")
       .appendTo(this.chainSection);
     this.state.chain.forEach((plugin, i) => {
       const item = new Html("div")
