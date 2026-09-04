@@ -283,6 +283,11 @@ class EncoreController {
     if (micDevice) await this.services.Forte.setMicDevice(micDevice);
     else await this.services.Forte.setMicDevice("default");
 
+    const savedMidiDevice = this.config.audioConfig?.midiOutputDevice;
+    if (savedMidiDevice && this.services.Forte.setMidiOutputDevice) {
+      await this.services.Forte.setMidiOutputDevice(savedMidiDevice);
+    }
+
     const savedChain = this.config.audioConfig?.vocalChain || [];
     await this.services.Forte.loadVocalChain(savedChain);
 

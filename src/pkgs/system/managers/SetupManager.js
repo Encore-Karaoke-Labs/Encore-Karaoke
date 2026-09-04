@@ -58,6 +58,7 @@ export default class SetupManager {
 
     this.micDevices = [];
     this.playbackDevices = [];
+    this.midiOutputDevices = [];
     this.updateServers = [];
 
     this.setupState = {
@@ -186,6 +187,11 @@ export default class SetupManager {
       this.micDevices = await this.ctx.services.Forte.getMicDevices();
       this.playbackDevices = await this.ctx.services.Forte.getPlaybackDevices();
 
+      if (this.ctx.services.Forte.getMidiOutputDevices) {
+        this.midiOutputDevices =
+          await this.ctx.services.Forte.getMidiOutputDevices();
+      }
+
       this.systemFonts = ["Radio Canada"];
       try {
         if ("queryLocalFonts" in window) {
@@ -312,6 +318,14 @@ export default class SetupManager {
       label: d.label || "Default",
       value: d.deviceId,
     }));
+
+    const midiOptions =
+      this.midiOutputDevices && this.midiOutputDevices.length > 0
+        ? this.midiOutputDevices.map((d) => ({
+            label: d.name || "Internal Synthesizer",
+            value: d.id,
+          }))
+        : [{ label: "Internal Synthesizer", value: "internal" }];
 
     const serverOptions =
       this.updateServers && this.updateServers.length > 0
@@ -461,6 +475,38 @@ export default class SetupManager {
                     v,
                   );
                   this.ctx.services.Forte.setPlaybackDevice(v);
+                },
+              },
+              {
+                id: "midi_out_device",
+                label: "MIDI Output / Synthesizer",
+                type: "select",
+                options: midiOptions,
+                get: () =>
+                  this.ctx.config.audioConfig?.midiOutputDevice || "internal",
+                set: (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.midiOutputDevice = v;
+                  window.config.setItem("audioConfig.midiOutputDevice", v);
+                  if (this.ctx.services.Forte.setMidiOutputDevice) {
+                    this.ctx.services.Forte.setMidiOutputDevice(v);
+                  }
+                  this.renderView();
+                },
+              },
+              {
+                id: "rescan_midi_devices",
+                label: "Rescan MIDI Ports",
+                type: "action",
+                action: async () => {
+                  this.showToast("SCANNING FOR MIDI DEVICES...", "info");
+                  if (this.ctx.services.Forte.getMidiOutputDevices) {
+                    this.midiOutputDevices =
+                      await this.ctx.services.Forte.getMidiOutputDevices();
+                  }
+                  this.buildSettingsMap();
+                  this.renderView();
+                  this.showToast("DEVICE LIST UPDATED", "success");
                 },
               },
               {
