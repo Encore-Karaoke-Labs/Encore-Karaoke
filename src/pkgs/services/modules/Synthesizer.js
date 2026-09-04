@@ -358,6 +358,13 @@ export class ForteSynthesizer {
               newOutput.port.send([0xc0 | ch, prog]);
             }
           }
+
+          if (
+            this.state.playback.transpose !== undefined &&
+            this.state.playback.transpose !== 0
+          ) {
+            this.sendExternalTranspose(this.state.playback.transpose);
+          }
         } catch (e) {
           console.error("[FORTE SVC] Failed to connect to MIDI output:", e);
           return false;
@@ -925,6 +932,7 @@ export class ForteSynthesizer {
             output.port.send([0xb0 | ch, 123, 0]); // All Notes Off
             output.port.send([0xb0 | ch, 121, 0]); // Reset All Controllers
           }
+          this.sendExternalTranspose(0);
         } catch (e) {
           console.warn(
             "[FORTE SVC] Failed to send MIDI reset to external port:",

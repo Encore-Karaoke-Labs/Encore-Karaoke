@@ -1528,6 +1528,9 @@ export class FortePlayback {
 
     if (this.state.playback.isMidi && this.state.playback.synthesizer) {
       this.state.playback.synthesizer.setSystemParameter("keyShift", clamped);
+      if (this.synthesizer) {
+        this.synthesizer.sendExternalTranspose(clamped);
+      }
     } else if (!this.state.playback.isMidi && this.audioElement) {
       this.audioElement.playbackRate = Math.pow(2, clamped / 12);
       this.audioElement.preservesPitch = false;
