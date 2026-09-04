@@ -1015,9 +1015,13 @@ export default class InputManager {
    */
   handleVolume(dir) {
     const state = this.ctx.state;
+    // Always start from Forte's live volume so changes in the Mixer aren't overridden
+    const currentVol =
+      this.ctx.services.Forte.getPlaybackState?.()?.volume ?? state.volume;
+
     state.volume = Math.max(
       0,
-      Math.min(1, state.volume + (dir === "up" ? 0.05 : -0.05)),
+      Math.min(1, currentVol + (dir === "up" ? 0.05 : -0.05)),
     );
     this.ctx.services.Forte.setTrackVolume(state.volume);
     this.ctx.services.Forte.setMusicRecordingVolume(state.volume);
@@ -1052,8 +1056,16 @@ export default class InputManager {
       0,
       Math.min(2.0, currentVol + (dir === "up" ? 0.05 : -0.05)),
     );
-    this.ctx.services.Forte.setMicMonitorVolume(newVol);
+
     this.ctx.services.Forte.setMicRecordingVolume(newVol);
+    this.ctx.services.Forte.setMicMonitorVolume(newVol);
+
+    if (this._micSaveTimeout) clearTimeout(this._micSaveTimeout);
+    this._micSaveTimeout = setTimeout(() => {
+      window.config?.setItem("audioConfig.micMonitorVolume", newVol);
+      window.config?.setItem("audioConfig.micRecordingVolume", newVol);
+    }, 300);
+
     const p = Math.round(newVol * 100);
     this.ctx.modules.infoBar.showTemp(
       "MIC VOLUME",

@@ -13,12 +13,17 @@ export class MixerModule {
   /**
    * Initializes the MixerModule with a Forte service instance.
    * @param {Object} forteSvc - The Forte audio service instance
+   * @param {Object} appState - The app's global state
    */
-  constructor(forteSvc) {
+  constructor(forteSvc, appState = null) {
     this.Forte = forteSvc;
+    this.appState = appState;
     this.isVisible = false;
     this.modal = null;
     this.state = {};
+
+    this._micSaveTimeout = null;
+    this._musicSaveTimeout = null;
 
     this.focusedPane = "faders";
     this.faderIndex = 0;
@@ -118,6 +123,21 @@ export class MixerModule {
     this.build();
   }
 
+  _saveMicVolume(val) {
+    if (this._micSaveTimeout) clearTimeout(this._micSaveTimeout);
+    this._micSaveTimeout = setTimeout(() => {
+      window.config?.setItem("audioConfig.micMonitorVolume", val);
+      window.config?.setItem("audioConfig.micRecordingVolume", val);
+    }, 300);
+  }
+
+  _saveMusicVolume(val) {
+    if (this._musicSaveTimeout) clearTimeout(this._musicSaveTimeout);
+    this._musicSaveTimeout = setTimeout(() => {
+      window.config?.setItem("audioConfig.mix.instrumental.volume", val);
+    }, 300);
+  }
+
   /**
    * Renders the mic and music faders section of the mixer.
    */
@@ -181,12 +201,17 @@ export class MixerModule {
    */
   _updateFaderVisuals() {
     if (!this.micFader || !this.musicFader) return;
-    const micVal = this.state.micGain;
+
+    const micVal = this.state.micMonitorVolume ?? this.state.micGain ?? 1.0;
     const micPercent = (micVal / 2.0) * 100;
     this.micFader.thumb.styleJs({ bottom: `calc(${micPercent}% - 8px)` });
     this.micFader.valDisplay.text(`${(micVal * 100).toFixed(0)} %`);
 
-    const musVal = this.state.musicGain;
+    const musVal =
+      this.Forte.getPlaybackState?.()?.volume ??
+      this.appState?.volume ??
+      this.state.musicGain ??
+      1.0;
     const musPercent = (musVal / 1.0) * 100;
     this.musicFader.thumb.styleJs({ bottom: `calc(${musPercent}% - 8px)` });
     this.musicFader.valDisplay.text(`${(musVal * 100).toFixed(0)} %`);
@@ -198,17 +223,25 @@ export class MixerModule {
    */
   _adjustFader(delta) {
     if (this.faderIndex === 0) {
-      let val = this.state.micGain + delta;
-      val = Math.max(0, Math.min(2.0, val));
+      let currentVal = this.state.micMonitorVolume ?? this.state.micGain ?? 1.0;
+      let val = Math.max(0, Math.min(2.0, currentVal + delta));
       this.Forte.setMicRecordingVolume(val);
       this.Forte.setMicMonitorVolume?.(val);
       this.state.micGain = val;
+      this.state.micMonitorVolume = val;
+      this._saveMicVolume(val);
     } else {
-      let val = this.state.musicGain + delta;
-      val = Math.max(0, Math.min(1.0, val));
-      this.Forte.setMusicRecordingVolume(val);
+      let currentVal =
+        this.Forte.getPlaybackState?.()?.volume ??
+        this.appState?.volume ??
+        this.state.musicGain ??
+        1.0;
+      let val = Math.max(0, Math.min(1.0, currentVal + delta));
       this.Forte.setTrackVolume?.(val);
+      this.Forte.setMusicRecordingVolume(val);
       this.state.musicGain = val;
+      if (this.appState) this.appState.volume = val;
+      this._saveMusicVolume(val);
     }
     this._updateFaderVisuals();
   }
@@ -473,10 +506,14 @@ export class MixerModule {
       this.Forte.setMicRecordingVolume(val);
       this.Forte.setMicMonitorVolume?.(val);
       this.state.micGain = val;
+      this.state.micMonitorVolume = val;
+      this._saveMicVolume(val);
     } else {
-      this.Forte.setMusicRecordingVolume(val);
       this.Forte.setTrackVolume?.(val);
+      this.Forte.setMusicRecordingVolume(val);
       this.state.musicGain = val;
+      if (this.appState) this.appState.volume = val;
+      this._saveMusicVolume(val);
     }
     this._updateFaderVisuals();
   }

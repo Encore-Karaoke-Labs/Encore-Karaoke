@@ -94,7 +94,7 @@ class EncoreController {
 
     this.dom = {};
 
-    this.mixer = new MixerModule(this.services.Forte);
+    this.mixer = new MixerModule(this.services.Forte, this.state);
     this.bgv = new BGVModule();
     this.scoreHud = new ScoreHUDModule();
 
