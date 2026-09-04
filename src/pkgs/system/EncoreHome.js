@@ -209,21 +209,12 @@ class EncoreController {
     this.context.wrapper.classOn("loading");
     this.services.Forte.setPianoRollContainer(this.context.wrapper);
 
-    if (this.config.audioConfig?.micRecordingVolume !== undefined) {
-      this.services.Forte.setMicRecordingVolume(
-        this.config.audioConfig.micRecordingVolume,
-      );
-    }
-    if (this.config.audioConfig?.musicRecordingVolume !== undefined) {
-      this.services.Forte.setMusicRecordingVolume(
-        this.config.audioConfig.musicRecordingVolume,
-      );
-    }
-    if (this.config.audioConfig?.micMonitorVolume !== undefined) {
-      this.services.Forte.setMicMonitorVolume(
-        this.config.audioConfig.micMonitorVolume,
-      );
-    }
+    const micVol =
+      this.config.audioConfig?.micMonitorVolume ??
+      this.config.audioConfig?.micRecordingVolume ??
+      1.0;
+    this.services.Forte.setMicMonitorVolume(micVol);
+    this.services.Forte.setMicRecordingVolume(micVol);
 
     if (this.config.audioConfig?.micLatency) {
       await this.services.Forte.setLatency(this.config.audioConfig.micLatency);
@@ -279,6 +270,7 @@ class EncoreController {
     document.title = `Encore Karaoke ${this.versionInformation.channel} v${this.versionInformation.number} (${this.versionInformation.codename})`;
 
     await this.services.Forte.setTrackVolume(this.state.volume);
+    await this.services.Forte.setMusicRecordingVolume(this.state.volume);
     const micDevice = this.config.audioConfig?.mix?.scoring?.inputDevice;
     if (micDevice) await this.services.Forte.setMicDevice(micDevice);
     else await this.services.Forte.setMicDevice("default");

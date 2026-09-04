@@ -1020,6 +1020,7 @@ export default class InputManager {
       Math.min(1, state.volume + (dir === "up" ? 0.05 : -0.05)),
     );
     this.ctx.services.Forte.setTrackVolume(state.volume);
+    this.ctx.services.Forte.setMusicRecordingVolume(state.volume);
 
     if (this.ctx.dom.sessionRemoteVideo)
       this.ctx.dom.sessionRemoteVideo.elm.volume = state.volume;
@@ -1052,6 +1053,7 @@ export default class InputManager {
       Math.min(2.0, currentVol + (dir === "up" ? 0.05 : -0.05)),
     );
     this.ctx.services.Forte.setMicMonitorVolume(newVol);
+    this.ctx.services.Forte.setMicRecordingVolume(newVol);
     const p = Math.round(newVol * 100);
     this.ctx.modules.infoBar.showTemp(
       "MIC VOLUME",

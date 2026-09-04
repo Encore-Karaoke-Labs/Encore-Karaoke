@@ -201,11 +201,13 @@ export class MixerModule {
       let val = this.state.micGain + delta;
       val = Math.max(0, Math.min(2.0, val));
       this.Forte.setMicRecordingVolume(val);
+      this.Forte.setMicMonitorVolume?.(val);
       this.state.micGain = val;
     } else {
       let val = this.state.musicGain + delta;
       val = Math.max(0, Math.min(1.0, val));
       this.Forte.setMusicRecordingVolume(val);
+      this.Forte.setTrackVolume?.(val);
       this.state.musicGain = val;
     }
     this._updateFaderVisuals();
@@ -469,9 +471,11 @@ export class MixerModule {
     const val = percent * maxVal;
     if (isMic) {
       this.Forte.setMicRecordingVolume(val);
+      this.Forte.setMicMonitorVolume?.(val);
       this.state.micGain = val;
     } else {
       this.Forte.setMusicRecordingVolume(val);
+      this.Forte.setTrackVolume?.(val);
       this.state.musicGain = val;
     }
     this._updateFaderVisuals();
