@@ -620,6 +620,62 @@ export class ForteSynthesizer {
   }
 
   /**
+   * Sends real-time Master Transpose SysEx messages to external MIDI hardware (Roland GS, Yamaha XG, and GM2).
+   * @param {number} semitones - Transposition in semitones (-24 to 24).
+   */
+  sendExternalTranspose(semitones) {
+    const clamped = Math.max(-24, Math.min(24, Math.round(semitones)));
+    const midiVal = 64 + clamped; // 64 (0x40) represents neutral / 0 semitones
+
+    const rolandSum = 0x40 + 0x00 + 0x05 + midiVal;
+    const rolandChecksum = (128 - (rolandSum % 128)) & 0x7f;
+    const rolandGsKeyShift = [
+      0xf0,
+      0x41,
+      0x10,
+      0x42,
+      0x12,
+      0x40,
+      0x00,
+      0x05,
+      midiVal,
+      rolandChecksum,
+      0xf7,
+    ];
+
+    const yamahaXgTranspose = [
+      0xf0,
+      0x43,
+      0x10,
+      0x4c,
+      0x00,
+      0x00,
+      0x06,
+      midiVal,
+      0xf7,
+    ];
+
+    const gm2MasterCoarseTune = [
+      0xf0,
+      0x7f,
+      0x7f,
+      0x04,
+      0x04,
+      0x00,
+      midiVal,
+      0xf7,
+    ];
+
+    this.sendExternalMidiMessage(rolandGsKeyShift);
+    this.sendExternalMidiMessage(yamahaXgTranspose);
+    this.sendExternalMidiMessage(gm2MasterCoarseTune);
+
+    logVerbose(
+      `[FORTE SVC] Sent external transpose: ${clamped > 0 ? "+" : ""}${clamped} semitones.`,
+    );
+  }
+
+  /**
    * Changes the drum kit preset on a specific channel.
    * @param {number} channelNumber - The MIDI channel (0-15)
    * @param {Object} drumPreset - The drum preset object with structure:
