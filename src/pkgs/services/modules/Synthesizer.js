@@ -182,7 +182,6 @@ export class ForteSynthesizer {
 
     const currentSequencer = this.state.playback.sequencer;
 
-    // 1. Disconnect from previous external device if currently connected
     if (
       prevDeviceId &&
       prevDeviceId !== "internal" &&
@@ -204,7 +203,6 @@ export class ForteSynthesizer {
 
     this.state.playback.currentMidiDeviceId = deviceId;
 
-    // 2. Connect to new external output, or remain on internal synth
     if (
       deviceId &&
       deviceId !== "internal" &&
