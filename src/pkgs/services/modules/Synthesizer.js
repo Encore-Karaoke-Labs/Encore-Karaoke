@@ -365,6 +365,10 @@ export class ForteSynthesizer {
           ) {
             this.sendExternalTranspose(this.state.playback.transpose);
           }
+
+          if (this.state.playback.volume !== undefined) {
+            this.sendExternalMasterVolume(this.state.playback.volume);
+          }
         } catch (e) {
           console.error("[FORTE SVC] Failed to connect to MIDI output:", e);
           return false;
@@ -683,6 +687,57 @@ export class ForteSynthesizer {
   }
 
   /**
+   * Sends real-time Master Volume SysEx messages to external MIDI hardware (Universal SysEx, Roland GS, and Yamaha XG).
+   * @param {number} level - Gain volume factor from 0.0 to 1.0.
+   */
+  sendExternalMasterVolume(level) {
+    const clamped = Math.max(0, Math.min(1, level));
+
+    const val14 = Math.round(clamped * 16383);
+    const lsb = val14 & 0x7f;
+    const msb = (val14 >> 7) & 0x7f;
+    const gmMasterVolume = [0xf0, 0x7f, 0x7f, 0x04, 0x01, lsb, msb, 0xf7];
+
+    const val7 = Math.round(clamped * 127);
+
+    const rolandSum = 0x40 + 0x00 + 0x04 + val7;
+    const rolandChecksum = (128 - (rolandSum % 128)) & 0x7f;
+    const rolandGsMasterVolume = [
+      0xf0,
+      0x41,
+      0x10,
+      0x42,
+      0x12,
+      0x40,
+      0x00,
+      0x04,
+      val7,
+      rolandChecksum,
+      0xf7,
+    ];
+
+    const yamahaXgMasterVolume = [
+      0xf0,
+      0x43,
+      0x10,
+      0x4c,
+      0x00,
+      0x00,
+      0x04,
+      val7,
+      0xf7,
+    ];
+
+    this.sendExternalMidiMessage(gmMasterVolume);
+    this.sendExternalMidiMessage(rolandGsMasterVolume);
+    this.sendExternalMidiMessage(yamahaXgMasterVolume);
+
+    logVerbose(
+      `[FORTE SVC] Sent external master volume: ${Math.round(clamped * 100)}% (${val7}/127)`,
+    );
+  }
+
+  /**
    * Changes the drum kit preset on a specific channel.
    * @param {number} channelNumber - The MIDI channel (0-15)
    * @param {Object} drumPreset - The drum preset object with structure:
@@ -933,6 +988,7 @@ export class ForteSynthesizer {
             output.port.send([0xb0 | ch, 121, 0]); // Reset All Controllers
           }
           this.sendExternalTranspose(0);
+          this.sendExternalMasterVolume(this.state.playback.volume ?? 1);
         } catch (e) {
           console.warn(
             "[FORTE SVC] Failed to send MIDI reset to external port:",

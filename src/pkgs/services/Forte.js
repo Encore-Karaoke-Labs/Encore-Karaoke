@@ -112,7 +112,10 @@ const pkg = {
     pauseTrack: () => playback.pauseTrack(),
     stopTrack: () => playback.stopTrack(),
 
-    setTrackVolume: (level) => audioCore.setTrackVolume(level),
+    setTrackVolume: (level) => {
+      audioCore.setTrackVolume(level);
+      synthesizer.sendExternalMasterVolume(level);
+    },
     setSfxVolume: (level) => audioCore.setSfxVolume(level),
 
     setVerbose: (enabled) => {
