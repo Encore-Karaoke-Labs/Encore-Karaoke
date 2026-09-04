@@ -110,6 +110,8 @@ export class ForteSFX {
           this.sfxSequencer = new Sequencer(this.state.playback.synthesizer);
           this.sfxSequencer.loop = false;
 
+          this.synthesizer.connectSequencerToMidiOutput(this.sfxSequencer);
+
           try {
             this.currentSfxMidi = BasicMIDI.fromArrayBuffer(cached.buffer);
           } catch (e) {
@@ -160,6 +162,9 @@ export class ForteSFX {
                 this.sfxResolve = null;
               }
               if (this.sfxSequencer) {
+                this.synthesizer.disconnectSequencerFromMidiOutput(
+                  this.sfxSequencer,
+                );
                 try {
                   this.sfxSequencer.pause();
                 } catch (e) {}
@@ -201,6 +206,7 @@ export class ForteSFX {
     }
 
     if (this.sfxSequencer) {
+      this.synthesizer.disconnectSequencerFromMidiOutput(this.sfxSequencer);
       try {
         this.sfxSequencer.pause();
       } catch (e) {}
