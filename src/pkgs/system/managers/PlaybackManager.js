@@ -450,6 +450,7 @@ export default class PlaybackManager {
       setTimeout(() => {
         if (state.mode !== "player") {
           state.isTransitioning = false;
+          state.pendingLyricCustomizerOpen = false;
           return;
         }
         dom.introCard.classOff("visible");
@@ -457,6 +458,11 @@ export default class PlaybackManager {
         if (this.mvPlayer) this.mvPlayer.play().catch(console.error);
         Forte.playTrack();
         state.isTransitioning = false;
+        if (state.pendingLyricCustomizerOpen) {
+          state.pendingLyricCustomizerOpen = false;
+          root.ui.toggleLyricCustomizer(true);
+        }
+
         setTimeout(() => {
           if (state.scoreSkipped) state.scoreSkipped = false;
         }, 5000);
@@ -516,6 +522,9 @@ export default class PlaybackManager {
     modules.recorder.clearSongInfo();
     if (this.ctx.root.games)
       this.ctx.root.games.broadcastPlaybackState("stopped", null);
+    if (this.ctx.state.isLyricCustomizerVisible) {
+      this.ctx.root.ui.toggleLyricCustomizer(false);
+    }
     dom.introCard.classOff("visible");
     dom.ytContainer.classOn("hidden");
     dom.ytIframe.attr({ src: "" });
@@ -547,6 +556,11 @@ export default class PlaybackManager {
     state.currentSongIsMV = false;
     state.currentSongIsYouTube = false;
     state.currentSongIsMultiplexed = false;
+
+    state.pendingLyricCustomizerOpen = false;
+    if (this.ctx.state.isLyricCustomizerVisible) {
+      this.ctx.root.ui.toggleLyricCustomizer(false);
+    }
 
     if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
   }

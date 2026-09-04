@@ -285,6 +285,46 @@ export default class InputManager {
       }
       return;
     }
+
+    if (this.ctx.state.isLyricCustomizerVisible) {
+      if (e.key === "Escape" || e.key === "l" || e.key === "L") {
+        e.preventDefault();
+        this.ctx.root.ui.toggleLyricCustomizer(false);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const curIdx = Number(this.ctx.state.lyricCustomizerIndex) || 0;
+        this.ctx.state.lyricCustomizerIndex = Math.max(0, curIdx - 1);
+        this.ctx.root.ui.renderLyricCustomizer();
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const curIdx = Number(this.ctx.state.lyricCustomizerIndex) || 0;
+        this.ctx.state.lyricCustomizerIndex = Math.min(2, curIdx + 1);
+        this.ctx.root.ui.renderLyricCustomizer();
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        this.ctx.root.ui.adjustLyricCustomizer(-1);
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        this.ctx.root.ui.adjustLyricCustomizer(1);
+        return;
+      }
+      return;
+    }
+
+    if ((e.key === "l" || e.key === "L") && this.ctx.state.mode === "player") {
+      e.preventDefault();
+      this.ctx.root.ui.toggleLyricCustomizer(true);
+      return;
+    }
+
     if (state.isYtSkipWarningActive && e.key === "ArrowUp") {
       e.preventDefault();
       playback.extendYoutubeSkip();

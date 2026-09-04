@@ -62,6 +62,11 @@ class EncoreController {
       videoSyncOffset: config.videoConfig?.syncOffset || 0,
 
       lyricFontFamily: config.videoConfig?.lyricFontFamily || "Radio Canada",
+      lyricFontSizeScale: config.videoConfig?.lyricFontSizeScale ?? 1.0,
+      lyricLineGapScale: config.videoConfig?.lyricLineGapScale ?? 1.0,
+      lyricBottomMargin: config.videoConfig?.lyricBottomMargin ?? 0,
+      isLyricCustomizerVisible: false,
+      lyricCustomizerIndex: 0,
 
       isTransitioning: false,
       isTypingNumber: false,
@@ -149,6 +154,8 @@ class EncoreController {
     this.input = new InputManager(this.context);
     this.setup = new SetupManager(this.context);
     this.games = new GamesManager(this.context);
+
+    this.context.modules.lyrics = this.lyrics;
 
     this.boundKeydown = (e) => this.input.handleKeyDown(e);
   }

@@ -1037,6 +1037,15 @@ export default class SetupManager {
                   }
                 },
               },
+              {
+                id: "preview_lyrics",
+                label: "Customize Sizing (Play Song)",
+                type: "action",
+                action: () => {
+                  this.setupState.lyricPickerInput = "";
+                  this.transitionTo("lyric_picker");
+                },
+              },
             ],
           },
           {
@@ -1216,11 +1225,39 @@ export default class SetupManager {
       if (e.key === "Escape") this.exitSetup();
       return;
     }
+
+    if (this.setupState.view === "lyric_picker") {
+      e.preventDefault();
+      if (e.key >= "0" && e.key <= "9") {
+        if ((this.setupState.lyricPickerInput || "").length < 6) {
+          this.setupState.lyricPickerInput =
+            (this.setupState.lyricPickerInput || "") + e.key;
+          this.renderView();
+        }
+      } else if (e.key === "Backspace") {
+        this.setupState.lyricPickerInput = (
+          this.setupState.lyricPickerInput || ""
+        ).slice(0, -1);
+        this.renderView();
+      } else if (e.key === "Enter") {
+        const song = this.findSongByCode(this.setupState.lyricPickerInput);
+        if (song) {
+          this.launchLyricPreview(song);
+        } else {
+          this.showToast("SONG NOT FOUND", "error");
+        }
+      } else if (e.key === "Escape") {
+        this.setupState.lyricPickerInput = "";
+        this.transitionTo("submenu");
+      }
+      return;
+    }
+
     if (this.setupState.manualCalib && this.setupState.manualCalib.active) {
       e.preventDefault();
       if (this.setupState.manualCalib.phase === "input") {
         if (e.key >= "0" && e.key <= "9") {
-          if (this.setupState.manualCalib.songInput.length < 5) {
+          if (this.setupState.manualCalib.songInput.length < 6) {
             this.setupState.manualCalib.songInput += e.key;
             this.renderView();
           }
@@ -1229,12 +1266,8 @@ export default class SetupManager {
             this.setupState.manualCalib.songInput.slice(0, -1);
           this.renderView();
         } else if (e.key === "Enter") {
-          const displayCode = this.setupState.manualCalib.songInput.padStart(
-            5,
-            "0",
-          );
-          const song = this.ctx.state.songList.find(
-            (s) => s.code === displayCode,
+          const song = this.findSongByCode(
+            this.setupState.manualCalib.songInput,
           );
           if (song) this.startCalibrationRecording(song);
         } else if (e.key === "Escape") this.exitManualCalibration();
@@ -1884,6 +1917,62 @@ export default class SetupManager {
       .appendTo(barBgFile);
   }
 
+  findSongByCode(rawCode) {
+    if (!rawCode) return null;
+    const code6 = rawCode.padStart(6, "0");
+    const code5 = rawCode.padStart(5, "0");
+    const state = this.ctx.state;
+
+    return (
+      state.songMap?.get(code6) ||
+      state.songMap?.get(code5) ||
+      state.songMap?.get(rawCode) ||
+      state.songList?.find(
+        (s) =>
+          String(s.code).padStart(6, "0") === code6 ||
+          String(s.code).padStart(5, "0") === code5 ||
+          String(s.code) === rawCode,
+      ) ||
+      null
+    );
+  }
+
+  async launchLyricPreview(song) {
+    if (this.previewSyncFrame) {
+      cancelAnimationFrame(this.previewSyncFrame);
+      this.previewSyncFrame = null;
+    }
+    if (this.setupState.manualCalib?.active) {
+      this.exitManualCalibration();
+    }
+    if (this.setupState.previewingVideo) {
+      this.stopVideoPreview();
+    }
+    this.ctx.services.Forte.stopSfx();
+
+    this.setupState.dialog = null;
+    this.setupState.showingLicenses = false;
+    this.setupState.showingVersionCard = false;
+    this.setupState.isTransitioning = false;
+    this.setupState.lyricPickerInput = "";
+    this.setupState.authInput = "";
+    this.setupState.view = "dashboard";
+
+    if (this.ctx.dom.setupContainer) {
+      this.ctx.dom.setupContainer.clear();
+    }
+    if (this.ctx.dom.setupScreen) {
+      this.ctx.dom.setupScreen.classOn("hidden");
+    }
+
+    this.ctx.modules.bgv.start();
+    await this.ctx.modules.bgv.updatePlaylistForCategory();
+
+    this.ctx.state.pendingLyricCustomizerOpen = true;
+
+    await this.ctx.root.playback.startPlayer(song);
+  }
+
   startManualCalibration() {
     this.setupState.manualCalib = {
       active: true,
@@ -2454,6 +2543,10 @@ export default class SetupManager {
 
     this.ctx.dom.setupContainer.styleJs({ display: "" });
 
+    if (this.setupState.view === "lyric_picker") {
+      this.renderLyricSongPickerOverlay(this.ctx.dom.setupContainer);
+      return;
+    }
     if (this.setupState.manualCalib?.active) {
       this.renderManualCalibrationOverlay(this.ctx.dom.setupContainer);
       return;
@@ -2539,13 +2632,13 @@ export default class SetupManager {
     if (this.setupState.manualCalib.phase === "input") {
       new Html("p")
         .text(
-          "Enter a 5-digit song number from your library to use for testing.",
+          "Enter a 6-digit song number from your library to use for testing.",
         )
         .appendTo(overlay);
       new Html("br").appendTo(overlay);
 
       const displayCode = this.setupState.manualCalib.songInput.padStart(
-        5,
+        6,
         "0",
       );
       new Html("div")
@@ -2553,7 +2646,7 @@ export default class SetupManager {
         .text(displayCode)
         .appendTo(overlay);
 
-      const song = this.ctx.state.songList.find((s) => s.code === displayCode);
+      const song = this.findSongByCode(this.setupState.manualCalib.songInput);
       if (song)
         new Html("p")
           .styleJs({ color: "#89cff0", fontWeight: "bold", fontSize: "1.5rem" })
@@ -2638,6 +2731,44 @@ export default class SetupManager {
         .on("click", () => this.exitManualCalibration())
         .appendTo(btns);
     }
+  }
+
+  renderLyricSongPickerOverlay(container) {
+    const overlay = new Html("div")
+      .classOn("setup-manual-calib-overlay")
+      .appendTo(container);
+
+    new Html("h2").text("LYRIC PREVIEW & CUSTOMIZATION").appendTo(overlay);
+    new Html("p")
+      .text("Enter a 6-digit song number to play and adjust lyric layout live.")
+      .appendTo(overlay);
+    new Html("br").appendTo(overlay);
+
+    const rawInput = this.setupState.lyricPickerInput || "";
+    const displayCode = rawInput.padStart(6, "0");
+
+    new Html("div")
+      .classOn("calib-value-display")
+      .text(displayCode)
+      .appendTo(overlay);
+
+    const song = this.findSongByCode(rawInput);
+    if (song) {
+      new Html("p")
+        .styleJs({ color: "#89cff0", fontWeight: "bold", fontSize: "1.6rem" })
+        .text(`${song.title} - ${song.artist}`)
+        .appendTo(overlay);
+    } else if (rawInput.length > 0) {
+      new Html("p")
+        .styleJs({ color: "#ff5555", fontWeight: "bold", fontSize: "1.5rem" })
+        .text("Song not found in library.")
+        .appendTo(overlay);
+    }
+
+    new Html("p")
+      .styleJs({ marginTop: "2rem", opacity: "0.6" })
+      .text("Use Number Keys to type | ENTER: Play & Adjust | ESC: Back")
+      .appendTo(overlay);
   }
 
   renderVideoPreviewOverlay(container) {

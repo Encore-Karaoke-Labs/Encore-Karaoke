@@ -34,6 +34,7 @@ export default class UIManager {
     this.buildSessionChatUI();
     this.buildQR();
     this.buildSetupUI();
+    this.buildLyricCustomizerUI();
     this.monitorFullscreenState();
   }
 
@@ -1482,6 +1483,217 @@ export default class UIManager {
         if (idx === this.ctx.state.highlightedSearchIndex)
           item.elm.scrollIntoView({ block: "nearest" });
       });
+  }
+
+  buildLyricCustomizerUI() {
+    const dom = this.ctx.dom;
+    dom.lyricCustomizer = new Html("div")
+      .classOn("lyric-customizer-overlay")
+      .appendTo(this.ctx.wrapper);
+
+    const win = new Html("div")
+      .classOn("lyric-customizer-window")
+      .appendTo(dom.lyricCustomizer);
+
+    const header = new Html("div")
+      .classOn("lyric-customizer-header")
+      .appendTo(win);
+
+    new Html("div")
+      .classOn("lyric-customizer-title")
+      .text("LYRIC DISPLAY SETTINGS")
+      .appendTo(header);
+
+    new Html("button")
+      .classOn("lyric-customizer-close")
+      .html('<ion-icon name="close"></ion-icon>')
+      .appendTo(header)
+      .on("click", () => this.toggleLyricCustomizer(false));
+
+    dom.lyricCustomizerBody = new Html("div")
+      .classOn("lyric-customizer-body")
+      .appendTo(win);
+
+    const footer = new Html("div")
+      .classOn("lyric-customizer-footer")
+      .appendTo(win);
+
+    new Html("p")
+      .html(
+        "▲ / ▼: Select | ◀ / ▶: Adjust | <kbd>L</kbd> / <kbd>ESC</kbd>: Close",
+      )
+      .appendTo(footer);
+  }
+
+  toggleLyricCustomizer(visible) {
+    const state = this.ctx.state;
+    const wrapper = this.ctx.wrapper;
+
+    const shouldShow =
+      visible !== undefined ? visible : !state.isLyricCustomizerVisible;
+
+    if (
+      shouldShow &&
+      (!state.mode.startsWith("player") || state.isTransitioning)
+    ) {
+      return;
+    }
+
+    state.isLyricCustomizerVisible = shouldShow;
+
+    if (shouldShow) {
+      wrapper.classOn("lyric-customizer-active");
+      this.renderLyricCustomizer();
+    } else {
+      wrapper.classOff("lyric-customizer-active");
+    }
+  }
+
+  renderLyricCustomizer() {
+    const dom = this.ctx.dom;
+    const state = this.ctx.state;
+    if (!dom.lyricCustomizerBody) return;
+
+    dom.lyricCustomizerBody.clear();
+
+    const currentMargin = Number(state.lyricBottomMargin) || 0;
+    const activeIdx = Number(state.lyricCustomizerIndex) || 0;
+
+    const options = [
+      {
+        id: "fontSize",
+        label: "Lyric Font Size",
+        min: 0.7,
+        max: 1.5,
+        value: Number(state.lyricFontSizeScale) || 1.0,
+        display: `${Math.round((Number(state.lyricFontSizeScale) || 1.0) * 100)}%`,
+      },
+      {
+        id: "lineGap",
+        label: "Line Spacing",
+        min: 0.5,
+        max: 2.0,
+        value: Number(state.lyricLineGapScale) || 1.0,
+        display: `${Math.round((Number(state.lyricLineGapScale) || 1.0) * 100)}%`,
+      },
+      {
+        id: "bottomMargin",
+        label: "Bottom Margin",
+        min: -150,
+        max: 150,
+        value: currentMargin,
+        display: `${currentMargin > 0 ? "+" : ""}${currentMargin}px`,
+      },
+    ];
+
+    options.forEach((opt, idx) => {
+      const isFocused = idx === activeIdx;
+      const row = new Html("div")
+        .classOn("lyric-customizer-item")
+        .appendTo(dom.lyricCustomizerBody);
+
+      if (isFocused) row.classOn("active");
+
+      row.on("click", () => {
+        state.lyricCustomizerIndex = idx;
+        this.renderLyricCustomizer();
+      });
+
+      new Html("div")
+        .classOn("lyric-customizer-label")
+        .text(opt.label)
+        .appendTo(row);
+
+      const valArea = new Html("div")
+        .classOn("lyric-customizer-value-area")
+        .appendTo(row);
+
+      const pct = Math.max(
+        0,
+        Math.min(100, ((opt.value - opt.min) / (opt.max - opt.min)) * 100),
+      );
+
+      valArea.html(`
+        <span class="customizer-arrow">◀</span>
+        <div class="setup-slider-bar">
+          <div class="setup-slider-fill" style="width: ${pct}%"></div>
+        </div>
+        <span class="customizer-val-text">${opt.display}</span>
+        <span class="customizer-arrow">▶</span>
+      `);
+    });
+  }
+
+  adjustLyricCustomizer(dir) {
+    const state = this.ctx.state;
+    const activeIdx = state.lyricCustomizerIndex || 0;
+    this.ctx.config.videoConfig ??= {};
+
+    if (activeIdx === 0) {
+      let nextScale =
+        Math.round((state.lyricFontSizeScale + dir * 0.05) * 100) / 100;
+      nextScale = Math.max(0.7, Math.min(1.5, nextScale));
+      state.lyricFontSizeScale = nextScale;
+      this.ctx.config.videoConfig.lyricFontSizeScale = nextScale;
+      window.config?.setItem?.("videoConfig.lyricFontSizeScale", nextScale);
+    } else if (activeIdx === 1) {
+      let nextGap =
+        Math.round((state.lyricLineGapScale + dir * 0.1) * 100) / 100;
+      nextGap = Math.max(0.5, Math.min(2.0, nextGap));
+      state.lyricLineGapScale = nextGap;
+      this.ctx.config.videoConfig.lyricLineGapScale = nextGap;
+      window.config?.setItem?.("videoConfig.lyricLineGapScale", nextGap);
+    } else if (activeIdx === 2) {
+      let nextMargin = state.lyricBottomMargin + dir * 10;
+      nextMargin = Math.max(-150, Math.min(150, nextMargin));
+      state.lyricBottomMargin = nextMargin;
+      this.ctx.config.videoConfig.lyricBottomMargin = nextMargin;
+      window.config?.setItem?.("videoConfig.lyricBottomMargin", nextMargin);
+    }
+
+    const lyricsEngine = this.ctx.root.lyrics || this.ctx.modules.lyrics;
+    if (lyricsEngine) {
+      lyricsEngine.updateLiveMetrics();
+    }
+
+    this.renderLyricCustomizer();
+  }
+
+  adjustLyricCustomizer(dir) {
+    const state = this.ctx.state;
+    const activeIdx = Number(state.lyricCustomizerIndex) || 0;
+    this.ctx.config.videoConfig ??= {};
+
+    if (activeIdx === 0) {
+      let currentScale = Number(state.lyricFontSizeScale) || 1.0;
+      let nextScale = Math.round((currentScale + dir * 0.05) * 100) / 100;
+      nextScale = Math.max(0.7, Math.min(1.5, nextScale));
+      state.lyricFontSizeScale = nextScale;
+      this.ctx.config.videoConfig.lyricFontSizeScale = nextScale;
+      window.config?.setItem?.("videoConfig.lyricFontSizeScale", nextScale);
+    } else if (activeIdx === 1) {
+      let currentGap = Number(state.lyricLineGapScale) || 1.0;
+      let nextGap = Math.round((currentGap + dir * 0.1) * 100) / 100;
+      nextGap = Math.max(0.5, Math.min(2.0, nextGap));
+      state.lyricLineGapScale = nextGap;
+      this.ctx.config.videoConfig.lyricLineGapScale = nextGap;
+      window.config?.setItem?.("videoConfig.lyricLineGapScale", nextGap);
+    } else if (activeIdx === 2) {
+      let currentMargin = Number(state.lyricBottomMargin);
+      if (isNaN(currentMargin)) currentMargin = 0;
+      let nextMargin = currentMargin + dir * 10;
+      nextMargin = Math.max(-150, Math.min(150, nextMargin));
+      state.lyricBottomMargin = nextMargin;
+      this.ctx.config.videoConfig.lyricBottomMargin = nextMargin;
+      window.config?.setItem?.("videoConfig.lyricBottomMargin", nextMargin);
+    }
+
+    const lyricsEngine = this.ctx.root.lyrics || this.ctx.modules.lyrics;
+    if (lyricsEngine) {
+      lyricsEngine.updateLiveMetrics();
+    }
+
+    this.renderLyricCustomizer();
   }
 
   startBumperCycle() {

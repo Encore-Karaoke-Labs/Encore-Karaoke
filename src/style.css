@@ -5531,3 +5531,177 @@ p + .flex-list button {
   line-height: 1.5;
   margin: 0 0 2rem 0;
 }
+
+/* ==========================================================================
+   Lyric Customizer Overlay
+   ========================================================================== */
+.lyric-customizer-overlay {
+  position: absolute;
+  top: calc(2rem + 50px + 1.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 68000;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.lyric-customizer-active .lyric-customizer-overlay {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.lyric-customizer-window {
+  width: 580px;
+  background: rgba(10, 10, 20, 0.95);
+  border: 1px solid rgba(137, 207, 240, 0.4);
+  border-radius: 0.5rem;
+  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: "Rajdhani", sans-serif;
+  color: #fff;
+}
+
+.lyric-customizer-header {
+  padding: 0.75rem 1.25rem;
+  background: rgba(0, 0, 0, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lyric-customizer-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #89cff0;
+  letter-spacing: 0.1em;
+}
+
+.lyric-customizer-close {
+  background: rgba(255, 85, 85, 0.15);
+  border: 1px solid rgba(255, 85, 85, 0.4);
+  color: #ff5555;
+  border-radius: 0.4rem;
+  width: 2rem;
+  height: 2rem;
+  min-width: unset;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: var(--cursor-pointer);
+  transition: all 0.2s ease;
+  font-size: 1.2rem;
+}
+
+.lyric-customizer-close:hover {
+  background: #ff5555;
+  color: #ffffff;
+  border-color: #ff5555;
+  box-shadow: 0 0 10px rgba(255, 85, 85, 0.4);
+}
+
+.lyric-customizer-body {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+/* Inherits Setup Menu's .submenu-item and .submenu-item.active animation */
+.lyric-customizer-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border-left: 5px solid transparent;
+  font-size: 1.3rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  cursor: var(--cursor-pointer);
+}
+
+.lyric-customizer-item:hover,
+.lyric-customizer-item.active {
+  background: rgba(137, 207, 240, 0.15);
+  border-left-color: #89cff0;
+  transform: scale(1.02);
+  transform-origin: center;
+  box-shadow: 0 5px 15px rgba(137, 207, 240, 0.1);
+}
+
+.lyric-customizer-label {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.lyric-customizer-value-area {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 55%;
+  justify-content: flex-end;
+}
+
+.lyric-customizer-value-area .setup-slider-bar {
+  flex-grow: 1;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.lyric-customizer-value-area .setup-slider-fill {
+  background: #89cff0;
+  height: 100%;
+  transition: width 0.1s linear;
+}
+
+.customizer-arrow {
+  color: #89cff0;
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+
+.lyric-customizer-item.active .customizer-arrow,
+.lyric-customizer-item:hover .customizer-arrow {
+  opacity: 1;
+}
+
+.customizer-val-text {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #89cff0;
+  min-width: 65px;
+  text-align: right;
+}
+
+.lyric-customizer-footer {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 0.75rem 1rem;
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lyric-customizer-footer p {
+  margin: 0;
+  color: #ffd700;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  opacity: 0.8;
+  font-size: 1rem;
+}
+
+.lyric-customizer-footer kbd {
+  padding: 0.15rem 0.45rem;
+  font-size: 0.85rem;
+}

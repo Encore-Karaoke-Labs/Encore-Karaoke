@@ -270,7 +270,8 @@ export default class LyricsEngine {
     const width = Math.min(window.innerWidth * 0.9, 1400);
 
     const logicalWidth = width;
-    const mainFontSize = Math.floor(logicalWidth * 0.045);
+    const fontScale = this.ctx.state.lyricFontSizeScale ?? 1.0;
+    const mainFontSize = Math.floor(logicalWidth * 0.045 * fontScale);
     const fixedHeight = Math.max(250, mainFontSize * 10);
 
     this.logicalWidth = logicalWidth;
@@ -278,11 +279,12 @@ export default class LyricsEngine {
 
     canvas.width = width * dpr;
     canvas.height = fixedHeight * dpr;
+    const margin = Number(this.ctx.state.lyricBottomMargin) || 0;
     this.ctx.dom.lyricsCanvas.styleJs({
       width: `${width}px`,
       height: `${fixedHeight}px`,
+      transform: `translateY(${-margin}px)`,
     });
-
     if (this.lyricsCtx) {
       this.lyricsCtx.setTransform(1, 0, 0, 1, 0, 0);
       this.lyricsCtx.scale(dpr, dpr);
@@ -309,6 +311,11 @@ export default class LyricsEngine {
   async setupLyrics(song, pbState) {
     this.reset();
     const dom = this.ctx.dom;
+
+    const margin = Number(this.ctx.state.lyricBottomMargin) || 0;
+    dom.lyricsCanvas.styleJs({
+      transform: `translateY(${-margin}px)`,
+    });
 
     let cachedTempoChanges = null;
 
@@ -777,6 +784,68 @@ export default class LyricsEngine {
     }
   }
 
+  updateLiveMetrics() {
+    if (!this.ctx.dom.lyricsCanvas) return;
+    const canvas = this.ctx.dom.lyricsCanvas.elm;
+    const dpr = window.devicePixelRatio || 1;
+    const width = Math.min(window.innerWidth * 0.9, 1400);
+
+    const fontScale = this.ctx.state.lyricFontSizeScale ?? 1.0;
+    const mainFontSize = Math.floor(width * 0.045 * fontScale);
+    const fixedHeight = Math.max(250, mainFontSize * 10);
+
+    this.logicalWidth = width;
+    this.logicalHeight = fixedHeight;
+
+    canvas.width = width * dpr;
+    canvas.height = fixedHeight * dpr;
+    this.pendingCanvasHeight = null;
+
+    const margin = Number(this.ctx.state.lyricBottomMargin) || 0;
+    this.ctx.dom.lyricsCanvas.styleJs({
+      width: `${width}px`,
+      height: `${fixedHeight}px`,
+      transform: `translateY(${-margin}px)`,
+    });
+
+    if (this.lyricsCtx) {
+      this.lyricsCtx.setTransform(1, 0, 0, 1, 0, 0);
+      this.lyricsCtx.scale(dpr, dpr);
+    }
+
+    if (this.ctx.state.currentSongIsMIDI && this.midiLines) {
+      const idx = this.currentSongLineIndex;
+      if (idx % 2 === 0) {
+        this.currentMidiLine1 = this.midiLines[idx] || [];
+        this.currentMidiLine2 = this.midiLines[idx + 1] || [];
+      } else {
+        this.currentMidiLine2 = this.midiLines[idx] || [];
+        this.currentMidiLine1 = this.midiLines[idx + 1] || [];
+      }
+    } else if (
+      !this.ctx.state.currentSongIsMIDI &&
+      this.parsedLrc &&
+      this.parsedLrc.length > 0
+    ) {
+      if (
+        this.currentLrcIndex >= 0 &&
+        this.currentLrcIndex < this.parsedLrc.length
+      ) {
+        if (this.isLrcLine2Active) {
+          this.currentLrcLine2 = this.parsedLrc[this.currentLrcIndex];
+          this.currentLrcLine1 = this.parsedLrc[this.currentLrcIndex + 1];
+        } else {
+          this.currentLrcLine1 = this.parsedLrc[this.currentLrcIndex];
+          this.currentLrcLine2 = this.parsedLrc[this.currentLrcIndex + 1];
+        }
+      }
+    }
+
+    this.calculateLyricLayout();
+    this.updateCanvasCache();
+    this.requestCanvasCacheUpdate = false;
+  }
+
   calculateLyricLayout() {
     if (!this.allMidiSyllables && !this.parsedLrc) return;
     const canvas = this.ctx.dom.lyricsCanvas.elm;
@@ -784,12 +853,14 @@ export default class LyricsEngine {
     const logicalWidth =
       parseFloat(canvas.style.width) || window.innerWidth * 0.9;
 
-    const mainFontSize = Math.floor(logicalWidth * 0.045);
-    const subFontSize = Math.floor(logicalWidth * 0.018);
+    const fontScale = this.ctx.state.lyricFontSizeScale ?? 1.0;
+    const gapScale = this.ctx.state.lyricLineGapScale ?? 1.0;
+    const mainFontSize = Math.floor(logicalWidth * 0.045 * fontScale);
+    const subFontSize = Math.floor(logicalWidth * 0.018 * fontScale);
     const mainFontStr = `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
     const rubyFontStr = `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
-    const lineSpacing = mainFontSize * 1.25;
-    const paragraphGap = mainFontSize * 1.8;
+    const lineSpacing = mainFontSize * 1.25 * gapScale;
+    const paragraphGap = mainFontSize * 1.8 * gapScale;
     let currentY = mainFontSize * 1.5;
     this.renderableLines = [];
 
@@ -1140,12 +1211,11 @@ export default class LyricsEngine {
       this.pendingCanvasHeight = requiredHeight;
     }
 
-    const bottomHeadroom = mainFontSize * 0.5;
+    const bottomMarginOffset = this.ctx.state.lyricBottomMargin ?? 0;
+    const bottomHeadroom = mainFontSize * 0.5 + bottomMarginOffset;
 
-    const yOffset = Math.max(
-      0,
-      this.logicalHeight - currentY - mainFontSize - bottomHeadroom,
-    );
+    const yOffset =
+      this.logicalHeight - currentY - mainFontSize - bottomHeadroom;
 
     if (this.renderableLines) {
       for (let i = 0; i < this.renderableLines.length; i++) {
@@ -1180,8 +1250,9 @@ export default class LyricsEngine {
       });
     }
 
-    const mainFontSize = Math.floor(logicalWidth * 0.045);
-    const subFontSize = Math.floor(logicalWidth * 0.018);
+    const fontScale = this.ctx.state.lyricFontSizeScale ?? 1.0;
+    const mainFontSize = Math.floor(logicalWidth * 0.045 * fontScale);
+    const subFontSize = Math.floor(logicalWidth * 0.018 * fontScale);
 
     this.renderableLines.forEach((line, lineIdx) => {
       const cache = this.lineCaches[lineIdx];
@@ -1417,7 +1488,8 @@ export default class LyricsEngine {
     }
 
     const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
-    const mainFontSize = Math.floor(logicalWidth * 0.045);
+    const fontScale = this.ctx.state.lyricFontSizeScale ?? 1.0;
+    const mainFontSize = Math.floor(logicalWidth * 0.045 * fontScale);
 
     if (this.requestCanvasCacheUpdate) {
       this.updateCanvasCache();
