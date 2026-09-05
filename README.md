@@ -90,6 +90,7 @@ Encore can be fully controlled via a standard keyboard or through EnMoku.
 | `Enter`         | Confirm reservation / Play highlighted song          |
 | `Escape`        | Stop playback / Clear input / Go back                |
 | `Space`         | Pause playback                                       |
+| `L`             | Open Lyric Customization menu                        |
 | `Y`             | Open Search Menu (Local + YouTube)                   |
 | `Q`             | Open Reservation List                                |
 | `M`             | Open Mixer (Adjust Mic & Music levels)               |
