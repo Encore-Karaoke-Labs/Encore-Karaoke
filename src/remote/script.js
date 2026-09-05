@@ -87,6 +87,12 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentLibraryTab = "local";
   let navState = { mobileLibraryOpen: false };
 
+  function formatSongCode(code) {
+    if (code == null) return "";
+    const str = String(code);
+    return /^\d+$/.test(str) ? str.padStart(6, "0") : str;
+  }
+
   function getFormatBadge(song) {
     if (song.chorusPath) {
       return { label: "CHR", color: "#FFD700" };
@@ -202,7 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
       } else {
         item.innerHTML = `
-        <div class="song-code">${song.code}</div>
+        <div class="song-code">${formatSongCode(song.code)}</div>
         <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
           <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 2px;">${song.title}</div>
           <div style="font-size:0.85rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
