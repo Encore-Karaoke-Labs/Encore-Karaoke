@@ -407,9 +407,6 @@ export default class NetworkManager {
         case "key_down":
           input.handleNav("down");
           break;
-        case "key_down":
-          input.handleNav("down");
-          break;
         case "toggle_melody":
           input.cycleGuideMelody();
           break;
