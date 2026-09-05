@@ -353,7 +353,7 @@ const pkg = {
         return false;
       }
 
-      const cacheVersion = "v2"; // Case-insensitive sibling-matching, AppleDouble filtering & NFC normalization
+      const cacheVersion = "v3"; // Standalone video file support
       const cacheKey = `encore-songlist:${cacheVersion}:${libraryPath}`;
       const signatureKey = `encore-signature:${cacheVersion}:${libraryPath}`;
       const newSongsKey = `encore-newsongs:${cacheVersion}:${libraryPath}`;
