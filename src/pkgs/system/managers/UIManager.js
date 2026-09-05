@@ -1562,7 +1562,9 @@ export default class UIManager {
 
     if (
       shouldShow &&
-      (!state.mode.startsWith("player") || state.isTransitioning)
+      (!state.mode.startsWith("player") ||
+        state.isTransitioning ||
+        state.currentSongIsStandaloneVideo)
     ) {
       return;
     }
