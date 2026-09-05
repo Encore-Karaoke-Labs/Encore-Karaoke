@@ -19,10 +19,12 @@ class VirtualScroller {
     this.items = [];
     this.container.addEventListener("scroll", () => this.render());
   }
-  setItems(items) {
+  setItems(items, resetScroll = true) {
     this.items = items;
     this.content.style.height = `${this.items.length * this.itemHeight}px`;
-    this.container.scrollTop = 0;
+    if (resetScroll) {
+      this.container.scrollTop = 0;
+    }
     this.render();
   }
   render() {
@@ -81,7 +83,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   let fullSongList = [],
-    tempChunkAccumulator = [],
     ytCache = [];
   let currentLibraryTab = "local";
   let navState = { mobileLibraryOpen: false };
@@ -219,6 +220,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loadingOverlay.classList.remove("active");
     errorOverlay.classList.remove("active");
 
+    fullSongList = [];
     socket.emit("remote-command", { type: "get_song_list", value: "" });
     if (!myNickname) {
       nickOverlay.classList.add("active");
@@ -263,18 +265,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   socket.on("fromRemote", (payload) => {
     if (payload.type === "songlist_chunk") {
-      tempChunkAccumulator = tempChunkAccumulator.concat(payload.contents);
-      if (payload.isLast) {
-        fullSongList = tempChunkAccumulator;
-        tempChunkAccumulator = [];
-        if (currentLibraryTab === "local" && !searchInput.value.trim()) {
-          songScroller.setItems(fullSongList);
-        }
+      const isFirstChunk = fullSongList.length === 0;
+      fullSongList = fullSongList.concat(payload.contents);
+
+      if (currentLibraryTab === "local" && !searchInput.value.trim()) {
+        songScroller.setItems(fullSongList, isFirstChunk);
       }
     }
 
     if (payload.type === "remote_search_results") {
-      if (currentLibraryTab === "local") {
+      if (currentLibraryTab === "local" && searchInput.value.trim()) {
         songScroller.setItems(payload.results);
       }
     }

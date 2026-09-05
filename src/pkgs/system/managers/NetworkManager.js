@@ -291,7 +291,7 @@ export default class NetworkManager {
       this.broadcastSocialState();
     });
 
-    this.socket.on("execute-command", (cmd) => {
+    this.socket.on("execute-command", async (cmd) => {
       const d = cmd.data;
 
       if (d.type === "set_nickname") {
@@ -513,7 +513,7 @@ export default class NetworkManager {
         case "remote_local_search":
           const rawQuery = d.value || "";
           const searchRes =
-            this.ctx.root.library.getLocalSearchResults(rawQuery);
+            await this.ctx.root.library.getLocalSearchResults(rawQuery);
           const mappedResults = searchRes.map((s) => ({
             code: s.code,
             title: s.title,
