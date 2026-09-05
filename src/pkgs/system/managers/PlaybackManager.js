@@ -204,6 +204,8 @@ export default class PlaybackManager {
 
     state.currentSongIsYouTube = song.path.startsWith("yt://");
     state.currentSongIsMV = !!song.videoPath;
+    state.currentSongIsStandaloneVideo =
+      state.currentSongIsMV && song.path === song.videoPath;
     state.reservationNumber = "";
 
     root.ui.setMode("player");
@@ -215,13 +217,21 @@ export default class PlaybackManager {
       this.ctx.wrapper.classOn("mode-player-cdg");
     }
 
-    const isMvWithoutLyrics = state.currentSongIsMV && !song.lrcPath;
+    const isMidi =
+      song.type === "mid" ||
+      song.type === "kar" ||
+      song.path.toLowerCase().endsWith(".mid") ||
+      song.path.toLowerCase().endsWith(".kar");
+    const hasLyrics = Boolean(song.lrcPath || isMidi);
 
-    if (isMvWithoutLyrics) {
+    if (!hasLyrics && !state.currentSongIsYouTube && !song.cdgPath) {
       this.ctx.wrapper.classOn("mode-player-no-lyrics");
       dom.lyricsCanvas.classOn("hidden");
-    } else if (!state.currentSongIsYouTube) {
-      dom.lyricsCanvas.classOff("hidden");
+    } else {
+      this.ctx.wrapper.classOff("mode-player-no-lyrics");
+      if (!state.currentSongIsYouTube) {
+        dom.lyricsCanvas.classOff("hidden");
+      }
     }
 
     if (!state.isSessionActive) {
