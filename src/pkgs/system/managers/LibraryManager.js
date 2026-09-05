@@ -85,7 +85,7 @@ export default class LibraryManager {
       return { label: "MIDI", color: colors.MIDI };
     }
 
-    if (song.videoPath) {
+    if (song.type === "video" || song.videoPath) {
       return { label: "MTV", color: colors.MTV };
     }
 

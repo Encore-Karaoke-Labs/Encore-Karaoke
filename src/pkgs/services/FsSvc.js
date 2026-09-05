@@ -514,7 +514,27 @@ const pkg = {
       const processableFiles = files.filter((file) => {
         if (file.type !== "file" || isAppleDouble(file.name)) return false;
         const ext = nfc(file.name).split(".").pop().toLowerCase();
-        return audioExtensions.has(ext) || ext === "mid" || ext === "kar";
+
+        if (audioExtensions.has(ext) || ext === "mid" || ext === "kar") {
+          return true;
+        }
+
+        if (videoExtensions.has(ext)) {
+          const lastDot = file.name.lastIndexOf(".");
+          const basename =
+            lastDot > -1 ? file.name.substring(0, lastDot) : file.name;
+
+          const hasAudioSibling =
+            Array.from(audioExtensions).some((aExt) =>
+              findSibling(`${basename}.${aExt}`),
+            ) ||
+            Boolean(findSibling(`${basename}.mid`)) ||
+            Boolean(findSibling(`${basename}.kar`));
+
+          return !hasAudioSibling;
+        }
+
+        return false;
       });
 
       processableFiles.sort((a, b) => a.name.localeCompare(b.name));
@@ -569,18 +589,33 @@ const pkg = {
 
             const lrcName = findSibling(`${basename}.lrc`);
             const cdgName = findSibling(`${basename}.cdg`);
+            const isVideo = videoExtensions.has(extension);
             const hasLrc = Boolean(lrcName);
             const hasCdg = Boolean(cdgName);
 
-            if (audioExtensions.has(extension) && (hasLrc || hasCdg)) {
+            if (
+              (audioExtensions.has(extension) && (hasLrc || hasCdg)) ||
+              isVideo
+            ) {
               if (state.buildAbortController?.signal.aborted) {
                 throw new Error("Build cancelled");
               }
               songData = {
-                type: isMultiplexed ? "multiplexed" : hasCdg ? "cdg" : "audio",
+                type: isVideo
+                  ? "video"
+                  : isMultiplexed
+                    ? "multiplexed"
+                    : hasCdg
+                      ? "cdg"
+                      : "audio",
                 lrcPath: lrcName,
-                cdgPath: cdgName,
+                cdgPath: isVideo ? null : cdgName,
               };
+
+              if (isVideo) {
+                videoName = filename;
+              }
+
               try {
                 const urlObj = await NetworkingUtility.getFileLink(fullPath);
                 const tags = await new Promise((resolve, reject) => {
