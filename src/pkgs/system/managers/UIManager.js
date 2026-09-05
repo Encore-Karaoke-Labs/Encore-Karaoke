@@ -1554,6 +1554,7 @@ export default class UIManager {
 
   toggleLyricCustomizer(visible) {
     const state = this.ctx.state;
+    const dom = this.ctx.dom;
     const wrapper = this.ctx.wrapper;
 
     const shouldShow =
@@ -1571,6 +1572,11 @@ export default class UIManager {
     if (shouldShow) {
       wrapper.classOn("lyric-customizer-active");
       state.lyricCustomizerView = "main";
+
+      if (!state.isInterludeActive && dom.lyricsCanvas) {
+        dom.lyricsCanvas.styleJs({ opacity: "1" });
+      }
+
       this.renderLyricCustomizer();
     } else {
       state.lyricCustomizerView = "main";

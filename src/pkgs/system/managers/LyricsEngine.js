@@ -1543,7 +1543,15 @@ export default class LyricsEngine {
           ? this.renderableLines[0].syllables[0].absoluteTime
           : 0;
 
+      const isCustomizerOpen =
+        Boolean(this.ctx.state.isLyricCustomizerVisible) &&
+        !this.ctx.state.isInterludeActive;
+
       const lineAlphas = this.renderableLines.map((line, lineIdx) => {
+        if (isCustomizerOpen) {
+          return 1.0;
+        }
+
         let alpha = line.isNextLine ? fadeProgress : 1.0;
         const isFirstLineGroup = isLrcMode
           ? this.currentLrcIndex <= 0
