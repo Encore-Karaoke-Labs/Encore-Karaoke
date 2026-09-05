@@ -370,9 +370,12 @@ export class FortePlayback {
 
     if (this.audioElement) {
       this.audioElement.pause();
-      this.audioElement.removeAttribute("src");
-      this.audioElement.load();
+      if (!this.audioElementIsExternal) {
+        this.audioElement.removeAttribute("src");
+        this.audioElement.load();
+      }
       this.audioElement = null;
+      this.audioElementIsExternal = false;
     }
     if (this.sourceNode) {
       try {
@@ -429,21 +432,28 @@ export class FortePlayback {
 
     this.pianoRoll.toggleVisibility(false);
 
+    const isMediaElement = url instanceof HTMLMediaElement;
+    const urlString = isMediaElement
+      ? url.currentSrc || url.src || ""
+      : String(url || "");
+    const lowerUrl = urlString.toLowerCase();
+
     const isMidi =
-      url.toLowerCase().endsWith(".mid") ||
-      url.toLowerCase().endsWith(".midi") ||
-      url.toLowerCase().endsWith(".kar");
+      !isMediaElement &&
+      (lowerUrl.endsWith(".mid") ||
+        lowerUrl.endsWith(".midi") ||
+        lowerUrl.endsWith(".kar"));
     this.state.playback.isMidi = isMidi;
 
-    const isPlatinum = url.toLowerCase().endsWith(".xtsp.mid");
+    const isPlatinum = !isMediaElement && lowerUrl.endsWith(".xtsp.mid");
     this.state.playback.isPlatinum = isPlatinum;
 
-    if (!isMidi && url.toLowerCase().includes(".multiplexed.")) {
+    if (!isMidi && lowerUrl.includes(".multiplexed.")) {
       this.state.playback.isMultiplexed = true;
     }
 
     logVerbose("Preparing to load track", {
-      url,
+      url: urlString,
       isMidi,
       isMultiplexed: this.state.playback.isMultiplexed,
       isPlatinum,
@@ -1112,16 +1122,24 @@ export class FortePlayback {
 
         this.state.playback.buffer = null;
       } else {
-        this.audioElement = new Audio(url);
-        this.audioElement.crossOrigin = "anonymous";
-        this.audioElement.preservesPitch = false;
+        const isMediaElement = url instanceof HTMLMediaElement;
 
-        await new Promise((resolve, reject) => {
-          this.audioElement.addEventListener("canplay", resolve, {
-            once: true,
+        if (isMediaElement) {
+          this.audioElement = url;
+          this.audioElementIsExternal = true;
+        } else {
+          this.audioElement = new Audio(url);
+          this.audioElementIsExternal = false;
+          this.audioElement.crossOrigin = "anonymous";
+          this.audioElement.preservesPitch = false;
+
+          await new Promise((resolve, reject) => {
+            this.audioElement.addEventListener("canplay", resolve, {
+              once: true,
+            });
+            this.audioElement.addEventListener("error", reject, { once: true });
           });
-          this.audioElement.addEventListener("error", reject, { once: true });
-        });
+        }
 
         this.sourceNode = this.audioCore.context.createMediaElementSource(
           this.audioElement,
@@ -1129,14 +1147,14 @@ export class FortePlayback {
 
         this.state.playback.buffer = null;
 
-        if (this.state.playback.isMultiplexed) {
+        if (this.state.playback.isMultiplexed && typeof url === "string") {
           this.startStreamingGuideAnalysis(url);
         }
       }
 
       this.state.playback.status = "stopped";
       this.state.playback.pauseTime = 0;
-      logVerbose(`Track loaded: ${url}`);
+      logVerbose(`Track loaded: ${urlString}`);
       this.dispatchUpdate();
       return true;
     } catch (e) {
@@ -1532,8 +1550,10 @@ export class FortePlayback {
         this.synthesizer.sendExternalTranspose(clamped);
       }
     } else if (!this.state.playback.isMidi && this.audioElement) {
-      this.audioElement.playbackRate = Math.pow(2, clamped / 12);
-      this.audioElement.preservesPitch = false;
+      if (!this.audioElementIsExternal) {
+        this.audioElement.playbackRate = Math.pow(2, clamped / 12);
+        this.audioElement.preservesPitch = false;
+      }
     }
 
     if (this.state.playback.hasChorus && this.state.effects.chorusPitchNode) {

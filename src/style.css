@@ -3146,7 +3146,8 @@ p + .flex-list button {
 }
 
 .mode-player-youtube .player-ui,
-.mode-player-cdg .player-ui {
+.mode-player-cdg .player-ui,
+.mode-player-no-lyrics .player-ui {
   background: transparent;
 }
 

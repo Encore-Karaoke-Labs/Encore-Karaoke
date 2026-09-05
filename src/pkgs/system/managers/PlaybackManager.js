@@ -215,6 +215,15 @@ export default class PlaybackManager {
       this.ctx.wrapper.classOn("mode-player-cdg");
     }
 
+    const isMvWithoutLyrics = state.currentSongIsMV && !song.lrcPath;
+
+    if (isMvWithoutLyrics) {
+      this.ctx.wrapper.classOn("mode-player-no-lyrics");
+      dom.lyricsCanvas.classOn("hidden");
+    } else if (!state.currentSongIsYouTube) {
+      dom.lyricsCanvas.classOff("hidden");
+    }
+
     if (!state.isSessionActive) {
       window.desktopIntegration.ipc.send("setRPC", {
         details: song.title,
@@ -283,9 +292,15 @@ export default class PlaybackManager {
       this.mvPlayer = null;
       dom.lyricsCanvas.styleJs({ opacity: "0" }).classOff("hidden");
 
+      const isStandaloneMV =
+        state.currentSongIsMV && song.path === song.videoPath;
+
       if (state.currentSongIsMV) {
         const videoUrl = await NetworkingUtility.getFileLink(song.videoPath);
-        this.mvPlayer = await modules.bgv.playSingleVideo(videoUrl.href);
+        this.mvPlayer = await modules.bgv.playSingleVideo(
+          videoUrl.href,
+          !isStandaloneMV,
+        );
 
         this.mvPlayer.onerror = (e) => {
           if (
@@ -302,14 +317,17 @@ export default class PlaybackManager {
       dom.ytContainer.classOn("hidden");
       dom.ytIframe.attr({ src: "" });
 
-      console.log("SONg", song);
-
-      const trackUrl = await NetworkingUtility.getFileLink(song.path);
       let chorusUrl = null;
       if (song.chorusPath) {
         chorusUrl = (await NetworkingUtility.getFileLink(song.chorusPath)).href;
       }
-      await Forte.loadTrack(trackUrl.href, chorusUrl);
+
+      if (isStandaloneMV && this.mvPlayer) {
+        await Forte.loadTrack(this.mvPlayer, chorusUrl);
+      } else {
+        const trackUrl = await NetworkingUtility.getFileLink(song.path);
+        await Forte.loadTrack(trackUrl.href, chorusUrl);
+      }
 
       const pbState = Forte.getPlaybackState();
       state.currentSongIsMultiplexed = pbState.isMultiplexed;
@@ -459,7 +477,10 @@ export default class PlaybackManager {
         }
         dom.introCard.classOff("visible");
         dom.lyricsCanvas.styleJs({ opacity: "1" });
-        if (this.mvPlayer) this.mvPlayer.play().catch(console.error);
+
+        if (this.mvPlayer && !isStandaloneMV) {
+          this.mvPlayer.play().catch(console.error);
+        }
         Forte.playTrack();
         state.isTransitioning = false;
         if (state.pendingLyricCustomizerOpen) {
@@ -522,6 +543,7 @@ export default class PlaybackManager {
 
     this.ctx.wrapper.classOff("mode-player-cdg");
     this.ctx.wrapper.classOff("mode-player-youtube");
+    this.ctx.wrapper.classOff("mode-player-no-lyrics");
 
     modules.recorder.clearSongInfo();
     if (this.ctx.root.games)

@@ -594,7 +594,7 @@ export class BGVModule {
    * @param {string} url - The video URL to play
    * @returns {Promise<HTMLVideoElement>} The video element
    */
-  async playSingleVideo(url) {
+  async playSingleVideo(url, isMuted = true) {
     this.isManualMode = true;
     if (this.videoElement) this.videoElement.onended = null;
 
@@ -615,12 +615,12 @@ export class BGVModule {
     }, 500);
 
     const v = document.createElement("video");
-    v.muted = true;
+    v.muted = isMuted;
     v.autoplay = false;
     v.playsInline = true;
-    v.defaultMuted = true;
+    v.defaultMuted = isMuted;
     v.preload = "auto";
-    v.volume = 0;
+    v.volume = isMuted ? 0 : 1;
 
     Object.assign(v.style, this.videoElementStyles);
 
@@ -628,7 +628,10 @@ export class BGVModule {
       v.style.display = "";
     }
 
-    v.addEventListener("volumechange", () => (v.volume = 0));
+    if (isMuted) {
+      v.addEventListener("volumechange", () => (v.volume = 0));
+    }
+
     this.activeManualPlayer = v;
 
     v.src = url;

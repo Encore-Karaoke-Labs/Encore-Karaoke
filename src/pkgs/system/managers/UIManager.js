@@ -373,15 +373,15 @@ export default class UIManager {
       .appendTo(dom.interludeOverlay);
 
     // Player Bottom Section
-    const bottom = new Html("div")
+    dom.playerBottomSection = new Html("div")
       .classOn("player-bottom-section")
       .appendTo(dom.playerUi);
     dom.countdownDisplay = new Html("div")
       .classOn("countdown-display")
-      .appendTo(bottom);
+      .appendTo(dom.playerBottomSection);
     dom.lyricsCanvas = new Html("canvas")
       .classOn("lyrics-render-surface")
-      .appendTo(bottom);
+      .appendTo(dom.playerBottomSection);
     dom.danmakuCanvas = new Html("canvas")
       .classOn("danmaku-surface")
       .appendTo(wrapper);

@@ -1048,7 +1048,20 @@ export default class InputManager {
       state.highlightedIndex = newIdx;
       this.ctx.root.ui.updateMenuUI();
     } else if (state.mode === "player") {
-      if (state.currentSongIsYouTube) return;
+      if (state.currentSongIsYouTube || state.currentSongIsMV) {
+        this.ctx.modules.infoBar.showTemp(
+          "TRANSPOSE",
+          "Not available for this format.",
+          3000,
+        );
+        if (typeof this.ctx.modules.dialog === "function") {
+          this.ctx.modules.dialog(
+            new Html("div").classOn("temp-dialog-text").text("NOT AVAILABLE"),
+            2000,
+          );
+        }
+        return;
+      }
       const change = dir === "up" ? 1 : -1;
       const cur = this.ctx.services.Forte.getPlaybackState().transpose || 0;
       const next = Math.max(-24, Math.min(24, cur + change));
