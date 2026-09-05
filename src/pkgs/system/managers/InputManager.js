@@ -382,6 +382,20 @@ export default class InputManager {
       !state.isSearchOverlayVisible
     ) {
       e.preventDefault();
+      if (state.currentSongIsStandaloneVideo) {
+        modules.infoBar.showTemp(
+          "LYRICS",
+          "Not available for this format.",
+          3000,
+        );
+        if (typeof modules.dialog === "function") {
+          modules.dialog(
+            new Html("div").classOn("temp-dialog-text").text("NOT AVAILABLE"),
+            2000,
+          );
+        }
+        return;
+      }
       this.ctx.root.ui.toggleLyricCustomizer(true);
       return;
     }
