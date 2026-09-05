@@ -61,12 +61,15 @@ class EncoreController {
       volume: config.audioConfig?.mix?.instrumental?.volume ?? 1,
       videoSyncOffset: config.videoConfig?.syncOffset || 0,
 
+      systemFonts: ["Radio Canada"],
       lyricFontFamily: config.videoConfig?.lyricFontFamily || "Radio Canada",
       lyricFontSizeScale: config.videoConfig?.lyricFontSizeScale ?? 1.0,
       lyricLineGapScale: config.videoConfig?.lyricLineGapScale ?? 1.0,
       lyricBottomMargin: config.videoConfig?.lyricBottomMargin ?? 0,
       isLyricCustomizerVisible: false,
       lyricCustomizerIndex: 0,
+      lyricCustomizerView: "main",
+      lyricCustomizerFontIndex: 0,
 
       isTransitioning: false,
       isTypingNumber: false,
@@ -289,6 +292,20 @@ class EncoreController {
 
     const savedChain = this.config.audioConfig?.vocalChain || [];
     await this.services.Forte.loadVocalChain(savedChain);
+
+    this.state.systemFonts = ["Radio Canada"];
+    try {
+      if ("queryLocalFonts" in window) {
+        const fonts = await window.queryLocalFonts();
+        const uniqueFonts = [...new Set(fonts.map((f) => f.family))].sort();
+        this.state.systemFonts = [
+          "Radio Canada",
+          ...uniqueFonts.filter((f) => f !== "Radio Canada"),
+        ];
+      }
+    } catch (e) {
+      console.warn("[EncoreHome] Could not query local fonts:", e);
+    }
 
     this.ui.buildAll();
 

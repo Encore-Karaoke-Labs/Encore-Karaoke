@@ -1499,7 +1499,7 @@ export default class UIManager {
       .classOn("lyric-customizer-header")
       .appendTo(win);
 
-    new Html("div")
+    dom.lyricCustomizerTitle = new Html("div")
       .classOn("lyric-customizer-title")
       .text("LYRIC DISPLAY SETTINGS")
       .appendTo(header);
@@ -1508,7 +1508,14 @@ export default class UIManager {
       .classOn("lyric-customizer-close")
       .html('<ion-icon name="close"></ion-icon>')
       .appendTo(header)
-      .on("click", () => this.toggleLyricCustomizer(false));
+      .on("click", () => {
+        if (this.ctx.state.lyricCustomizerView === "fonts") {
+          this.ctx.state.lyricCustomizerView = "main";
+          this.renderLyricCustomizer();
+        } else {
+          this.toggleLyricCustomizer(false);
+        }
+      });
 
     dom.lyricCustomizerBody = new Html("div")
       .classOn("lyric-customizer-body")
@@ -1518,7 +1525,7 @@ export default class UIManager {
       .classOn("lyric-customizer-footer")
       .appendTo(win);
 
-    new Html("p")
+    dom.lyricCustomizerFooterText = new Html("p")
       .html(
         "▲ / ▼: Select | ◀ / ▶: Adjust | <kbd>L</kbd> / <kbd>ESC</kbd>: Close",
       )
@@ -1543,8 +1550,10 @@ export default class UIManager {
 
     if (shouldShow) {
       wrapper.classOn("lyric-customizer-active");
+      state.lyricCustomizerView = "main";
       this.renderLyricCustomizer();
     } else {
+      state.lyricCustomizerView = "main";
       wrapper.classOff("lyric-customizer-active");
     }
   }
@@ -1554,14 +1563,37 @@ export default class UIManager {
     const state = this.ctx.state;
     if (!dom.lyricCustomizerBody) return;
 
+    if (state.lyricCustomizerView === "fonts") {
+      this.renderLyricFontPicker();
+      return;
+    }
+
+    if (dom.lyricCustomizerTitle) {
+      dom.lyricCustomizerTitle.text("LYRIC DISPLAY SETTINGS");
+    }
+    if (dom.lyricCustomizerFooterText) {
+      dom.lyricCustomizerFooterText.html(
+        "▲ / ▼: Select | ◀ / ▶: Adjust | ENTER: Open | <kbd>L</kbd> / <kbd>ESC</kbd>: Close",
+      );
+    }
+
     dom.lyricCustomizerBody.clear();
 
+    const currentFont = state.lyricFontFamily || "Radio Canada";
     const currentMargin = Number(state.lyricBottomMargin) || 0;
     const activeIdx = Number(state.lyricCustomizerIndex) || 0;
 
     const options = [
       {
+        id: "fontFamily",
+        type: "action",
+        label: "Font Family",
+        value: currentFont,
+        display: currentFont,
+      },
+      {
         id: "fontSize",
+        type: "range",
         label: "Lyric Font Size",
         min: 0.7,
         max: 1.5,
@@ -1570,6 +1602,7 @@ export default class UIManager {
       },
       {
         id: "lineGap",
+        type: "range",
         label: "Line Spacing",
         min: 0.5,
         max: 2.0,
@@ -1578,6 +1611,7 @@ export default class UIManager {
       },
       {
         id: "bottomMargin",
+        type: "range",
         label: "Bottom Margin",
         min: -150,
         max: 150,
@@ -1594,11 +1628,6 @@ export default class UIManager {
 
       if (isFocused) row.classOn("active");
 
-      row.on("click", () => {
-        state.lyricCustomizerIndex = idx;
-        this.renderLyricCustomizer();
-      });
-
       new Html("div")
         .classOn("lyric-customizer-label")
         .text(opt.label)
@@ -1608,55 +1637,37 @@ export default class UIManager {
         .classOn("lyric-customizer-value-area")
         .appendTo(row);
 
-      const pct = Math.max(
-        0,
-        Math.min(100, ((opt.value - opt.min) / (opt.max - opt.min)) * 100),
-      );
+      if (opt.id === "fontFamily") {
+        row.on("click", () => {
+          state.lyricCustomizerIndex = idx;
+          this.openLyricFontPicker();
+        });
 
-      valArea.html(`
-        <span class="customizer-arrow">◀</span>
-        <div class="setup-slider-bar">
-          <div class="setup-slider-fill" style="width: ${pct}%"></div>
-        </div>
-        <span class="customizer-val-text">${opt.display}</span>
-        <span class="customizer-arrow">▶</span>
-      `);
+        valArea.html(`
+          <span class="customizer-val-text select-text" style="flex: 1; text-align: right; font-family: '${opt.value}', 'Rajdhani', sans-serif;">${opt.display}</span>
+          <span style="opacity: 0.5; font-size: 0.85em; margin-left: 6px; color: #89cff0;">↵</span>
+        `);
+      } else {
+        row.on("click", () => {
+          state.lyricCustomizerIndex = idx;
+          this.renderLyricCustomizer();
+        });
+
+        const pct = Math.max(
+          0,
+          Math.min(100, ((opt.value - opt.min) / (opt.max - opt.min)) * 100),
+        );
+
+        valArea.html(`
+          <span class="customizer-arrow">◀</span>
+          <div class="setup-slider-bar">
+            <div class="setup-slider-fill" style="width: ${pct}%"></div>
+          </div>
+          <span class="customizer-val-text">${opt.display}</span>
+          <span class="customizer-arrow">▶</span>
+        `);
+      }
     });
-  }
-
-  adjustLyricCustomizer(dir) {
-    const state = this.ctx.state;
-    const activeIdx = state.lyricCustomizerIndex || 0;
-    this.ctx.config.videoConfig ??= {};
-
-    if (activeIdx === 0) {
-      let nextScale =
-        Math.round((state.lyricFontSizeScale + dir * 0.05) * 100) / 100;
-      nextScale = Math.max(0.7, Math.min(1.5, nextScale));
-      state.lyricFontSizeScale = nextScale;
-      this.ctx.config.videoConfig.lyricFontSizeScale = nextScale;
-      window.config?.setItem?.("videoConfig.lyricFontSizeScale", nextScale);
-    } else if (activeIdx === 1) {
-      let nextGap =
-        Math.round((state.lyricLineGapScale + dir * 0.1) * 100) / 100;
-      nextGap = Math.max(0.5, Math.min(2.0, nextGap));
-      state.lyricLineGapScale = nextGap;
-      this.ctx.config.videoConfig.lyricLineGapScale = nextGap;
-      window.config?.setItem?.("videoConfig.lyricLineGapScale", nextGap);
-    } else if (activeIdx === 2) {
-      let nextMargin = state.lyricBottomMargin + dir * 10;
-      nextMargin = Math.max(-150, Math.min(150, nextMargin));
-      state.lyricBottomMargin = nextMargin;
-      this.ctx.config.videoConfig.lyricBottomMargin = nextMargin;
-      window.config?.setItem?.("videoConfig.lyricBottomMargin", nextMargin);
-    }
-
-    const lyricsEngine = this.ctx.root.lyrics || this.ctx.modules.lyrics;
-    if (lyricsEngine) {
-      lyricsEngine.updateLiveMetrics();
-    }
-
-    this.renderLyricCustomizer();
   }
 
   adjustLyricCustomizer(dir) {
@@ -1665,20 +1676,23 @@ export default class UIManager {
     this.ctx.config.videoConfig ??= {};
 
     if (activeIdx === 0) {
+      this.openLyricFontPicker();
+      return;
+    } else if (activeIdx === 1) {
       let currentScale = Number(state.lyricFontSizeScale) || 1.0;
       let nextScale = Math.round((currentScale + dir * 0.05) * 100) / 100;
       nextScale = Math.max(0.7, Math.min(1.5, nextScale));
       state.lyricFontSizeScale = nextScale;
       this.ctx.config.videoConfig.lyricFontSizeScale = nextScale;
       window.config?.setItem?.("videoConfig.lyricFontSizeScale", nextScale);
-    } else if (activeIdx === 1) {
+    } else if (activeIdx === 2) {
       let currentGap = Number(state.lyricLineGapScale) || 1.0;
       let nextGap = Math.round((currentGap + dir * 0.1) * 100) / 100;
       nextGap = Math.max(0.5, Math.min(2.0, nextGap));
       state.lyricLineGapScale = nextGap;
       this.ctx.config.videoConfig.lyricLineGapScale = nextGap;
       window.config?.setItem?.("videoConfig.lyricLineGapScale", nextGap);
-    } else if (activeIdx === 2) {
+    } else if (activeIdx === 3) {
       let currentMargin = Number(state.lyricBottomMargin);
       if (isNaN(currentMargin)) currentMargin = 0;
       let nextMargin = currentMargin + dir * 10;
@@ -1694,6 +1708,194 @@ export default class UIManager {
     }
 
     this.renderLyricCustomizer();
+  }
+
+  openLyricFontPicker() {
+    const state = this.ctx.state;
+    const fonts = state.systemFonts || ["Radio Canada"];
+    const current = state.lyricFontFamily || "Radio Canada";
+    let idx = fonts.indexOf(current);
+    if (idx === -1) idx = 0;
+
+    state.lyricCustomizerFontIndex = idx;
+    state.lyricCustomizerView = "fonts";
+    this.renderLyricCustomizer();
+  }
+
+  selectLyricFont(fontName) {
+    const state = this.ctx.state;
+    state.lyricFontFamily = fontName;
+    this.ctx.config.videoConfig ??= {};
+    this.ctx.config.videoConfig.lyricFontFamily = fontName;
+    window.config?.setItem?.("videoConfig.lyricFontFamily", fontName);
+
+    const lyricsEngine = this.ctx.root.lyrics || this.ctx.modules.lyrics;
+    if (lyricsEngine) {
+      lyricsEngine.updateLiveMetrics();
+    }
+
+    state.lyricCustomizerView = "main";
+    this.renderLyricCustomizer();
+  }
+
+  navigateLyricFontPicker(dir) {
+    const state = this.ctx.state;
+    const fonts = state.systemFonts || ["Radio Canada"];
+    const total = fonts.length;
+    const nextIdx = Math.max(
+      0,
+      Math.min(total - 1, (state.lyricCustomizerFontIndex || 0) + dir),
+    );
+
+    if (nextIdx !== state.lyricCustomizerFontIndex) {
+      state.lyricCustomizerFontIndex = nextIdx;
+      if (this._lyricFontListEl) {
+        const ITEM_HEIGHT = 48;
+        const scrollY = this._lyricFontListEl.scrollTop;
+        const viewportH = this._lyricFontListEl.clientHeight;
+        const itemTop = nextIdx * ITEM_HEIGHT;
+        const itemBottom = itemTop + ITEM_HEIGHT;
+
+        if (itemTop < scrollY) {
+          this._lyricFontListEl.scrollTop = itemTop;
+        } else if (itemBottom > scrollY + viewportH) {
+          this._lyricFontListEl.scrollTop = itemBottom - viewportH;
+        } else {
+          this._renderLyricFontItems?.();
+        }
+      }
+    }
+  }
+
+  renderLyricFontPicker() {
+    const dom = this.ctx.dom;
+    const state = this.ctx.state;
+    const fonts = state.systemFonts || ["Radio Canada"];
+    const ITEM_HEIGHT = 48;
+
+    if (dom.lyricCustomizerTitle) {
+      dom.lyricCustomizerTitle.text("SELECT LYRIC FONT");
+    }
+    if (dom.lyricCustomizerFooterText) {
+      dom.lyricCustomizerFooterText.html(
+        "▲ / ▼: Navigate | ENTER: Select | ESC: Back",
+      );
+    }
+
+    dom.lyricCustomizerBody.clear();
+
+    const listContainer = new Html("div")
+      .styleJs({
+        height: "320px",
+        overflowY: "auto",
+        position: "relative",
+        borderRadius: "6px",
+        background: "rgba(0, 0, 0, 0.4)",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+      })
+      .appendTo(dom.lyricCustomizerBody);
+
+    this._lyricFontListEl = listContainer.elm;
+
+    const totalHeight = fonts.length * ITEM_HEIGHT;
+    new Html("div")
+      .styleJs({
+        height: `${totalHeight}px`,
+        width: "100%",
+        position: "absolute",
+        top: "0",
+        left: "0",
+        zIndex: "-1",
+        pointerEvents: "none",
+      })
+      .appendTo(listContainer);
+
+    const renderWindow = new Html("div")
+      .styleJs({ position: "absolute", top: "0", left: "0", width: "100%" })
+      .appendTo(listContainer);
+
+    this._renderLyricFontItems = () => {
+      if (!listContainer.elm) return;
+      const scrollTop = listContainer.elm.scrollTop;
+      const clientH = listContainer.elm.clientHeight || 320;
+
+      const startIdx = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - 2);
+      const endIdx = Math.min(
+        fonts.length,
+        Math.ceil((scrollTop + clientH) / ITEM_HEIGHT) + 2,
+      );
+
+      renderWindow.clear();
+      renderWindow.styleJs({
+        transform: `translateY(${startIdx * ITEM_HEIGHT}px)`,
+      });
+
+      for (let i = startIdx; i < endIdx; i++) {
+        const fontName = fonts[i];
+        const isActive = i === state.lyricCustomizerFontIndex;
+        const isCurrentActiveFont = fontName === state.lyricFontFamily;
+
+        const row = new Html("div")
+          .styleJs({
+            height: `${ITEM_HEIGHT}px`,
+            padding: "0 1.25rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+            boxSizing: "border-box",
+            cursor: "pointer",
+            background: isActive ? "rgba(137, 207, 240, 0.18)" : "transparent",
+            borderLeft: isActive
+              ? "4px solid #89cff0"
+              : "4px solid transparent",
+          })
+          .on("click", () => this.selectLyricFont(fontName))
+          .appendTo(renderWindow);
+
+        new Html("span")
+          .styleJs({
+            fontFamily: `"${fontName}", "Rajdhani", sans-serif`,
+            fontSize: "1.3rem",
+            fontWeight: isActive || isCurrentActiveFont ? "700" : "500",
+            color: isActive
+              ? "#89cff0"
+              : isCurrentActiveFont
+                ? "#ffd700"
+                : "rgba(255, 255, 255, 0.85)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            maxWidth: "460px",
+          })
+          .text(fontName)
+          .appendTo(row);
+
+        if (isCurrentActiveFont) {
+          new Html("span")
+            .styleJs({
+              fontSize: "1.1rem",
+              color: "#ffd700",
+              fontWeight: "bold",
+            })
+            .text("ACTIVE")
+            .appendTo(row);
+        }
+      }
+    };
+
+    listContainer.on("scroll", this._renderLyricFontItems);
+
+    requestAnimationFrame(() => {
+      if (this._lyricFontListEl) {
+        const targetScroll =
+          (state.lyricCustomizerFontIndex || 0) * ITEM_HEIGHT -
+          this._lyricFontListEl.clientHeight / 2 +
+          ITEM_HEIGHT / 2;
+        this._lyricFontListEl.scrollTop = Math.max(0, targetScroll);
+        this._renderLyricFontItems();
+      }
+    });
   }
 
   startBumperCycle() {

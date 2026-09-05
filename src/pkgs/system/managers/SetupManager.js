@@ -192,19 +192,7 @@ export default class SetupManager {
           await this.ctx.services.Forte.getMidiOutputDevices();
       }
 
-      this.systemFonts = ["Radio Canada"];
-      try {
-        if ("queryLocalFonts" in window) {
-          const fonts = await window.queryLocalFonts();
-          const uniqueFonts = [...new Set(fonts.map((f) => f.family))].sort();
-          this.systemFonts = [
-            "Radio Canada",
-            ...uniqueFonts.filter((f) => f !== "Radio Canada"),
-          ];
-        }
-      } catch (e) {
-        console.warn("Could not load local fonts:", e);
-      }
+      this.systemFonts = this.ctx.state.systemFonts || ["Radio Canada"];
 
       this.updateServers =
         await window.desktopIntegration.ipc.invoke("get-update-servers");

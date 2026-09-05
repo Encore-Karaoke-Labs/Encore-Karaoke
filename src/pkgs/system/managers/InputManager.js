@@ -287,10 +287,55 @@ export default class InputManager {
     }
 
     if (this.ctx.state.isLyricCustomizerVisible) {
+      if (this.ctx.state.lyricCustomizerView === "fonts") {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          this.ctx.state.lyricCustomizerView = "main";
+          this.ctx.root.ui.renderLyricCustomizer();
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const fonts = this.ctx.state.systemFonts || ["Radio Canada"];
+          const chosenFont =
+            fonts[this.ctx.state.lyricCustomizerFontIndex || 0];
+          this.ctx.root.ui.selectLyricFont(chosenFont);
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          this.ctx.root.ui.navigateLyricFontPicker(-1);
+          return;
+        }
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          this.ctx.root.ui.navigateLyricFontPicker(1);
+          return;
+        }
+        if (e.key === "PageUp") {
+          e.preventDefault();
+          this.ctx.root.ui.navigateLyricFontPicker(-6);
+          return;
+        }
+        if (e.key === "PageDown") {
+          e.preventDefault();
+          this.ctx.root.ui.navigateLyricFontPicker(6);
+          return;
+        }
+        return;
+      }
+
       if (e.key === "Escape" || e.key === "l" || e.key === "L") {
         e.preventDefault();
         this.ctx.root.ui.toggleLyricCustomizer(false);
         return;
+      }
+      if (e.key === "Enter") {
+        if (Number(this.ctx.state.lyricCustomizerIndex) === 0) {
+          e.preventDefault();
+          this.ctx.root.ui.openLyricFontPicker();
+          return;
+        }
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
@@ -302,7 +347,7 @@ export default class InputManager {
       if (e.key === "ArrowDown") {
         e.preventDefault();
         const curIdx = Number(this.ctx.state.lyricCustomizerIndex) || 0;
-        this.ctx.state.lyricCustomizerIndex = Math.min(2, curIdx + 1);
+        this.ctx.state.lyricCustomizerIndex = Math.min(3, curIdx + 1);
         this.ctx.root.ui.renderLyricCustomizer();
         return;
       }
