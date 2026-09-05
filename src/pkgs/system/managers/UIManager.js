@@ -1,5 +1,22 @@
 import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
+import { COLOR_PALETTES } from "./LyricsEngine.js";
+
+const LYRIC_ROLES = [
+  { id: "default", label: "Solo / Main", defaultColor: "white" },
+  { id: "m", label: "Male 1 (M1)", defaultColor: "blue" },
+  { id: "f", label: "Female 1 (F1)", defaultColor: "yellow" },
+  { id: "m2", label: "Male 2 (M2)", defaultColor: "red" },
+  { id: "f2", label: "Female 2 (F2)", defaultColor: "green" },
+  { id: "a", label: "Duet / All", defaultColor: "orange" },
+];
+
+const COLOR_SWATCHES = Object.keys(COLOR_PALETTES).map((key) => ({
+  id: key,
+  label: COLOR_PALETTES[key].label,
+  hex: COLOR_PALETTES[key].main,
+  stroke: COLOR_PALETTES[key].stroke,
+}));
 
 export default class UIManager {
   /**
@@ -1491,13 +1508,13 @@ export default class UIManager {
       .classOn("lyric-customizer-overlay")
       .appendTo(this.ctx.wrapper);
 
-    const win = new Html("div")
+    dom.lyricCustomizerWindow = new Html("div")
       .classOn("lyric-customizer-window")
       .appendTo(dom.lyricCustomizer);
 
     const header = new Html("div")
       .classOn("lyric-customizer-header")
-      .appendTo(win);
+      .appendTo(dom.lyricCustomizerWindow);
 
     dom.lyricCustomizerTitle = new Html("div")
       .classOn("lyric-customizer-title")
@@ -1509,7 +1526,10 @@ export default class UIManager {
       .html('<ion-icon name="close"></ion-icon>')
       .appendTo(header)
       .on("click", () => {
-        if (this.ctx.state.lyricCustomizerView === "fonts") {
+        if (
+          this.ctx.state.lyricCustomizerView === "fonts" ||
+          this.ctx.state.lyricCustomizerView === "colors"
+        ) {
           this.ctx.state.lyricCustomizerView = "main";
           this.renderLyricCustomizer();
         } else {
@@ -1519,11 +1539,11 @@ export default class UIManager {
 
     dom.lyricCustomizerBody = new Html("div")
       .classOn("lyric-customizer-body")
-      .appendTo(win);
+      .appendTo(dom.lyricCustomizerWindow);
 
     const footer = new Html("div")
       .classOn("lyric-customizer-footer")
-      .appendTo(win);
+      .appendTo(dom.lyricCustomizerWindow);
 
     dom.lyricCustomizerFooterText = new Html("p")
       .html(
@@ -1564,13 +1584,23 @@ export default class UIManager {
     if (!dom.lyricCustomizerBody) return;
 
     if (state.lyricCustomizerView === "fonts") {
+      if (dom.lyricCustomizerWindow)
+        dom.lyricCustomizerWindow.styleJs({ width: "580px" });
       this.renderLyricFontPicker();
       return;
     }
 
-    if (dom.lyricCustomizerTitle) {
-      dom.lyricCustomizerTitle.text("LYRIC DISPLAY SETTINGS");
+    if (state.lyricCustomizerView === "colors") {
+      if (dom.lyricCustomizerWindow)
+        dom.lyricCustomizerWindow.styleJs({ width: "660px" });
+      this.renderLyricColorPicker();
+      return;
     }
+
+    if (dom.lyricCustomizerWindow)
+      dom.lyricCustomizerWindow.styleJs({ width: "580px" });
+    if (dom.lyricCustomizerTitle)
+      dom.lyricCustomizerTitle.text("LYRIC DISPLAY SETTINGS");
     if (dom.lyricCustomizerFooterText) {
       dom.lyricCustomizerFooterText.html(
         "▲ / ▼: Select | ◀ / ▶: Adjust | ENTER: Open | <kbd>L</kbd> / <kbd>ESC</kbd>: Close",
@@ -1582,6 +1612,7 @@ export default class UIManager {
     const currentFont = state.lyricFontFamily || "Radio Canada";
     const currentMargin = Number(state.lyricBottomMargin) || 0;
     const activeIdx = Number(state.lyricCustomizerIndex) || 0;
+    const savedColors = this.ctx.config.videoConfig?.lyricColors || {};
 
     const options = [
       {
@@ -1590,6 +1621,13 @@ export default class UIManager {
         label: "Font Family",
         value: currentFont,
         display: currentFont,
+      },
+      {
+        id: "colors",
+        type: "action",
+        label: "Lyric Colors",
+        value: "colors",
+        display: "Palette",
       },
       {
         id: "fontSize",
@@ -1647,6 +1685,27 @@ export default class UIManager {
           <span class="customizer-val-text select-text" style="flex: 1; text-align: right; font-family: '${opt.value}', 'Rajdhani', sans-serif;">${opt.display}</span>
           <span style="opacity: 0.5; font-size: 0.85em; margin-left: 6px; color: #89cff0;">↵</span>
         `);
+      } else if (opt.id === "colors") {
+        row.on("click", () => {
+          state.lyricCustomizerIndex = idx;
+          this.openLyricColorPicker();
+        });
+
+        const previewDots = ["default", "m", "f"]
+          .map((roleId) => {
+            const cKey =
+              savedColors[roleId] ||
+              (roleId === "m" ? "blue" : roleId === "f" ? "yellow" : "white");
+            const hex = COLOR_PALETTES[cKey]?.main || "#ffffff";
+            return `<span style="width: 12px; height: 12px; border-radius: 50%; background: ${hex}; display: inline-block; box-shadow: 0 0 5px ${hex}88;"></span>`;
+          })
+          .join("");
+
+        valArea.html(`
+          <div style="display: flex; align-items: center; gap: 6px; margin-right: 8px;">${previewDots}</div>
+          <span class="customizer-val-text" style="color: #89cff0;">Palette</span>
+          <span style="opacity: 0.5; font-size: 0.85em; margin-left: 6px; color: #89cff0;">↵</span>
+        `);
       } else {
         row.on("click", () => {
           state.lyricCustomizerIndex = idx;
@@ -1679,20 +1738,23 @@ export default class UIManager {
       this.openLyricFontPicker();
       return;
     } else if (activeIdx === 1) {
+      this.openLyricColorPicker();
+      return;
+    } else if (activeIdx === 2) {
       let currentScale = Number(state.lyricFontSizeScale) || 1.0;
       let nextScale = Math.round((currentScale + dir * 0.05) * 100) / 100;
       nextScale = Math.max(0.7, Math.min(1.5, nextScale));
       state.lyricFontSizeScale = nextScale;
       this.ctx.config.videoConfig.lyricFontSizeScale = nextScale;
       window.config?.setItem?.("videoConfig.lyricFontSizeScale", nextScale);
-    } else if (activeIdx === 2) {
+    } else if (activeIdx === 3) {
       let currentGap = Number(state.lyricLineGapScale) || 1.0;
       let nextGap = Math.round((currentGap + dir * 0.1) * 100) / 100;
       nextGap = Math.max(0.5, Math.min(2.0, nextGap));
       state.lyricLineGapScale = nextGap;
       this.ctx.config.videoConfig.lyricLineGapScale = nextGap;
       window.config?.setItem?.("videoConfig.lyricLineGapScale", nextGap);
-    } else if (activeIdx === 3) {
+    } else if (activeIdx === 4) {
       let currentMargin = Number(state.lyricBottomMargin);
       if (isNaN(currentMargin)) currentMargin = 0;
       let nextMargin = currentMargin + dir * 10;
@@ -1765,6 +1827,403 @@ export default class UIManager {
         }
       }
     }
+  }
+
+  openLyricColorPicker() {
+    const state = this.ctx.state;
+    state.colorRoleIdx = state.colorRoleIdx || 0;
+    state.colorSection = "roles";
+
+    const activeRole = LYRIC_ROLES[state.colorRoleIdx];
+    const currentColorKey =
+      this.ctx.config.videoConfig?.lyricColors?.[activeRole.id] ||
+      activeRole.defaultColor;
+
+    state.colorSwatchIdx = Math.max(
+      0,
+      COLOR_SWATCHES.findIndex((s) => s.id === currentColorKey),
+    );
+
+    state.lyricCustomizerView = "colors";
+    this.renderLyricCustomizer();
+  }
+
+  applyLyricColor(roleId, swatchId) {
+    this.ctx.config.videoConfig ??= {};
+    this.ctx.config.videoConfig.lyricColors ??= {};
+    this.ctx.config.videoConfig.lyricColors[roleId] = swatchId;
+    window.config?.setItem?.(`videoConfig.lyricColors.${roleId}`, swatchId);
+
+    const lyricsEngine = this.ctx.root.lyrics || this.ctx.modules.lyrics;
+    if (lyricsEngine) {
+      lyricsEngine.requestCanvasCacheUpdate = true;
+      lyricsEngine.updateLiveMetrics();
+    }
+
+    this.renderLyricCustomizer();
+  }
+
+  resetLyricColors() {
+    this.ctx.config.videoConfig ??= {};
+    this.ctx.config.videoConfig.lyricColors = {
+      default: "white",
+      m: "blue",
+      f: "yellow",
+      m2: "red",
+      f2: "green",
+      a: "orange",
+    };
+    window.config?.setItem?.(
+      "videoConfig.lyricColors",
+      this.ctx.config.videoConfig.lyricColors,
+    );
+
+    const lyricsEngine = this.ctx.root.lyrics || this.ctx.modules.lyrics;
+    if (lyricsEngine) {
+      lyricsEngine.requestCanvasCacheUpdate = true;
+      lyricsEngine.updateLiveMetrics();
+    }
+
+    this.renderLyricCustomizer();
+  }
+
+  handleLyricColorNav(key) {
+    const state = this.ctx.state;
+    const section = state.colorSection || "roles";
+    const activeRole = LYRIC_ROLES[state.colorRoleIdx || 0];
+
+    if (key === "Escape") {
+      if (section === "swatches" || section === "reset") {
+        state.colorSection = "roles";
+      } else {
+        state.lyricCustomizerView = "main";
+      }
+      this.renderLyricCustomizer();
+      return;
+    }
+
+    if (section === "roles") {
+      if (key === "ArrowUp") {
+        state.colorRoleIdx = Math.max(0, (state.colorRoleIdx || 0) - 1);
+      } else if (key === "ArrowDown") {
+        if ((state.colorRoleIdx || 0) < LYRIC_ROLES.length - 1) {
+          state.colorRoleIdx++;
+        } else {
+          state.colorSection = "reset";
+        }
+      } else if (key === "ArrowRight" || key === "Enter") {
+        state.colorSection = "swatches";
+        const newRole = LYRIC_ROLES[state.colorRoleIdx];
+        const newRoleColor =
+          this.ctx.config.videoConfig?.lyricColors?.[newRole.id] ||
+          newRole.defaultColor;
+        state.colorSwatchIdx = Math.max(
+          0,
+          COLOR_SWATCHES.findIndex((s) => s.id === newRoleColor),
+        );
+      }
+    } else if (section === "swatches") {
+      const total = COLOR_SWATCHES.length;
+      if (key === "ArrowLeft") {
+        if (state.colorSwatchIdx % 2 === 0) {
+          state.colorSection = "roles";
+        } else {
+          state.colorSwatchIdx--;
+        }
+      } else if (key === "ArrowRight") {
+        if (
+          state.colorSwatchIdx % 2 === 0 &&
+          state.colorSwatchIdx + 1 < total
+        ) {
+          state.colorSwatchIdx++;
+        }
+      } else if (key === "ArrowUp") {
+        if (state.colorSwatchIdx >= 2) {
+          state.colorSwatchIdx -= 2;
+        } else {
+          state.colorSection = "roles";
+        }
+      } else if (key === "ArrowDown") {
+        if (state.colorSwatchIdx + 2 < total) {
+          state.colorSwatchIdx += 2;
+        } else {
+          state.colorSection = "reset";
+        }
+      } else if (key === "Enter") {
+        const chosen = COLOR_SWATCHES[state.colorSwatchIdx];
+        this.applyLyricColor(activeRole.id, chosen.id);
+        return;
+      }
+    } else if (section === "reset") {
+      if (key === "ArrowUp") {
+        state.colorSection = "roles";
+        state.colorRoleIdx = LYRIC_ROLES.length - 1;
+      } else if (key === "ArrowRight") {
+        state.colorSection = "swatches";
+        state.colorSwatchIdx = COLOR_SWATCHES.length - 2;
+      } else if (key === "Enter") {
+        this.resetLyricColors();
+        return;
+      }
+    }
+
+    this.renderLyricCustomizer();
+  }
+
+  renderLyricColorPicker() {
+    const dom = this.ctx.dom;
+    const state = this.ctx.state;
+    const activeRoleIdx = state.colorRoleIdx || 0;
+    const activeRole = LYRIC_ROLES[activeRoleIdx];
+    const section = state.colorSection || "roles";
+
+    const savedColors = this.ctx.config.videoConfig?.lyricColors || {};
+    const selectedColorKey =
+      savedColors[activeRole.id] || activeRole.defaultColor;
+
+    if (dom.lyricCustomizerTitle) {
+      dom.lyricCustomizerTitle.text("LYRIC COLOR PALETTE");
+    }
+    if (dom.lyricCustomizerFooterText) {
+      if (section === "roles") {
+        dom.lyricCustomizerFooterText.html(
+          "▲ / ▼: Role | ▶ / ENTER: Swatches | ESC: Back",
+        );
+      } else if (section === "swatches") {
+        dom.lyricCustomizerFooterText.html(
+          "ARROWS: Select | ENTER: Apply | ESC: Roles",
+        );
+      } else {
+        dom.lyricCustomizerFooterText.html(
+          "ENTER: Restore Defaults | ▲ / ▶: Cancel | ESC: Roles",
+        );
+      }
+    }
+
+    dom.lyricCustomizerBody.clear();
+
+    const layout = new Html("div")
+      .styleJs({
+        display: "grid",
+        gridTemplateColumns: "220px 1fr",
+        gap: "1rem",
+        height: "425px",
+      })
+      .appendTo(dom.lyricCustomizerBody);
+
+    const rolesCol = new Html("div")
+      .styleJs({
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.35rem",
+        background: "rgba(0, 0, 0, 0.4)",
+        padding: "0.75rem",
+        borderRadius: "8px",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        boxSizing: "border-box",
+      })
+      .appendTo(layout);
+
+    new Html("div")
+      .styleJs({
+        color: "#89cff0",
+        fontWeight: "bold",
+        fontSize: "1.05rem",
+        letterSpacing: "1px",
+        marginBottom: "0.3rem",
+      })
+      .text("SELECT ROLE")
+      .appendTo(rolesCol);
+
+    LYRIC_ROLES.forEach((role, idx) => {
+      const isFocused = section === "roles" && idx === activeRoleIdx;
+      const isCurrentSelectedRole = idx === activeRoleIdx;
+      const assignedColorKey = savedColors[role.id] || role.defaultColor;
+      const palette = COLOR_PALETTES[assignedColorKey] || COLOR_PALETTES.white;
+
+      const row = new Html("div")
+        .styleJs({
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0.5rem 0.75rem",
+          borderRadius: "6px",
+          boxSizing: "border-box",
+          cursor: "pointer",
+          background: isFocused
+            ? "rgba(137, 207, 240, 0.25)"
+            : isCurrentSelectedRole
+              ? "rgba(255, 255, 255, 0.1)"
+              : "transparent",
+          border: `2px solid ${
+            isFocused
+              ? "#89cff0"
+              : isCurrentSelectedRole
+                ? "rgba(255, 255, 255, 0.2)"
+                : "transparent"
+          }`,
+        })
+        .on("click", () => {
+          state.colorRoleIdx = idx;
+          state.colorSection = "swatches";
+          const newColor = savedColors[role.id] || role.defaultColor;
+          state.colorSwatchIdx = Math.max(
+            0,
+            COLOR_SWATCHES.findIndex((s) => s.id === newColor),
+          );
+          this.renderLyricCustomizer();
+        })
+        .appendTo(rolesCol);
+
+      new Html("span")
+        .styleJs({
+          fontWeight: isCurrentSelectedRole ? "bold" : "600",
+          fontSize: "1rem",
+          color: isFocused ? "#89cff0" : "#ffffff",
+        })
+        .text(role.label)
+        .appendTo(row);
+
+      new Html("div")
+        .styleJs({
+          width: "16px",
+          height: "16px",
+          borderRadius: "50%",
+          backgroundColor: palette.main,
+          border: `2px solid ${palette.stroke}`,
+          boxShadow: `0 0 6px ${palette.main}88`,
+        })
+        .appendTo(row);
+    });
+
+    const isResetFocused = section === "reset";
+    const resetBtn = new Html("div")
+      .styleJs({
+        marginTop: "auto",
+        padding: "0.6rem",
+        borderRadius: "6px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "0.4rem",
+        fontWeight: "bold",
+        fontSize: "0.95rem",
+        cursor: "pointer",
+        flexShrink: "0",
+        boxSizing: "border-box",
+        color: isResetFocused ? "#ffffff" : "#ff7777",
+        background: isResetFocused ? "#ff4444" : "rgba(255, 0, 0, 0.15)",
+        border: `2px solid ${isResetFocused ? "#ffffff" : "#ff4444"}`,
+        boxShadow: isResetFocused ? "0 0 12px rgba(255, 68, 68, 0.5)" : "none",
+      })
+      .on("click", () => this.resetLyricColors())
+      .appendTo(rolesCol);
+
+    new Html("span")
+      .styleJs({ fontSize: "1.1rem", display: "flex", alignItems: "center" })
+      .html('<ion-icon name="refresh-outline"></ion-icon>')
+      .appendTo(resetBtn);
+    new Html("span").text("Restore Defaults").appendTo(resetBtn);
+
+    const rightCol = new Html("div")
+      .styleJs({
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.6rem",
+        background: "rgba(0, 0, 0, 0.4)",
+        padding: "0.75rem 1rem",
+        borderRadius: "8px",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        overflowY: "auto",
+      })
+      .appendTo(layout);
+
+    new Html("div")
+      .styleJs({
+        color: "#89cff0",
+        fontWeight: "bold",
+        fontSize: "1.05rem",
+        letterSpacing: "1px",
+      })
+      .text(`PALETTE: ${activeRole.label.toUpperCase()}`)
+      .appendTo(rightCol);
+
+    const swatchGrid = new Html("div")
+      .styleJs({
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "0.5rem",
+        flex: "1",
+      })
+      .appendTo(rightCol);
+
+    const activeSwatchIdx = state.colorSwatchIdx || 0;
+
+    COLOR_SWATCHES.forEach((swatch, idx) => {
+      const isFocused = section === "swatches" && idx === activeSwatchIdx;
+      const isSelected = swatch.id === selectedColorKey;
+
+      const card = new Html("div")
+        .styleJs({
+          display: "flex",
+          alignItems: "center",
+          padding: "0.5rem 0.8rem",
+          borderRadius: "6px",
+          gap: "0.75rem",
+          boxSizing: "border-box",
+          cursor: "pointer",
+          background: isFocused
+            ? "rgba(255, 255, 255, 0.18)"
+            : isSelected
+              ? "rgba(255, 255, 255, 0.08)"
+              : "rgba(0, 0, 0, 0.4)",
+          border: `2px solid ${
+            isFocused
+              ? "#ffd700"
+              : isSelected
+                ? swatch.hex
+                : "rgba(255, 255, 255, 0.08)"
+          }`,
+          boxShadow: isFocused ? "0 0 10px rgba(255, 215, 0, 0.3)" : "none",
+        })
+        .on("click", () => this.applyLyricColor(activeRole.id, swatch.id))
+        .appendTo(swatchGrid);
+
+      new Html("div")
+        .styleJs({
+          width: "28px",
+          height: "28px",
+          minWidth: "28px",
+          borderRadius: "4px",
+          backgroundColor: swatch.hex,
+          border: `2px solid ${swatch.stroke}`,
+          boxShadow:
+            isFocused || isSelected ? `0 0 8px ${swatch.hex}88` : "none",
+        })
+        .appendTo(card);
+
+      new Html("div")
+        .styleJs({
+          flex: "1",
+          fontSize: "1.05rem",
+          fontWeight: isSelected ? "bold" : "600",
+          color: isSelected ? swatch.hex : "#fff",
+        })
+        .text(swatch.label)
+        .appendTo(card);
+
+      if (isSelected) {
+        new Html("div")
+          .styleJs({
+            fontSize: "1.3rem",
+            color: swatch.hex,
+            display: "flex",
+            alignItems: "center",
+          })
+          .html('<ion-icon name="checkmark-circle"></ion-icon>')
+          .appendTo(card);
+      }
+    });
   }
 
   renderLyricFontPicker() {

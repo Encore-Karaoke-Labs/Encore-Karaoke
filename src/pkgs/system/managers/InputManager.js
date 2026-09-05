@@ -287,6 +287,12 @@ export default class InputManager {
     }
 
     if (this.ctx.state.isLyricCustomizerVisible) {
+      if (this.ctx.state.lyricCustomizerView === "colors") {
+        e.preventDefault();
+        this.ctx.root.ui.handleLyricColorNav(e.key);
+        return;
+      }
+
       if (this.ctx.state.lyricCustomizerView === "fonts") {
         if (e.key === "Escape") {
           e.preventDefault();
@@ -331,9 +337,14 @@ export default class InputManager {
         return;
       }
       if (e.key === "Enter") {
-        if (Number(this.ctx.state.lyricCustomizerIndex) === 0) {
+        const curIdx = Number(this.ctx.state.lyricCustomizerIndex) || 0;
+        if (curIdx === 0) {
           e.preventDefault();
           this.ctx.root.ui.openLyricFontPicker();
+          return;
+        } else if (curIdx === 1) {
+          e.preventDefault();
+          this.ctx.root.ui.openLyricColorPicker();
           return;
         }
       }
@@ -347,7 +358,7 @@ export default class InputManager {
       if (e.key === "ArrowDown") {
         e.preventDefault();
         const curIdx = Number(this.ctx.state.lyricCustomizerIndex) || 0;
-        this.ctx.state.lyricCustomizerIndex = Math.min(3, curIdx + 1);
+        this.ctx.state.lyricCustomizerIndex = Math.min(4, curIdx + 1);
         this.ctx.root.ui.renderLyricCustomizer();
         return;
       }
