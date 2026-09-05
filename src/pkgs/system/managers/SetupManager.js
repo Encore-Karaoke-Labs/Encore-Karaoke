@@ -962,7 +962,8 @@ export default class SetupManager {
                 type: "action",
                 action: () => {
                   this.setupState.lyricPickerInput = "";
-                  this.transitionTo("lyric_picker");
+                  this.setupState.view = "lyric_picker";
+                  this.renderView();
                 },
               },
             ],
@@ -1167,7 +1168,8 @@ export default class SetupManager {
         }
       } else if (e.key === "Escape") {
         this.setupState.lyricPickerInput = "";
-        this.transitionTo("submenu");
+        this.setupState.view = "submenu";
+        this.renderView();
       }
       return;
     }
