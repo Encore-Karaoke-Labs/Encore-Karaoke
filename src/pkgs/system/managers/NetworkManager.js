@@ -420,7 +420,6 @@ export default class NetworkManager {
           input.handleChorusToggle();
           break;
         case "pan_left":
-        case "pan_left":
           input.handlePan("left");
           break;
         case "pan_right":
