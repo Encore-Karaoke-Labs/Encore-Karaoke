@@ -272,10 +272,12 @@ export default class PlaybackManager {
       }
 
       dom.lyricsCanvas.classOn("hidden");
-      dom.formatIndicator.styleJs({
-        backgroundImage: 'url("/assets/img/icons/yt.png")',
-        opacity: "1",
-      });
+      if (this.ctx.config.displayFormatIndicator !== false) {
+        dom.formatIndicator.styleJs({
+          backgroundImage: 'url("/assets/img/icons/yt.png")',
+          opacity: "1",
+        });
+      }
       state.isTransitioning = false;
     } else {
       this.mvPlayer = null;
@@ -329,10 +331,12 @@ export default class PlaybackManager {
               ? "mtv.png"
               : "rs.png";
 
-      dom.formatIndicator.styleJs({
-        backgroundImage: `url("/assets/img/icons/${icon}")`,
-        opacity: "1",
-      });
+      if (this.ctx.config.displayFormatIndicator !== false) {
+        dom.formatIndicator.styleJs({
+          backgroundImage: `url("/assets/img/icons/${icon}")`,
+          opacity: "1",
+        });
+      }
 
       if (!state.currentSongIsYouTube) {
         if (

@@ -927,6 +927,23 @@ export default class SetupManager {
                   }
                 },
               },
+              {
+                id: "display_format_indicator",
+                label: "Show Format Indicator",
+                type: "select",
+                options: [
+                  { value: false, label: "Hidden" },
+                  { value: true, label: "Visible" },
+                ],
+                get: () => this.ctx.config.displayFormatIndicator !== false,
+                set: (v) => {
+                  this.ctx.config.displayFormatIndicator = v;
+                  window.config.setItem("displayFormatIndicator", v);
+                  if (!v && this.ctx.dom.formatIndicator) {
+                    this.ctx.dom.formatIndicator.styleJs({ opacity: "0" });
+                  }
+                },
+              },
             ],
           },
           {
