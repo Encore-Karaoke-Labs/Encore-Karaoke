@@ -1053,7 +1053,7 @@ export default class InputManager {
       state.highlightedIndex = newIdx;
       this.ctx.root.ui.updateMenuUI();
     } else if (state.mode === "player") {
-      if (state.currentSongIsYouTube || state.currentSongIsMV) {
+      if (state.currentSongIsYouTube || state.currentSongIsStandaloneVideo) {
         this.ctx.modules.infoBar.showTemp(
           "TRANSPOSE",
           "Not available for this format.",
