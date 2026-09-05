@@ -375,7 +375,12 @@ export default class InputManager {
       return;
     }
 
-    if ((e.key === "l" || e.key === "L") && this.ctx.state.mode === "player") {
+    if (
+      (e.key === "l" || e.key === "L") &&
+      this.ctx.state.mode === "player" &&
+      !isSearchInputFocused &&
+      !state.isSearchOverlayVisible
+    ) {
       e.preventDefault();
       this.ctx.root.ui.toggleLyricCustomizer(true);
       return;
