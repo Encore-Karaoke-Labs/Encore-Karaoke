@@ -531,7 +531,10 @@ export default class NetworkManager {
           break;
 
         case "reserve_code":
-          const s = state.songMap.get(d.value.padStart(5, "0"));
+          const s =
+            state.songMap.get(d.value) ??
+            state.songMap.get(d.value.padStart(5, "0")) ??
+            state.songMap.get(d.value.padStart(6, "0"));
           if (s) {
             state.mode === "menu"
               ? root.playback.startPlayer(s)
