@@ -759,17 +759,27 @@
 
       async function loadData() {
         appData = await ipc.invoke("libmgr-get-config");
-        renderSidebar();
 
         if (selectedLib) {
           selectedLib =
             appData.libraries.find((l) => l.path === selectedLib.path) || null;
         }
 
-        if (selectedLib) renderMainPane();
-        else if (appData.libraries.length > 0) {
-          selectedLib = appData.libraries[0];
+        if (!selectedLib && appData.libraries.length > 0) {
+          selectedLib =
+            appData.libraries.find((l) => l.path === appData.active) ||
+            appData.libraries[0];
+        }
+
+        renderSidebar();
+
+        if (selectedLib) {
           renderMainPane();
+
+          const selectedItem = document.querySelector(".lib-item.selected");
+          if (selectedItem) {
+            selectedItem.scrollIntoView({ block: "nearest" });
+          }
         } else {
           document.getElementById("main-pane").style.display = "none";
           document.getElementById("empty-pane").style.display = "flex";
