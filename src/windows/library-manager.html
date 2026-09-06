@@ -6,39 +6,39 @@
     <style>
       /* rajdhani-regular - latin */
       @font-face {
-        font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+        font-display: swap;
         font-family: "Rajdhani";
         font-style: normal;
         font-weight: 400;
         src: url("static/assets/fonts/rajdhani-v17-latin-regular.woff2")
-          format("woff2"); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+          format("woff2");
       }
       /* rajdhani-500 - latin */
       @font-face {
-        font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+        font-display: swap;
         font-family: "Rajdhani";
         font-style: normal;
         font-weight: 500;
         src: url("static/assets/fonts/rajdhani-v17-latin-500.woff2")
-          format("woff2"); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+          format("woff2");
       }
       /* rajdhani-600 - latin */
       @font-face {
-        font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+        font-display: swap;
         font-family: "Rajdhani";
         font-style: normal;
         font-weight: 600;
         src: url("static/assets/fonts/rajdhani-v17-latin-600.woff2")
-          format("woff2"); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+          format("woff2");
       }
       /* rajdhani-700 - latin */
       @font-face {
-        font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+        font-display: swap;
         font-family: "Rajdhani";
         font-style: normal;
         font-weight: 700;
         src: url("static/assets/fonts/rajdhani-v17-latin-700.woff2")
-          format("woff2"); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+          format("woff2");
       }
 
       :root {
@@ -337,6 +337,41 @@
         font-family: monospace;
       }
 
+      .bgv-header-bar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 15px;
+      }
+      .bgv-header-desc {
+        margin: 0;
+        color: var(--text-muted);
+        flex: 1 1 300px;
+      }
+      .bgv-header-actions {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      .bgv-status-container {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        width: 140px;
+        flex-shrink: 0;
+      }
+      .bgv-autosave-status {
+        font-size: 0.95rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-align: right;
+        white-space: nowrap;
+        transition: color 0.25s ease;
+      }
+
       .bgv-category {
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 6px;
@@ -596,26 +631,19 @@
         </div>
 
         <div id="tab-bgvs" class="tab-content">
-          <div
-            style="
-              display: flex;
-              flex-wrap: wrap;
-              justify-content: space-between;
-              gap: 15px;
-              margin-bottom: 15px;
-              align-items: center;
-            "
-          >
-            <p style="margin: 0; color: var(--text-muted); flex: 1 1 300px">
-              Background Videos must be located inside the library folder. Add
-              files here to map them into the manifest.
+          <div class="bgv-header-bar">
+            <p class="bgv-header-desc">
+              Background Videos must be located inside the library folder.
+              Changes are saved automatically.
             </p>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap">
+            <div class="bgv-header-actions">
+              <div class="bgv-status-container">
+                <span id="bgv-status" class="bgv-autosave-status"
+                  >AUTOSAVED</span
+                >
+              </div>
               <button onclick="addBgvCategory()" class="action-btn outline">
                 + Add Category
-              </button>
-              <button onclick="saveBgvs()" class="action-btn success">
-                Save BGV Config
               </button>
             </div>
           </div>
@@ -680,6 +708,17 @@
       let appData = { active: null, libraries: [] };
       let selectedLib = null;
       let bgvData = [];
+      let bgvSaveTimeout = null;
+
+      function escapeHtml(str) {
+        if (!str) return "";
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
 
       let confirmCallback = null;
       function openConfirmModal(title, text, onConfirm) {
@@ -729,14 +768,15 @@
           const item = document.createElement("div");
           item.className = `lib-item ${isActive ? "active-lib" : ""} ${isSelected ? "selected" : ""}`;
           item.onclick = () => {
+            flushBgvAutoSave();
             selectedLib = lib;
             renderSidebar();
             renderMainPane();
           };
 
           item.innerHTML = `
-          <div class="lib-item-title">${lib.manifest.title || "Unknown Library"}</div>
-          <div class="lib-item-path">${lib.path}</div>
+          <div class="lib-item-title">${escapeHtml(lib.manifest.title || "Unknown Library")}</div>
+          <div class="lib-item-path">${escapeHtml(lib.path)}</div>
         `;
           container.appendChild(item);
         });
@@ -763,11 +803,13 @@
         }
 
         bgvData = selectedLib.manifest.additionalContents?.bgvCategories || [];
+        setBgvStatus("idle");
         renderBgvs();
         loadSongs();
       }
 
       function switchTab(tabId) {
+        flushBgvAutoSave();
         document
           .querySelectorAll(".tab-btn")
           .forEach((b) => b.classList.remove("active"));
@@ -817,10 +859,14 @@
 
           let html = `
           <div class="bgv-category-header">
-            <input type="text" value="${cat.BGV_CATEGORY}" onchange="updateBgvCategoryName(${cIdx}, this.value)" placeholder="Category Name (e.g. KPOP)">
+            <input type="text" value="${escapeHtml(cat.BGV_CATEGORY || "")}" 
+              oninput="updateBgvCategoryName(${cIdx}, this.value)" 
+              onchange="flushBgvAutoSave()" 
+              onblur="flushBgvAutoSave()"
+              placeholder="Category Name (e.g. KPOP)">
             <div style="display: flex; gap: 10px; align-items: center;">
               <button class="action-btn outline" style="padding: 5px 10px; font-size: 0.9rem;" onclick="addVideoToCategory(${cIdx})">+ Add Videos</button>
-              <button class="action-btn danger" style="padding: 5px 10px; font-size: 0.9rem;" onclick="confirmRemoveBgvCategory(${cIdx}, '${cat.BGV_CATEGORY.replace(/'/g, "\\'")}')">Delete Category</button>
+              <button class="action-btn danger" style="padding: 5px 10px; font-size: 0.9rem;" onclick="confirmRemoveBgvCategory(${cIdx})">Delete Category</button>
             </div>
           </div>
         `;
@@ -831,7 +877,7 @@
             cat.BGV_LIST.forEach((vid, vIdx) => {
               html += `
               <div class="bgv-file-row">
-                <span>${vid}</span>
+                <span>${escapeHtml(vid)}</span>
                 <button onclick="removeVideoFromCategory(${cIdx}, ${vIdx})">✕</button>
               </div>
             `;
@@ -843,28 +889,87 @@
         });
       }
 
+      function setBgvStatus(state) {
+        const el = document.getElementById("bgv-status");
+        if (!el) return;
+        if (state === "saving") {
+          el.style.color = "var(--accent)";
+          el.innerText = "SAVING...";
+        } else if (state === "saved") {
+          el.style.color = "var(--success)";
+          el.innerText = "CHANGES SAVED";
+          setTimeout(() => {
+            if (el.innerText === "CHANGES SAVED") {
+              el.style.color = "var(--text-muted)";
+              el.innerText = "AUTOSAVED";
+            }
+          }, 2500);
+        } else if (state === "error") {
+          el.style.color = "var(--danger)";
+          el.innerText = "SAVE FAILED";
+        } else {
+          el.style.color = "var(--text-muted)";
+          el.innerText = "AUTOSAVED";
+        }
+      }
+
+      function queueBgvAutoSave(immediate = false) {
+        if (bgvSaveTimeout) {
+          clearTimeout(bgvSaveTimeout);
+          bgvSaveTimeout = null;
+        }
+
+        if (immediate) {
+          saveBgvs();
+        } else {
+          setBgvStatus("saving");
+          bgvSaveTimeout = setTimeout(() => {
+            bgvSaveTimeout = null;
+            saveBgvs();
+          }, 600);
+        }
+      }
+
+      function flushBgvAutoSave() {
+        if (bgvSaveTimeout) {
+          clearTimeout(bgvSaveTimeout);
+          bgvSaveTimeout = null;
+          saveBgvs();
+        }
+      }
+
       function addBgvCategory() {
         bgvData.push({ BGV_CATEGORY: "New Category", BGV_LIST: [] });
         renderBgvs();
-      }
-      function updateBgvCategoryName(idx, val) {
-        bgvData[idx].BGV_CATEGORY = val;
+        queueBgvAutoSave(true);
       }
 
-      function confirmRemoveBgvCategory(idx, catName) {
+      function updateBgvCategoryName(idx, val) {
+        if (bgvData[idx]) {
+          bgvData[idx].BGV_CATEGORY = val;
+          queueBgvAutoSave(false);
+        }
+      }
+
+      function confirmRemoveBgvCategory(idx) {
+        const catName = bgvData[idx]?.BGV_CATEGORY || "Category";
         openConfirmModal(
           "DELETE CATEGORY",
           `Are you sure you want to delete the category "${catName}"? This will not delete the video files from your disk.`,
           () => {
             bgvData.splice(idx, 1);
             renderBgvs();
+            queueBgvAutoSave(true);
           },
         );
       }
 
       function removeVideoFromCategory(cIdx, vIdx) {
-        bgvData[cIdx].BGV_LIST.splice(vIdx, 1);
-        renderBgvs();
+        if (bgvData[cIdx]?.BGV_LIST) {
+          bgvData[cIdx].BGV_LIST.splice(vIdx, 1);
+          renderBgvs();
+          queueBgvAutoSave(true);
+        }
       }
 
       async function addVideoToCategory(idx) {
@@ -872,39 +977,57 @@
           "libmgr-select-bgv-files",
           selectedLib.path,
         );
-        if (res.outsideCount > 0) {
+        if (res && res.outsideCount > 0) {
           showToast(
             `${res.outsideCount} ${res.outsideCount > 1 ? "videos" : "video"} must be inside the library folder!`,
             "var(--danger)",
           );
         }
 
-        if (res.relativePaths.length > 0) {
+        if (res && res.relativePaths && res.relativePaths.length > 0) {
           if (!bgvData[idx].BGV_LIST) bgvData[idx].BGV_LIST = [];
+          let added = false;
           res.relativePaths.forEach((p) => {
-            if (!bgvData[idx].BGV_LIST.includes(p))
+            if (!bgvData[idx].BGV_LIST.includes(p)) {
               bgvData[idx].BGV_LIST.push(p);
+              added = true;
+            }
           });
-          renderBgvs();
+          if (added) {
+            renderBgvs();
+            queueBgvAutoSave(true);
+          }
         }
       }
 
       async function saveBgvs() {
+        if (!selectedLib) return;
         selectedLib.manifest.additionalContents =
           selectedLib.manifest.additionalContents || {};
         selectedLib.manifest.additionalContents.bgvCategories = bgvData;
+
+        setBgvStatus("saving");
 
         const res = await ipc.invoke("libmgr-update-manifest", {
           folderPath: selectedLib.path,
           manifestData: selectedLib.manifest,
         });
 
-        if (res.success) {
-          showToast("Background Videos saved successfully!", "var(--success)");
-          loadData();
+        if (res && res.success) {
+          setBgvStatus("saved");
+          const libInConfig = appData.libraries.find(
+            (l) => l.path === selectedLib.path,
+          );
+          if (libInConfig) {
+            libInConfig.manifest = selectedLib.manifest;
+          }
         } else {
-          console.error("BGV Save Error:", res.error);
-          showToast(`Failed to save: ${res.error}`, "var(--danger)");
+          setBgvStatus("error");
+          console.error("BGV Save Error:", res ? res.error : "Unknown error");
+          showToast(
+            `Failed to autosave BGV: ${res ? res.error : "Unknown error"}`,
+            "var(--danger)",
+          );
         }
       }
 
@@ -928,6 +1051,7 @@
       }
 
       async function saveManifest() {
+        flushBgvAutoSave();
         selectedLib.manifest.title = document.getElementById("lib-title").value;
         selectedLib.manifest.description =
           document.getElementById("lib-desc").value;
@@ -951,6 +1075,7 @@
       }
 
       async function setActive() {
+        flushBgvAutoSave();
         const res = await ipc.invoke("libmgr-set-active", selectedLib.path);
         if (!res.success) {
           showToast(res.reason, "var(--danger)");
