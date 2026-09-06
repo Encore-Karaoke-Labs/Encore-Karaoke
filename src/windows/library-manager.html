@@ -337,33 +337,34 @@
         font-family: monospace;
       }
 
-      .bgv-header-bar {
+      /* Consistent Section Headers */
+      .pane-header-bar {
         display: flex;
         flex-wrap: wrap;
         justify-content: space-between;
         align-items: center;
         gap: 15px;
-        margin-bottom: 15px;
+        margin-bottom: 20px;
       }
-      .bgv-header-desc {
+      .pane-header-desc {
         margin: 0;
         color: var(--text-muted);
         flex: 1 1 300px;
       }
-      .bgv-header-actions {
+      .pane-header-actions {
         display: flex;
         gap: 15px;
         align-items: center;
         flex-shrink: 0;
       }
-      .bgv-status-container {
+      .autosave-status-container {
         display: inline-flex;
         align-items: center;
         justify-content: flex-end;
         width: 140px;
         flex-shrink: 0;
       }
-      .bgv-autosave-status {
+      .autosave-status {
         font-size: 0.95rem;
         font-weight: 700;
         letter-spacing: 1px;
@@ -583,21 +584,40 @@
         </div>
 
         <div id="tab-overview" class="tab-content active">
+          <div class="pane-header-bar">
+            <p class="pane-header-desc">
+              General metadata and configuration for this library. Changes are
+              saved automatically.
+            </p>
+            <div class="pane-header-actions">
+              <div class="autosave-status-container">
+                <span id="overview-status" class="autosave-status"
+                  >AUTOSAVED</span
+                >
+              </div>
+            </div>
+          </div>
+
           <div class="editor-group">
             <label>LIBRARY TITLE</label>
-            <input type="text" id="lib-title" />
+            <input
+              type="text"
+              id="lib-title"
+              oninput="onTitleInput(this.value)"
+              onchange="flushManifestAutoSave()"
+              onblur="flushManifestAutoSave()"
+            />
           </div>
           <div class="editor-group">
             <label>DESCRIPTION</label>
-            <textarea id="lib-desc" rows="2"></textarea>
+            <textarea
+              id="lib-desc"
+              rows="2"
+              oninput="onDescInput()"
+              onchange="flushManifestAutoSave()"
+              onblur="flushManifestAutoSave()"
+            ></textarea>
           </div>
-          <button
-            onclick="saveManifest()"
-            class="action-btn outline"
-            style="margin-bottom: 20px; width: max-content"
-          >
-            Save Details
-          </button>
 
           <label>LIBRARY ROOT DIRECTORY</label>
           <div class="path-display" id="lib-path"></div>
@@ -631,16 +651,14 @@
         </div>
 
         <div id="tab-bgvs" class="tab-content">
-          <div class="bgv-header-bar">
-            <p class="bgv-header-desc">
+          <div class="pane-header-bar">
+            <p class="pane-header-desc">
               Background Videos must be located inside the library folder.
               Changes are saved automatically.
             </p>
-            <div class="bgv-header-actions">
-              <div class="bgv-status-container">
-                <span id="bgv-status" class="bgv-autosave-status"
-                  >AUTOSAVED</span
-                >
+            <div class="pane-header-actions">
+              <div class="autosave-status-container">
+                <span id="bgv-status" class="autosave-status">AUTOSAVED</span>
               </div>
               <button onclick="addBgvCategory()" class="action-btn outline">
                 + Add Category
@@ -709,6 +727,7 @@
       let selectedLib = null;
       let bgvData = [];
       let bgvSaveTimeout = null;
+      let manifestSaveTimeout = null;
 
       function escapeHtml(str) {
         if (!str) return "";
@@ -768,7 +787,7 @@
           const item = document.createElement("div");
           item.className = `lib-item ${isActive ? "active-lib" : ""} ${isSelected ? "selected" : ""}`;
           item.onclick = () => {
-            flushBgvAutoSave();
+            flushAllAutoSaves();
             selectedLib = lib;
             renderSidebar();
             renderMainPane();
@@ -779,6 +798,18 @@
           <div class="lib-item-path">${escapeHtml(lib.path)}</div>
         `;
           container.appendChild(item);
+        });
+      }
+
+      function updateSidebarTitle(path, newTitle) {
+        const items = document.querySelectorAll(".lib-item");
+        appData.libraries.forEach((lib, idx) => {
+          if (lib.path === path && items[idx]) {
+            const titleEl = items[idx].querySelector(".lib-item-title");
+            if (titleEl) {
+              titleEl.innerText = newTitle || "Unknown Library";
+            }
+          }
         });
       }
 
@@ -803,13 +834,14 @@
         }
 
         bgvData = selectedLib.manifest.additionalContents?.bgvCategories || [];
+        setOverviewStatus("idle");
         setBgvStatus("idle");
         renderBgvs();
         loadSongs();
       }
 
       function switchTab(tabId) {
-        flushBgvAutoSave();
+        flushAllAutoSaves();
         document
           .querySelectorAll(".tab-btn")
           .forEach((b) => b.classList.remove("active"));
@@ -843,6 +875,118 @@
         });
       }
 
+      /* Overview / Details Autosave Logic */
+      function setOverviewStatus(state) {
+        const el = document.getElementById("overview-status");
+        if (!el) return;
+        if (state === "saving") {
+          el.style.color = "var(--accent)";
+          el.innerText = "SAVING...";
+        } else if (state === "saved") {
+          el.style.color = "var(--success)";
+          el.innerText = "CHANGES SAVED";
+          setTimeout(() => {
+            if (el.innerText === "CHANGES SAVED") {
+              el.style.color = "var(--text-muted)";
+              el.innerText = "AUTOSAVED";
+            }
+          }, 2500);
+        } else if (state === "error") {
+          el.style.color = "var(--danger)";
+          el.innerText = "SAVE FAILED";
+        } else {
+          el.style.color = "var(--text-muted)";
+          el.innerText = "AUTOSAVED";
+        }
+      }
+
+      function queueManifestAutoSave(immediate = false) {
+        if (manifestSaveTimeout) {
+          clearTimeout(manifestSaveTimeout);
+          manifestSaveTimeout = null;
+        }
+
+        if (immediate) {
+          saveManifest();
+        } else {
+          setOverviewStatus("saving");
+          manifestSaveTimeout = setTimeout(() => {
+            manifestSaveTimeout = null;
+            saveManifest();
+          }, 600);
+        }
+      }
+
+      function flushManifestAutoSave() {
+        if (manifestSaveTimeout) {
+          clearTimeout(manifestSaveTimeout);
+          manifestSaveTimeout = null;
+        }
+        if (selectedLib) {
+          const titleInput = document.getElementById("lib-title");
+          const descInput = document.getElementById("lib-desc");
+          if (titleInput && descInput) {
+            if (
+              selectedLib.manifest.title !== titleInput.value ||
+              selectedLib.manifest.description !== descInput.value
+            ) {
+              saveManifest();
+            }
+          }
+        }
+      }
+
+      function onTitleInput(val) {
+        if (selectedLib) {
+          updateSidebarTitle(selectedLib.path, val);
+          queueManifestAutoSave(false);
+        }
+      }
+
+      function onDescInput() {
+        if (selectedLib) {
+          queueManifestAutoSave(false);
+        }
+      }
+
+      async function saveManifest() {
+        if (!selectedLib) return;
+        const titleVal = document.getElementById("lib-title").value;
+        const descVal = document.getElementById("lib-desc").value;
+
+        selectedLib.manifest.title = titleVal;
+        selectedLib.manifest.description = descVal;
+
+        setOverviewStatus("saving");
+
+        const res = await ipc.invoke("libmgr-update-manifest", {
+          folderPath: selectedLib.path,
+          manifestData: selectedLib.manifest,
+        });
+
+        if (res && res.success) {
+          setOverviewStatus("saved");
+          const libInConfig = appData.libraries.find(
+            (l) => l.path === selectedLib.path,
+          );
+          if (libInConfig) {
+            libInConfig.manifest = selectedLib.manifest;
+          }
+          updateSidebarTitle(selectedLib.path, titleVal);
+        } else {
+          setOverviewStatus("error");
+          console.error(
+            "Manifest Save Error:",
+            res ? res.error : "Unknown error",
+          );
+          showToast(
+            `Failed to autosave details: ${res ? res.error : "Unknown error"}`,
+            "var(--danger)",
+          );
+        }
+      }
+
+      /* BGV Autosave Logic */
       function renderBgvs() {
         const container = document.getElementById("bgv-container");
         container.innerHTML = "";
@@ -936,6 +1080,11 @@
           bgvSaveTimeout = null;
           saveBgvs();
         }
+      }
+
+      function flushAllAutoSaves() {
+        flushManifestAutoSave();
+        flushBgvAutoSave();
       }
 
       function addBgvCategory() {
@@ -1050,32 +1199,12 @@
         }
       }
 
-      async function saveManifest() {
-        flushBgvAutoSave();
-        selectedLib.manifest.title = document.getElementById("lib-title").value;
-        selectedLib.manifest.description =
-          document.getElementById("lib-desc").value;
-
-        const res = await ipc.invoke("libmgr-update-manifest", {
-          folderPath: selectedLib.path,
-          manifestData: selectedLib.manifest,
-        });
-
-        if (res.success) {
-          showToast("Library details saved!", "var(--success)");
-          loadData();
-        } else {
-          console.error("Manifest Save Error:", res.error);
-          showToast(`Failed to save details: ${res.error}`, "var(--danger)");
-        }
-      }
-
       function openFolder() {
         ipc.send("libmgr-open-folder", selectedLib.path);
       }
 
       async function setActive() {
-        flushBgvAutoSave();
+        flushAllAutoSaves();
         const res = await ipc.invoke("libmgr-set-active", selectedLib.path);
         if (!res.success) {
           showToast(res.reason, "var(--danger)");
@@ -1086,6 +1215,14 @@
       }
 
       function confirmRemoveLibrary() {
+        if (manifestSaveTimeout) {
+          clearTimeout(manifestSaveTimeout);
+          manifestSaveTimeout = null;
+        }
+        if (bgvSaveTimeout) {
+          clearTimeout(bgvSaveTimeout);
+          bgvSaveTimeout = null;
+        }
         openConfirmModal(
           "REMOVE LIBRARY",
           `Remove "${selectedLib.manifest.title || "Unknown Library"}" from the list?\n\n(No actual files will be deleted)`,
@@ -1108,6 +1245,7 @@
 
       async function exportSongbook() {
         if (!selectedLib) return;
+        flushAllAutoSaves();
 
         const res = await ipc.invoke("libmgr-export-songbook", {
           folderPath: selectedLib.path,
