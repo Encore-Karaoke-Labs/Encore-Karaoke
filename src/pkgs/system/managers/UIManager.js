@@ -1285,10 +1285,7 @@ export default class UIManager {
           .text(String(song.code).padStart(6, "0"))
           .appendTo(titleRow);
       } else {
-        new Html("span")
-          .classOn("queue-code")
-          .text(String(song.code).padStart(6, "0"))
-          .appendTo(titleRow);
+        new Html("span").classOn("queue-code").text("YT").appendTo(titleRow);
       }
 
       new Html("span")
