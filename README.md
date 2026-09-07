@@ -84,27 +84,27 @@ _Note: For Multiplex tracks (where vocals are on one channel and instrumentals o
 
 Encore can be fully controlled via a standard keyboard or through EnMoku.
 
-| Key             | Action                                               |
-| :-------------- | :--------------------------------------------------- |
-| `0-9`           | Type song code to reserve/play                       |
-| `Enter`         | Confirm reservation / Play highlighted song          |
-| `Escape`        | Stop playback / Clear input / Go back                |
-| `Space`         | Pause playback                                       |
-| `L`             | Open Lyric Customization menu                        |
-| `Y`             | Open Search Menu (Local + YouTube)                   |
-| `Q`             | Open Reservation List                                |
-| `M`             | Open Mixer (Adjust Mic & Music levels)               |
-| `R`             | Toggle recording (during playback) / View recordings |
-| `S`             | Open Encore Sessions menu                            |
-| `T`             | Chat (In a session)                                  |
-| `C`             | Toggle Chorus on/off                                 |
-| `- / =`         | Adjust volume                                        |
-| `Shift + - / =` | Adjust mic monitoring volume                         |
-| `Up / Down`     | Pitch shift (Transpose) up/down                      |
-| `Left / Right`  | Multiplex pan (Toggle guide vocal on/off)            |
-| `' / "`         | Change drum presets                                  |
-| `[ / ]`         | Cycle background videos (BGVs) / Video sync offset   |
-| `F2`            | Enter Setup Mode (in main menu)                      |
+| Key             | Action                                                |
+| :-------------- | :---------------------------------------------------- |
+| `0-9`           | Type song code to reserve/play                        |
+| `Enter`         | Confirm reservation / Play highlighted song           |
+| `Escape`        | Stop playback / Clear input / Go back                 |
+| `Space`         | Pause playback                                        |
+| `L`             | Open Lyric Customization menu                         |
+| `Y`             | Open Search Menu (Local + YouTube)                    |
+| `Q`             | Open Reservation List                                 |
+| `M`             | Open Mixer (Adjust Mic & Music levels)                |
+| `R`             | Toggle recording (during playback) / View recordings  |
+| `S`             | Open Encore Sessions menu                             |
+| `T`             | Chat (In a session)                                   |
+| `C`             | Toggle Chorus on/off                                  |
+| `- / =`         | Adjust volume                                         |
+| `Shift + - / =` | Adjust mic monitoring volume                          |
+| `Up / Down`     | Tranpose up/down (Playback) / Select song (Main menu) |
+| `Left / Right`  | Multiplex pan (Toggle guide vocal on/off)             |
+| `' / "`         | Change drum presets                                   |
+| `[ / ]`         | Cycle background videos (BGVs) / Video sync offset    |
+| `F2`            | Enter Setup Mode (in main menu)                       |
 
 ---
 
