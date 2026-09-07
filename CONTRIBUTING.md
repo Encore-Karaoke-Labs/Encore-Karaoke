@@ -31,7 +31,7 @@ This document covers how to get set up, what we expect from contributions, and h
 We do not prohibit the use of artificial intelligence for your PRs, with the exception of these:
 
 - Media, including but not limited to illustrations, videos and music generated with atificial intelligence is prohibited and contributions that include them will immediately get rejected.
-- Contributions that are not transparent in their AI usage may get rejected.
+- Contributions that are not transparent in their AI usage may get rejected. When using Claude Code, do not omit Claude as a contrbutor in your PR. This also applies to other artificial intelligence that tags themselves as a contributior.
 
 ## Commit messages
 
