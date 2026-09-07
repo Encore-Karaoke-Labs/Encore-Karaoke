@@ -22,7 +22,7 @@ import _Kuroshiro from "kuroshiro";
 import _KuromojiAnalyzer from "kuroshiro-analyzer-kuromoji";
 import loudness from "loudness";
 import mime from "mime-types";
-import { exec } from "node:child_process";
+import { ChildProcess, exec, spawn } from "node:child_process";
 import crypto from "node:crypto";
 import dgram from "node:dgram";
 import fs from "node:fs";
@@ -255,6 +255,9 @@ const pendingDeepLinks: string[] = [];
 let appViewWebContents: WebContents | null = null;
 let libraryManagerWin: BrowserWindow | null = null;
 let isSongbookBuildActive = false;
+
+let ffmpegStreamProcess: ChildProcess | null = null;
+let streamHeaderChunk: Buffer | null = null;
 
 function extractDeepLink(argv: readonly string[]): string | null {
   if (!Array.isArray(argv)) return null;
@@ -1341,6 +1344,117 @@ void app.whenReady().then(() => {
       }
     },
   );
+
+  ipcMain.handle("stream-start", async () => {
+    if (ffmpegStreamProcess) {
+      logger.warn("STREAM", "Stream is already running.");
+      return { success: false, reason: "Already running" };
+    }
+
+    const ffmpegArgs = [
+      "-loglevel",
+      "warning",
+      "-fflags",
+      "+genpts+igndts",
+      "-f",
+      "matroska",
+      "-i",
+      "pipe:0",
+      "-c:v",
+      "copy",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "192k",
+      "-ar",
+      "48000",
+      "-f",
+      "flv",
+      "-listen",
+      "1",
+      "http://127.0.0.1:8080/live", // Local preview stream
+    ];
+
+    try {
+      ffmpegStreamProcess = spawn("ffmpeg", ffmpegArgs, {
+        windowsHide: true,
+        stdio: ["pipe", "inherit", "inherit"],
+      });
+
+      ffmpegStreamProcess.stdin?.on("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "EOF" || err.code === "EPIPE") {
+          return;
+        }
+        logger.error("STREAM", `stdin error: ${err.message}`);
+      });
+
+      streamHeaderChunk = null;
+
+      ffmpegStreamProcess.on("close", (code) => {
+        logger.info("STREAM", `FFmpeg process exited with code ${code}`);
+        ffmpegStreamProcess = null;
+        streamHeaderChunk = null;
+        if (appViewWebContents && !appViewWebContents.isDestroyed()) {
+          appViewWebContents.send("stream-status-changed", {
+            isStreaming: false,
+          });
+        }
+      });
+
+      ffmpegStreamProcess.on("error", (err) => {
+        logger.error("STREAM", `FFmpeg spawn error: ${err.message}`);
+        ffmpegStreamProcess = null;
+      });
+
+      logger.info("STREAM", `Streaming pipe opened to`);
+      return { success: true };
+    } catch (error) {
+      const err = error as Error;
+      logger.error("STREAM", `Failed to spawn FFmpeg: ${err.message}`);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.on("stream-chunk", (_event: IpcMainEvent, chunk: ArrayBuffer) => {
+    if (
+      !ffmpegStreamProcess ||
+      !ffmpegStreamProcess.stdin ||
+      !ffmpegStreamProcess.stdin.writable
+    )
+      return;
+
+    try {
+      const buffer = Buffer.from(chunk);
+      if (!streamHeaderChunk) {
+        streamHeaderChunk = buffer;
+      }
+
+      ffmpegStreamProcess.stdin.write(buffer, (_err) => {
+        // Silently ignore write errors
+      });
+    } catch {
+      // Ignored
+    }
+  });
+
+  ipcMain.handle("stream-stop", async () => {
+    if (!ffmpegStreamProcess) return { success: true };
+
+    logger.info("STREAM", "Stopping streaming pipe...");
+    return new Promise((resolve) => {
+      if (ffmpegStreamProcess && ffmpegStreamProcess.stdin) {
+        ffmpegStreamProcess.stdin.end();
+      }
+      setTimeout(() => {
+        if (ffmpegStreamProcess) {
+          ffmpegStreamProcess.kill("SIGINT");
+          ffmpegStreamProcess = null;
+        }
+        streamHeaderChunk = null;
+        resolve({ success: true });
+      }, 500);
+    });
+  });
 
   ipcMain.handle("select-soundfont-file", async (event: IpcMainInvokeEvent) => {
     const win = BrowserWindow.fromWebContents(event.sender);
