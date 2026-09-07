@@ -11,6 +11,7 @@ import PlaybackManager from "./managers/PlaybackManager.js";
 import RecordingsManager from "./managers/RecordingsManager.js";
 import SessionManager from "./managers/SessionManager.js";
 import SetupManager from "./managers/SetupManager.js";
+import StreamManager from "./managers/StreamManager.js";
 import UIManager from "./managers/UIManager.js";
 
 import { BGVModule } from "../../modules/BGVPlayer.js";
@@ -157,7 +158,9 @@ class EncoreController {
     this.input = new InputManager(this.context);
     this.setup = new SetupManager(this.context);
     this.games = new GamesManager(this.context);
+    this.stream = new StreamManager(this.context);
 
+    this.context.modules.stream = this.stream;
     this.context.modules.lyrics = this.lyrics;
 
     this.boundKeydown = (e) => this.input.handleKeyDown(e);
@@ -426,6 +429,7 @@ class EncoreController {
     if (this._deepLinkCleanup) this._deepLinkCleanup();
     if (this.boundKeydown)
       window.removeEventListener("keydown", this.boundKeydown);
+    if (this.stream) this.stream.destroy();
     this.playback.cleanupPlayerEvents();
     this.network.destroy();
     this.sessions.destroy();

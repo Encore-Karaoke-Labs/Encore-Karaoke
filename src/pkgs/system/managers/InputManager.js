@@ -336,6 +336,7 @@ export default class InputManager {
         this.ctx.root.ui.toggleLyricCustomizer(false);
         return;
       }
+
       if (e.key === "Enter") {
         const curIdx = Number(this.ctx.state.lyricCustomizerIndex) || 0;
         if (curIdx === 0) {
@@ -468,6 +469,13 @@ export default class InputManager {
       }
       return;
     }
+
+    // Extremely experimental streaming feature
+    // if (e.ctrlKey && e.altKey && e.key.toLowerCase() === "b") {
+    //   e.preventDefault();
+    //   this.ctx.modules.stream?.toggleStream();
+    //   return;
+    // }
 
     if (
       e.key.toLowerCase() === "q" &&
