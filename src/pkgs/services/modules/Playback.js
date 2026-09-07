@@ -476,17 +476,54 @@ export class FortePlayback {
           throw e;
         }
 
+        if (!parsedMidi.isKaraokeFile) {
+          const isKarExtension = lowerUrl.endsWith(".kar");
+          const hasKaraokeHeaders = parsedMidi.tracks.some((track) =>
+            track.events.some((e) => {
+              if (
+                (e.statusByte === midiMessageTypes.text ||
+                  e.statusByte === midiMessageTypes.lyric) &&
+                e.data &&
+                e.data.length > 0
+              ) {
+                if (String.fromCharCode(e.data[0]) === "@") {
+                  const header = new TextDecoder("ascii")
+                    .decode(e.data.slice(0, 6))
+                    .toUpperCase();
+                  return (
+                    header.startsWith("@KMIDI") ||
+                    header.startsWith("@T") ||
+                    header.startsWith("@A") ||
+                    header.startsWith("@K") ||
+                    header.startsWith("@V") ||
+                    header.startsWith("@L") ||
+                    header.startsWith("@W")
+                  );
+                }
+              }
+              return false;
+            }),
+          );
+
+          if (isKarExtension || hasKaraokeHeaders) {
+            parsedMidi.isKaraokeFile = true;
+          }
+        }
+
         let primaryLyricTrackEvents = [];
         let highestLyricScore = 0;
 
         parsedMidi.tracks.forEach((midiTrack) => {
           let trackLyricScore = 0;
-          const isKar = parsedMidi.isKaraokeFile;
-          const trackTextEvents = midiTrack.events.filter(
-            (e) =>
-              e.statusByte === midiMessageTypes.lyric ||
-              (isKar && e.statusByte === midiMessageTypes.text),
-          );
+          let hasExplicitLyrics = false;
+
+          const trackTextEvents = midiTrack.events.filter((e) => {
+            if (e.statusByte === midiMessageTypes.lyric) {
+              hasExplicitLyrics = true;
+              return true;
+            }
+            return e.statusByte === midiMessageTypes.text;
+          });
 
           trackTextEvents.forEach((e) => {
             if (!e.data || e.data.length === 0) return;
@@ -494,11 +531,20 @@ export class FortePlayback {
             if (firstChar !== "@" && firstChar !== "#") trackLyricScore++;
           });
 
-          if (trackLyricScore > highestLyricScore) {
+          const isValidLyricTrack =
+            hasExplicitLyrics ||
+            parsedMidi.isKaraokeFile ||
+            trackLyricScore >= 5;
+
+          if (isValidLyricTrack && trackLyricScore > highestLyricScore) {
             highestLyricScore = trackLyricScore;
             primaryLyricTrackEvents = trackTextEvents;
           }
         });
+
+        if (highestLyricScore > 0) {
+          parsedMidi.isKaraokeFile = true;
+        }
 
         this.state.playback.sequencer = new Sequencer(
           this.state.playback.synthesizer,
@@ -644,6 +690,7 @@ export class FortePlayback {
           if (!message.data) return;
           if (
             !parsedMidi.isKaraokeFile &&
+            highestLyricScore === 0 &&
             message.statusByte === midiMessageTypes.text
           )
             return;
