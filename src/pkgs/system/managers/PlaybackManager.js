@@ -180,7 +180,7 @@ export default class PlaybackManager {
 
     if (root.lyrics) root.lyrics.reset();
     if (root.input) root.input.currentDrumPresetIndex = -1;
-    if (root.input) root.input.currentGuideMelodyIndex = 2;
+    if (root.input) root.input.currentGuideMelodyIndex = 1;
 
     dom.countdownDisplay.classOff("visible").text("");
     modules.scoreHud.hide();
