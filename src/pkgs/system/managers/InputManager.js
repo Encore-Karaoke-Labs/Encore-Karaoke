@@ -16,7 +16,7 @@ export default class InputManager {
       { label: "NORMAL", value: 90 },
       { label: "STRONG", value: 127 },
     ];
-    this.currentGuideMelodyIndex = 2;
+    this.currentGuideMelodyIndex = 1;
     this.lastNavSfxTime = 0;
   }
 
