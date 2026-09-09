@@ -550,12 +550,16 @@ const pkg = {
           const basename =
             lastDot > -1 ? file.name.substring(0, lastDot) : file.name;
 
+          const cleanBasename = basename.replace(/\.multiplexed$/i, "");
+
           const hasAudioSibling =
-            Array.from(audioExtensions).some((aExt) =>
-              findSibling(`${basename}.${aExt}`),
+            Array.from(audioExtensions).some(
+              (aExt) =>
+                findSibling(`${cleanBasename}.${aExt}`) ||
+                findSibling(`${cleanBasename}.multiplexed.${aExt}`),
             ) ||
-            Boolean(findSibling(`${basename}.mid`)) ||
-            Boolean(findSibling(`${basename}.kar`));
+            Boolean(findSibling(`${cleanBasename}.mid`)) ||
+            Boolean(findSibling(`${cleanBasename}.kar`));
 
           return !hasAudioSibling;
         }
