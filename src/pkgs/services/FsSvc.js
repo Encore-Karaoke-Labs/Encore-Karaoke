@@ -353,7 +353,7 @@ const pkg = {
         return false;
       }
 
-      const cacheVersion = "v3"; // Standalone video file support
+      const cacheVersion = "v4"; // Standalone video file support with BGV filtering
       const cacheKey = `encore-songlist:${cacheVersion}:${libraryPath}`;
       const signatureKey = `encore-signature:${cacheVersion}:${libraryPath}`;
       const newSongsKey = `encore-newsongs:${cacheVersion}:${libraryPath}`;
