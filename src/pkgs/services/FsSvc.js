@@ -362,6 +362,27 @@ const pkg = {
       const nfc = (s) => (typeof s === "string" ? s.normalize("NFC") : s);
       const isAppleDouble = (name) => name.startsWith("._");
 
+      const manifestBgvFiles = new Set();
+      const bgvCategories = [
+        ...(loadedManifest?.additionalContents?.bgvCategories || []),
+        ...(loadedManifest?.bgvCategories || []),
+      ];
+
+      for (const cat of bgvCategories) {
+        if (Array.isArray(cat?.BGV_LIST)) {
+          for (const item of cat.BGV_LIST) {
+            if (typeof item === "string") {
+              const clean = nfc(item).replace(/\\/g, "/").trim().toLowerCase();
+              manifestBgvFiles.add(clean);
+              const basename = clean.split("/").pop();
+              if (basename) {
+                manifestBgvFiles.add(basename);
+              }
+            }
+          }
+        }
+      }
+
       const audioExtensions = new Set(["wav", "mp3", "m4a", "ogg"]);
       const videoExtensions = new Set(["mp4", "mkv", "webm", "avi"]);
       const validExts = new Set([
@@ -379,6 +400,7 @@ const pkg = {
           if (isAppleDouble(f.name)) return false;
           const name = nfc(f.name).toLowerCase();
           if (name === "songdb.json" || name === "manifest.json") return false;
+          if (manifestBgvFiles.has(name)) return false;
           return validExts.has(name.split(".").pop());
         })
         .sort((a, b) => a.name.localeCompare(b.name))
@@ -513,6 +535,10 @@ const pkg = {
 
       const processableFiles = files.filter((file) => {
         if (file.type !== "file" || isAppleDouble(file.name)) return false;
+
+        const fileNameLower = nfc(file.name).toLowerCase();
+        if (manifestBgvFiles.has(fileNameLower)) return false;
+
         const ext = nfc(file.name).split(".").pop().toLowerCase();
 
         if (audioExtensions.has(ext) || ext === "mid" || ext === "kar") {
