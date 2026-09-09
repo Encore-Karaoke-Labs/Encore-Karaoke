@@ -114,6 +114,7 @@ Pressing **`F2`** in the Main Menu will put you into **Setup Mode**. Setup Mode 
 
 - Change your target Library path.
 - Select the specific Microphone (Input) and Speaker (Output) hardware.
+- Change the SoundFont and MIDI device outputs
 - Adjust Master Volume and Mic Latency overrides.
 - Calibrate Video Sync offsets.
 - Change the Security PIN (Recommended).
