@@ -1,4 +1,3 @@
-import localforage from "localforage";
 import { BasicMIDI } from "spessasynth_core";
 import NetworkingUtility from "../../libs/networkingUtility.js";
 const jsmediatags = window.jsmediatags;
@@ -210,10 +209,10 @@ const pkg = {
       try {
         const res = await fetch(url, { method: "GET" });
         if (!res.ok) {
-          const errorData = await res.json();
+          const errorData = await res.json().catch(() => ({}));
           console.error(
             `[FsSvc] Error fetching file ${path}:`,
-            errorData.error_msg,
+            errorData.error_msg || errorData.error || res.statusText,
           );
           return null;
         }
@@ -335,32 +334,41 @@ const pkg = {
       state.buildAbortController = new AbortController();
       console.log(`[FsSvc] Checking song list for: ${libraryPath}`);
 
-      let loadedManifest = null;
-      try {
-        const manifestContent = await pkg.data.readFile(
-          `${libraryPath}manifest.json`,
-        );
-        if (manifestContent) {
-          loadedManifest = JSON.parse(manifestContent);
-        }
-      } catch (e) {
-        console.warn("[FsSvc] Failed to load manifest for current library", e);
-      }
-
       const files = await pkg.data.getFolder(libraryPath);
       if (!files) {
         state.isBuilding = false;
         return false;
       }
 
-      const cacheVersion = "v4"; // Standalone video file support with BGV filtering
-      const cacheKey = `encore-songlist:${cacheVersion}:${libraryPath}`;
-      const signatureKey = `encore-signature:${cacheVersion}:${libraryPath}`;
-      const newSongsKey = `encore-newsongs:${cacheVersion}:${libraryPath}`;
-
       // macOS readdir returns NFD; Windows/Linux return NFC
       const nfc = (s) => (typeof s === "string" ? s.normalize("NFC") : s);
       const isAppleDouble = (name) => name.startsWith("._");
+
+      const hasManifest = files.some(
+        (f) =>
+          f.type === "file" &&
+          !isAppleDouble(f.name) &&
+          nfc(f.name).toLowerCase() === "manifest.json",
+      );
+
+      let loadedManifest = null;
+      if (hasManifest) {
+        try {
+          const manifestContent = await pkg.data.readFile(
+            `${libraryPath}manifest.json`,
+          );
+          if (manifestContent) {
+            loadedManifest = JSON.parse(manifestContent);
+          }
+        } catch (e) {
+          console.warn(
+            "[FsSvc] Failed to load manifest for current library",
+            e,
+          );
+        }
+      }
+
+      const dbVersion = "v4";
 
       const manifestBgvFiles = new Set();
       const bgvCategories = [
@@ -395,7 +403,7 @@ const pkg = {
         "cdg",
       ]);
 
-      const currentSignature = [...files]
+      const fileSignatures = [...files]
         .filter((f) => {
           if (isAppleDouble(f.name)) return false;
           const name = nfc(f.name).toLowerCase();
@@ -407,18 +415,25 @@ const pkg = {
         .map((f) => `${nfc(f.name)}:${f.modified}`)
         .join("|");
 
-      const cachedSignature = await localforage.getItem(signatureKey);
-      const cachedList = (await localforage.getItem(cacheKey)) || [];
-      const cachedNewSongs = (await localforage.getItem(newSongsKey)) || [];
+      const currentSignature = `${dbVersion}:${fileSignatures}`;
+
+      const hasSongDb = files.some(
+        (f) =>
+          f.type === "file" &&
+          !isAppleDouble(f.name) &&
+          nfc(f.name).toLowerCase() === "songdb.json",
+      );
 
       let embeddedCache = null;
-      try {
-        const embeddedContent = await pkg.data.readFile(
-          `${libraryPath}songdb.json`,
-        );
-        if (embeddedContent) embeddedCache = JSON.parse(embeddedContent);
-      } catch (e) {
-        // No embedded cache found
+      if (hasSongDb) {
+        try {
+          const embeddedContent = await pkg.data.readFile(
+            `${libraryPath}songdb.json`,
+          );
+          if (embeddedContent) embeddedCache = JSON.parse(embeddedContent);
+        } catch (e) {
+          // Corrupted or invalid JSON
+        }
       }
 
       const toRelative = (p) =>
@@ -450,16 +465,7 @@ const pkg = {
         validCacheList = embeddedCache.songList;
         validNewSongs = embeddedCache.newSongs || [];
         console.log(
-          `[FsSvc] Embedded cache is fresh. Loaded ${validCacheList.length} songs.`,
-        );
-      } else if (
-        cachedSignature === currentSignature &&
-        cachedList.length > 0
-      ) {
-        validCacheList = cachedList;
-        validNewSongs = cachedNewSongs;
-        console.log(
-          `[FsSvc] Local cache is fresh. Loaded ${validCacheList.length} songs.`,
+          `[FsSvc] Embedded database is fresh. Loaded ${validCacheList.length} songs.`,
         );
       }
 
@@ -470,29 +476,6 @@ const pkg = {
         state.currentManifest = loadedManifest;
         state.isBuilding = false;
         dispatchSongListReady();
-
-        if (!embeddedCache || embeddedCache.signature !== currentSignature) {
-          const shrinkSong = (song) => ({
-            ...song,
-            path: toRelative(song.path),
-            lrcPath: toRelative(song.lrcPath),
-            cdgPath: toRelative(song.cdgPath),
-            videoPath: toRelative(song.videoPath),
-            chorusPath: toRelative(song.chorusPath),
-          });
-
-          window.desktopIntegration.ipc
-            .invoke("save-songbook-cache", {
-              libraryPath,
-              songList: validCacheList.map(shrinkSong),
-              newSongs: validNewSongs.map(shrinkSong),
-              signature: currentSignature,
-            })
-            .catch((e) =>
-              console.warn("[FsSvc] Failed to write embedded cache", e),
-            );
-        }
-
         return true;
       }
 
@@ -507,7 +490,7 @@ const pkg = {
       const newSongList = [];
       const newlyAddedSongs = [];
 
-      const previousList = embeddedCache?.songList || cachedList || [];
+      const previousList = embeddedCache?.songList || [];
       const codeMap = new Map();
       let maxCode = 0;
 
@@ -822,8 +805,7 @@ const pkg = {
 
         newSongList.sort((a, b) => parseInt(a.code, 10) - parseInt(b.code, 10));
 
-        const previousNewSongs =
-          embeddedCache?.newSongs || cachedNewSongs || [];
+        const previousNewSongs = embeddedCache?.newSongs || [];
         const relativeNewSongs =
           newlyAddedSongs.length > 0
             ? newlyAddedSongs
@@ -842,10 +824,6 @@ const pkg = {
         console.log(
           `[FsSvc] Build complete. Found ${state.songList.length} songs. ${state.newSongs.length} new.`,
         );
-
-        await localforage.setItem(cacheKey, newSongList);
-        await localforage.setItem(signatureKey, currentSignature);
-        await localforage.setItem(newSongsKey, relativeNewSongs);
 
         await window.desktopIntegration.ipc
           .invoke("save-songbook-cache", {
