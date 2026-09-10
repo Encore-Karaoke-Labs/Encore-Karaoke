@@ -102,7 +102,15 @@ if (windowEntryPoints.length > 0) {
   });
 }
 
-Promise.all([buildMain, buildPreload, buildOS, buildWindows])
+const buildCSS = esbuild.build({
+  entryPoints: ["src/style.css"],
+  bundle: true,
+  outfile: "dist/resources/static/style.css",
+  minify: !isDev,
+  sourcemap: isDev,
+});
+
+Promise.all([buildMain, buildPreload, buildOS, buildWindows, buildCSS])
   .then(() => {
     console.log("Copying static assets...");
     copyRecursiveSync("src/libs", "dist/resources/static/libs");
@@ -112,8 +120,6 @@ Promise.all([buildMain, buildPreload, buildOS, buildWindows])
 
     if (fs.existsSync("src/index.html"))
       fs.copyFileSync("src/index.html", "dist/resources/static/index.html");
-    if (fs.existsSync("src/style.css"))
-      fs.copyFileSync("src/style.css", "dist/resources/static/style.css");
 
     const windowsDir = "src/windows";
     if (fs.existsSync(windowsDir)) {
