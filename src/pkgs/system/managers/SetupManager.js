@@ -2336,6 +2336,30 @@ export default class SetupManager {
       .appendTo(this.ctx.dom.setupContainer);
     new Html("h1").text("ENCORE SYSTEM CONFIGURATION").appendTo(header);
 
+    if (
+      this.setupState.view === "submenu" ||
+      this.setupState.view === "pin_change"
+    ) {
+      new Html("button")
+        .classOn("setup-header-btn")
+        .text("◀ Back (ESC)")
+        .on("click", () => {
+          this.ctx.services.Forte.stopSfx();
+          this.transitionTo("dashboard");
+        })
+        .appendTo(header);
+    } else if (
+      this.setupState.view === "dashboard" ||
+      this.setupState.view === "auth" ||
+      this.setupState.view === "loading"
+    ) {
+      new Html("button")
+        .classOn("setup-header-btn")
+        .text("✕ Exit (ESC)")
+        .on("click", () => this.exitSetup())
+        .appendTo(header);
+    }
+
     const body = new Html("div")
       .classOn("setup-body")
       .appendTo(this.ctx.dom.setupContainer);
@@ -2417,6 +2441,13 @@ export default class SetupManager {
           .text("Song not found in library.")
           .appendTo(overlay);
 
+      new Html("button")
+        .classOn("setup-header-btn")
+        .styleJs({ marginTop: "1.5rem" })
+        .text("Cancel (ESC)")
+        .on("click", () => this.exitManualCalibration())
+        .appendTo(overlay);
+
       new Html("p")
         .styleJs({ marginTop: "2rem", opacity: "0.6" })
         .text("Use Number Keys to type | ENTER to Start | ESC to Cancel")
@@ -2437,6 +2468,12 @@ export default class SetupManager {
         .classOn("calib-lyric-line", "next")
         .text("")
         .appendTo(lrcCont);
+      new Html("button")
+        .classOn("box", "positive")
+        .styleJs({ marginTop: "1.5rem" })
+        .text("Done Singing (ENTER)")
+        .on("click", () => this.stopCalibrationRecording())
+        .appendTo(overlay);
       new Html("p")
         .styleJs({ marginTop: "1rem" })
         .text("Press ENTER when you are finished singing to begin adjusting.")
@@ -2524,6 +2561,17 @@ export default class SetupManager {
         .appendTo(overlay);
     }
 
+    new Html("button")
+      .classOn("setup-header-btn")
+      .styleJs({ marginTop: "1.5rem" })
+      .text("Back (ESC)")
+      .on("click", () => {
+        this.setupState.lyricPickerInput = "";
+        this.setupState.view = "submenu";
+        this.renderView();
+      })
+      .appendTo(overlay);
+
     new Html("p")
       .styleJs({ marginTop: "2rem", opacity: "0.6" })
       .text("Use Number Keys to type | ENTER: Play & Adjust | ESC: Back")
@@ -2540,12 +2588,54 @@ export default class SetupManager {
       .appendTo(overlay);
     const hud = new Html("div").classOn("setup-preview-hud").appendTo(overlay);
     new Html("h2").text("VIDEO SYNC CALIBRATION").appendTo(hud);
+
     const currentOffset = this.ctx.config.videoConfig?.syncOffset || 0;
+
+    const offsetControls = new Html("div")
+      .styleJs({
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "1.5rem",
+        margin: "1rem 0",
+      })
+      .appendTo(hud);
+
+    const adjustOffset = (delta) => {
+      const cur = this.ctx.config.videoConfig?.syncOffset || 0;
+      const next = Math.max(-1000, Math.min(1000, cur + delta));
+      this.ctx.config.videoConfig ??= {};
+      this.ctx.config.videoConfig.syncOffset = next;
+      window.config.setItem("videoConfig.syncOffset", next);
+      if (this.offsetDisplay) {
+        this.offsetDisplay.text(`OFFSET: ${next > 0 ? "+" : ""}${next} ms`);
+      }
+    };
+
+    new Html("button")
+      .classOn("setup-header-btn")
+      .text("◀ -10ms")
+      .on("click", () => adjustOffset(-10))
+      .appendTo(offsetControls);
+
     this.offsetDisplay = new Html("div")
       .classOn("setup-preview-offset")
+      .styleJs({ margin: "0" })
       .text(`OFFSET: ${currentOffset > 0 ? "+" : ""}${currentOffset} ms`)
+      .appendTo(offsetControls);
+
+    new Html("button")
+      .classOn("setup-header-btn")
+      .text("+10ms ▶")
+      .on("click", () => adjustOffset(10))
+      .appendTo(offsetControls);
+
+    new Html("button")
+      .classOn("box", "positive")
+      .styleJs({ margin: "1rem auto 0 auto" })
+      .text("Save & Exit (ENTER)")
+      .on("click", () => this.stopVideoPreview())
       .appendTo(hud);
-    new Html("p").text("◀ / ▶ to adjust | ENTER / ESC to save").appendTo(hud);
   }
 
   renderVersionCardOverlay(container) {
@@ -2563,6 +2653,17 @@ export default class SetupManager {
         justifyContent: "center",
         alignItems: "center",
       })
+      .on("click", () => {
+        const card = overlay.elm;
+        if (card && !card.classList.contains("fadeOut")) {
+          card.classList.remove("fadeIn");
+          card.classList.add("fadeOut");
+          setTimeout(() => {
+            this.setupState.showingVersionCard = false;
+            this.renderView();
+          }, 450);
+        }
+      })
       .appendTo(container);
 
     new Html("img")
@@ -2579,6 +2680,12 @@ export default class SetupManager {
   renderDialog(container) {
     const overlay = new Html("div")
       .classOn("setup-dialog-overlay")
+      .on("click", (e) => {
+        if (e.target === overlay.elm) {
+          this.setupState.dialog = null;
+          this.renderView();
+        }
+      })
       .appendTo(container);
     const box = new Html("div").classOn("setup-dialog-box").appendTo(overlay);
     new Html("h2").text(this.setupState.dialog.title).appendTo(box);
@@ -2589,12 +2696,23 @@ export default class SetupManager {
     new Html("p")
       .classOn("setup-dialog-hint")
       .text("Press ENTER or ESC to close")
+      .on("click", () => {
+        this.setupState.dialog = null;
+        this.renderView();
+      })
       .appendTo(box);
   }
 
   renderLicensesOverlay(container) {
     const overlay = new Html("div")
       .classOn("setup-dialog-overlay")
+      .on("click", (e) => {
+        if (e.target === overlay.elm) {
+          this.setupState.showingLicenses = false;
+          this.licensesListEl = null;
+          this.renderView();
+        }
+      })
       .appendTo(container);
 
     const box = new Html("div")
@@ -2706,6 +2824,11 @@ export default class SetupManager {
       .classOn("setup-dialog-hint")
       .styleJs({ marginTop: "1.5rem" })
       .text("Press ESC or ENTER to close | Arrows or Page Up/Down to scroll")
+      .on("click", () => {
+        this.setupState.showingLicenses = false;
+        this.licensesListEl = null;
+        this.renderView();
+      })
       .appendTo(box);
   }
 
@@ -2783,6 +2906,18 @@ export default class SetupManager {
           padding: "1.5rem 2rem",
           textAlign: "left",
         })
+        .on("mouseenter", () => {
+          const tiles = document.querySelectorAll(".setup-tile");
+          if (tiles[this.setupState.dashboardIndex]) {
+            tiles[this.setupState.dashboardIndex].classList.remove("active");
+          }
+          tileEl.classOn("active");
+          this.setupState.dashboardIndex = idx;
+        })
+        .on("click", () => {
+          this.setupState.dashboardIndex = idx;
+          this.executeAction(tile.id);
+        })
         .appendTo(grid);
       if (idx === this.setupState.dashboardIndex) tileEl.classOn("active");
 
@@ -2845,30 +2980,108 @@ export default class SetupManager {
 
       group.items.forEach((item) => {
         const itemIdx = globalItemIndex++;
-        const row = new Html("div").classOn("submenu-item").appendTo(list);
+        const row = new Html("div")
+          .classOn("submenu-item")
+          .on("mouseenter", () => {
+            const rows = document.querySelectorAll(".submenu-item");
+            if (rows[this.setupState.submenuIndex]) {
+              rows[this.setupState.submenuIndex].classList.remove("active");
+            }
+            row.classOn("active");
+            this.setupState.submenuIndex = itemIdx;
+          })
+          .appendTo(list);
+
         if (itemIdx === this.setupState.submenuIndex) row.classOn("active");
+
+        if (item.type === "action" || item.type === "info-action") {
+          row.on("click", () => {
+            this.setupState.submenuIndex = itemIdx;
+            item.action();
+          });
+        }
+
         new Html("div").classOn("submenu-label").text(item.label).appendTo(row);
         const valWrap = new Html("div").classOn("submenu-value").appendTo(row);
 
-        if (item.type === "info")
+        if (item.type === "info") {
           valWrap.html(`<span class="info-text">${item.get()}</span>`);
-        else if (item.type === "info-action")
+        } else if (item.type === "info-action") {
           valWrap.html(
             `<span class="info-text">${item.get()}</span> <span style="opacity: 0.5; font-size: 0.8em; margin-left: 10px;">↵</span>`,
           );
-        else if (item.type === "action") valWrap.text("Press Enter to execute");
-        else if (item.type === "range") {
+        } else if (item.type === "action") {
+          valWrap.text("Press Enter to execute");
+        } else if (item.type === "range") {
           const val = item.get();
           const p = ((val - item.min) / (item.max - item.min)) * 100;
-          valWrap.html(
-            `<div class="setup-slider-bar"><div class="setup-slider-fill" style="width: ${p}%"></div></div><span>${val}</span>`,
-          );
+          const bar = new Html("div")
+            .classOn("setup-slider-bar")
+            .appendTo(valWrap);
+          new Html("div")
+            .classOn("setup-slider-fill")
+            .styleJs({ width: `${p}%` })
+            .appendTo(bar);
+          new Html("span").text(val).appendTo(valWrap);
+
+          bar.on("click", (e) => {
+            e.stopPropagation();
+            const rect = bar.elm.getBoundingClientRect();
+            const ratio = Math.max(
+              0,
+              Math.min(1, (e.clientX - rect.left) / rect.width),
+            );
+            const raw = item.min + ratio * (item.max - item.min);
+            const stepped =
+              Math.round((raw - item.min) / item.step) * item.step + item.min;
+            const clamped = Math.max(item.min, Math.min(item.max, stepped));
+            this.setupState.submenuIndex = itemIdx;
+            item.set(clamped);
+            this.renderView();
+          });
         } else if (item.type === "select") {
           const val = item.get();
           const opt = item.options.find((o) => o.value === val);
-          valWrap.html(
-            `<span>◀</span> <span class="select-text">${opt ? opt.label : val}</span> <span>▶</span>`,
-          );
+
+          const cycleSelect = (dir) => {
+            this.setupState.submenuIndex = itemIdx;
+            const currentVal = item.get();
+            const currentIndex = item.options.findIndex(
+              (o) => o.value === currentVal,
+            );
+            const nextIndex =
+              (currentIndex + dir + item.options.length) % item.options.length;
+            item.set(item.options[nextIndex].value);
+            this.renderView();
+          };
+
+          new Html("span")
+            .classOn("setup-select-arrow")
+            .text("◀")
+            .on("click", (e) => {
+              e.stopPropagation();
+              cycleSelect(-1);
+            })
+            .appendTo(valWrap);
+
+          new Html("span")
+            .classOn("select-text")
+            .styleJs({ cursor: "pointer" })
+            .text(opt ? opt.label : val)
+            .on("click", (e) => {
+              e.stopPropagation();
+              cycleSelect(1);
+            })
+            .appendTo(valWrap);
+
+          new Html("span")
+            .classOn("setup-select-arrow")
+            .text("▶")
+            .on("click", (e) => {
+              e.stopPropagation();
+              cycleSelect(1);
+            })
+            .appendTo(valWrap);
         }
       });
     });
