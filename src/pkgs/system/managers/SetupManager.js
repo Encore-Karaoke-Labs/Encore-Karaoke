@@ -520,7 +520,7 @@ export default class SetupManager {
             items: [
               {
                 id: "soundfont_mode",
-                label: "Soundfont Source",
+                label: "SoundFont Source",
                 type: "select",
                 options: [
                   { value: "default", label: "Internal Default" },
@@ -589,7 +589,7 @@ export default class SetupManager {
               },
               {
                 id: "custom_soundfont_path",
-                label: "Custom Soundfont Path (Press Enter to Browse)",
+                label: "SoundFont Path (Click to Browse)",
                 type: "info-action",
                 get: () => {
                   const p = this.ctx.config.audioConfig?.customSoundfontPath;
@@ -1037,7 +1037,7 @@ export default class SetupManager {
                 id: "about_encore",
                 label: "About Encore",
                 type: "info-action",
-                get: () => "Press Enter to view",
+                get: () => "Click or press Enter to view",
                 action: () => {
                   this.setupState.showingVersionCard = true;
                   this.renderView();
@@ -1047,7 +1047,7 @@ export default class SetupManager {
                 id: "oss_licenses",
                 label: "Open Source Licenses",
                 type: "info-action",
-                get: () => "Press Enter to view",
+                get: () => "Click or press Enter to view",
                 action: async () => {
                   if (!this.setupState.licensesData) {
                     try {
@@ -3023,7 +3023,7 @@ export default class SetupManager {
             `<span class="info-text">${item.get()}</span> <span style="opacity: 0.5; font-size: 0.8em; margin-left: 10px;">↵</span>`,
           );
         } else if (item.type === "action") {
-          valWrap.text("Press Enter to execute");
+          valWrap.text("Click or press Enter to execute");
         } else if (item.type === "range") {
           const val = item.get();
           const p = ((val - item.min) / (item.max - item.min)) * 100;
