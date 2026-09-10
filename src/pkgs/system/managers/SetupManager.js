@@ -1383,27 +1383,18 @@ export default class SetupManager {
       } else if (e.key === "ArrowUp") {
         newIndex = Math.max(0, this.setupState.submenuIndex - 1);
       } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        if (currentItem.type === "range") {
-          const dir = e.key === "ArrowRight" ? 1 : -1;
-          const newVal = Math.max(
-            currentItem.min,
-            Math.min(
-              currentItem.max,
-              currentItem.get() + currentItem.step * dir,
-            ),
-          );
-          currentItem.set(newVal);
-        } else if (currentItem.type === "select") {
-          const dir = e.key === "ArrowRight" ? 1 : -1;
-          const currentVal = currentItem.get();
-          const currentIndex = currentItem.options.findIndex(
-            (o) => o.value === currentVal,
-          );
-          const nextIndex =
-            (currentIndex + dir + currentItem.options.length) %
-            currentItem.options.length;
-          currentItem.set(currentItem.options[nextIndex].value);
+        const rows = document.querySelectorAll(".submenu-item");
+        const activeRow = rows[this.setupState.submenuIndex];
+        const dir = e.key === "ArrowRight" ? 1 : -1;
+
+        if (currentItem.type === "range" && activeRow?._updateRange) {
+          activeRow._updateRange(currentItem.get() + currentItem.step * dir);
+          return;
+        } else if (currentItem.type === "select" && activeRow?._updateSelect) {
+          activeRow._updateSelect(dir);
+          return;
         }
+
         this.renderView();
         return;
       } else if (
@@ -2204,7 +2195,11 @@ export default class SetupManager {
           await window.desktopIntegration.ipc.invoke("get-update-servers");
         this.buildSettingsMap();
       }
-      this.transitionTo("submenu", { activeMenuId: id, submenuIndex: 0 });
+      this.transitionTo("submenu", {
+        activeMenuId: id,
+        submenuIndex: 0,
+        submenuScrollTop: 0,
+      });
     }
   }
 
@@ -2293,6 +2288,17 @@ export default class SetupManager {
 
   renderView(isTransition = false) {
     if (!this.ctx.dom.setupContainer) return;
+
+    const existingList = this.ctx.dom.setupContainer.elm?.querySelector(
+      ".submenu-panel .submenu-list",
+    );
+    if (existingList) {
+      this.setupState.submenuScrollTop = existingList.scrollTop;
+      const maxScroll = existingList.scrollHeight - existingList.clientHeight;
+      this.setupState.wasAtBottom =
+        maxScroll > 0 && maxScroll - existingList.scrollTop <= 6;
+    }
+
     this.ctx.dom.setupContainer.clear();
 
     const existingCard = document.querySelector(".setup-version-card-overlay");
@@ -2963,6 +2969,12 @@ export default class SetupManager {
       .text(menuData.title)
       .appendTo(panel);
     const list = new Html("div").classOn("submenu-list").appendTo(panel);
+    list.on("scroll", () => {
+      this.setupState.submenuScrollTop = list.elm.scrollTop;
+      const maxScroll = list.elm.scrollHeight - list.elm.clientHeight;
+      this.setupState.wasAtBottom =
+        maxScroll > 0 && maxScroll - list.elm.scrollTop <= 6;
+    });
 
     const groups = menuData.groups || [
       { title: null, items: menuData.items || [] },
@@ -3018,11 +3030,21 @@ export default class SetupManager {
           const bar = new Html("div")
             .classOn("setup-slider-bar")
             .appendTo(valWrap);
-          new Html("div")
+          const fill = new Html("div")
             .classOn("setup-slider-fill")
             .styleJs({ width: `${p}%` })
             .appendTo(bar);
-          new Html("span").text(val).appendTo(valWrap);
+          const numSpan = new Html("span").text(val).appendTo(valWrap);
+
+          const updateRangeVisual = (newVal) => {
+            const clamped = Math.max(item.min, Math.min(item.max, newVal));
+            item.set(clamped);
+            const newPct = ((clamped - item.min) / (item.max - item.min)) * 100;
+            fill.styleJs({ width: `${newPct}%` });
+            numSpan.text(clamped);
+          };
+
+          row.elm._updateRange = updateRangeVisual;
 
           bar.on("click", (e) => {
             e.stopPropagation();
@@ -3034,14 +3056,34 @@ export default class SetupManager {
             const raw = item.min + ratio * (item.max - item.min);
             const stepped =
               Math.round((raw - item.min) / item.step) * item.step + item.min;
-            const clamped = Math.max(item.min, Math.min(item.max, stepped));
             this.setupState.submenuIndex = itemIdx;
-            item.set(clamped);
-            this.renderView();
+            updateRangeVisual(stepped);
           });
         } else if (item.type === "select") {
           const val = item.get();
           const opt = item.options.find((o) => o.value === val);
+
+          const leftBtn = new Html("span")
+            .classOn("setup-select-arrow")
+            .text("◀")
+            .appendTo(valWrap);
+
+          const selectTxt = new Html("span")
+            .classOn("select-text")
+            .styleJs({ cursor: "pointer" })
+            .text(opt ? opt.label : val)
+            .appendTo(valWrap);
+
+          const rightBtn = new Html("span")
+            .classOn("setup-select-arrow")
+            .text("▶")
+            .appendTo(valWrap);
+
+          const updateSelectVisual = (newVal) => {
+            item.set(newVal);
+            const found = item.options.find((o) => o.value === newVal);
+            selectTxt.text(found ? found.label : newVal);
+          };
 
           const cycleSelect = (dir) => {
             this.setupState.submenuIndex = itemIdx;
@@ -3051,49 +3093,40 @@ export default class SetupManager {
             );
             const nextIndex =
               (currentIndex + dir + item.options.length) % item.options.length;
-            item.set(item.options[nextIndex].value);
-            this.renderView();
+            updateSelectVisual(item.options[nextIndex].value);
           };
 
-          new Html("span")
-            .classOn("setup-select-arrow")
-            .text("◀")
-            .on("click", (e) => {
-              e.stopPropagation();
-              cycleSelect(-1);
-            })
-            .appendTo(valWrap);
+          row.elm._updateSelect = (dir) => cycleSelect(dir);
 
-          new Html("span")
-            .classOn("select-text")
-            .styleJs({ cursor: "pointer" })
-            .text(opt ? opt.label : val)
-            .on("click", (e) => {
-              e.stopPropagation();
-              cycleSelect(1);
-            })
-            .appendTo(valWrap);
+          leftBtn.on("click", (e) => {
+            e.stopPropagation();
+            cycleSelect(-1);
+          });
 
-          new Html("span")
-            .classOn("setup-select-arrow")
-            .text("▶")
-            .on("click", (e) => {
-              e.stopPropagation();
-              cycleSelect(1);
-            })
-            .appendTo(valWrap);
+          selectTxt.on("click", (e) => {
+            e.stopPropagation();
+            cycleSelect(1);
+          });
+
+          rightBtn.on("click", (e) => {
+            e.stopPropagation();
+            cycleSelect(1);
+          });
         }
       });
     });
 
-    requestAnimationFrame(() => {
-      if (list.elm) {
-        list.elm.scrollTop = this.setupState.submenuScrollTop || 0;
-        const activeItem = list.elm.querySelector(".submenu-item.active");
-        if (activeItem)
-          activeItem.scrollIntoView({ block: "nearest", behavior: "auto" });
+    const restoreScroll = () => {
+      if (!list.elm) return;
+      if (this.setupState.wasAtBottom) {
+        list.elm.scrollTop = list.elm.scrollHeight - list.elm.clientHeight;
+      } else if (this.setupState.submenuScrollTop) {
+        list.elm.scrollTop = this.setupState.submenuScrollTop;
       }
-    });
+    };
+
+    restoreScroll();
+    requestAnimationFrame(restoreScroll);
   }
 
   destroy() {
