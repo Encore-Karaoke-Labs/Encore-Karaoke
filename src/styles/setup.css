@@ -54,10 +54,16 @@
 }
 
 .setup-header-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: unset;
+  line-height: 1;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(137, 207, 240, 0.3);
   color: #89cff0;
-  padding: 0.5rem 1.25rem;
+  padding: 0.55rem 1.25rem;
   border-radius: 6px;
   font-size: 1.2rem;
   font-weight: 700;
@@ -69,6 +75,24 @@
   background: rgba(137, 207, 240, 0.2);
   border-color: #89cff0;
   color: #fff;
+}
+
+.setup-header-btn-icon,
+.setup-header-btn ion-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15em;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.setup-header-btn-text {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  position: relative;
+  top: -2px;
 }
 
 .setup-header h1 {
