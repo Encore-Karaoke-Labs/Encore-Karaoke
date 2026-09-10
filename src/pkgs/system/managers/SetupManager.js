@@ -1274,9 +1274,7 @@ export default class SetupManager {
         this.ctx.config.videoConfig.syncOffset = newOffset;
         window.config.setItem("videoConfig.syncOffset", newOffset);
         if (this.offsetDisplay)
-          this.offsetDisplay.text(
-            `OFFSET: ${newOffset > 0 ? "+" : ""}${newOffset} ms`,
-          );
+          this.offsetDisplay.text(`${newOffset > 0 ? "+" : ""}${newOffset} ms`);
       } else if (e.key === "Enter" || e.key === "Escape") {
         this.stopVideoPreview();
       }
@@ -2348,7 +2346,9 @@ export default class SetupManager {
     ) {
       new Html("button")
         .classOn("setup-header-btn")
-        .text("◀ Back (ESC)")
+        .html(
+          `<span class="setup-header-btn-icon">◀</span><span class="setup-header-btn-text">Back (ESC)</span>`,
+        )
         .on("click", () => {
           this.ctx.services.Forte.stopSfx();
           this.transitionTo("dashboard");
@@ -2361,7 +2361,9 @@ export default class SetupManager {
     ) {
       new Html("button")
         .classOn("setup-header-btn")
-        .text("✕ Exit (ESC)")
+        .html(
+          `<span class="setup-header-btn-icon">✕</span><span class="setup-header-btn-text">Exit (ESC)</span>`,
+        )
         .on("click", () => this.exitSetup())
         .appendTo(header);
     }
@@ -2614,7 +2616,7 @@ export default class SetupManager {
       this.ctx.config.videoConfig.syncOffset = next;
       window.config.setItem("videoConfig.syncOffset", next);
       if (this.offsetDisplay) {
-        this.offsetDisplay.text(`OFFSET: ${next > 0 ? "+" : ""}${next} ms`);
+        this.offsetDisplay.text(`${next > 0 ? "+" : ""}${next} ms`);
       }
     };
 
@@ -2627,7 +2629,7 @@ export default class SetupManager {
     this.offsetDisplay = new Html("div")
       .classOn("setup-preview-offset")
       .styleJs({ margin: "0" })
-      .text(`OFFSET: ${currentOffset > 0 ? "+" : ""}${currentOffset} ms`)
+      .text(`${currentOffset > 0 ? "+" : ""}${currentOffset} ms`)
       .appendTo(offsetControls);
 
     new Html("button")
