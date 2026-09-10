@@ -1,0 +1,72 @@
+/* radio-canada-regular - latin */
+@font-face {
+  font-display: swap;
+  font-family: "Radio Canada";
+  font-style: normal;
+  font-weight: 400;
+  src: url("./assets/fonts/radio-canada-v26-latin-regular.woff2")
+    format("woff2");
+}
+
+/* radio-canada-500 - latin */
+@font-face {
+  font-display: swap;
+  font-family: "Radio Canada";
+  font-style: normal;
+  font-weight: 500;
+  src: url("./assets/fonts/radio-canada-v26-latin-500.woff2") format("woff2");
+}
+
+/* radio-canada-600 - latin */
+@font-face {
+  font-display: swap;
+  font-family: "Radio Canada";
+  font-style: normal;
+  font-weight: 600;
+  src: url("./assets/fonts/radio-canada-v26-latin-600.woff2") format("woff2");
+}
+
+/* radio-canada-700 - latin */
+@font-face {
+  font-display: swap;
+  font-family: "Radio Canada";
+  font-style: normal;
+  font-weight: 700;
+  src: url("./assets/fonts/radio-canada-v26-latin-700.woff2") format("woff2");
+}
+
+/* rajdhani-regular - latin */
+@font-face {
+  font-display: swap;
+  font-family: "Rajdhani";
+  font-style: normal;
+  font-weight: 400;
+  src: url("./assets/fonts/rajdhani-v17-latin-regular.woff2") format("woff2");
+}
+
+/* rajdhani-500 - latin */
+@font-face {
+  font-display: swap;
+  font-family: "Rajdhani";
+  font-style: normal;
+  font-weight: 500;
+  src: url("./assets/fonts/rajdhani-v17-latin-500.woff2") format("woff2");
+}
+
+/* rajdhani-600 - latin */
+@font-face {
+  font-display: swap;
+  font-family: "Rajdhani";
+  font-style: normal;
+  font-weight: 600;
+  src: url("./assets/fonts/rajdhani-v17-latin-600.woff2") format("woff2");
+}
+
+/* rajdhani-700 - latin */
+@font-face {
+  font-display: swap;
+  font-family: "Rajdhani";
+  font-style: normal;
+  font-weight: 700;
+  src: url("./assets/fonts/rajdhani-v17-latin-700.woff2") format("woff2");
+}

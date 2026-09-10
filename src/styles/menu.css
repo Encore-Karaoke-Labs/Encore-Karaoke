@@ -1,0 +1,353 @@
+.ui {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: unset;
+  padding: 1rem 2rem;
+  max-width: 80rem;
+  margin: 0 auto;
+  display: flex;
+  overflow: auto;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.full-ui {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: unset;
+  display: flex;
+  flex-direction: column;
+}
+
+.ui .flex-list:first-of-type button {
+  scroll-margin: 999rem;
+}
+
+.ui .flex-list:last-of-type button {
+  scroll-margin: 9rem;
+}
+
+p + .flex-list button {
+  scroll-margin: 10rem;
+}
+
+.modal-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  backdrop-filter: blur(0.5rem) brightness(0.5) contrast(1.05);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 2rem;
+  border-radius: 0.8rem;
+  background-color: var(--background-default);
+  border: 0.1rem solid var(--background-lighter);
+  box-shadow: 0 0 0.5rem 0 var(--current-player);
+}
+
+@media screen and (max-height: 420px) {
+  .keyboard .modal-content > h2,
+  .keyboard .modal-content > p {
+    display: none;
+  }
+}
+
+.modal-buttons {
+  display: flex;
+  overflow-x: auto;
+  gap: 0.75rem;
+}
+
+/* ==========================================================================
+   System Notifications & Status Displays
+   ========================================================================== */
+.notify-box {
+  display: flex;
+  flex-direction: column-reverse;
+  position: fixed;
+  z-index: 999999;
+  top: 1.5rem;
+  left: 1.5rem;
+  gap: 1rem;
+}
+
+.notify-box > .notify {
+  background-color: var(--background-default);
+  border: 0.125rem solid var(--current-player);
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  min-width: 20rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  backdrop-filter: blur(0.5rem) brightness(0.8) contrast(1.2);
+  box-shadow: 0 0 1rem 0 rgba(0, 0, 0, 0.5);
+}
+
+.notify-box > .notify .notify-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--current-player);
+  letter-spacing: 0.05em;
+}
+
+.notify-box > .notify .notify-description {
+  font-size: 0.95rem;
+  color: var(--text-default);
+  opacity: 0.9;
+}
+
+.vp-progress-bar {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 1.5rem;
+  border-radius: 10rem;
+  background: var(--background-light);
+  border: 0.1rem solid var(--background-lightest);
+  overflow: clip;
+}
+
+.vp-progress-bar-value {
+  display: flex;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 100%;
+  border-radius: 10rem;
+  background: var(--current-player);
+  border: 0.1rem solid var(--background-lightest);
+}
+
+.controller-status-bar {
+  position: fixed;
+  bottom: 1rem;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-top: 0.1rem solid var(--background-lighter);
+  padding-top: 1rem;
+  gap: 2.5rem;
+  z-index: 9999999;
+}
+
+.controller-status-bar .csb-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.csb-button span {
+  display: flex;
+  align-items: center;
+  width: 2rem;
+  height: 2rem;
+}
+
+.csb-button svg {
+  width: 100%;
+  height: 100%;
+}
+
+.csb-button kbd {
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+}
+
+.tiles {
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(var(--columns), 1fr);
+  grid-template-rows: repeat(var(--rows), 1ft);
+}
+
+.tile {
+  background-color: rgb(0, 0, 0);
+  opacity: 1;
+  transition: all;
+}
+
+.main-menu-attached {
+  width: 100%;
+  padding: 0rem 2rem 2.75rem 2rem;
+}
+
+.game-list,
+.main-menu-attached,
+.main-menu-container,
+.oobe-bar {
+  background-color: #0004;
+}
+
+.game-list {
+  overflow: auto;
+  align-items: flex-end;
+  width: 100%;
+  padding: 0 9rem 8rem 9rem;
+  min-height: 27rem;
+}
+
+.game-list .game {
+  width: 22.125rem;
+  height: 15rem;
+  border-radius: 1rem;
+  border: 0.125rem solid transparent;
+  flex-shrink: 0;
+  position: relative;
+  overflow: visible;
+  scroll-margin: 20rem;
+  scroll-snap-align: center;
+  transition:
+    width 0.25s ease,
+    height 0.25s ease;
+}
+
+.game-list .game.over {
+  width: 26.5rem;
+  height: 18rem;
+}
+
+.game-list .game:first-of-type {
+  scroll-margin-left: 9rem;
+}
+
+.game-list .game:last-of-type {
+  scroll-margin-right: 9rem;
+}
+
+.game-list .game .game-under-text {
+  position: absolute;
+  width: 100%;
+  left: 0;
+  top: calc(100% + 1rem);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.game-list .game.over .game-under-text {
+  opacity: 1;
+}
+
+.game-list .game .game-name {
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.game-list .game .game-play-time {
+  color: var(--label-dimmest);
+  font-weight: 600;
+}
+
+.main-menu {
+  align-items: center;
+  flex-shrink: 1;
+  padding: 0 !important;
+  max-width: unset !important;
+  gap: 0 !important;
+  background-color: unset;
+}
+
+.main-menu-container {
+  padding: 3.5rem 9rem 3.75rem 9rem;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+}
+
+.icon,
+.icon svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.main-menu-container .left,
+.main-menu-container .left .buttons {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+}
+
+.main-menu-container .left .buttons:has(.over) :not(.over) {
+  color: var(--text-dimmest);
+}
+
+.main-menu-container .right,
+.main-menu-container .right .buttons {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.main-menu-container .left .buttons .btn {
+  height: max-content;
+  margin: auto 0;
+  font-size: 1.5rem;
+  font-weight: bold;
+  display: flex;
+  align-items: flex-end;
+}
+
+.main-menu-container .left .buttons .btn.selected {
+  color: var(--current-player);
+}
+
+.main-menu-container .left .logo,
+.main-menu-container .left .logo svg {
+  width: 4rem;
+  height: 4rem;
+}
+
+.key {
+  position: relative;
+}
+
+.key-button-prompt {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background-color: var(--text-default);
+}
+
+.home-menu-section {
+  overflow: auto;
+}
+
+.friends-count {
+  margin-left: 8px;
+  font-size: 1rem;
+  padding: 8px;
+  width: 2rem;
+  height: 2rem;
+  aspect-ratio: 1 / 1;
+  background-color: var(--background-light);
+  border-radius: 50%;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}

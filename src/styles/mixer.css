@@ -1,0 +1,344 @@
+.calibration-screen {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: white;
+  font-family: "Rajdhani", sans-serif;
+  z-index: 999999;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+  text-align: center;
+  padding: 2rem;
+}
+
+.calibration-screen.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.calibration-screen h1 {
+  font-size: 3rem;
+  letter-spacing: 0.1em;
+  color: #89cff0;
+  margin-bottom: 1rem;
+}
+
+.calibration-screen p {
+  font-size: 1.5rem;
+  opacity: 0.8;
+  max-width: 60ch;
+}
+
+/* -- Mixer Modal -- */
+.mixer-modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(15px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  font-family: "Rajdhani", sans-serif;
+  color: #fff;
+}
+
+.mixer-modal.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.mixer-content {
+  width: 715px;
+  height: 80vh;
+  max-height: 800px;
+  background: rgba(10, 10, 20, 0.85);
+  border: 1px solid rgba(137, 207, 240, 0.4);
+  border-radius: 1rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+}
+
+.mixer-content.expanded {
+  width: 95vw;
+  max-width: 1600px;
+}
+
+.mixer-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.mixer-header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  letter-spacing: 0.1em;
+  color: #89cff0;
+}
+
+.mixer-header p {
+  margin: 0.25rem 0 0 0;
+  opacity: 0.6;
+  font-size: 0.9rem;
+}
+
+.mixer-layout {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.mixer-main {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+/* -- Faders and Meters -- */
+.mixer-faders-section {
+  display: flex;
+  gap: 3rem;
+  padding: 2rem 4rem;
+  background: rgba(0, 0, 0, 0.6);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.channel-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  width: 120px;
+  padding: 2rem 0;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.2s ease;
+  height: 100%;
+}
+
+.channel-strip.focused {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.1);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+}
+
+.fader-area {
+  display: flex;
+  justify-content: center;
+  flex-grow: 1;
+  min-height: 250px;
+  width: 100%;
+  position: relative;
+}
+
+.fader-track {
+  width: 24px;
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 6px;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.8);
+  height: 100%;
+}
+
+.vu-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  border-radius: 5px;
+  background: linear-gradient(
+    to top,
+    #39ff14 0%,
+    #39ff14 60%,
+    #f7b733 80%,
+    #ff5555 100%
+  );
+  clip-path: inset(100% 0 0 0);
+  pointer-events: none;
+}
+
+.fader-thumb {
+  position: absolute;
+  left: -12px;
+  width: 48px;
+  height: 16px;
+  background: rgba(137, 207, 240, 0.85);
+  border-radius: 4px;
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(2px);
+  transition: background-color 0.2s;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.channel-strip.focused .fader-thumb {
+  background: rgba(255, 215, 0, 0.85);
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+/* -- Effects Chain -- */
+.mixer-chain-section {
+  flex: 1;
+  min-width: 300px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 10, 20, 0.4);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.chain-header {
+  color: #89cff0;
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+  margin: 0 0 1rem 0;
+  border-bottom: 1px solid rgba(137, 207, 240, 0.3);
+  padding-bottom: 0.5rem;
+}
+
+.chain-item {
+  padding: 0.8rem 1.2rem;
+  margin-bottom: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: var(--cursor-pointer);
+  font-size: 1.2rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.chain-item.focused {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.15);
+  color: #ffd700;
+  transform: translateX(5px);
+}
+
+.chain-item.active-plugin {
+  border-color: #89cff0;
+  background: rgba(137, 207, 240, 0.2);
+  box-shadow: 0 0 15px rgba(137, 207, 240, 0.3);
+}
+
+.add-header {
+  color: #ffd700;
+  margin-top: 1.5rem;
+}
+
+.mixer-plugin-section {
+  flex: 4;
+  padding: 2rem;
+  display: none;
+  background: rgba(5, 5, 10, 0.6);
+  overflow-y: auto;
+  overflow-x: auto;
+  position: relative;
+}
+
+.mixer-content.expanded .mixer-plugin-section {
+  display: block;
+  animation: fadeIn 0.4s ease forwards;
+}
+
+/* -- Miser Controls -- */
+.mixer-list-panel {
+  flex: 1;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  overflow-y: auto;
+  padding: 0.5rem 0;
+}
+
+.mixer-item {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  cursor: var(--cursor-pointer);
+  border-left: 4px solid transparent;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.mixer-item--active {
+  background-color: rgba(137, 207, 240, 0.2);
+  border-left-color: #89cff0;
+}
+
+.mixer-controls-panel {
+  flex: 3;
+  padding: 1rem 1.5rem;
+  overflow-y: auto;
+}
+
+.mixer-controls-title {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.5rem;
+  color: #ffd700;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 0.75rem;
+}
+
+.mixer-controls-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  min-width: max-content;
+  padding-bottom: 1rem;
+}
+
+.mixer-control {
+  display: grid;
+  grid-template-columns: 200px 1fr 100px;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s ease;
+  cursor: var(--cursor-pointer);
+}
+
+.mixer-control--active {
+  background-color: rgba(137, 207, 240, 0.1);
+}
+
+.mixer-control label {
+  font-weight: 500;
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mixer-value-display {
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-align: right;
+  color: #89cff0;
+}
+
+.mixer-slider-wrapper {
+  width: 100%;
+}

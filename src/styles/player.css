@@ -1,0 +1,932 @@
+.overlay-ui {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 2rem 3rem;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.7) 0%,
+    rgba(0, 0, 0, 0.3) 20%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.9) 100%
+  );
+  transition: opacity 0.3s ease-out;
+  z-index: 10;
+}
+
+.bgv-container {
+  position: absolute;
+  inset: 0;
+  background-color: #000;
+  overflow: hidden;
+  z-index: 1;
+  transform: translateZ(0);
+  will-change: contents;
+}
+
+.youtube-player-container {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: #000;
+  pointer-events: none;
+  transform: translateZ(0);
+}
+
+.youtube-player-container iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* -- Song Number Entry -- */
+.main-content {
+  text-align: center;
+  color: white;
+  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+  transition: opacity 0.3s ease-out;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 12;
+  pointer-events: none;
+}
+
+.mode-menu.is-typing .main-content {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.main-content h1 {
+  font-size: 2rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.number-display {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 10rem;
+  line-height: 1;
+  font-weight: 700;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.5rem;
+  padding: 1rem 2rem;
+  letter-spacing: 0.5rem;
+  transition: all 0.2s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 600px;
+  height: 180px;
+  margin: 0 auto;
+}
+
+.number-display.active {
+  transform: scale(1.02);
+  border-color: #89cff0;
+  box-shadow: 0 0 20px #89cff066;
+}
+
+.song-info {
+  margin-top: 1.5rem;
+  height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.song-title {
+  font-size: 2.5rem;
+  font-weight: bold;
+}
+
+.song-artist {
+  font-size: 1.5rem;
+  opacity: 0.8;
+}
+
+/* -- Standby -- */
+.standby-screen {
+  position: absolute;
+  bottom: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  min-width: 450px;
+  max-width: 55%;
+  height: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(8, 8, 16, 0.75);
+  backdrop-filter: blur(8px);
+  border-radius: 0.5rem;
+  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
+  padding: 1rem;
+  z-index: 11;
+  transition:
+    opacity 0.3s ease-out,
+    background 0.3s ease-out;
+  pointer-events: none;
+}
+
+.standby-screen.has-bumper-image {
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+  padding: 0;
+  min-height: 0;
+}
+
+.standby-bumper-image {
+  max-height: 15em;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  opacity: 1;
+  transition: opacity 0.5s ease-in-out;
+  filter: drop-shadow(0 5px 15px rgba(0, 0, 0, 0.6));
+  border-radius: 10px;
+}
+
+.standby-text {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 0 1.5rem;
+}
+
+.idle-hint {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1.1rem;
+  color: rgb(255, 255, 255);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  animation: blink-hint 2s infinite;
+  z-index: 15;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.idle-hint.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.idle-hint kbd {
+  font-size: 0.9rem;
+  padding: 0.2rem 0.4rem;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* -- New Song List -- */
+@keyframes slideInRightStagger {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.new-song-screen {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 1400px;
+  height: auto;
+  max-height: 85vh;
+  background: rgba(10, 10, 20, 0.85);
+  border: 1px solid rgba(137, 207, 240, 0.4);
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  z-index: 11;
+  overflow: hidden;
+  transition: opacity 0.5s ease-in-out;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.new-song-header {
+  padding: 1.5rem 2rem;
+  border-bottom: 2px solid rgba(137, 207, 240, 0.4);
+  background: rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.ns-head-text {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 3rem;
+  font-weight: 800;
+  color: #ffd700;
+  letter-spacing: 0.15em;
+  text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.8);
+}
+
+.new-song-list {
+  padding: 1rem 3rem 2rem 3rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  justify-content: flex-start;
+  gap: clamp(0.25rem, 1.2vh, 1.2rem);
+}
+
+.ns-row {
+  display: flex;
+  align-items: center;
+  font-family: "Rajdhani", sans-serif;
+  font-size: clamp(1.2rem, 3vh, 2.2rem);
+  font-weight: 600;
+  color: white;
+  opacity: 0;
+  animation: slideInRightStagger 0.4s ease-out forwards;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
+  padding-bottom: clamp(0.25rem, 1vh, 0.5rem);
+}
+
+.ns-row:last-child {
+  border-bottom: none;
+}
+
+.ns-code {
+  color: #89cff0;
+  width: 140px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ns-title-col {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ns-title {
+  margin-left: 0.5rem;
+}
+
+.ns-artist {
+  width: 30%;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.temp-dialog {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  min-width: 450px;
+  max-width: 55%;
+  height: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(8, 8, 16, 0.75);
+  backdrop-filter: blur(8px);
+  border-radius: 0.5rem;
+  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
+  padding: 1rem;
+  z-index: 21;
+  transition:
+    opacity 0.3s ease-out,
+    background 0.3s ease-out;
+  pointer-events: none;
+}
+
+.temp-dialog-text {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 5rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 0 1.5rem;
+}
+
+/* -- Lyrics -- */
+.player-ui {
+  position: absolute;
+  inset: 0;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  transition: background 0.3s ease-out;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, transparent 50%);
+  z-index: 15;
+  padding-bottom: 5vh;
+  pointer-events: none;
+}
+
+.mode-player-youtube .player-ui,
+.mode-player-cdg .player-ui,
+.mode-player-no-lyrics .player-ui {
+  background: transparent;
+}
+
+.player-bottom-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1rem;
+}
+
+.countdown-display {
+  width: 9rem;
+  height: 9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 120%, #f7b733, #fc4a1a);
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 900;
+  font-size: 6rem;
+  color: #000;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 0 10px rgba(0, 0, 0, 0.5),
+    0 5px 15px rgba(0, 0, 0, 0.4);
+  border: 4px solid #4d4d4d;
+  opacity: 0;
+  line-height: 1;
+  margin-bottom: 0;
+  pointer-events: none;
+  z-index: 20;
+  position: absolute;
+  top: calc(2rem + 50px + 1rem + 6.3rem + 1rem + 125px);
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+  transition:
+    opacity 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.countdown-display.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.lyrics-render-surface {
+  width: 100%;
+  max-width: 1400px;
+  display: block;
+  margin: 2rem auto -8rem auto;
+  pointer-events: none;
+  z-index: 10;
+  transition: opacity 0.3s ease;
+}
+
+.player-progress {
+  width: 100%;
+  max-width: 1200px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  margin-top: 1rem;
+}
+
+.progress-bar {
+  width: 0%;
+  height: 100%;
+  background-color: #89cff0;
+  border-radius: 5px;
+  transition: width 0.1s linear;
+}
+
+/* -- Title Card -- */
+.intro-card {
+  position: absolute;
+  top: 25%;
+  left: 0;
+  width: 100%;
+  padding: 3rem 10%;
+  background: linear-gradient(
+    90deg,
+    rgba(10, 10, 20, 0.5) 0%,
+    rgba(10, 10, 20, 0.9) 20%,
+    rgba(15, 23, 42, 0.95) 50%,
+    rgba(10, 10, 20, 0.9) 80%,
+    rgba(10, 10, 20, 0.5) 100%
+  );
+  border-top: 2px solid rgba(137, 207, 240, 0.3);
+  border-bottom: 2px solid rgba(137, 207, 240, 0.3);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  text-align: center;
+  font-family: "Rajdhani", sans-serif;
+  color: white;
+  z-index: 16;
+  opacity: 0;
+  transform: scaleY(0);
+  transition:
+    opacity 0.4s ease-out,
+    transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+}
+
+.intro-card.visible {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.intro-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 1200px;
+}
+
+.intro-card-title {
+  font-size: 5.5rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  line-height: 1.1;
+  text-shadow:
+    0 0 20px rgba(137, 207, 240, 0.5),
+    0 5px 10px rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.5s ease-out,
+    transform 0.5s ease-out;
+}
+
+.intro-card-artist {
+  font-size: 2rem;
+  font-weight: 500;
+  color: #e2e8f0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.25rem 2rem;
+  border-radius: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  margin-top: 0.5rem;
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.5s ease-out,
+    transform 0.5s ease-out;
+}
+
+.intro-card-meta {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f7b733;
+  margin-top: 1rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.5s ease-out;
+}
+
+.intro-card.visible .intro-card-title {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.2s;
+}
+
+.intro-card.visible .intro-card-artist {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.3s;
+}
+
+.intro-card.visible .intro-card-meta {
+  opacity: 1;
+  transition-delay: 0.5s;
+}
+
+/* -- Interludes -- */
+.interlude-overlay {
+  position: absolute;
+  bottom: 5%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(10, 10, 20, 0.85);
+  border: 2px solid rgba(137, 207, 240, 0.8);
+  padding: 2rem 5rem;
+  border-radius: 20px;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    opacity 0.5s ease-out,
+    transform 0.5s ease-out,
+    visibility 0.5s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  will-change: transform, opacity;
+  transform-style: preserve-3d;
+}
+
+.interlude-overlay::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 20px;
+  box-shadow: 0 0 60px rgba(137, 207, 240, 0.6);
+  z-index: -1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.interlude-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, -50%) scale(1.05);
+}
+
+.interlude-overlay.visible::before {
+  animation: pulse-interlude 3s infinite ease-in-out;
+}
+
+.interlude-text {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 4rem;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 0.4em;
+  margin-right: -0.4em;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+  border-bottom: 2px solid rgba(137, 207, 240, 0.5);
+  padding-bottom: 0.5rem;
+}
+
+.interlude-tip-box {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: #ffd700;
+  text-align: center;
+  max-width: 500px;
+  line-height: 1.4;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+  opacity: 0.9;
+}
+
+/* -- Info Bar & More -- */
+.top-bar-container {
+  position: absolute;
+  top: 2rem;
+  left: 3rem;
+  right: 3rem;
+  height: 50px;
+  display: flex;
+  gap: 1rem;
+  z-index: 67000;
+  pointer-events: none;
+}
+
+.system-indicators {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.5rem;
+  padding: 0 1.2rem;
+  font-family: "Rajdhani", sans-serif;
+  color: white;
+  transition: all 0.3s ease;
+  pointer-events: none;
+  flex-shrink: 0;
+  order: 2;
+}
+
+.system-indicators.hidden {
+  display: none !important;
+}
+
+.battery-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.battery-text {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.system-indicators ion-icon {
+  font-size: 1.6rem;
+}
+
+.info-bar {
+  position: relative;
+  height: 100%;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.5rem;
+  font-family: "Rajdhani", sans-serif;
+  color: white;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  order: 1;
+}
+
+.info-bar.persist-visible,
+.info-bar.temp-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.info-bar-label {
+  flex: 0 0 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ffd700;
+  letter-spacing: 0.1rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.info-bar-content {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1.5rem;
+  font-size: 1.6rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.info-bar-code {
+  font-weight: 700;
+  color: #89cff0;
+  letter-spacing: 0.1rem;
+}
+
+.info-bar-code.is-youtube {
+  color: #ff5555;
+  letter-spacing: 0;
+}
+
+.info-bar-title {
+  font-weight: bold;
+}
+
+.info-bar-artist {
+  opacity: 0.7;
+}
+
+.bgv-carousel,
+.rhythm-carousel {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  overflow: hidden;
+  padding: 10px;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.rhythm-carousel {
+  gap: 30px;
+}
+
+.bgv-item,
+.rhythm-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-in-out;
+  opacity: 0.4;
+  min-width: 80px;
+  padding: 0.5rem;
+  flex-shrink: 0;
+}
+
+.bgv-item.selected,
+.rhythm-item.selected {
+  transform: scale(1.1);
+  opacity: 1;
+  min-width: 120px;
+}
+
+.bgv-item > span {
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: #fff;
+  transition: all 0.2s ease-in-out;
+}
+
+.bgv-item.selected > span {
+  color: #89cff0;
+  text-shadow: 0 0 15px rgba(137, 207, 240, 0.5);
+}
+
+.rhythm-item > span:first-child {
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+.rhythm-item.selected > span:first-child {
+  color: #ffca28;
+  text-shadow: 0 0 15px rgba(255, 202, 40, 0.5);
+}
+
+.rhythm-item > span:last-child {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: -5px;
+  letter-spacing: 1px;
+  display: none;
+}
+
+.rhythm-item.selected > span:last-child {
+  display: block;
+}
+
+.transpose-display {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 1rem;
+}
+
+.transpose-min,
+.transpose-max {
+  font-size: 1.2rem;
+  font-weight: 700;
+  opacity: 0.6;
+  width: 40px;
+  text-align: center;
+}
+
+.transpose-slider-container {
+  flex-grow: 1;
+  height: 12px;
+  background-color: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  position: relative;
+}
+
+.transpose-slider-center-line {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background-color: rgba(255, 255, 255, 0.6);
+  transform: translateX(-50%);
+  border-radius: 2px;
+  z-index: 2;
+}
+
+.transpose-slider-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background-color: #f7b733;
+  border-radius: 6px;
+  transition:
+    width 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    left 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.transpose-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  width: 60px;
+  text-align: right;
+  color: #f7b733;
+}
+
+.info-bar-content .volume-display {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 1rem;
+}
+
+.info-bar-content .volume-slider-container {
+  flex-grow: 1;
+  height: 12px;
+  background-color: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.info-bar-content .volume-slider-fill {
+  height: 100%;
+  background-color: #89cff0;
+  border-radius: 6px;
+  transition: width 0.1s linear;
+}
+
+.info-bar-content .volume-percentage {
+  font-size: 1.6rem;
+  font-weight: 700;
+  width: 70px;
+  text-align: right;
+}
+
+/* -- Score HUD -- */
+.score-hud {
+  position: absolute;
+  bottom: 2rem;
+  left: 3rem;
+  padding: 0.5rem 1.2rem;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.5rem;
+  font-family: "Rajdhani", sans-serif;
+  color: white;
+  z-index: 26;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.75rem;
+  opacity: 0;
+  transition:
+    opacity 0.3s ease,
+    bottom 0.3s ease;
+  pointer-events: none;
+}
+
+.score-hud.visible {
+  opacity: 1;
+}
+
+.score-hud-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ffd700;
+  letter-spacing: 0.1rem;
+}
+
+.score-hud-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #89cff0;
+  letter-spacing: 0.1rem;
+  line-height: 1;
+}

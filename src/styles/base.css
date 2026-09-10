@@ -1,0 +1,374 @@
+* {
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+  scrollbar-color: rgba(255, 255, 255, 0.01) transparent;
+  scrollbar-width: thin;
+}
+
+html,
+body {
+  overflow: hidden;
+  margin: 0;
+  height: 100%;
+}
+
+html,
+body,
+.flex {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  margin: 0;
+  gap: 0.5rem;
+}
+
+body {
+  background-color: var(--background-dimmer);
+  color: var(--label-lighter);
+  font-family:
+    "Radio Canada",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    "Open Sans",
+    "Helvetica Neue",
+    sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+ul {
+  margin: 0;
+}
+
+a:not(.btn) {
+  color: var(--current-player);
+  text-decoration: underline;
+}
+
+a.hv {
+  text-decoration: none;
+  border: 0;
+  text-decoration-thickness: 0rem;
+}
+
+a.hv.selected {
+  text-decoration: none;
+}
+
+a.hv.over {
+  text-decoration: underline;
+  text-decoration-thickness: 0.2rem;
+  border: 0 !important;
+}
+
+label {
+  color: var(--label-dim);
+  font-weight: 500;
+  pointer-events: none;
+}
+
+iframe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  border: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9;
+}
+
+kbd {
+  border: 0.1rem solid #fff4;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.5rem;
+  background: #fff2;
+  font: inherit;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+
+[part="cue"] {
+  border-radius: 10px;
+  font-family:
+    "Radio Canada",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    "Open Sans",
+    "Helvetica Neue",
+    sans-serif;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* -- Form Controls -- */
+.hv,
+button {
+  border: 0.125rem solid transparent;
+  scroll-margin: 2rem;
+}
+
+button svg {
+  width: 100%;
+  height: 100%;
+}
+
+.hv:hover,
+button:hover .hv.over,
+button.over {
+  border: 0.125rem solid var(--current-player) !important;
+}
+
+button,
+.box {
+  min-width: 11.25rem;
+  padding: 1rem 0.75rem;
+  font: inherit;
+  background-color: var(--background-light);
+  border-radius: 0.5rem;
+  font-weight: 550;
+  color: var(--text-default);
+  cursor: var(--cursor-pointer), auto;
+  outline: none;
+}
+
+button.small,
+button.sm {
+  min-width: unset;
+  min-width: 3rem;
+  width: 3rem;
+  height: 3rem;
+  padding: 0.75rem;
+}
+
+button.sm {
+  min-width: 5rem;
+}
+
+button.auto {
+  min-width: unset !important;
+}
+
+button.pressed {
+  background-color: var(--background-lightest);
+  color: var(--current-player);
+}
+
+button.wide {
+  flex: 1;
+}
+
+button[disabled] {
+  filter: saturate(0);
+}
+
+button.negative {
+  background-color: var(--negative-light);
+}
+
+button.positive {
+  background-color: var(--positive-light);
+}
+
+input[type="text"],
+.input,
+button.input-box {
+  white-space: pre-wrap;
+  overflow: auto;
+  max-width: 100%;
+  min-width: 11.25rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 1rem 0.75rem;
+  font: inherit;
+  background-color: var(--background-light);
+  border-radius: 0.32rem;
+  font-weight: 550;
+  color: var(--text-default);
+  cursor: var(--cursor-pointer), auto;
+  border: 0.125rem solid var(--current-player);
+}
+
+.input::after {
+  content: "|";
+  animation: blink 1.5s linear infinite;
+}
+
+button.input-box {
+  border-color: var(--background-dimmer);
+}
+
+button.input-box.over {
+  border-color: var(--current-player);
+}
+
+input[type="range"] {
+  accent-color: var(--current-player);
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #89cff0;
+  border-radius: 50%;
+  cursor: var(--cursor-pointer);
+  border: 2px solid #010141;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: #89cff0;
+  border-radius: 50%;
+  cursor: var(--cursor-pointer);
+  border: 2px solid #010141;
+}
+
+/* -- Common Layouts -- */
+.box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.flex-list,
+.flex-row {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 1rem;
+}
+
+.flex-center {
+  justify-content: center;
+  align-items: center;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.flex-list-small,
+.flex-row-small {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.flex-col-small {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pad-top {
+  padding-top: 5rem;
+}
+
+.pad-top-sm {
+  padding-top: 3rem;
+}
+
+.gap {
+  gap: 2rem;
+}
+
+.w-100 .home-menu-section {
+  padding: 2.75rem 0;
+  gap: 2.5rem;
+}
+
+.hidden {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.mouse-disabled,
+.mouse-disabled * {
+  cursor: var(--cursor-inactive), auto !important;
+  pointer-events: none;
+}
+
+.transparent {
+  background-color: transparent;
+}
+
+.transparent .target {
+  border: 0.1rem solid var(--background-lighter);
+  border-radius: 0.32rem;
+}
+
+.transparent.over .target {
+  border-color: var(--current-player);
+}
+
+.positive-text {
+  color: var(--positive-lighting);
+}
+
+.negative-text {
+  color: var(--negative-lighting);
+}
+
+.space {
+  transition: opacity 1s linear;
+}
+
+.title {
+  font-size: 1.5rem;
+}
+
+/* -- Global Scrollbars -- */
+.ui-box::-webkit-scrollbar,
+.ui::-webkit-scrollbar {
+  width: 0.5em;
+}
+
+.ui-box::-webkit-scrollbar-track,
+.ui::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ui-box::-webkit-scrollbar-thumb,
+.ui::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}

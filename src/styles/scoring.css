@@ -1,0 +1,429 @@
+.post-song-score-screen {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+
+.post-song-score-screen.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: all;
+}
+
+.score-card {
+  background: linear-gradient(
+    145deg,
+    rgba(20, 20, 40, 0.85),
+    rgba(10, 10, 20, 0.9)
+  );
+  border: 1px solid rgba(137, 207, 240, 0.4);
+  border-radius: 1rem;
+  width: 90%;
+  max-width: 900px;
+  padding: 2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  font-family: "Rajdhani", sans-serif;
+}
+
+.score-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.score-header-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #89cff0;
+  text-shadow: 0 0 5px #89cff0;
+}
+
+.score-header-subtitle {
+  font-size: 1.5rem;
+  opacity: 0.8;
+}
+
+.score-main {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.final-score-container {
+  text-align: center;
+}
+
+.final-score {
+  font-family: "Orbitron", sans-serif;
+  font-size: 10rem;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow:
+    0 0 10px #fff,
+    0 0 20px #89cff0,
+    0 0 30px #89cff0;
+  color: #f0f0f0;
+}
+
+.final-score-label {
+  font-size: 1.2rem;
+  color: #ffd700;
+  letter-spacing: 0.2rem;
+}
+
+.score-details {
+  display: flex;
+  justify-content: space-around;
+  gap: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* -- Gauges -- */
+.score-gauge-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.score-gauge-label {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.score-gauge {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.score-gauge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--gauge-color) calc(var(--value) * 1%),
+    #444 0
+  );
+  mask: radial-gradient(transparent 65%, black 66%);
+  -webkit-mask: radial-gradient(transparent 65%, black 66%);
+  transition: background 0.5s ease-out;
+}
+
+.score-gauge-value {
+  font-family: "Orbitron", sans-serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  z-index: 1;
+}
+
+.gauge-key-rhythm {
+  --gauge-color: #3b82f6;
+}
+.gauge-vibrato {
+  --gauge-color: #22c55e;
+}
+.gauge-upband {
+  --gauge-color: #f59e0b;
+}
+.gauge-downband {
+  --gauge-color: #ef4444;
+}
+
+/* -- Post Song Screen -- */
+.post-song-screen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 8, 12, 0.98) 0%,
+    rgba(2, 2, 5, 0.99) 100%
+  );
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+  font-family: "Radio Canada", sans-serif;
+  color: white;
+}
+
+.score-title-text {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 3.5rem;
+  text-transform: uppercase;
+  letter-spacing: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 2vh;
+  font-weight: 700;
+  transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.score-main-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6vh;
+  transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-origin: center center;
+}
+
+.score-display-number {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 16rem;
+  font-weight: 700;
+  line-height: 0.9;
+  color: #fff;
+  text-shadow: 0 0 40px rgba(255, 255, 255, 0.2);
+}
+
+.rank-display-text {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 6rem;
+  font-weight: 700;
+  margin-top: 10px;
+  text-transform: uppercase;
+  letter-spacing: 5px;
+}
+
+.score-details-grid {
+  display: flex;
+  gap: 6vw;
+  justify-content: center;
+  width: 90%;
+  max-width: 1400px;
+}
+
+.gauge-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.gauge-svg-container {
+  position: relative;
+  width: 160px;
+  height: 160px;
+}
+
+.gauge-svg {
+  transform: rotate(-90deg);
+  width: 100%;
+  height: 100%;
+}
+
+.gauge-bg-circle {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 8;
+}
+
+.gauge-fill-circle {
+  fill: none;
+  stroke: var(--g-color);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 283; /* 2 * PI * 45 */
+  stroke-dashoffset: 283;
+  transition: stroke-dashoffset 0.1s linear;
+}
+
+.gauge-value-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: "Rajdhani", sans-serif;
+  font-size: 3rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.gauge-label {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.4rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+}
+
+.score-skip-hint {
+  position: absolute;
+  bottom: 50px;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  animation: blink-hint 2s infinite;
+}
+
+/* -- Session Leaderboard -- */
+.post-song-screen-overlay.show-leaderboard .score-main-group {
+  transform: translateX(-22vw) scale(0.75);
+  margin-bottom: 0;
+}
+
+.post-song-screen-overlay.show-leaderboard .score-title-text {
+  transform: translateX(-22vw) scale(0.85);
+}
+
+.score-session-leaderboard {
+  font-family: "Rajdhani", sans-serif;
+  position: absolute;
+  right: 5vw;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 42vw;
+  max-width: 800px;
+  gap: 1rem;
+  background: linear-gradient(
+    145deg,
+    rgba(20, 20, 40, 0.9),
+    rgba(10, 10, 20, 0.95)
+  );
+  border: 1px solid rgba(137, 207, 240, 0.4);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.8),
+    inset 0 0 20px rgba(137, 207, 240, 0.1);
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+  transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.score-session-leaderboard.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(100px);
+}
+
+.score-session-leaderboard h3 {
+  margin: 0;
+  color: #ffd700;
+  font-size: 2rem;
+  letter-spacing: 0.15em;
+  text-align: center;
+  border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+  padding-bottom: 0.5rem;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+  width: 100%;
+}
+
+.score-lb-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  width: 100%;
+}
+
+.score-lb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 1.5rem;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.score-lb-row.is-current-singer {
+  background: rgba(255, 215, 0, 0.15);
+  border: 2px solid #ffd700;
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+  z-index: 2;
+}
+
+.score-lb-rank {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ffd700;
+  width: 45px;
+}
+
+.score-lb-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  margin-right: 1.5rem;
+}
+
+.score-lb-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.score-lb-name {
+  font-size: 1.3rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.score-lb-song {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.score-lb-row.is-current-singer .score-lb-name {
+  color: #ffd700;
+}
+
+.score-lb-row.is-current-singer .score-lb-song {
+  color: rgba(255, 215, 0, 0.7);
+}
+
+.score-lb-score {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #89cff0;
+  text-shadow: 0 0 10px rgba(137, 207, 240, 0.4);
+}

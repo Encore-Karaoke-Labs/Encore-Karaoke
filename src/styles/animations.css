@@ -1,0 +1,304 @@
+/* ==========================================================================
+   Animations & Keyframes
+   ========================================================================== */
+@keyframes load {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes animateIn {
+  from {
+    transform: translateY(-5%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes animateOut {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(5%);
+    opacity: 0;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(50%);
+    opacity: 0;
+  }
+}
+
+@keyframes slideUpIn {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideUpOut {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes slideDownIn {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDownOut {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes pop {
+  from {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes blink {
+  20% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+  80% {
+    opacity: 1;
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes pulse-status {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes logoAnimateIn {
+  0% {
+    transform: scale(0) translateY(-50%);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes logoAnimateOut {
+  0% {
+    transform: scale(1);
+    filter: saturate(1) brightness(1);
+    opacity: 1;
+  }
+  20% {
+    transform: scale(0.75);
+    filter: saturate(1) brightness(1);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(1);
+    filter: saturate(1) brightness(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(5) translateY(0);
+    filter: saturate(0) brightness(0);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-interlude {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes blink-hint {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.loading {
+  animation: load 1s linear infinite;
+}
+
+.loading * {
+  opacity: 0 !important;
+}
+
+.popIn {
+  pointer-events: none;
+  animation: animateIn 0.5s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.popOut {
+  pointer-events: none;
+  animation: animateOut 0.5s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.slideIn {
+  pointer-events: none;
+  animation: slideIn 0.5s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.slideOut {
+  pointer-events: none;
+  animation: slideOut 0.5s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.slideUpIn {
+  pointer-events: none;
+  animation: slideUpIn 0.5s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.slideUpOut {
+  pointer-events: none;
+  animation: slideUpOut 0.5s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.slideDownIn {
+  pointer-events: none;
+  animation: slideDownIn 0.5s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.slideDownOut {
+  pointer-events: none;
+  animation: slideDownOut 0.5s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.fadeIn {
+  pointer-events: none;
+  animation: fadeIn 0.5s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.fadeOut {
+  pointer-events: none;
+  animation: fadeOut 0.5s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.pop {
+  animation: pop 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.logoAnimateIn {
+  animation: logoAnimateIn 1s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.logoAnimateOut {
+  animation: logoAnimateOut 1s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.pulse-status {
+  animation: pulse-status 1s ease-in-out infinite;
+}
+
+.lyric-fade-in {
+  animation: fade-in 0.5s ease-out;
+  animation-delay: var(--animation-delay, 0s);
+}
