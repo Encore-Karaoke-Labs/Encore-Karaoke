@@ -106,6 +106,7 @@ const buildCSS = esbuild.build({
   entryPoints: ["src/style.css"],
   bundle: true,
   outfile: "dist/resources/static/style.css",
+  external: ["*.woff2", "*.woff"],
   minify: !isDev,
   sourcemap: isDev,
 });
