@@ -498,7 +498,7 @@ export default class InputManager {
         );
         return;
       }
-      if (state.mode === "menu" && !state.isTypingNumber) {
+      if (!state.isTypingNumber) {
         e.preventDefault();
         modules.stream.toggleStreamModal();
         return;
