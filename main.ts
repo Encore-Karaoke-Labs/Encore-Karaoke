@@ -1345,75 +1345,155 @@ void app.whenReady().then(() => {
     },
   );
 
-  ipcMain.handle("stream-start", async () => {
-    if (ffmpegStreamProcess) {
-      logger.warn("STREAM", "Stream is already running.");
-      return { success: false, reason: "Already running" };
-    }
+  ipcMain.handle(
+    "stream-start",
+    async (
+      event: IpcMainInvokeEvent,
+      payload?: { rtmpUrl?: string; streamKey?: string; videoBitrate?: number },
+    ) => {
+      if (ffmpegStreamProcess) {
+        logger.warn("STREAM", "Stream is already running.");
+        return { success: false, reason: "Already running" };
+      }
 
-    const ffmpegArgs = [
-      "-loglevel",
-      "warning",
-      "-fflags",
-      "+genpts+igndts",
-      "-f",
-      "matroska",
-      "-i",
-      "pipe:0",
-      "-c:v",
-      "copy",
-      "-c:a",
-      "aac",
-      "-b:a",
-      "192k",
-      "-ar",
-      "48000",
-      "-f",
-      "flv",
-      "-listen",
-      "1",
-      "http://127.0.0.1:8080/live", // Local preview stream
-    ];
+      const rtmpUrl = payload?.rtmpUrl?.trim();
+      const streamKey = payload?.streamKey?.trim();
 
-    try {
-      ffmpegStreamProcess = spawn("ffmpeg", ffmpegArgs, {
-        windowsHide: true,
-        stdio: ["pipe", "inherit", "inherit"],
-      });
+      let targetDestination = "http://127.0.0.1:8080/live";
+      if (rtmpUrl) {
+        targetDestination = streamKey
+          ? `${rtmpUrl.replace(/\/+$/, "")}/${streamKey}`
+          : rtmpUrl;
+      }
 
-      ffmpegStreamProcess.stdin?.on("error", (err: NodeJS.ErrnoException) => {
-        if (err.code === "EOF" || err.code === "EPIPE") {
-          return;
-        }
-        logger.error("STREAM", `stdin error: ${err.message}`);
-      });
+      const ffmpegArgs = [
+        "-loglevel",
+        "warning",
+        "-progress",
+        "pipe:1",
+        "-stats_period",
+        "1",
+        "-thread_queue_size",
+        "2048",
+        "-fflags",
+        "+genpts+igndts+nobuffer",
+        "-f",
+        "matroska",
+        "-i",
+        "pipe:0",
+        "-c:v",
+        "copy",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-ar",
+        "48000",
+        "-ac",
+        "2",
+        "-af",
+        "aresample=async=1:first_pts=0",
+        "-flags",
+        "+global_header",
+        "-flvflags",
+        "no_duration_filesize",
+        "-f",
+        "flv",
+        targetDestination,
+      ];
 
-      streamHeaderChunk = null;
+      try {
+        ffmpegStreamProcess = spawn("ffmpeg", ffmpegArgs, {
+          windowsHide: true,
+          stdio: ["pipe", "pipe", "pipe"],
+        });
 
-      ffmpegStreamProcess.on("close", (code) => {
-        logger.info("STREAM", `FFmpeg process exited with code ${code}`);
-        ffmpegStreamProcess = null;
+        ffmpegStreamProcess.stdin?.on("error", (err: NodeJS.ErrnoException) => {
+          if (err.code === "EOF" || err.code === "EPIPE") {
+            return;
+          }
+          logger.error("STREAM", `stdin error: ${err.message}`);
+        });
+
         streamHeaderChunk = null;
-        if (appViewWebContents && !appViewWebContents.isDestroyed()) {
-          appViewWebContents.send("stream-status-changed", {
-            isStreaming: false,
-          });
-        }
-      });
+        const streamSender = event.sender;
+        let stdoutBuffer = "";
+        const currentStats: Record<string, string> = {};
 
-      ffmpegStreamProcess.on("error", (err) => {
-        logger.error("STREAM", `FFmpeg spawn error: ${err.message}`);
-        ffmpegStreamProcess = null;
-      });
+        ffmpegStreamProcess.stdout?.on("data", (chunk: Buffer) => {
+          stdoutBuffer += chunk.toString("utf8");
+          const lines = stdoutBuffer.split(/\r?\n/);
+          stdoutBuffer = lines.pop() ?? "";
 
-      logger.info("STREAM", `Streaming pipe opened to`);
-      return { success: true };
-    } catch (error) {
-      const err = error as Error;
-      logger.error("STREAM", `Failed to spawn FFmpeg: ${err.message}`);
-      return { success: false, error: err.message };
-    }
-  });
+          for (const line of lines) {
+            const idx = line.indexOf("=");
+            if (idx !== -1) {
+              const key = line.substring(0, idx).trim();
+              const val = line.substring(idx + 1).trim();
+              currentStats[key] = val;
+
+              if (key === "progress") {
+                const fps = parseFloat(currentStats["fps"] || "30");
+                const bitrate = currentStats["bitrate"] || "N/A";
+                const dropFrames = parseInt(
+                  currentStats["drop_frames"] || "0",
+                  10,
+                );
+                const totalSize = parseInt(
+                  currentStats["total_size"] || "0",
+                  10,
+                );
+                const speedStr = currentStats["speed"] || "1.00x";
+                const speedVal = parseFloat(speedStr.replace("x", "")) || 1.0;
+
+                let health: "excellent" | "good" | "poor" = "excellent";
+                if (speedVal < 0.85 || dropFrames > 30) {
+                  health = "poor";
+                } else if (speedVal < 0.98 || dropFrames > 5) {
+                  health = "good";
+                }
+
+                if (!streamSender.isDestroyed()) {
+                  streamSender.send("stream-stats", {
+                    fps: isNaN(fps) ? 30 : fps,
+                    bitrate,
+                    dropFrames: isNaN(dropFrames) ? 0 : dropFrames,
+                    totalSize: isNaN(totalSize) ? 0 : totalSize,
+                    speed: speedStr,
+                    health,
+                  });
+                }
+              }
+            }
+          }
+        });
+
+        ffmpegStreamProcess.on("close", (code) => {
+          logger.info("STREAM", `FFmpeg process exited with code ${code}`);
+          ffmpegStreamProcess = null;
+          streamHeaderChunk = null;
+          if (appViewWebContents && !appViewWebContents.isDestroyed()) {
+            appViewWebContents.send("stream-status-changed", false);
+          }
+        });
+
+        ffmpegStreamProcess.on("error", (err) => {
+          logger.error("STREAM", `FFmpeg spawn error: ${err.message}`);
+          ffmpegStreamProcess = null;
+        });
+
+        logger.info(
+          "STREAM",
+          `Streaming pipe opened to ${targetDestination.replace(/(live2?\/)[^/]+/, "$1******")}`,
+        );
+        return { success: true };
+      } catch (error) {
+        const err = error as Error;
+        logger.error("STREAM", `Failed to spawn FFmpeg: ${err.message}`);
+        return { success: false, error: err.message };
+      }
+    },
+  );
 
   ipcMain.on("stream-chunk", (_event: IpcMainEvent, chunk: ArrayBuffer) => {
     if (
