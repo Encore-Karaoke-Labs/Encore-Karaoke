@@ -172,8 +172,17 @@ export class ForteSynthesizer {
       console.log("[FORTE SVC] MIDI Synthesizer initialized successfully.");
 
       try {
-        this.midiDeviceHandler =
-          await MIDIDeviceHandler.createMIDIDeviceHandler();
+        const midiTimeout = new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("MIDI device initialization timed out")),
+            2500,
+          ),
+        );
+
+        this.midiDeviceHandler = await Promise.race([
+          MIDIDeviceHandler.createMIDIDeviceHandler(),
+          midiTimeout,
+        ]);
         logVerbose("MIDIDeviceHandler initialized successfully.");
       } catch (midiErr) {
         logVerboseWarn(
