@@ -69,6 +69,16 @@ export default class InputManager {
       return;
     }
 
+    if (
+      document.activeElement &&
+      document.activeElement.classList.contains("stream-input")
+    ) {
+      if (e.key === "Escape") {
+        document.activeElement.blur();
+      }
+      return;
+    }
+
     const isSearchInputFocused =
       dom.searchInput && document.activeElement === dom.searchInput.elm;
 
@@ -126,6 +136,11 @@ export default class InputManager {
 
     if (state.isSessionModalOpen) {
       sessions.handleKeyDown(e);
+      return;
+    }
+
+    if (state.isStreamModalOpen) {
+      modules.stream.handleKeyDown(e);
       return;
     }
 
@@ -470,12 +485,25 @@ export default class InputManager {
       return;
     }
 
-    // Extremely experimental streaming feature
-    // if (e.ctrlKey && e.altKey && e.key.toLowerCase() === "b") {
-    //   e.preventDefault();
-    //   this.ctx.modules.stream?.toggleStream();
-    //   return;
-    // }
+    if (
+      e.key.toLowerCase() === "b" &&
+      !isSearchInputFocused &&
+      !state.isSearchOverlayVisible
+    ) {
+      if (state.isSessionActive) {
+        modules.infoBar.showTemp(
+          "STREAM",
+          "Streaming is disabled during an active Session.",
+          3000,
+        );
+        return;
+      }
+      if (state.mode === "menu" && !state.isTypingNumber) {
+        e.preventDefault();
+        modules.stream.toggleStreamModal();
+        return;
+      }
+    }
 
     if (
       e.key.toLowerCase() === "q" &&
