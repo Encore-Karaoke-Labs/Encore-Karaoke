@@ -1,5 +1,5 @@
 import { ForteAudioCore } from "./core/AudioCore.js";
-import { logVerbose, state } from "./core/State.js";
+import { logVerbose, logVerboseWarn, state } from "./core/State.js";
 import { ForteMicrophone } from "./modules/Microphone.js";
 import { FortePianoRoll } from "./modules/PianoRoll.js";
 import { FortePlayback } from "./modules/Playback.js";
@@ -54,16 +54,14 @@ const pkg = {
     pianoRoll = new FortePianoRoll(state);
     pianoRoll.initialize();
 
+    microphone = new ForteMicrophone(state, audioCore);
+    scoring = new ForteScoring(state, audioCore, pianoRoll);
+
     synthesizer = new ForteSynthesizer(
       state,
       audioCore,
       dispatchPlaybackUpdate,
     );
-    await synthesizer.initialize();
-    synthesizer.getMidiOutputDevices();
-
-    microphone = new ForteMicrophone(state, audioCore);
-    scoring = new ForteScoring(state, audioCore, pianoRoll);
 
     playback = new FortePlayback(
       state,
@@ -76,6 +74,13 @@ const pkg = {
     );
 
     sfx = new ForteSFX(state, audioCore, synthesizer);
+
+    await synthesizer.initialize();
+    try {
+      synthesizer.getMidiOutputDevices();
+    } catch (e) {
+      logVerboseWarn("Could not query MIDI output devices:", e);
+    }
 
     await pkg.data.initializeScoringEngine();
   },
