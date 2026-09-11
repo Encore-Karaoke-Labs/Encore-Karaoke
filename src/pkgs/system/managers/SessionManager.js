@@ -92,6 +92,15 @@ export default class SessionManager {
     if (!roomCode) return;
     const state = this.ctx.state;
 
+    if (this.ctx.modules.stream?.isStreaming) {
+      this.ctx.modules.infoBar.showTemp(
+        "SESSION",
+        "Cannot join a Session while live streaming.",
+        4000,
+      );
+      return;
+    }
+
     if (state.isSessionActive && state.sessionRoomId === roomCode) {
       this.ctx.modules.infoBar.showTemp(
         "SESSION",
@@ -515,6 +524,16 @@ export default class SessionManager {
   toggleSessionModal(forceState = null) {
     const isOpening =
       forceState !== null ? forceState : !this.ctx.state.isSessionModalOpen;
+
+    if (isOpening && this.ctx.modules.stream?.isStreaming) {
+      this.ctx.modules.infoBar.showTemp(
+        "SESSION",
+        "Cannot open Sessions while live streaming.",
+        4000,
+      );
+      return;
+    }
+
     this.ctx.state.isSessionModalOpen = isOpening;
 
     if (isOpening) {
@@ -778,6 +797,16 @@ export default class SessionManager {
         .text(isHost ? "CREATE" : "JOIN")
         .on("click", async () => {
           if (!isHost && !roomInput.getValue().trim()) return;
+
+          if (this.ctx.modules.stream?.isStreaming) {
+            this.ctx.modules.infoBar.showTemp(
+              "SESSIONS",
+              "Cannot start or join a Session while live streaming.",
+              4000,
+            );
+            return;
+          }
+
           await Identity.updateProfile(nickInput.getValue());
           dom.sessionContentArea.clear();
           new Html("h2")
