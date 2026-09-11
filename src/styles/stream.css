@@ -1,0 +1,290 @@
+.stream-modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  z-index: 65000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  font-family: "Rajdhani", sans-serif;
+  color: #fff;
+}
+
+.stream-modal.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.stream-box {
+  background: rgba(10, 10, 20, 0.85);
+  border: 1px solid rgba(137, 207, 240, 0.4);
+  border-radius: 1rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  width: 80vw;
+  height: 80vh;
+  max-width: 1200px;
+  overflow: hidden;
+}
+
+.stream-header {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+  text-align: left;
+}
+
+.stream-header h1 {
+  margin: 0;
+  font-size: 2.2rem;
+  letter-spacing: 0.1em;
+  color: #89cff0;
+  text-transform: uppercase;
+}
+
+.stream-header p {
+  margin: 0.25rem 0 0 0;
+  opacity: 0.6;
+  font-size: 1.1rem;
+}
+
+/* -- 2-Column Layout -- */
+.stream-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  padding: 2rem;
+  gap: 3rem;
+  overflow-y: auto;
+}
+
+.stream-col {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 1.25rem;
+  min-height: 0;
+}
+
+.stream-section-title {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #ffd700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+/* -- Input Controls -- */
+.stream-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.stream-form-label {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #89cff0;
+}
+
+input.stream-input,
+.stream-input {
+  height: 52px !important;
+  min-height: 52px !important;
+  max-height: 52px !important;
+  box-sizing: border-box !important;
+  background: rgba(0, 0, 0, 0.6) !important;
+  border: 2px solid rgba(137, 207, 240, 0.4) !important;
+  color: #ffffff !important;
+  padding: 0 1.25rem !important;
+  border-radius: 8px !important;
+  font-size: 1.25rem !important;
+  font-family: "Rajdhani", sans-serif !important;
+  font-weight: 600 !important;
+  outline: none !important;
+  width: 100% !important;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text !important;
+}
+
+input.stream-input::placeholder,
+.stream-input::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+input.stream-input:focus,
+.stream-input:focus {
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.3) !important;
+}
+
+.stream-input-wrapper .stream-input {
+  padding-right: 165px !important;
+}
+
+.stream-key-actions {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stream-key-action-btn {
+  background: rgba(137, 207, 240, 0.15) !important;
+  border: 1px solid rgba(137, 207, 240, 0.4) !important;
+  color: #89cff0 !important;
+  font-size: 0.9rem !important;
+  padding: 0.45rem 0.9rem !important;
+  cursor: var(--cursor-pointer) !important;
+  border-radius: 6px !important;
+  font-family: "Rajdhani", sans-serif !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  min-width: unset !important;
+  height: auto !important;
+  transition: all 0.2s ease !important;
+}
+
+.stream-key-action-btn:hover {
+  background: #89cff0 !important;
+  color: #000000 !important;
+  border-color: #89cff0 !important;
+}
+
+/* -- Stream Health (Left Column) -- */
+.stream-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(137, 207, 240, 0.3);
+  border-radius: 8px;
+  padding: 1.1rem 1.25rem;
+  box-sizing: border-box;
+}
+
+.stream-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.stream-stat-label {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.stream-stat-value {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #89cff0;
+  white-space: nowrap;
+}
+
+.stream-stat-value.health-excellent {
+  color: #55ff55 !important;
+}
+
+.stream-stat-value.health-good {
+  color: #ffd700 !important;
+}
+
+.stream-stat-value.health-poor {
+  color: #ff5555 !important;
+}
+
+.stream-health-meter {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.3rem;
+}
+
+.stream-health-bar {
+  height: 100%;
+  width: 0%;
+  background-color: #55ff55;
+  transition:
+    width 0.4s ease,
+    background-color 0.4s ease;
+}
+
+/* -- Bitrate Chips (Right Column) -- */
+.stream-bitrate-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.stream-bitrate-chip {
+  flex: 1;
+  padding: 0.8rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(137, 207, 240, 0.3);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 1.1rem;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 700;
+  color: #fff;
+  cursor: var(--cursor-pointer);
+  transition: all 0.2s ease;
+}
+
+.stream-bitrate-chip:hover {
+  border-color: #89cff0;
+  background: rgba(137, 207, 240, 0.15);
+}
+
+.stream-bitrate-chip.active {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.15);
+  color: #ffd700;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+}
+
+/* -- Info Card & Actions (Right Column) -- */
+.stream-info-card {
+  background: rgba(10, 10, 20, 0.6);
+  border: 1px solid rgba(137, 207, 240, 0.3);
+  border-radius: 12px;
+  padding: 1.25rem;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.65);
+  box-shadow: inset 0 0 15px rgba(137, 207, 240, 0.05);
+}
+
+.stream-info-card strong {
+  color: #89cff0;
+  font-size: 1.15rem;
+  letter-spacing: 0.05em;
+}
+
+.stream-btn-row {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+  margin-top: auto;
+}
