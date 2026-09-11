@@ -48,6 +48,7 @@ export default class UIManager {
     this.buildPostSongScreen();
     this.buildRecordingsUI();
     this.buildSessionsUI();
+    this.buildStreamUI();
     this.buildSessionChatUI();
     this.buildQR();
     this.buildSetupUI();
@@ -288,6 +289,14 @@ export default class UIManager {
       .classOn("action-button")
       .html('<ion-icon name="people"></ion-icon> <span>Sessions (S)</span>')
       .on("click", () => this.ctx.root.sessions.toggleSessionModal())
+      .appendTo(dom.bottomActions);
+
+    new Html("div")
+      .classOn("action-button")
+      .html(
+        '<ion-icon name="radio-outline"></ion-icon> <span>Broadcast (B)</span>',
+      )
+      .on("click", () => this.ctx.modules.stream.toggleStreamModal())
       .appendTo(dom.bottomActions);
 
     new Html("div")
@@ -853,6 +862,30 @@ export default class UIManager {
     dom.sessionContentArea = new Html("div")
       .classOn("session-content-area")
       .appendTo(dom.sessionBox);
+  }
+
+  buildStreamUI() {
+    const dom = this.ctx.dom;
+    dom.streamModal = new Html("div")
+      .classOn("stream-modal", "hidden")
+      .appendTo(this.ctx.wrapper);
+
+    dom.streamModal.on("click", (e) => {
+      if (e.target === dom.streamModal.elm)
+        this.ctx.modules.stream.toggleStreamModal(false);
+    });
+
+    dom.streamBox = new Html("div")
+      .classOn("stream-box")
+      .appendTo(dom.streamModal);
+
+    dom.streamHeader = new Html("div")
+      .classOn("stream-header")
+      .appendTo(dom.streamBox);
+
+    dom.streamContentArea = new Html("div")
+      .classOn("stream-content-area")
+      .appendTo(dom.streamBox);
   }
 
   buildSessionChatUI() {
