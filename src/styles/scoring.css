@@ -310,11 +310,7 @@
   width: 42vw;
   max-width: 800px;
   gap: 1rem;
-  background: linear-gradient(
-    145deg,
-    rgba(20, 20, 40, 0.9),
-    rgba(10, 10, 20, 0.95)
-  );
+  background: rgba(10, 10, 20, 0.95);
   border: 1px solid rgba(137, 207, 240, 0.4);
   border-radius: 16px;
   padding: 2rem;
