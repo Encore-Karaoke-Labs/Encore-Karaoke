@@ -39,6 +39,8 @@
   - Don't have a song in your local library? Search YouTube directly from the player or your phone and queue it up instantly.
 - **Instant Recording**
   - Record your best vocal performances directly to your hard drive with the press of a button.
+- **Live Streaming with RTMP**
+  - Live stream your karaoke sessions to your fans directly inside of Encore!
 - **Pitch & Latency Control**
   - Adjust pitch (transpose) and tempo on the fly.
   - Calibrate your microphone and signal chain's latency quickly.
