@@ -555,7 +555,6 @@ export default class PlaybackManager {
     this.ctx.wrapper.classOff("mode-player-youtube");
     this.ctx.wrapper.classOff("mode-player-no-lyrics");
 
-    modules.recorder.clearSongInfo();
     if (this.ctx.root.games)
       this.ctx.root.games.broadcastPlaybackState("stopped", null);
     if (this.ctx.state.isLyricCustomizerVisible) {
@@ -647,9 +646,6 @@ export default class PlaybackManager {
       state.isTransitioning = true;
       this.ctx.services.Forte.togglePianoRollVisibility(false);
 
-      if (this.ctx.modules.recorder.isRecording)
-        this.ctx.modules.recorder.stop();
-
       const wasLocalAudio = !state.currentSongIsYouTube;
       const wasMV = state.currentSongIsMV;
       this.ctx.modules.scoreHud.hide();
@@ -685,6 +681,12 @@ export default class PlaybackManager {
         }
         state.currentScoreEntryId = null;
       }
+
+      if (this.ctx.modules.recorder.isRecording) {
+        this.ctx.modules.recorder.stop();
+        this.ctx.modules.recorder.clearSongInfo();
+      }
+
       this.transitionAfterSong();
     }
     state.lastPlaybackStatus = status;
@@ -742,6 +744,13 @@ export default class PlaybackManager {
     if (root.games)
       root.games.broadcastPlaybackState("score_screen", scoreData);
     dom.postSongScreen.classOff("show-leaderboard");
+
+    const isRemoteAudience =
+      state.isSessionActive &&
+      this.ctx.services.SessionsSvc &&
+      this.ctx.services.SessionsSvc.state.mode === "performance" &&
+      this.ctx.services.SessionsSvc.state.singerId !==
+        this.ctx.services.SessionsSvc.peer?.id;
 
     if (state.isSessionActive) {
       const singerName = state.remoteScoreEntry
@@ -837,7 +846,7 @@ export default class PlaybackManager {
       else if (s >= 70) fanfareUrl = "/assets/audio/fanfare-3.mid";
       else if (s >= 20) fanfareUrl = "/assets/audio/fanfare.mid";
 
-      if (state.isScoreFanfareEnabled) {
+      if (state.isScoreFanfareEnabled && !isRemoteAudience) {
         const fanfareFinished = await Forte.playSfx(fanfareUrl, 0.5);
         if (!fanfareFinished || state.scoreSkipped) return;
       } else {
@@ -845,7 +854,7 @@ export default class PlaybackManager {
       }
 
       let playedNarration = false;
-      if (state.isScoreNarrationEnabled) {
+      if (state.isScoreNarrationEnabled && !isRemoteAudience) {
         const libraryInfo = root.library?.libraryInfo;
         const narrations =
           libraryInfo?.manifest?.additionalContents?.scoreNarrations;
