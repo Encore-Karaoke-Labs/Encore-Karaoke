@@ -323,6 +323,10 @@ class EncoreController {
       lyricsCanvas: this.dom.lyricsCanvas,
       scoreDisplay: this.scoreHud.scoreDisplay,
       danmakuCanvas: this.dom.danmakuCanvas,
+      postSongScreen: this.dom.postSongScreen,
+      scoreTitleText: this.dom.scoreTitleText,
+      finalScoreDisplay: this.dom.finalScoreDisplay,
+      rankDisplay: this.dom.rankDisplay,
     });
 
     await this.library.init();
