@@ -737,26 +737,7 @@
 
             <div class="editor-group">
               <label>LIBRARY FLAGS</label>
-              <div class="flags-container">
-                <label class="flag-item" for="flag-flip-artist-title">
-                  <input
-                    type="checkbox"
-                    id="flag-flip-artist-title"
-                    onchange="onFlagChange()"
-                  />
-                  <div class="flag-text-group">
-                    <span class="flag-title"
-                      >Invert Filename Order (Song Title - Artist Name)</span
-                    >
-                    <p class="flag-desc">
-                      When enabled, files like
-                      <code>Ang Huling El Bimbo - Eraserheads.kar</code> will be
-                      indexed as Title: <b>Ang Huling El Bimbo</b> and Artist:
-                      <b>Eraserheads</b>.
-                    </p>
-                  </div>
-                </label>
-              </div>
+              <div class="flags-container" id="flags-container"></div>
             </div>
 
             <label>LIBRARY ROOT DIRECTORY</label>
@@ -869,6 +850,70 @@
       let bgvData = [];
       let bgvSaveTimeout = null;
       let manifestSaveTimeout = null;
+
+      const AVAILABLE_FLAGS = [
+        {
+          key: "flipArtistTitle",
+          title: "Invert Filename Order (Song Title - Artist Name)",
+          description:
+            "When enabled, files like <code>Ang Huling El Bimbo - Eraserheads.kar</code> will be indexed as Title: <b>Ang Huling El Bimbo</b> and Artist: <b>Eraserheads</b>.",
+          defaultValue: false,
+        },
+        {
+          key: "enableMtvCategory",
+          title: "Automatic MTV Category",
+          description:
+            "When enabled, music videos found in the library are automatically registered as an <b>MTV</b> Background Video category.",
+          defaultValue: true,
+        },
+      ];
+
+      function renderFlags() {
+        const container = document.getElementById("flags-container");
+        if (!container) return;
+        container.innerHTML = "";
+
+        const flags = selectedLib?.manifest?.flags || {};
+
+        AVAILABLE_FLAGS.forEach((flag) => {
+          const isChecked =
+            flags[flag.key] !== undefined
+              ? Boolean(flags[flag.key])
+              : flag.defaultValue;
+
+          const label = document.createElement("label");
+          label.className = "flag-item";
+          label.htmlFor = `flag-${flag.key}`;
+
+          label.innerHTML = `
+            <input
+              type="checkbox"
+              id="flag-${flag.key}"
+              ${isChecked ? "checked" : ""}
+              onchange="onFlagChange()"
+            />
+            <div class="flag-text-group">
+              <span class="flag-title">${escapeHtml(flag.title)}</span>
+              <p class="flag-desc">${flag.description}</p>
+            </div>
+          `;
+          container.appendChild(label);
+        });
+      }
+
+      function hasFlagChanges() {
+        if (!selectedLib) return false;
+        const currentFlags = selectedLib.manifest.flags || {};
+        return AVAILABLE_FLAGS.some((flag) => {
+          const input = document.getElementById(`flag-${flag.key}`);
+          if (!input) return false;
+          const currentVal =
+            currentFlags[flag.key] !== undefined
+              ? Boolean(currentFlags[flag.key])
+              : flag.defaultValue;
+          return input.checked !== currentVal;
+        });
+      }
 
       function escapeHtml(str) {
         if (!str) return "";
@@ -985,10 +1030,7 @@
         }
 
         bgvData = selectedLib.manifest.additionalContents?.bgvCategories || [];
-        const flags = selectedLib.manifest.flags || {};
-        document.getElementById("flag-flip-artist-title").checked = Boolean(
-          flags.flipArtistTitle,
-        );
+        renderFlags();
         setOverviewStatus("idle");
         setBgvStatus("idle");
         renderBgvs();
@@ -1086,14 +1128,12 @@
         if (selectedLib) {
           const titleInput = document.getElementById("lib-title");
           const descInput = document.getElementById("lib-desc");
-          const flagInput = document.getElementById("flag-flip-artist-title");
-          const currentFlags = selectedLib.manifest.flags || {};
 
-          if (titleInput && descInput && flagInput) {
+          if (titleInput && descInput) {
             if (
               selectedLib.manifest.title !== titleInput.value ||
               selectedLib.manifest.description !== descInput.value ||
-              Boolean(currentFlags.flipArtistTitle) !== flagInput.checked
+              hasFlagChanges()
             ) {
               saveManifest();
             }
@@ -1118,15 +1158,16 @@
         if (!selectedLib) return;
         const titleVal = document.getElementById("lib-title").value;
         const descVal = document.getElementById("lib-desc").value;
-        const flipArtistTitleVal = document.getElementById(
-          "flag-flip-artist-title",
-        ).checked;
-
         selectedLib.manifest.title = titleVal;
         selectedLib.manifest.description = descVal;
 
         selectedLib.manifest.flags = selectedLib.manifest.flags || {};
-        selectedLib.manifest.flags.flipArtistTitle = flipArtistTitleVal;
+        AVAILABLE_FLAGS.forEach((flag) => {
+          const input = document.getElementById(`flag-${flag.key}`);
+          if (input) {
+            selectedLib.manifest.flags[flag.key] = input.checked;
+          }
+        });
 
         setOverviewStatus("saving");
 
