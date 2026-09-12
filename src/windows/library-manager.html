@@ -315,12 +315,29 @@
         word-break: break-all;
         margin-bottom: 20px;
       }
+
+      #tab-overview.tab-content {
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .tab-scroll-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 30px;
+      }
+
       .bottom-actions {
         display: flex;
         justify-content: space-between;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        padding-top: 20px;
-        margin-top: auto;
+        align-items: center;
+        padding: 16px 30px;
+        background: rgba(14, 14, 22, 0.95);
+        backdrop-filter: blur(10px);
+        border-top: 1px solid rgba(137, 207, 240, 0.15);
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+        flex-shrink: 0;
+        z-index: 5;
       }
 
       .data-list {
@@ -510,6 +527,103 @@
         transition: width 0.1s linear;
         box-shadow: 0 0 10px rgba(137, 207, 240, 0.5);
       }
+
+      .flags-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 20px;
+      }
+
+      .flag-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .flag-item input[type="checkbox"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 20px;
+        height: 20px;
+        background: rgba(0, 0, 0, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 4px;
+        margin: 2px 0 0 0;
+        cursor: pointer;
+        display: grid;
+        place-content: center;
+        flex-shrink: 0;
+        transition: all 0.2s ease;
+        outline: none;
+      }
+
+      .flag-item input[type="checkbox"]:hover {
+        border-color: var(--accent);
+        background: rgba(137, 207, 240, 0.08);
+      }
+
+      .flag-item input[type="checkbox"]:checked {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+
+      .flag-item input[type="checkbox"]::after {
+        content: "";
+        width: 5px;
+        height: 10px;
+        border: solid var(--bg-dark);
+        border-width: 0 2.5px 2.5px 0;
+        transform: rotate(45deg) scale(0);
+        transition: transform 0.15s ease-in-out;
+        margin-bottom: 2px;
+      }
+
+      .flag-item input[type="checkbox"]:checked::after {
+        transform: rotate(45deg) scale(1);
+      }
+
+      .flag-text-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .flag-title {
+        color: var(--text-main);
+        font-size: 1.15rem;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      .flag-desc {
+        font-size: 1rem;
+        color: var(--text-muted);
+        margin: 0;
+        line-height: 1.4;
+        font-weight: normal;
+        letter-spacing: 1px;
+      }
+
+      .flag-desc code {
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 1px 5px;
+        border-radius: 4px;
+        color: var(--accent);
+        font-family: monospace;
+        font-size: 0.85rem;
+      }
+
+      .flag-desc b {
+        color: #fff;
+      }
     </style>
   </head>
   <body>
@@ -584,54 +698,81 @@
         </div>
 
         <div id="tab-overview" class="tab-content active">
-          <div class="pane-header-bar">
-            <p class="pane-header-desc">
-              General metadata and configuration for this library. Changes are
-              saved automatically.
-            </p>
-            <div class="pane-header-actions">
-              <div class="autosave-status-container">
-                <span id="overview-status" class="autosave-status"
-                  >AUTOSAVED</span
-                >
+          <div class="tab-scroll-body">
+            <div class="pane-header-bar">
+              <p class="pane-header-desc">
+                General metadata and configuration for this library. Changes are
+                saved automatically.
+              </p>
+              <div class="pane-header-actions">
+                <div class="autosave-status-container">
+                  <span id="overview-status" class="autosave-status"
+                    >AUTOSAVED</span
+                  >
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="editor-group">
-            <label>LIBRARY TITLE</label>
-            <input
-              type="text"
-              id="lib-title"
-              oninput="onTitleInput(this.value)"
-              onchange="flushManifestAutoSave()"
-              onblur="flushManifestAutoSave()"
-            />
-          </div>
-          <div class="editor-group">
-            <label>DESCRIPTION</label>
-            <textarea
-              id="lib-desc"
-              rows="2"
-              oninput="onDescInput()"
-              onchange="flushManifestAutoSave()"
-              onblur="flushManifestAutoSave()"
-            ></textarea>
-          </div>
+            <div class="editor-group">
+              <label>LIBRARY TITLE</label>
+              <input
+                type="text"
+                id="lib-title"
+                oninput="onTitleInput(this.value)"
+                onchange="flushManifestAutoSave()"
+                onblur="flushManifestAutoSave()"
+              />
+            </div>
 
-          <label>LIBRARY ROOT DIRECTORY</label>
-          <div class="path-display" id="lib-path"></div>
-          <div style="display: flex; gap: 10px; margin-bottom: 20px">
-            <button
-              onclick="openFolder()"
-              class="action-btn outline"
-              id="openFolderBtn"
-            >
-              Open in File Explorer
-            </button>
-            <button onclick="exportSongbook()" class="action-btn outline">
-              Export PDF Songbook
-            </button>
+            <div class="editor-group">
+              <label>DESCRIPTION</label>
+              <textarea
+                id="lib-desc"
+                rows="2"
+                oninput="onDescInput()"
+                onchange="flushManifestAutoSave()"
+                onblur="flushManifestAutoSave()"
+              ></textarea>
+            </div>
+
+            <div class="editor-group">
+              <label>LIBRARY FLAGS</label>
+              <div class="flags-container">
+                <label class="flag-item" for="flag-flip-artist-title">
+                  <input
+                    type="checkbox"
+                    id="flag-flip-artist-title"
+                    onchange="onFlagChange()"
+                  />
+                  <div class="flag-text-group">
+                    <span class="flag-title"
+                      >Invert Filename Order (Song Title - Artist Name)</span
+                    >
+                    <p class="flag-desc">
+                      When enabled, files like
+                      <code>Ang Huling El Bimbo - Eraserheads.kar</code> will be
+                      indexed as Title: <b>Ang Huling El Bimbo</b> and Artist:
+                      <b>Eraserheads</b>.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <label>LIBRARY ROOT DIRECTORY</label>
+            <div class="path-display" id="lib-path"></div>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px">
+              <button
+                onclick="openFolder()"
+                class="action-btn outline"
+                id="openFolderBtn"
+              >
+                Open in File Explorer
+              </button>
+              <button onclick="exportSongbook()" class="action-btn outline">
+                Export PDF Songbook
+              </button>
+            </div>
           </div>
 
           <div class="bottom-actions">
@@ -844,10 +985,20 @@
         }
 
         bgvData = selectedLib.manifest.additionalContents?.bgvCategories || [];
+        const flags = selectedLib.manifest.flags || {};
+        document.getElementById("flag-flip-artist-title").checked = Boolean(
+          flags.flipArtistTitle,
+        );
         setOverviewStatus("idle");
         setBgvStatus("idle");
         renderBgvs();
         loadSongs();
+      }
+
+      function onFlagChange() {
+        if (selectedLib) {
+          queueManifestAutoSave(true);
+        }
       }
 
       function switchTab(tabId) {
@@ -935,10 +1086,14 @@
         if (selectedLib) {
           const titleInput = document.getElementById("lib-title");
           const descInput = document.getElementById("lib-desc");
-          if (titleInput && descInput) {
+          const flagInput = document.getElementById("flag-flip-artist-title");
+          const currentFlags = selectedLib.manifest.flags || {};
+
+          if (titleInput && descInput && flagInput) {
             if (
               selectedLib.manifest.title !== titleInput.value ||
-              selectedLib.manifest.description !== descInput.value
+              selectedLib.manifest.description !== descInput.value ||
+              Boolean(currentFlags.flipArtistTitle) !== flagInput.checked
             ) {
               saveManifest();
             }
@@ -963,9 +1118,15 @@
         if (!selectedLib) return;
         const titleVal = document.getElementById("lib-title").value;
         const descVal = document.getElementById("lib-desc").value;
+        const flipArtistTitleVal = document.getElementById(
+          "flag-flip-artist-title",
+        ).checked;
 
         selectedLib.manifest.title = titleVal;
         selectedLib.manifest.description = descVal;
+
+        selectedLib.manifest.flags = selectedLib.manifest.flags || {};
+        selectedLib.manifest.flags.flipArtistTitle = flipArtistTitleVal;
 
         setOverviewStatus("saving");
 

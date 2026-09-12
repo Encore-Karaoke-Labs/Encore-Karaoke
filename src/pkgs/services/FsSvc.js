@@ -444,15 +444,35 @@ const pkg = {
         );
       const toAbsolute = (p) => (p ? `${libraryPath}${p}` : null);
 
+      const isPlatinumSong = (song) => {
+        const p = nfc(song?.path || "").toLowerCase();
+        return p.endsWith(".xtsp.mid");
+      };
+
+      const flipArtistTitle = Boolean(loadedManifest?.flags?.flipArtistTitle);
+
       // water up 💧💧💧
-      const hydrateSong = (song) => ({
-        ...song,
-        path: toAbsolute(toRelative(song.path)),
-        lrcPath: toAbsolute(toRelative(song.lrcPath)),
-        cdgPath: toAbsolute(toRelative(song.cdgPath)),
-        videoPath: toAbsolute(toRelative(song.videoPath)),
-        chorusPath: toAbsolute(toRelative(song.chorusPath)),
-      });
+      const hydrateSong = (song) => {
+        const isPlatinum = isPlatinumSong(song);
+
+        const shouldFlip =
+          flipArtistTitle &&
+          !isPlatinum &&
+          song.artist &&
+          song.artist !== "Unknown Artist" &&
+          song.title;
+
+        return {
+          ...song,
+          title: shouldFlip ? song.artist : song.title,
+          artist: shouldFlip ? song.title : song.artist,
+          path: toAbsolute(toRelative(song.path)),
+          lrcPath: toAbsolute(toRelative(song.lrcPath)),
+          cdgPath: toAbsolute(toRelative(song.cdgPath)),
+          videoPath: toAbsolute(toRelative(song.videoPath)),
+          chorusPath: toAbsolute(toRelative(song.chorusPath)),
+        };
+      };
 
       let validCacheList = null;
       let validNewSongs = null;
