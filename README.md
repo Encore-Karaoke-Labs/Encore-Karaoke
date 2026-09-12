@@ -98,6 +98,7 @@ Encore can be fully controlled via a standard keyboard or through EnMoku.
 | `M`             | Open Mixer (Adjust Mic & Music levels)                |
 | `R`             | Toggle recording (during playback) / View recordings  |
 | `S`             | Open Encore Sessions menu                             |
+| `B`             | Open Broadcast menu                                   |
 | `T`             | Chat (In a session)                                   |
 | `C`             | Toggle Chorus on/off                                  |
 | `- / =`         | Adjust volume                                         |
