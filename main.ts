@@ -267,6 +267,25 @@ let isSongbookBuildActive = false;
 let ffmpegStreamProcess: ChildProcess | null = null;
 let streamHeaderChunk: Buffer | null = null;
 
+function getFfmpegPath(): string {
+  const binaryName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+
+  let ffmpegExecutable: string;
+  if (app.isPackaged) {
+    ffmpegExecutable = path.join(process.resourcesPath, "bin", binaryName);
+  } else {
+    ffmpegExecutable = path.join(__dirname, "resources", "bin", binaryName);
+  }
+
+  if (process.platform !== "win32" && fs.existsSync(ffmpegExecutable)) {
+    try {
+      fs.chmodSync(ffmpegExecutable, 0o755);
+    } catch {}
+  }
+
+  return ffmpegExecutable;
+}
+
 function extractDeepLink(argv: readonly string[]): string | null {
   if (!Array.isArray(argv)) return null;
 
@@ -1374,6 +1393,13 @@ void app.whenReady().then(() => {
           : rtmpUrl;
       }
 
+      const ffmpegPath = getFfmpegPath();
+
+      if (!fs.existsSync(ffmpegPath)) {
+        logger.error("STREAM", `FFmpeg binary not found at: ${ffmpegPath}`);
+        return { success: false, error: "FFmpeg executable is missing." };
+      }
+
       const ffmpegArgs = [
         "-loglevel",
         "warning",
@@ -1411,7 +1437,7 @@ void app.whenReady().then(() => {
       ];
 
       try {
-        ffmpegStreamProcess = spawn("ffmpeg", ffmpegArgs, {
+        ffmpegStreamProcess = spawn(ffmpegPath, ffmpegArgs, {
           windowsHide: true,
           stdio: ["pipe", "pipe", "pipe"],
         });
