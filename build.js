@@ -1,4 +1,5 @@
 import * as esbuild from "esbuild";
+import ffmpegPath from "ffmpeg-static";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -118,6 +119,25 @@ Promise.all([buildMain, buildPreload, buildOS, buildWindows, buildCSS])
     copyRecursiveSync("src/assets", "dist/resources/static/assets");
     copyRecursiveSync("src/remote", "dist/resources/static/remote");
     copyRecursiveSync("src/games", "dist/resources/static/games");
+
+    const binDir = path.join("dist", "resources", "bin");
+    if (!fs.existsSync(binDir)) {
+      fs.mkdirSync(binDir, { recursive: true });
+    }
+
+    if (ffmpegPath && fs.existsSync(ffmpegPath)) {
+      const binaryName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+      const targetPath = path.join(binDir, binaryName);
+
+      fs.copyFileSync(ffmpegPath, targetPath);
+
+      if (process.platform !== "win32") {
+        fs.chmodSync(targetPath, 0o755);
+      }
+      console.log(`FFmpeg binary staged to ${targetPath}`);
+    } else {
+      console.warn("WARNING: ffmpeg-static binary not found!");
+    }
 
     if (fs.existsSync("src/index.html"))
       fs.copyFileSync("src/index.html", "dist/resources/static/index.html");

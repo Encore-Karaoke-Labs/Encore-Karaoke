@@ -88,7 +88,11 @@ export default {
 
     ...signing,
 
-    extraResource: ["dist/resources/static", "dist/resources/icon.png"],
+    extraResource: [
+      "dist/resources/static",
+      "dist/resources/icon.png",
+      "dist/resources/bin",
+    ],
     linux: {
       target: "deb",
     },
@@ -111,6 +115,7 @@ export default {
       if (normalizedPath.startsWith("/dist/resources/static")) return true;
 
       if (normalizedPath === "/dist/resources/icon.png") return true;
+      if (normalizedPath.startsWith("/dist/resources/bin")) return true;
 
       if (normalizedPath === "/package.json") return false;
       if (normalizedPath.startsWith("/dist")) return false;
