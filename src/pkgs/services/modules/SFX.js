@@ -107,6 +107,21 @@ export class ForteSFX {
             0.01,
           );
 
+          if (this.state.recording.destinationNode) {
+            try {
+              this.state.playback.midiGain.connect(
+                this.state.recording.destinationNode,
+              );
+            } catch (e) {}
+          }
+          if (this.state.recording.musicDestinationNode) {
+            try {
+              this.state.playback.midiGain.connect(
+                this.state.recording.musicDestinationNode,
+              );
+            } catch (e) {}
+          }
+
           this.sfxSequencer = new Sequencer(this.state.playback.synthesizer);
           this.sfxSequencer.loop = false;
 
@@ -135,6 +150,27 @@ export class ForteSFX {
                   0.01,
                 );
                 this.sfxMidiOriginalVolume = null;
+              }
+
+              if (
+                this.state.recording.destinationNode &&
+                this.state.playback.midiGain
+              ) {
+                try {
+                  this.state.playback.midiGain.disconnect(
+                    this.state.recording.destinationNode,
+                  );
+                } catch (e) {}
+              }
+              if (
+                this.state.recording.musicDestinationNode &&
+                this.state.playback.midiGain
+              ) {
+                try {
+                  this.state.playback.midiGain.disconnect(
+                    this.state.recording.musicDestinationNode,
+                  );
+                } catch (e) {}
               }
 
               logVerbose("Unlocking channels");
@@ -206,6 +242,26 @@ export class ForteSFX {
     }
 
     if (this.sfxSequencer) {
+      if (
+        this.state.recording.destinationNode &&
+        this.state.playback.midiGain
+      ) {
+        try {
+          this.state.playback.midiGain.disconnect(
+            this.state.recording.destinationNode,
+          );
+        } catch (e) {}
+      }
+      if (
+        this.state.recording.musicDestinationNode &&
+        this.state.playback.midiGain
+      ) {
+        try {
+          this.state.playback.midiGain.disconnect(
+            this.state.recording.musicDestinationNode,
+          );
+        } catch (e) {}
+      }
       this.synthesizer.disconnectSequencerFromMidiOutput(this.sfxSequencer);
       try {
         this.sfxSequencer.pause();

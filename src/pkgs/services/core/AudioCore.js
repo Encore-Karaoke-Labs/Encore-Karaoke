@@ -68,6 +68,9 @@ export class ForteAudioCore {
       this.state.recording.musicDestinationNode =
         this.context.createMediaStreamDestination();
 
+      this.sfxGain.connect(this.state.recording.destinationNode);
+      this.sfxGain.connect(this.state.recording.musicDestinationNode);
+
       this.state.recording.micAudioStream =
         this.state.recording.micDestinationNode.stream;
       this.state.recording.musicAudioStream =
