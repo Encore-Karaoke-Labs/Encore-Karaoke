@@ -66,6 +66,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-unicorn": "^73.0.0",
     "express": "^5.2.1",
+    "ffmpeg-static": "^5.3.0",
     "fuse.js": "^7.5.0",
     "globals": "^17.11.0",
     "ionicons": "^8.1.0",
@@ -91,7 +92,8 @@
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
-    "electron-winstaller@5.4.4": true
+    "electron-winstaller@5.4.4": true,
+    "ffmpeg-static": true
   },
   "lint-staged": {
     "*.ts": [
