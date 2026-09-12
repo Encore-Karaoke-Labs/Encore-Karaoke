@@ -722,7 +722,8 @@ export default class LyricsEngine {
   }
 
   async _resolveRomajiForLine(lineIndex) {
-    if (!this.midiLines || lineIndex >= this.midiLines.length) return;
+    if (!this.midiLines || lineIndex < 0 || lineIndex >= this.midiLines.length)
+      return;
     const line = this.midiLines[lineIndex];
     if (!line || line.length === 0) return;
 
@@ -757,9 +758,14 @@ export default class LyricsEngine {
           Romanizer.romanize(chunkText).then((res) => {
             this.romajiCache[chunkText] = res || "";
             this.pendingRomajiFetches.delete(chunkText);
+            const isLastLine =
+              this.midiLines &&
+              this.midiLines.length >= 2 &&
+              this.currentSongLineIndex === this.midiLines.length - 1;
             if (
               lineIndex === this.currentSongLineIndex ||
-              lineIndex === this.currentSongLineIndex + 1
+              lineIndex === this.currentSongLineIndex + 1 ||
+              (isLastLine && lineIndex === this.currentSongLineIndex - 1)
             ) {
               this.calculateLyricLayout();
               this.requestCanvasCacheUpdate = true;
@@ -815,12 +821,25 @@ export default class LyricsEngine {
 
     if (this.ctx.state.currentSongIsMIDI && this.midiLines) {
       const idx = this.currentSongLineIndex;
-      if (idx % 2 === 0) {
-        this.currentMidiLine1 = this.midiLines[idx] || [];
-        this.currentMidiLine2 = this.midiLines[idx + 1] || [];
+      const isLastLine =
+        this.midiLines.length >= 2 && idx === this.midiLines.length - 1;
+
+      if (isLastLine) {
+        if (idx % 2 === 0) {
+          this.currentMidiLine1 = this.midiLines[idx] || [];
+          this.currentMidiLine2 = this.midiLines[idx - 1] || [];
+        } else {
+          this.currentMidiLine1 = this.midiLines[idx - 1] || [];
+          this.currentMidiLine2 = this.midiLines[idx] || [];
+        }
       } else {
-        this.currentMidiLine2 = this.midiLines[idx] || [];
-        this.currentMidiLine1 = this.midiLines[idx + 1] || [];
+        if (idx % 2 === 0) {
+          this.currentMidiLine1 = this.midiLines[idx] || [];
+          this.currentMidiLine2 = this.midiLines[idx + 1] || [];
+        } else {
+          this.currentMidiLine2 = this.midiLines[idx] || [];
+          this.currentMidiLine1 = this.midiLines[idx + 1] || [];
+        }
       }
     } else if (
       !this.ctx.state.currentSongIsMIDI &&
@@ -831,12 +850,26 @@ export default class LyricsEngine {
         this.currentLrcIndex >= 0 &&
         this.currentLrcIndex < this.parsedLrc.length
       ) {
-        if (this.isLrcLine2Active) {
-          this.currentLrcLine2 = this.parsedLrc[this.currentLrcIndex];
-          this.currentLrcLine1 = this.parsedLrc[this.currentLrcIndex + 1];
+        const isLastLrcLine =
+          this.parsedLrc.length >= 2 &&
+          this.currentLrcIndex === this.parsedLrc.length - 1;
+
+        if (isLastLrcLine) {
+          if (this.isLrcLine2Active) {
+            this.currentLrcLine1 = this.parsedLrc[this.currentLrcIndex - 1];
+            this.currentLrcLine2 = this.parsedLrc[this.currentLrcIndex];
+          } else {
+            this.currentLrcLine1 = this.parsedLrc[this.currentLrcIndex];
+            this.currentLrcLine2 = this.parsedLrc[this.currentLrcIndex - 1];
+          }
         } else {
-          this.currentLrcLine1 = this.parsedLrc[this.currentLrcIndex];
-          this.currentLrcLine2 = this.parsedLrc[this.currentLrcIndex + 1];
+          if (this.isLrcLine2Active) {
+            this.currentLrcLine2 = this.parsedLrc[this.currentLrcIndex];
+            this.currentLrcLine1 = this.parsedLrc[this.currentLrcIndex + 1];
+          } else {
+            this.currentLrcLine1 = this.parsedLrc[this.currentLrcIndex];
+            this.currentLrcLine2 = this.parsedLrc[this.currentLrcIndex + 1];
+          }
         }
       }
     }
@@ -864,7 +897,7 @@ export default class LyricsEngine {
     let currentY = mainFontSize * 1.5;
     this.renderableLines = [];
 
-    const buildLineLayout = (lineData, isNextLine) => {
+    const buildLineLayout = (lineData, isNextLine, isPreviousLine = false) => {
       if (!lineData || lineData.length === 0) return;
       const flatSyllables = [];
       ctx.font = mainFontStr;
@@ -933,7 +966,6 @@ export default class LyricsEngine {
 
       if (lyricCase !== "original") {
         let capitalizeNext = true;
-        // Join the syllables to search for word boundaries accurately
         let fullText = flatSyllables.map((s) => s.text || "").join("");
         let isIChar = new Array(fullText.length).fill(false);
 
@@ -1179,24 +1211,53 @@ export default class LyricsEngine {
       currentY += paragraphGap;
       this.renderableLines.push({
         isNextLine,
+        isPreviousLine,
         syllables: flatSyllables,
         rows: rows,
       });
     };
 
     if (this.ctx.state.currentSongIsMIDI) {
+      const isLastLine =
+        this.midiLines &&
+        this.midiLines.length >= 2 &&
+        this.currentSongLineIndex === this.midiLines.length - 1;
+
       const isLine1Active = this.currentSongLineIndex % 2 === 0;
-      buildLineLayout(this.currentMidiLine1, !isLine1Active);
-      buildLineLayout(this.currentMidiLine2, isLine1Active);
+      const isLine1Next = !isLastLine && !isLine1Active;
+      const isLine2Next = !isLastLine && isLine1Active;
+      const isLine1Prev = isLastLine && !isLine1Active;
+      const isLine2Prev = isLastLine && isLine1Active;
+
+      buildLineLayout(this.currentMidiLine1, isLine1Next, isLine1Prev);
+      buildLineLayout(this.currentMidiLine2, isLine2Next, isLine2Prev);
     } else if (
       !this.ctx.state.currentSongIsMIDI &&
       this.parsedLrc &&
       this.parsedLrc.length > 0
     ) {
+      const isLastLrcLine =
+        this.parsedLrc.length >= 2 &&
+        this.currentLrcIndex === this.parsedLrc.length - 1;
+
       const isLine1Active = !this.isLrcLine2Active && this.currentLrcIndex >= 0;
       const isLine2Active = this.isLrcLine2Active && this.currentLrcIndex >= 0;
-      buildLineLayout(this.currentLrcLine1?.syllables || [], !isLine1Active);
-      buildLineLayout(this.currentLrcLine2?.syllables || [], !isLine2Active);
+
+      const isLine1Next = !isLastLrcLine && !isLine1Active;
+      const isLine2Next = !isLastLrcLine && !isLine2Active;
+      const isLine1Prev = isLastLrcLine && !isLine1Active;
+      const isLine2Prev = isLastLrcLine && isLine1Active;
+
+      buildLineLayout(
+        this.currentLrcLine1?.syllables || [],
+        isLine1Next,
+        isLine1Prev,
+      );
+      buildLineLayout(
+        this.currentLrcLine2?.syllables || [],
+        isLine2Next,
+        isLine2Prev,
+      );
     }
 
     const baseHeight = Math.max(250, mainFontSize * 10);
@@ -1603,7 +1664,9 @@ export default class LyricsEngine {
           ? this.currentLrcIndex <= 0
           : this.currentSongLineIndex === 0;
 
-        if (isLrcMode && this.lrcChangeTime) {
+        if (isLrcMode && line.isPreviousLine) {
+          ctx.globalAlpha = 1.0;
+        } else if (isLrcMode && this.lrcChangeTime) {
           ctx.globalAlpha = Math.min(
             1.0,
             Math.max(0, (performance.now() - this.lrcChangeTime) / 300),
@@ -1690,17 +1753,36 @@ export default class LyricsEngine {
           this.currentSongLineIndex = newLineIndex;
           this.triggerLineFade();
 
-          if (this.currentSongLineIndex % 2 === 0) {
-            this.currentMidiLine1 =
-              this.midiLines[this.currentSongLineIndex] || [];
-            this.currentMidiLine2 =
-              this.midiLines[this.currentSongLineIndex + 1] || [];
+          const isLastLine =
+            this.midiLines.length >= 2 &&
+            this.currentSongLineIndex === this.midiLines.length - 1;
+
+          if (isLastLine) {
+            if (this.currentSongLineIndex % 2 === 0) {
+              this.currentMidiLine1 =
+                this.midiLines[this.currentSongLineIndex] || [];
+              this.currentMidiLine2 =
+                this.midiLines[this.currentSongLineIndex - 1] || [];
+            } else {
+              this.currentMidiLine1 =
+                this.midiLines[this.currentSongLineIndex - 1] || [];
+              this.currentMidiLine2 =
+                this.midiLines[this.currentSongLineIndex] || [];
+            }
           } else {
-            this.currentMidiLine2 =
-              this.midiLines[this.currentSongLineIndex] || [];
-            this.currentMidiLine1 =
-              this.midiLines[this.currentSongLineIndex + 1] || [];
+            if (this.currentSongLineIndex % 2 === 0) {
+              this.currentMidiLine1 =
+                this.midiLines[this.currentSongLineIndex] || [];
+              this.currentMidiLine2 =
+                this.midiLines[this.currentSongLineIndex + 1] || [];
+            } else {
+              this.currentMidiLine2 =
+                this.midiLines[this.currentSongLineIndex] || [];
+              this.currentMidiLine1 =
+                this.midiLines[this.currentSongLineIndex + 1] || [];
+            }
           }
+
           this.calculateLyricLayout();
           this.requestCanvasCacheUpdate = true;
           this._resolveRomajiForLine(this.currentSongLineIndex + 2);
@@ -1799,15 +1881,29 @@ export default class LyricsEngine {
           this.isLrcLine2Active = currentLrcIndex % 2 !== 0;
           this.lrcChangeTime = performance.now();
 
-          if (this.isLrcLine2Active) {
-            this.currentLrcLine2 = this.parsedLrc[currentLrcIndex];
-            this.currentLrcLine1 = this.parsedLrc[currentLrcIndex + 1];
+          const isLastLrcLine =
+            this.parsedLrc.length >= 2 &&
+            currentLrcIndex === this.parsedLrc.length - 1;
+
+          if (isLastLrcLine) {
+            if (this.isLrcLine2Active) {
+              this.currentLrcLine1 = this.parsedLrc[currentLrcIndex - 1];
+              this.currentLrcLine2 = this.parsedLrc[currentLrcIndex];
+            } else {
+              this.currentLrcLine1 = this.parsedLrc[currentLrcIndex];
+              this.currentLrcLine2 = this.parsedLrc[currentLrcIndex - 1];
+            }
           } else {
-            this.currentLrcLine1 = this.parsedLrc[currentLrcIndex];
-            this.currentLrcLine2 = this.parsedLrc[currentLrcIndex + 1];
+            if (this.isLrcLine2Active) {
+              this.currentLrcLine2 = this.parsedLrc[currentLrcIndex];
+              this.currentLrcLine1 = this.parsedLrc[currentLrcIndex + 1];
+            } else {
+              this.currentLrcLine1 = this.parsedLrc[currentLrcIndex];
+              this.currentLrcLine2 = this.parsedLrc[currentLrcIndex + 1];
+            }
           }
 
-          if (currentLrcIndex > 0) {
+          if (currentLrcIndex > 0 && !isLastLrcLine) {
             this.nextLineFadeStartMs = performance.now();
             this.nextLineFadeDurationMs = 500;
           }
