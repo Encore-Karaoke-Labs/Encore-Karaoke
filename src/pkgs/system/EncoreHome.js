@@ -347,7 +347,12 @@ class EncoreController {
 
     const libraryInfo = this.library.libraryInfo;
     if (libraryInfo?.manifest?.additionalContents?.bgvCategories) {
-      await this.bgv.loadManifestCategories();
+      const enableDefaultBgv =
+        libraryInfo?.manifest?.flags?.enableDefaultCategories ?? true;
+
+      if (enableDefaultBgv) {
+        await this.bgv.loadManifestCategories();
+      }
 
       const enableMtvCategory =
         libraryInfo?.manifest?.flags?.enableMtvCategory ?? true;

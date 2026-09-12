@@ -108,6 +108,7 @@ export type HashCache = Record<string, HashCacheEntry>;
 export interface LibraryFlags {
   flipArtistTitle?: boolean;
   enableMtvCategory?: boolean;
+  enableDefaultCategories?: boolean;
   [key: string]: unknown;
 }
 
@@ -2287,6 +2288,7 @@ void app.whenReady().then(() => {
           flags: {
             flipArtistTitle: false,
             enableMtvCategory: true,
+            enableDefaultCategories: true,
           },
           additionalContents: { bgvCategories: [], bumperImages: [] },
         };
