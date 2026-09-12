@@ -145,6 +145,8 @@ export class RecorderModule {
     this.isInterludeVisible = false;
     this.cachedInterludeTip = "";
 
+    this.scoreScreenOpacity = 0.0;
+
     console.log("[RECORDER] Video Recording feature initialized.");
   }
 
@@ -861,8 +863,91 @@ export class RecorderModule {
       }
     }
 
-    if (this.metaCanvas) {
-      ctx.drawImage(this.metaCanvas, 0, 0);
+    if (this.metaCanvas && this.scoreScreenOpacity < 0.99) {
+      if (this.scoreScreenOpacity > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = 1 - this.scoreScreenOpacity;
+        ctx.drawImage(this.metaCanvas, 0, 0);
+        ctx.restore();
+      } else {
+        ctx.drawImage(this.metaCanvas, 0, 0);
+      }
+    }
+
+    const postSongScreen = this.uiRefs?.postSongScreen?.elm;
+    const isScoreActive =
+      postSongScreen &&
+      (parseFloat(postSongScreen.style.opacity || "0") > 0.05 ||
+        postSongScreen.classList.contains("visible"));
+
+    const targetScoreOpacity = isScoreActive ? 1.0 : 0.0;
+    this.scoreScreenOpacity +=
+      (targetScoreOpacity - this.scoreScreenOpacity) * 0.2;
+
+    if (this.scoreScreenOpacity > 0.01) {
+      ctx.save();
+      ctx.globalAlpha = this.scoreScreenOpacity;
+
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+      bgGrad.addColorStop(0, "rgba(8, 8, 12, 0.98)");
+      bgGrad.addColorStop(1, "rgba(2, 2, 5, 0.99)");
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      const isLeaderboard =
+        postSongScreen.classList.contains("show-leaderboard");
+      const scoreX = isLeaderboard ? w * 0.28 : w / 2;
+      const scale = isLeaderboard ? 0.75 : 1.0;
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      const titleEl = this.uiRefs?.scoreTitleText?.elm;
+      const titleText = titleEl ? titleEl.textContent : "YOUR SCORE";
+
+      ctx.font = `bold ${Math.floor(h * 0.052 * scale)}px "Rajdhani", sans-serif`;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+      if ("letterSpacing" in ctx) {
+        ctx.letterSpacing = `${Math.floor(8 * scale)}px`;
+      }
+      ctx.fillText(titleText, scoreX, h * 0.285);
+
+      const scoreEl = this.uiRefs?.finalScoreDisplay?.elm;
+      const scoreText = scoreEl ? scoreEl.textContent : "0";
+
+      ctx.font = `bold ${Math.floor(h * 0.24 * scale)}px "Rajdhani", sans-serif`;
+      if ("letterSpacing" in ctx) {
+        ctx.letterSpacing = "0px";
+      }
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowColor = "rgba(255, 255, 255, 0.25)";
+      ctx.shadowBlur = Math.floor(40 * (h / 1080) * scale);
+      ctx.fillText(scoreText, scoreX, h * 0.445);
+
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+
+      const rankEl = this.uiRefs?.rankDisplay?.elm;
+      if (rankEl) {
+        const rankText = (rankEl.textContent || "").toUpperCase();
+        const rankOpacity = parseFloat(rankEl.style.opacity || "0");
+        const rankColor = rankEl.style.color || "#ffffff";
+
+        if (rankText && rankOpacity > 0.01) {
+          ctx.globalAlpha = this.scoreScreenOpacity * rankOpacity;
+          ctx.font = `bold ${Math.floor(h * 0.09 * scale)}px "Rajdhani", sans-serif`;
+          if ("letterSpacing" in ctx) {
+            ctx.letterSpacing = `${Math.floor(5 * scale)}px`;
+          }
+          ctx.fillStyle = rankColor;
+          ctx.fillText(rankText, scoreX, h * 0.63);
+        }
+      }
+
+      if ("letterSpacing" in ctx) {
+        ctx.letterSpacing = "0px";
+      }
+      ctx.restore();
     }
 
     this.ctx.drawImage(this.offscreenCanvas || this.canvas, 0, 0);
