@@ -105,9 +105,15 @@ export interface HashCacheEntry {
 
 export type HashCache = Record<string, HashCacheEntry>;
 
+export interface LibraryFlags {
+  flipArtistTitle?: boolean;
+  [key: string]: unknown;
+}
+
 export interface LibraryManifest {
   title: string;
   description?: string;
+  flags?: LibraryFlags;
   additionalContents?: {
     bgvCategories?: string[];
     bumperImages?: string[];
@@ -2277,6 +2283,9 @@ void app.whenReady().then(() => {
         const defaultManifest: LibraryManifest = {
           title: `${folderName} (Custom Library)`,
           description: "A custom library created via Encore Library Manager.",
+          flags: {
+            flipArtistTitle: false,
+          },
           additionalContents: { bgvCategories: [], bumperImages: [] },
         };
         fs.writeFileSync(
