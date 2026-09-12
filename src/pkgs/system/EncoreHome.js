@@ -348,10 +348,15 @@ class EncoreController {
     const libraryInfo = this.library.libraryInfo;
     if (libraryInfo?.manifest?.additionalContents?.bgvCategories) {
       await this.bgv.loadManifestCategories();
+
+      const enableMtvCategory =
+        libraryInfo?.manifest?.flags?.enableMtvCategory ?? true;
+
       const mtvPaths = this.state.songList
         .filter((s) => s.videoPath)
         .map((s) => s.videoPath);
-      if (mtvPaths.length) {
+
+      if (enableMtvCategory && mtvPaths.length) {
         this.bgv.addDynamicCategory({
           BGV_CATEGORY: "MTV",
           BGV_LIST: mtvPaths,

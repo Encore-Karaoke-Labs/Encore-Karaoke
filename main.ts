@@ -107,6 +107,7 @@ export type HashCache = Record<string, HashCacheEntry>;
 
 export interface LibraryFlags {
   flipArtistTitle?: boolean;
+  enableMtvCategory?: boolean;
   [key: string]: unknown;
 }
 
@@ -2285,6 +2286,7 @@ void app.whenReady().then(() => {
           description: "A custom library created via Encore Library Manager.",
           flags: {
             flipArtistTitle: false,
+            enableMtvCategory: true,
           },
           additionalContents: { bgvCategories: [], bumperImages: [] },
         };
