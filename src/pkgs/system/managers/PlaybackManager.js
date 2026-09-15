@@ -495,27 +495,35 @@ export default class PlaybackManager {
         }
 
         dom.introCard.classOff("visible").classOn("exiting");
-        dom.lyricsCanvas.styleJs({ opacity: "1" });
 
         this.introCardExitTimer = setTimeout(() => {
-          dom.introCard.classOff("exiting");
           this.introCardExitTimer = null;
+
+          if (state.mode !== "player") {
+            state.isTransitioning = false;
+            state.pendingLyricCustomizerOpen = false;
+            return;
+          }
+
+          dom.introCard.classOff("exiting");
+          dom.lyricsCanvas.styleJs({ opacity: "1" });
+
+          if (this.mvPlayer && !isStandaloneMV) {
+            this.mvPlayer.play().catch(console.error);
+          }
+          Forte.playTrack();
+          state.isTransitioning = false;
+
+          if (state.pendingLyricCustomizerOpen) {
+            state.pendingLyricCustomizerOpen = false;
+            root.ui.toggleLyricCustomizer(true);
+          }
+
+          setTimeout(() => {
+            if (state.scoreSkipped) state.scoreSkipped = false;
+          }, 5000);
         }, 700);
-
-        if (this.mvPlayer && !isStandaloneMV) {
-          this.mvPlayer.play().catch(console.error);
-        }
-        Forte.playTrack();
-        state.isTransitioning = false;
-        if (state.pendingLyricCustomizerOpen) {
-          state.pendingLyricCustomizerOpen = false;
-          root.ui.toggleLyricCustomizer(true);
-        }
-
-        setTimeout(() => {
-          if (state.scoreSkipped) state.scoreSkipped = false;
-        }, 5000);
-      }, 2500);
+      }, 2200);
     }
   }
 
