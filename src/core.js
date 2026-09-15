@@ -4,7 +4,6 @@
 ////////////////////////
 
 import Html from "./libs/html.js";
-import vfs from "./libs/vfs.js";
 
 (async () => {
   let Security = {
@@ -14,14 +13,6 @@ import vfs from "./libs/vfs.js";
     },
     setSecureVariable(key, value) {
       return this.vars.set(key, value);
-    },
-    async setToken(token) {
-      await vfs.importFS();
-      await vfs.writeFile("Root/CherryTree/user/.token", token);
-    },
-    async getToken() {
-      await vfs.importFS();
-      return await vfs.readFile("Root/CherryTree/user/.token");
     },
   };
   let Libs = {
