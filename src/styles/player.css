@@ -457,17 +457,57 @@
   z-index: 16;
   opacity: 0;
   transform: scaleY(0);
-  transition:
-    opacity 0.4s ease-out,
-    transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
   pointer-events: none;
   display: flex;
   justify-content: center;
+  overflow: hidden;
 }
 
 .intro-card.visible {
+  animation: introBackdropIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.1)
+    forwards;
+}
+
+.intro-card.visible .intro-card-title {
+  animation: introTextSlideInRight 0.38s cubic-bezier(0.165, 0.84, 0.44, 1)
+    0.22s both;
+}
+
+.intro-card.visible .intro-card-artist {
+  animation: introTextSlideInRight 0.38s cubic-bezier(0.165, 0.84, 0.44, 1)
+    0.28s both;
+}
+
+.intro-card.visible .intro-card-meta {
+  animation: introTextSlideInRight 0.38s cubic-bezier(0.165, 0.84, 0.44, 1)
+    0.34s both;
+}
+
+.intro-card.exiting {
   opacity: 1;
   transform: scaleY(1);
+  animation: introBackdropOut 0.3s cubic-bezier(0.87, 0, 0.13, 1) 0.35s both;
+}
+
+.intro-card.exiting .intro-card-title,
+.intro-card.exiting .intro-card-artist,
+.intro-card.exiting .intro-card-meta {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.intro-card.exiting .intro-card-title {
+  animation: introTextSlideOutLeft 0.3s cubic-bezier(0.87, 0, 0.13, 1) 0s both;
+}
+
+.intro-card.exiting .intro-card-artist {
+  animation: introTextSlideOutLeft 0.3s cubic-bezier(0.87, 0, 0.13, 1) 0.04s
+    both;
+}
+
+.intro-card.exiting .intro-card-meta {
+  animation: introTextSlideOutLeft 0.3s cubic-bezier(0.87, 0, 0.13, 1) 0.08s
+    both;
 }
 
 .intro-card-content {
@@ -487,10 +527,6 @@
     0 0 20px rgba(137, 207, 240, 0.5),
     0 5px 10px rgba(0, 0, 0, 0.8);
   opacity: 0;
-  transform: translateY(20px);
-  transition:
-    opacity 0.5s ease-out,
-    transform 0.5s ease-out;
 }
 
 .intro-card-artist {
@@ -505,10 +541,6 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   margin-top: 0.5rem;
   opacity: 0;
-  transform: translateY(20px);
-  transition:
-    opacity 0.5s ease-out,
-    transform 0.5s ease-out;
 }
 
 .intro-card-meta {
@@ -519,24 +551,6 @@
   letter-spacing: 0.2em;
   text-transform: uppercase;
   opacity: 0;
-  transition: opacity 0.5s ease-out;
-}
-
-.intro-card.visible .intro-card-title {
-  opacity: 1;
-  transform: translateY(0);
-  transition-delay: 0.2s;
-}
-
-.intro-card.visible .intro-card-artist {
-  opacity: 1;
-  transform: translateY(0);
-  transition-delay: 0.3s;
-}
-
-.intro-card.visible .intro-card-meta {
-  opacity: 1;
-  transition-delay: 0.5s;
 }
 
 /* -- Interludes -- */

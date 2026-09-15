@@ -24,6 +24,9 @@ export default class PlaybackManager {
     this.boundScoreUpdate = null;
     this.boundDuetEvent = null;
 
+    this.introCardTimer = null;
+    this.introCardExitTimer = null;
+
     document.addEventListener(
       "CherryTree.Forte.Playback.Update",
       this.boundPlaybackUpdate,
@@ -181,6 +184,11 @@ export default class PlaybackManager {
     if (root.lyrics) root.lyrics.reset();
     if (root.input) root.input.currentDrumPresetIndex = -1;
     if (root.input) root.input.currentGuideMelodyIndex = 2;
+
+    if (this.introCardTimer) clearTimeout(this.introCardTimer);
+    if (this.introCardExitTimer) clearTimeout(this.introCardExitTimer);
+    this.introCardTimer = null;
+    this.introCardExitTimer = null;
 
     dom.countdownDisplay.classOff("visible").text("");
     modules.scoreHud.hide();
@@ -377,7 +385,7 @@ export default class PlaybackManager {
 
       dom.introTitle.text(this.truncateTitleIfNeeded(song.title));
       dom.introArtist.text(song.artist);
-      dom.introCard.classOn("visible");
+      dom.introCard.classOff("exiting").classOn("visible");
       dom.lyricsCanvas.styleJs({ opacity: "0" });
 
       state.currentBpm = pbState.midiInfo
@@ -479,14 +487,20 @@ export default class PlaybackManager {
         );
       }
 
-      setTimeout(() => {
+      this.introCardTimer = setTimeout(() => {
         if (state.mode !== "player") {
           state.isTransitioning = false;
           state.pendingLyricCustomizerOpen = false;
           return;
         }
-        dom.introCard.classOff("visible");
+
+        dom.introCard.classOff("visible").classOn("exiting");
         dom.lyricsCanvas.styleJs({ opacity: "1" });
+
+        this.introCardExitTimer = setTimeout(() => {
+          dom.introCard.classOff("exiting");
+          this.introCardExitTimer = null;
+        }, 700);
 
         if (this.mvPlayer && !isStandaloneMV) {
           this.mvPlayer.play().catch(console.error);
@@ -560,7 +574,11 @@ export default class PlaybackManager {
     if (this.ctx.state.isLyricCustomizerVisible) {
       this.ctx.root.ui.toggleLyricCustomizer(false);
     }
-    dom.introCard.classOff("visible");
+    if (this.introCardTimer) clearTimeout(this.introCardTimer);
+    if (this.introCardExitTimer) clearTimeout(this.introCardExitTimer);
+    this.introCardTimer = null;
+    this.introCardExitTimer = null;
+    dom.introCard.classOff("visible").classOff("exiting");
     dom.ytContainer.classOn("hidden");
     dom.ytIframe.attr({ src: "" });
     this.clearYoutubeTimers();
