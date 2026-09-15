@@ -16,6 +16,8 @@ export class BGVModule {
     this.resizeObserver = null;
     this.canvasOnlyMode = false;
 
+    this._heartbeatRafId = null;
+
     this.videoElementStyles = {
       position: "absolute",
       top: "0",
@@ -25,8 +27,7 @@ export class BGVModule {
       objectFit: "contain",
       opacity: "0",
       transition: "opacity 0.5s ease-in-out",
-      willChange: "opacity",
-      transform: "translateZ(0)",
+      zIndex: "1",
     };
 
     this.imageCanvas = null;
@@ -125,7 +126,6 @@ export class BGVModule {
         pointerEvents: "none",
         opacity: "0",
         transition: "opacity 0.5s ease-in-out",
-        willChange: "opacity",
         zIndex: "5",
       })
       .appendTo(this.container).elm;
@@ -171,6 +171,7 @@ export class BGVModule {
       }
     });
     this.resizeObserver.observe(this.container.elm);
+    this._startCompositorHeartbeat();
   }
 
   /**
@@ -415,6 +416,32 @@ export class BGVModule {
     }
   }
 
+  _startCompositorHeartbeat() {
+    if (this._heartbeatRafId) return;
+
+    const tick = () => {
+      if (
+        this.videoElement &&
+        !this.videoElement.paused &&
+        !this.videoElement.ended
+      ) {
+        if (this.customCtx) {
+          this.customCtx.clearRect(0, 0, 1, 1);
+        }
+      }
+      this._heartbeatRafId = requestAnimationFrame(tick);
+    };
+
+    this._heartbeatRafId = requestAnimationFrame(tick);
+  }
+
+  _stopCompositorHeartbeat() {
+    if (this._heartbeatRafId) {
+      cancelAnimationFrame(this._heartbeatRafId);
+      this._heartbeatRafId = null;
+    }
+  }
+
   /**
    * Start playback of the current playlist
    */
@@ -425,6 +452,8 @@ export class BGVModule {
     }
     if (this.isManualMode || this.playlist.length === 0 || this.canvasOnlyMode)
       return;
+
+    this._startCompositorHeartbeat();
     this._playUrl(this.playlist[this.currentIndex]);
   }
 
@@ -596,6 +625,7 @@ export class BGVModule {
    */
   async playSingleVideo(url, isMuted = true) {
     this.isManualMode = true;
+    this._startCompositorHeartbeat();
     if (this.videoElement) this.videoElement.onended = null;
 
     if (this.transitionTimeout) clearTimeout(this.transitionTimeout);
@@ -741,6 +771,7 @@ export class BGVModule {
       this.imageRafId = null;
       this.currentImageState = null;
       this.prevImageState = null;
+      this._stopCompositorHeartbeat();
 
       console.log(
         "[BGV] Switched to Canvas-Only Mode. Media engines disabled.",
@@ -750,6 +781,7 @@ export class BGVModule {
       if (this.imageCanvas) this.imageCanvas.style.display = "";
 
       console.log("[BGV] Restored Media Mode.");
+      this._startCompositorHeartbeat();
       this.start();
     }
   }
@@ -776,5 +808,6 @@ export class BGVModule {
     }
     this.currentImageState = null;
     this.prevImageState = null;
+    this._stopCompositorHeartbeat();
   }
 }

@@ -7,6 +7,7 @@ import {
   dialog,
   globalShortcut,
   ipcMain,
+  powerSaveBlocker,
   session,
   shell,
   WebContentsView,
@@ -266,6 +267,8 @@ let isSongbookBuildActive = false;
 
 let ffmpegStreamProcess: ChildProcess | null = null;
 let streamHeaderChunk: Buffer | null = null;
+
+let powerSaveId: number | null = null;
 
 function getFfmpegPath(): string {
   const binaryName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
@@ -1027,7 +1030,25 @@ if (isLowLatency) {
   app.commandLine.appendSwitch("alsa-output-buffer-size", "512");
 }
 
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-background-timer-throttling");
+app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+
+app.commandLine.appendSwitch(
+  "disable-features",
+  [
+    "CalculateNativeWinOcclusion",
+    "IntensiveWakeUpThrottling",
+    "UseEcoQoSForBackgroundProcess",
+    "ThrottleDisplayNoneAndVisibilityHiddenFrame",
+  ].join(","),
+);
+
+app.commandLine.appendSwitch("disable-direct-composition-video-overlays");
+
 void app.whenReady().then(() => {
+  powerSaveId = powerSaveBlocker.start("prevent-display-sleep");
+  logger.info("SYSTEM", `Power save blocker active (ID: ${powerSaveId})`);
   session.defaultSession.setPermissionRequestHandler(
     (_webContents, permission, callback) => {
       if ((permission as string) === "local-fonts") callback(true);
@@ -2699,5 +2720,11 @@ app.on("before-quit", () => {
         logger.info("SYSTEM", "Explorer restarted");
       }
     });
+  }
+});
+
+app.on("will-quit", () => {
+  if (powerSaveId !== null && powerSaveBlocker.isStarted(powerSaveId)) {
+    powerSaveBlocker.stop(powerSaveId);
   }
 });
