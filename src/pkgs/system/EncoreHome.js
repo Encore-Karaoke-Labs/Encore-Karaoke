@@ -426,7 +426,7 @@ class EncoreController {
     }
 
     setTimeout(() => {
-      document.dispatchEvent(new CustomEvent("CherryTree.UI.Ready"));
+      document.dispatchEvent(new CustomEvent("Encore.UI.Ready"));
       setTimeout(() => {
         this.context.wrapper.classOff("loading");
         this.services.Ui.transition("fadeIn", this.context.wrapper);

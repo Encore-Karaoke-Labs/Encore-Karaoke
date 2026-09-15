@@ -136,7 +136,7 @@ const pkg = {
             });
             call.on("stream", (remoteStream) => {
               document.dispatchEvent(
-                new CustomEvent("CherryTree.Sessions.RemoteStream", {
+                new CustomEvent("Encore.Sessions.RemoteStream", {
                   detail: remoteStream,
                 }),
               );
@@ -146,7 +146,7 @@ const pkg = {
             call.answer(forteSvc.getMicAudioStream());
             call.on("stream", (remoteStream) => {
               document.dispatchEvent(
-                new CustomEvent("CherryTree.Sessions.LoungeStream", {
+                new CustomEvent("Encore.Sessions.LoungeStream", {
                   detail: { id: call.peer, stream: remoteStream },
                 }),
               );
@@ -249,7 +249,7 @@ const pkg = {
             );
             this.leaveRoom();
             document.dispatchEvent(
-              new CustomEvent("CherryTree.Sessions.Kicked", {
+              new CustomEvent("Encore.Sessions.Kicked", {
                 detail: "version_mismatch",
               }),
             );
@@ -262,7 +262,7 @@ const pkg = {
           this.state = data.state;
 
           document.dispatchEvent(
-            new CustomEvent("CherryTree.Sessions.StateUpdate", {
+            new CustomEvent("Encore.Sessions.StateUpdate", {
               detail: this.state,
             }),
           );
@@ -272,7 +272,7 @@ const pkg = {
             this.state.chatHistory.length > prevChatLength
           ) {
             document.dispatchEvent(
-              new CustomEvent("CherryTree.Sessions.ChatHistorySync", {
+              new CustomEvent("Encore.Sessions.ChatHistorySync", {
                 detail: this.state.chatHistory,
               }),
             );
@@ -302,7 +302,7 @@ const pkg = {
         } else if (data.type === "kicked") {
           if (!this.isHost && conn.peer === this.roomId) {
             document.dispatchEvent(
-              new CustomEvent("CherryTree.Sessions.Kicked", {
+              new CustomEvent("Encore.Sessions.Kicked", {
                 detail: data.reason,
               }),
             );
@@ -310,7 +310,7 @@ const pkg = {
         } else if (data.type === "force_stop") {
           if (!this.isHost && conn.peer === this.roomId) {
             document.dispatchEvent(
-              new CustomEvent("CherryTree.Sessions.ForceStop"),
+              new CustomEvent("Encore.Sessions.ForceStop"),
             );
           }
         } else if (data.type === "submit_score") {
@@ -327,7 +327,7 @@ const pkg = {
               if (c.open) c.send(scoreEvent);
             }
             document.dispatchEvent(
-              new CustomEvent("CherryTree.Sessions.RemoteScore", {
+              new CustomEvent("Encore.Sessions.RemoteScore", {
                 detail: scoreEvent,
               }),
             );
@@ -335,15 +335,13 @@ const pkg = {
         } else if (data.type === "remote_score") {
           if (!this.isHost) {
             document.dispatchEvent(
-              new CustomEvent("CherryTree.Sessions.RemoteScore", {
+              new CustomEvent("Encore.Sessions.RemoteScore", {
                 detail: data,
               }),
             );
           }
         } else if (data.type === "skip_score") {
-          document.dispatchEvent(
-            new CustomEvent("CherryTree.Sessions.SkipScore"),
-          );
+          document.dispatchEvent(new CustomEvent("Encore.Sessions.SkipScore"));
           if (this.isHost) {
             for (let c of this.connections.values()) {
               if (c.open && c.peer !== conn.peer) c.send(data);
@@ -352,7 +350,7 @@ const pkg = {
         } else if (data.type === "chat_message" || data.type === "cheer") {
           document.dispatchEvent(
             new CustomEvent(
-              `CherryTree.Sessions.${data.type === "chat_message" ? "Chat" : "Cheer"}`,
+              `Encore.Sessions.${data.type === "chat_message" ? "Chat" : "Cheer"}`,
               { detail: data },
             ),
           );
@@ -364,7 +362,7 @@ const pkg = {
           }
         } else if (data.type === "plugin_data") {
           document.dispatchEvent(
-            new CustomEvent("CherryTree.Sessions.PluginData", { detail: data }),
+            new CustomEvent("Encore.Sessions.PluginData", { detail: data }),
           );
           if (this.isHost) {
             for (let c of this.connections.values()) {
@@ -394,7 +392,7 @@ const pkg = {
       }
 
       document.dispatchEvent(
-        new CustomEvent("CherryTree.Sessions.PeerDisconnected", {
+        new CustomEvent("Encore.Sessions.PeerDisconnected", {
           detail: peerId,
         }),
       );
@@ -402,7 +400,7 @@ const pkg = {
       if (!this.isHost && peerId === this.roomId) {
         this.leaveRoom();
         document.dispatchEvent(
-          new CustomEvent("CherryTree.Sessions.HostDisconnected"),
+          new CustomEvent("Encore.Sessions.HostDisconnected"),
         );
       } else if (this.isHost) {
         this.state.participants = this.state.participants.filter(
@@ -469,7 +467,7 @@ const pkg = {
     broadcastState: function () {
       if (!this.isHost) return;
       document.dispatchEvent(
-        new CustomEvent("CherryTree.Sessions.StateUpdate", {
+        new CustomEvent("Encore.Sessions.StateUpdate", {
           detail: this.state,
         }),
       );
@@ -491,7 +489,7 @@ const pkg = {
       if (this.state.chatHistory.length > 100) this.state.chatHistory.shift();
 
       document.dispatchEvent(
-        new CustomEvent("CherryTree.Sessions.Chat", { detail: data }),
+        new CustomEvent("Encore.Sessions.Chat", { detail: data }),
       );
 
       if (this.isHost) {
@@ -507,7 +505,7 @@ const pkg = {
     broadcastCheer: function (sender, text) {
       const data = { type: "cheer", sender, text };
       document.dispatchEvent(
-        new CustomEvent("CherryTree.Sessions.Cheer", { detail: data }),
+        new CustomEvent("Encore.Sessions.Cheer", { detail: data }),
       );
 
       if (this.isHost) {
@@ -536,7 +534,7 @@ const pkg = {
       const data = { type: "plugin_data", pluginId, payload };
 
       document.dispatchEvent(
-        new CustomEvent("CherryTree.Sessions.PluginData", { detail: data }),
+        new CustomEvent("Encore.Sessions.PluginData", { detail: data }),
       );
 
       if (this.isHost) {
@@ -616,9 +614,7 @@ const pkg = {
       if (modeChanged || playTriggerChanged) {
         for (let call of this.mediaCalls.values()) call.close();
         this.mediaCalls.clear();
-        document.dispatchEvent(
-          new CustomEvent("CherryTree.Sessions.ClearStreams"),
-        );
+        document.dispatchEvent(new CustomEvent("Encore.Sessions.ClearStreams"));
         this.currentPerformanceStream = null;
       }
 
@@ -631,7 +627,7 @@ const pkg = {
               this.mediaCalls.set(p.id, call);
               call.on("stream", (stream) => {
                 document.dispatchEvent(
-                  new CustomEvent("CherryTree.Sessions.LoungeStream", {
+                  new CustomEvent("Encore.Sessions.LoungeStream", {
                     detail: { id: p.id, stream },
                   }),
                 );
@@ -691,9 +687,7 @@ const pkg = {
       };
 
       console.log("[SESSIONS] Service state has been reset to default.");
-      document.dispatchEvent(
-        new CustomEvent("CherryTree.Sessions.ClearStreams"),
-      );
+      document.dispatchEvent(new CustomEvent("Encore.Sessions.ClearStreams"));
     },
 
     leaveRoom: function () {

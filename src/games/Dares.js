@@ -71,7 +71,7 @@ export default class DaresGame {
 
   async init() {
     document.addEventListener(
-      "CherryTree.Sessions.PluginData",
+      "Encore.Sessions.PluginData",
       this.handlePluginData,
     );
     const savedDares = await window.config.getItem("games.dares.list");
@@ -994,7 +994,7 @@ export default class DaresGame {
 
   destroy() {
     document.removeEventListener(
-      "CherryTree.Sessions.PluginData",
+      "Encore.Sessions.PluginData",
       this.handlePluginData,
     );
     this.closeCanvasRoom();

@@ -28,7 +28,7 @@ export default class PlaybackManager {
     this.introCardExitTimer = null;
 
     document.addEventListener(
-      "CherryTree.Forte.Playback.Update",
+      "Encore.Forte.Playback.Update",
       this.boundPlaybackUpdate,
     );
   }
@@ -206,7 +206,7 @@ export default class PlaybackManager {
       if (root.lyrics) root.lyrics.requestCanvasCacheUpdate = true;
     };
     document.addEventListener(
-      "CherryTree.Forte.Playback.DuetDetected",
+      "Encore.Forte.Playback.DuetDetected",
       this.boundDuetEvent,
     );
 
@@ -395,7 +395,7 @@ export default class PlaybackManager {
         state.currentBpm = e.detail.bpm;
       };
       document.addEventListener(
-        "CherryTree.Forte.Playback.TempoEvent",
+        "Encore.Forte.Playback.TempoEvent",
         this.boundTempoUpdate,
       );
 
@@ -403,7 +403,7 @@ export default class PlaybackManager {
         this.currentMediaTime = e.detail.currentTime;
       };
       document.addEventListener(
-        "CherryTree.Forte.Playback.TimeUpdate",
+        "Encore.Forte.Playback.TimeUpdate",
         this.boundTimeUpdate,
       );
 
@@ -482,7 +482,7 @@ export default class PlaybackManager {
         this.boundScoreUpdate = (e) =>
           modules.scoreHud.show(e.detail.finalScore);
         document.addEventListener(
-          "CherryTree.Forte.Scoring.Update",
+          "Encore.Forte.Scoring.Update",
           this.boundScoreUpdate,
         );
       }
@@ -631,23 +631,23 @@ export default class PlaybackManager {
 
     if (this.boundScoreUpdate)
       document.removeEventListener(
-        "CherryTree.Forte.Scoring.Update",
+        "Encore.Forte.Scoring.Update",
         this.boundScoreUpdate,
       );
     if (this.boundTempoUpdate)
       document.removeEventListener(
-        "CherryTree.Forte.Playback.TempoEvent",
+        "Encore.Forte.Playback.TempoEvent",
         this.boundTempoUpdate,
       );
     if (this.boundDuetEvent)
       document.removeEventListener(
-        "CherryTree.Forte.Playback.DuetDetected",
+        "Encore.Forte.Playback.DuetDetected",
         this.boundDuetEvent,
       );
 
     if (this.boundTimeUpdate)
       document.removeEventListener(
-        "CherryTree.Forte.Playback.TimeUpdate",
+        "Encore.Forte.Playback.TimeUpdate",
         this.boundTimeUpdate,
       );
 

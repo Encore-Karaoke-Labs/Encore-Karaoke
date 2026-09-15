@@ -42,7 +42,7 @@ const pkg = {
 
           call.on("stream", (remoteStream) => {
             document.dispatchEvent(
-              new CustomEvent("CherryTree.Camera.StreamReceived", {
+              new CustomEvent("Encore.Camera.StreamReceived", {
                 detail: remoteStream,
               }),
             );
@@ -61,7 +61,7 @@ const pkg = {
 
     handleStreamEnd: function () {
       this.currentCall = null;
-      document.dispatchEvent(new CustomEvent("CherryTree.Camera.StreamEnded"));
+      document.dispatchEvent(new CustomEvent("Encore.Camera.StreamEnded"));
     },
   },
 };

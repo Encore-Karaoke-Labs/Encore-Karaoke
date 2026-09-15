@@ -1,4 +1,3 @@
-import Html from "../../libs/html.js";
 import localforage from "localforage";
 
 let r;
@@ -23,7 +22,7 @@ let controls = [
 
 function dispatchPlayerSwapEvent(plr) {
   document.dispatchEvent(
-    new CustomEvent("CherryTree.Ui.ControllerChange", {
+    new CustomEvent("Encore.Ui.ControllerChange", {
       detail: plr,
     }),
   );

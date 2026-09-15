@@ -91,7 +91,7 @@ let actualPort = 9864;
  */
 function dispatchSongListReady() {
   document.dispatchEvent(
-    new CustomEvent("CherryTree.FsSvc.SongList.Ready", {
+    new CustomEvent("Encore.FsSvc.SongList.Ready", {
       detail: {
         libraryPath: state.currentLibraryPath,
         songCount: state.songList.length,
@@ -106,7 +106,7 @@ function dispatchSongListReady() {
  */
 function dispatchBuildProgress(current, total) {
   document.dispatchEvent(
-    new CustomEvent("CherryTree.FsSvc.SongList.Progress", {
+    new CustomEvent("Encore.FsSvc.SongList.Progress", {
       detail: {
         current,
         total,
@@ -161,7 +161,7 @@ const pkg = {
           );
         };
         document.addEventListener(
-          "CherryTree.FsSvc.SongList.Progress",
+          "Encore.FsSvc.SongList.Progress",
           progressHandler,
         );
 
@@ -185,7 +185,7 @@ const pkg = {
         }
 
         document.removeEventListener(
-          "CherryTree.FsSvc.SongList.Progress",
+          "Encore.FsSvc.SongList.Progress",
           progressHandler,
         );
 

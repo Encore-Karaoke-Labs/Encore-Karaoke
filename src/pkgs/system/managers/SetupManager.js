@@ -99,7 +99,7 @@ export default class SetupManager {
 
   init() {
     document.addEventListener(
-      "CherryTree.FsSvc.SongList.Progress",
+      "Encore.FsSvc.SongList.Progress",
       this.boundBuildProgress,
     );
     window.desktopIntegration.ipc.on(
@@ -1886,7 +1886,7 @@ export default class SetupManager {
     };
 
     document.addEventListener(
-      "CherryTree.Forte.Playback.TimeUpdate",
+      "Encore.Forte.Playback.TimeUpdate",
       this.boundCalibTimeUpdate,
     );
 
@@ -1922,7 +1922,7 @@ export default class SetupManager {
     this.ctx.services.Forte.stopTrack();
     if (this.boundCalibTimeUpdate)
       document.removeEventListener(
-        "CherryTree.Forte.Playback.TimeUpdate",
+        "Encore.Forte.Playback.TimeUpdate",
         this.boundCalibTimeUpdate,
       );
 
@@ -2107,7 +2107,7 @@ export default class SetupManager {
         this.setupState.manualCalib.audioContext.close();
       if (this.boundCalibTimeUpdate)
         document.removeEventListener(
-          "CherryTree.Forte.Playback.TimeUpdate",
+          "Encore.Forte.Playback.TimeUpdate",
           this.boundCalibTimeUpdate,
         );
       this.ctx.services.Forte.stopTrack();
@@ -3133,7 +3133,7 @@ export default class SetupManager {
 
   destroy() {
     document.removeEventListener(
-      "CherryTree.FsSvc.SongList.Progress",
+      "Encore.FsSvc.SongList.Progress",
       this.boundBuildProgress,
     );
     if (window.desktopIntegration.ipc.off) {

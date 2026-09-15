@@ -125,7 +125,7 @@ import Html from "./libs/html.js";
             if (result !== false) Core.process.cleanup(pid);
 
             document.dispatchEvent(
-              new CustomEvent("CherryTree.Core.ProcessExit", {
+              new CustomEvent("Encore.Core.ProcessExit", {
                 detail: { url, name: pkgData.name, pid },
               }),
             );
@@ -151,7 +151,7 @@ import Html from "./libs/html.js";
         pkg.default.start(Root);
 
         document.dispatchEvent(
-          new CustomEvent("CherryTree.Core.ProcessStart", {
+          new CustomEvent("Encore.Core.ProcessStart", {
             detail: { url, name: pkgData.name, pid },
           }),
         );

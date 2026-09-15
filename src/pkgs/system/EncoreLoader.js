@@ -159,14 +159,14 @@ const pkg = {
     };
 
     document.addEventListener(
-      "CherryTree.FsSvc.SongList.Progress",
+      "Encore.FsSvc.SongList.Progress",
       progressHandler,
     );
 
     const success = await fsSvc.buildSongList(libraryPath);
 
     document.removeEventListener(
-      "CherryTree.FsSvc.SongList.Progress",
+      "Encore.FsSvc.SongList.Progress",
       progressHandler,
     );
 
@@ -219,7 +219,7 @@ const pkg = {
     await root.Libs.startPkg("system:EncoreHome", []);
 
     document.addEventListener(
-      "CherryTree.UI.Ready",
+      "Encore.UI.Ready",
       () => {
         root.end();
       },

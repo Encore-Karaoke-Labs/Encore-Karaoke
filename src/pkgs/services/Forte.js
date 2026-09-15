@@ -23,7 +23,7 @@ let sfx;
  */
 function dispatchPlaybackUpdate() {
   document.dispatchEvent(
-    new CustomEvent("CherryTree.Forte.Playback.Update", {
+    new CustomEvent("Encore.Forte.Playback.Update", {
       detail: pkg.data.getPlaybackState(),
     }),
   );

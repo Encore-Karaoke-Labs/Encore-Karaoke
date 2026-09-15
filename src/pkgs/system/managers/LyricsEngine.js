@@ -256,7 +256,7 @@ export default class LyricsEngine {
 
     if (this.boundTimeUpdate)
       document.removeEventListener(
-        "CherryTree.Forte.Playback.TimeUpdate",
+        "Encore.Forte.Playback.TimeUpdate",
         this.boundTimeUpdate,
       );
 
@@ -1912,7 +1912,7 @@ export default class LyricsEngine {
       }
     };
     document.addEventListener(
-      "CherryTree.Forte.Playback.TimeUpdate",
+      "Encore.Forte.Playback.TimeUpdate",
       this.boundTimeUpdate,
     );
   }

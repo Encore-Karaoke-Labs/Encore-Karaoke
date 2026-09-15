@@ -1,5 +1,3 @@
-import Html from "../libs/html.js";
-
 const V_WIDTH = 1920;
 const V_HEIGHT = 1080;
 
@@ -41,7 +39,7 @@ export default class RouletteGame {
 
   async init() {
     document.addEventListener(
-      "CherryTree.Sessions.PluginData",
+      "Encore.Sessions.PluginData",
       this.handlePluginData,
     );
   }
@@ -593,7 +591,7 @@ export default class RouletteGame {
 
   destroy() {
     document.removeEventListener(
-      "CherryTree.Sessions.PluginData",
+      "Encore.Sessions.PluginData",
       this.handlePluginData,
     );
     this.closeCanvasRoom();

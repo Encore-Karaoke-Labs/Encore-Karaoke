@@ -51,7 +51,7 @@ export class BGVModule {
     this.currentLoadId = null;
 
     this.liveStream = null;
-    document.addEventListener("CherryTree.Camera.StreamReceived", (e) => {
+    document.addEventListener("Encore.Camera.StreamReceived", (e) => {
       this.liveStream = e.detail;
       this.categories = this.categories.filter(
         (c) => c.BGV_CATEGORY !== "EnMoku Camera",
@@ -65,7 +65,7 @@ export class BGVModule {
       this.updatePlaylistForCategory();
     });
 
-    document.addEventListener("CherryTree.Camera.StreamEnded", () => {
+    document.addEventListener("Encore.Camera.StreamEnded", () => {
       this.liveStream = null;
       this.categories = this.categories.filter(
         (c) => c.BGV_CATEGORY !== "EnMoku Camera",
@@ -468,7 +468,7 @@ export class BGVModule {
       if (url.includes("/getFile") && !this.canvasOnlyMode) {
         fetch(url, { method: "HEAD" }).catch(() => {
           document.dispatchEvent(
-            new CustomEvent("CherryTree.Storage.Disconnected"),
+            new CustomEvent("Encore.Storage.Disconnected"),
           );
         });
       }

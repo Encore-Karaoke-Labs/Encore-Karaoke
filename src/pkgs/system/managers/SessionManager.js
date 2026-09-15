@@ -143,48 +143,48 @@ export default class SessionManager {
    */
   init() {
     document.addEventListener(
-      "CherryTree.Sessions.StateUpdate",
+      "Encore.Sessions.StateUpdate",
       this.handleStateUpdate,
     );
     document.addEventListener(
-      "CherryTree.Sessions.RemoteScore",
+      "Encore.Sessions.RemoteScore",
       this.handleRemoteScore,
     );
     document.addEventListener(
-      "CherryTree.Sessions.SkipScore",
+      "Encore.Sessions.SkipScore",
       this.handleSkipScore,
     );
     document.addEventListener(
-      "CherryTree.Sessions.RemoteStream",
+      "Encore.Sessions.RemoteStream",
       this.handleRemoteStream,
     );
     document.addEventListener(
-      "CherryTree.Sessions.LoungeStream",
+      "Encore.Sessions.LoungeStream",
       this.handleLoungeStream,
     );
     document.addEventListener(
-      "CherryTree.Sessions.ClearStreams",
+      "Encore.Sessions.ClearStreams",
       this.handleClearStreams,
     );
     document.addEventListener(
-      "CherryTree.Sessions.PeerDisconnected",
+      "Encore.Sessions.PeerDisconnected",
       this.handlePeerDisconnected,
     );
     document.addEventListener(
-      "CherryTree.Sessions.HostDisconnected",
+      "Encore.Sessions.HostDisconnected",
       this.handleHostDisconnected,
     );
-    document.addEventListener("CherryTree.Sessions.Kicked", this.handleKicked);
+    document.addEventListener("Encore.Sessions.Kicked", this.handleKicked);
     document.addEventListener(
-      "CherryTree.Sessions.ForceStop",
+      "Encore.Sessions.ForceStop",
       this.handleForceStop,
     );
     document.addEventListener(
-      "CherryTree.Sessions.ChatHistorySync",
+      "Encore.Sessions.ChatHistorySync",
       this.handleChatHistorySync,
     );
-    document.addEventListener("CherryTree.Sessions.Chat", this.handleChat);
-    document.addEventListener("CherryTree.Sessions.Cheer", this.handleCheer);
+    document.addEventListener("Encore.Sessions.Chat", this.handleChat);
+    document.addEventListener("Encore.Sessions.Cheer", this.handleCheer);
   }
 
   handleStateUpdate(e) {
@@ -1426,50 +1426,47 @@ export default class SessionManager {
 
   destroy() {
     document.removeEventListener(
-      "CherryTree.Sessions.StateUpdate",
+      "Encore.Sessions.StateUpdate",
       this.handleStateUpdate,
     );
     document.removeEventListener(
-      "CherryTree.Sessions.RemoteScore",
+      "Encore.Sessions.RemoteScore",
       this.handleRemoteScore,
     );
     document.removeEventListener(
-      "CherryTree.Sessions.SkipScore",
+      "Encore.Sessions.SkipScore",
       this.handleSkipScore,
     );
     document.removeEventListener(
-      "CherryTree.Sessions.RemoteStream",
+      "Encore.Sessions.RemoteStream",
       this.handleRemoteStream,
     );
     document.removeEventListener(
-      "CherryTree.Sessions.LoungeStream",
+      "Encore.Sessions.LoungeStream",
       this.handleLoungeStream,
     );
     document.removeEventListener(
-      "CherryTree.Sessions.ClearStreams",
+      "Encore.Sessions.ClearStreams",
       this.handleClearStreams,
     );
     document.removeEventListener(
-      "CherryTree.Sessions.PeerDisconnected",
+      "Encore.Sessions.PeerDisconnected",
       this.handlePeerDisconnected,
     );
     document.removeEventListener(
-      "CherryTree.Sessions.HostDisconnected",
+      "Encore.Sessions.HostDisconnected",
       this.handleHostDisconnected,
     );
+    document.removeEventListener("Encore.Sessions.Kicked", this.handleKicked);
     document.removeEventListener(
-      "CherryTree.Sessions.Kicked",
-      this.handleKicked,
-    );
-    document.removeEventListener(
-      "CherryTree.Sessions.ForceStop",
+      "Encore.Sessions.ForceStop",
       this.handleForceStop,
     );
     document.removeEventListener(
-      "CherryTree.Sessions.ChatHistorySync",
+      "Encore.Sessions.ChatHistorySync",
       this.handleChatHistorySync,
     );
-    document.removeEventListener("CherryTree.Sessions.Chat", this.handleChat);
-    document.removeEventListener("CherryTree.Sessions.Cheer", this.handleCheer);
+    document.removeEventListener("Encore.Sessions.Chat", this.handleChat);
+    document.removeEventListener("Encore.Sessions.Cheer", this.handleCheer);
   }
 }

@@ -88,7 +88,7 @@ export default {
     );
 
     document.dispatchEvent(
-      new CustomEvent("CherryTree.Comms.Audio.Update", {
+      new CustomEvent("Encore.Comms.Audio.Update", {
         detail: audioInputs[audioResult.id].deviceId,
       }),
     );
@@ -123,7 +123,7 @@ export default {
     );
 
     document.dispatchEvent(
-      new CustomEvent("CherryTree.Comms.Video.Update", {
+      new CustomEvent("Encore.Comms.Video.Update", {
         detail: videoInputs[videoResult.id].deviceId,
       }),
     );

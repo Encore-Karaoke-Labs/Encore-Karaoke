@@ -144,7 +144,7 @@ export class FortePlayback {
       if (now - this.lastScoreTime > 33) {
         this.scoring.updateScore(currentTime);
         document.dispatchEvent(
-          new CustomEvent("CherryTree.Forte.Scoring.Update", {
+          new CustomEvent("Encore.Forte.Scoring.Update", {
             detail: this.scoring.getScoringState(),
           }),
         );
@@ -153,7 +153,7 @@ export class FortePlayback {
     }
 
     document.dispatchEvent(
-      new CustomEvent("CherryTree.Forte.Playback.TimeUpdate", {
+      new CustomEvent("Encore.Forte.Playback.TimeUpdate", {
         detail: { currentTime, duration },
       }),
     );
@@ -804,7 +804,7 @@ export class FortePlayback {
                 "Duet track detected via embedded meta text (pre-scan)",
               );
               document.dispatchEvent(
-                new CustomEvent("CherryTree.Forte.Playback.DuetDetected"),
+                new CustomEvent("Encore.Forte.Playback.DuetDetected"),
               );
             }
 
@@ -1057,7 +1057,7 @@ export class FortePlayback {
             if (validChannels.length > 0) {
               this.state.playback.guideChannels = validChannels;
               document.dispatchEvent(
-                new CustomEvent("CherryTree.Forte.GuideFound"),
+                new CustomEvent("Encore.Forte.GuideFound"),
               );
 
               let combinedNotes = [];
@@ -1638,7 +1638,7 @@ export class FortePlayback {
       this.guideVolumeSwitchTimeout = setTimeout(() => {
         if (this.state.playback.guideChannels.length < 1) {
           document.addEventListener(
-            "CherryTree.Forte.GuideFound",
+            "Encore.Forte.GuideFound",
             applyVolumeToGuide,
             { once: true },
           );
@@ -1653,15 +1653,10 @@ export class FortePlayback {
       return;
     }
 
-    document.removeEventListener(
-      "CherryTree.Forte.Playback.Update",
-      scheduleApply,
-    );
-    document.addEventListener(
-      "CherryTree.Forte.Playback.Update",
-      scheduleApply,
-      { once: true },
-    );
+    document.removeEventListener("Encore.Forte.Playback.Update", scheduleApply);
+    document.addEventListener("Encore.Forte.Playback.Update", scheduleApply, {
+      once: true,
+    });
   }
 
   /**
