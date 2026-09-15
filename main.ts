@@ -869,6 +869,8 @@ const createWindow = (): void => {
   const appView = new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
+      spellcheck: false,
+      backgroundThrottling: false,
     },
   });
 
