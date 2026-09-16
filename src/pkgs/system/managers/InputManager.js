@@ -755,7 +755,11 @@ export default class InputManager {
     const ui = this.ctx.root.ui;
 
     const target = state.mode === "player" ? "reservationNumber" : "songNumber";
-    state[target] = state[target].length >= 6 ? digit : state[target] + digit;
+    if (state[target].length >= 6) {
+      state[target] = state[target].slice(1) + digit;
+    } else {
+      state[target] = state[target] + digit;
+    }
 
     if (state.mode !== "player") {
       if (state.isNumberSfxEnabled !== false) {
