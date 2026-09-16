@@ -1075,7 +1075,6 @@ void app.whenReady().then(() => {
   const RELAY_URL = "https://enmoku.encorekaraoke.org/1.11.0/";
   const cloudSocket: ClientSocket = ioClient(CLOUD_URL, {
     query: { clientType: "host" },
-    reconnectionAttempts: 5,
   });
   let activeRoomCode: string | null = null;
 
