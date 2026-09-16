@@ -129,7 +129,7 @@ Pressing **`F2`** in the Main Menu will put you into **Setup Mode**. Setup Mode 
 ### Installing
 
 > [!NOTE]
-> Currently, versions 1.0.0 to 1.3.1 are supported on Windows. Versions 1.4.0 and above support Linux and Versions 1.10 and above support MacOS.
+> Currently, versions 1.0.0 to 1.3.1 are supported on Windows. Versions 1.4.0 and above support Linux and versions 1.10 and above support MacOS.
 
 Ready-to-use installers are available on the [Releases](https://github.com/Encore-Karaoke-Labs/Encore-Karaoke/releases) page.
 
