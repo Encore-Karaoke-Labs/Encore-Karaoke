@@ -265,6 +265,19 @@
   }
 }
 
+@keyframes menuZoomOut {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+  100% {
+    transform: scale(1.32);
+    opacity: 0;
+    filter: blur(8px);
+  }
+}
+
 .loading {
   animation: load 1s linear infinite;
 }

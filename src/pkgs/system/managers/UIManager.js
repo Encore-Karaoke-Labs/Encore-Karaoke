@@ -36,6 +36,7 @@ export default class UIManager {
     this.loungeRafId = null;
     this._scrollRafId = null;
     this._menuUpdateRafId = null;
+    this._menuExitTimer = null;
     this._fullscreenListenerAttached = false;
     this._isFullscreenDetected = false;
   }
@@ -1002,6 +1003,7 @@ export default class UIManager {
     const dom = this.ctx.dom;
     const wrapper = this.ctx.wrapper;
 
+    const prevMode = state.mode;
     state.mode = newMode;
     wrapper.classOff(
       "mode-menu",
@@ -1012,7 +1014,23 @@ export default class UIManager {
     );
     wrapper.classOn(`mode-${newMode}`);
 
-    dom.overlay.classOn("hidden");
+    if (prevMode === "menu" && newMode === "player") {
+      dom.overlay.classOn("menu-zoom-out");
+      if (this._menuExitTimer) clearTimeout(this._menuExitTimer);
+      this._menuExitTimer = setTimeout(() => {
+        this._menuExitTimer = null;
+        dom.overlay.classOn("hidden");
+        dom.overlay.classOff("menu-zoom-out");
+      }, 450);
+    } else {
+      if (this._menuExitTimer) {
+        clearTimeout(this._menuExitTimer);
+        this._menuExitTimer = null;
+      }
+      dom.overlay.classOff("menu-zoom-out");
+      dom.overlay.classOn("hidden");
+    }
+
     dom.playerUi.classOn("hidden");
     if (dom.setupScreen) dom.setupScreen.classOn("hidden");
 
@@ -1031,8 +1049,12 @@ export default class UIManager {
       dom.setupScreen.classOff("hidden");
       this.ctx.root.setup.open();
     } else if (newMode === "menu") {
+      if (this._menuExitTimer) {
+        clearTimeout(this._menuExitTimer);
+        this._menuExitTimer = null;
+      }
+      dom.overlay.classOff("hidden", "menu-zoom-out");
       state.showSongList = false;
-      dom.overlay.classOff("hidden");
       dom.searchInput.elm.blur();
       this.ctx.modules.infoBar.hideBar();
       this.updateMenuUI();
