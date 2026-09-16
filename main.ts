@@ -1081,7 +1081,7 @@ void app.whenReady().then(() => {
   cloudSocket.on("connect", () => {
     logger.info(
       "CLOUD",
-      `Successfully connected to Cloud Relay at ${CLOUD_URL}`,
+      `Successfully connected to EnMoku Cloud Relay at ${CLOUD_URL}`,
     );
   });
 
