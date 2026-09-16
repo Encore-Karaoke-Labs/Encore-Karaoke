@@ -18,6 +18,29 @@ const COLOR_SWATCHES = Object.keys(COLOR_PALETTES).map((key) => ({
   stroke: COLOR_PALETTES[key].stroke,
 }));
 
+/**
+ * Resolves a song from songMap regardless of leading zeros or number/string typing.
+ */
+function findSongInMap(songMap, code) {
+  if (!songMap || !code) return null;
+  const str = String(code).trim();
+  if (!str) return null;
+
+  const unpadded = str.replace(/^0+/, "");
+  const num = parseInt(str, 10);
+
+  return (
+    songMap.get(str) ??
+    (unpadded ? songMap.get(unpadded) : null) ??
+    (!isNaN(num) ? songMap.get(num) : null) ??
+    (unpadded ? songMap.get(unpadded.padStart(5, "0")) : null) ??
+    (unpadded ? songMap.get(unpadded.padStart(6, "0")) : null) ??
+    songMap.get(str.padStart(5, "0")) ??
+    songMap.get(str.padStart(6, "0")) ??
+    null
+  );
+}
+
 export default class UIManager {
   /**
    * @param {Object} context - The shared context
@@ -1166,9 +1189,7 @@ export default class UIManager {
 
       let activeSong =
         state.songNumber.length > 0
-          ? (state.songMap.get(code) ??
-            state.songMap.get(code.padStart(5, "0")) ??
-            state.songMap.get(code.padStart(6, "0")))
+          ? findSongInMap(state.songMap, code)
           : state.highlightedIndex >= 0
             ? state.songList[state.highlightedIndex]
             : null;
