@@ -1418,7 +1418,7 @@ void app.whenReady().then(() => {
       const ffmpegPath = getFfmpegPath();
 
       if (!fs.existsSync(ffmpegPath)) {
-        logger.error("STREAM", `FFmpeg binary not found at: ${ffmpegPath}`);
+        logger.error("STREAM", `FFmpeg binary not found! ${ffmpegPath}`);
         return { success: false, error: "FFmpeg executable is missing." };
       }
 
