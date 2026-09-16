@@ -909,6 +909,13 @@ export default class InputManager {
               ? state.songList[state.highlightedIndex]
               : null;
           if (song) {
+            if (state.songNumber && state.songNumber.length > 0) {
+              root.ui.menuTransitionSource = "number";
+            } else if (state.showSongList) {
+              root.ui.menuTransitionSource = "list";
+            } else {
+              root.ui.menuTransitionSource = "none";
+            }
             state.songNumber = "";
             state.highlightedIndex = -1;
             state.isTypingNumber = false;

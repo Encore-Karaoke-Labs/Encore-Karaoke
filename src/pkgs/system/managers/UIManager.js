@@ -1015,19 +1015,47 @@ export default class UIManager {
     wrapper.classOn(`mode-${newMode}`);
 
     if (prevMode === "menu" && newMode === "player") {
-      dom.overlay.classOn("menu-zoom-out");
+      const source = this.menuTransitionSource || "none";
+      this.menuTransitionSource = null;
+
+      if (source === "number") {
+        dom.songListContainer.classOn("hidden");
+        dom.bottomActions.classOn("hidden");
+        dom.overlay.classOn("zoom-out-active", "zoom-out-number");
+      } else if (source === "list") {
+        dom.mainContent.classOn("hidden");
+        dom.bottomActions.classOn("hidden");
+        dom.overlay.classOn("zoom-out-active", "zoom-out-list");
+      } else {
+        dom.overlay.classOn("hidden");
+      }
+
       if (this._menuExitTimer) clearTimeout(this._menuExitTimer);
       this._menuExitTimer = setTimeout(() => {
         this._menuExitTimer = null;
         dom.overlay.classOn("hidden");
-        dom.overlay.classOff("menu-zoom-out");
-      }, 450);
+        dom.overlay.classOff(
+          "zoom-out-active",
+          "zoom-out-number",
+          "zoom-out-list",
+        );
+        dom.mainContent.classOff("hidden");
+        dom.songListContainer.classOff("hidden");
+        dom.bottomActions.classOff("hidden");
+      }, 600);
     } else {
       if (this._menuExitTimer) {
         clearTimeout(this._menuExitTimer);
         this._menuExitTimer = null;
       }
-      dom.overlay.classOff("menu-zoom-out");
+      dom.overlay.classOff(
+        "zoom-out-active",
+        "zoom-out-number",
+        "zoom-out-list",
+      );
+      dom.mainContent.classOff("hidden");
+      dom.songListContainer.classOff("hidden");
+      dom.bottomActions.classOff("hidden");
       dom.overlay.classOn("hidden");
     }
 
@@ -1053,7 +1081,15 @@ export default class UIManager {
         clearTimeout(this._menuExitTimer);
         this._menuExitTimer = null;
       }
-      dom.overlay.classOff("hidden", "menu-zoom-out");
+      dom.overlay.classOff(
+        "hidden",
+        "zoom-out-active",
+        "zoom-out-number",
+        "zoom-out-list",
+      );
+      dom.mainContent.classOff("hidden");
+      dom.songListContainer.classOff("hidden");
+      dom.bottomActions.classOff("hidden");
       state.showSongList = false;
       dom.searchInput.elm.blur();
       this.ctx.modules.infoBar.hideBar();
@@ -1273,6 +1309,7 @@ export default class UIManager {
           .appendTo(item);
 
         item.on("click", () => {
+          this.menuTransitionSource = "list";
           if (state.isSessionActive)
             this.ctx.root.sessions.reserveSongInSession(song);
           else this.ctx.root.playback.startPlayer(song);

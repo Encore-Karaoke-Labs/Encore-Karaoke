@@ -265,16 +265,25 @@
   }
 }
 
-@keyframes menuZoomOut {
+@keyframes numberZoomOut {
   0% {
-    transform: scale(1);
+    transform: translate3d(-50%, -50%, 0) scale(1);
     opacity: 1;
-    filter: blur(0px);
   }
   100% {
-    transform: scale(1.32);
+    transform: translate3d(-50%, -50%, 0) scale(1.35);
     opacity: 0;
-    filter: blur(8px);
+  }
+}
+
+@keyframes listZoomOut {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.18);
+    opacity: 0;
   }
 }
 

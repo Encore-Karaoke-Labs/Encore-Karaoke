@@ -20,27 +20,27 @@
   will-change: transform, opacity, filter;
 }
 
-.overlay-ui.menu-zoom-out {
-  animation: menuZoomOut 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+.overlay-ui.zoom-out-active {
   pointer-events: none !important;
-}
-
-.overlay-ui.menu-zoom-out .main-content {
-  transform: translate(-50%, -50%) scale(1.12);
-  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.overlay-ui.menu-zoom-out .song-list-container {
-  transform: scale(1.05);
-  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.overlay-ui.menu-zoom-out .bottom-actions {
-  transform: translateY(35px);
+  transition: opacity 0.6s ease-out;
   opacity: 0;
-  transition:
-    transform 0.35s ease-in,
-    opacity 0.35s ease-in;
+}
+
+.overlay-ui.zoom-out-number .main-content {
+  opacity: 1 !important;
+  animation: numberZoomOut 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+  pointer-events: none !important;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+.overlay-ui.zoom-out-list .song-list-container {
+  opacity: 1 !important;
+  transform-origin: center center;
+  animation: listZoomOut 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+  pointer-events: none !important;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 .bgv-container {
