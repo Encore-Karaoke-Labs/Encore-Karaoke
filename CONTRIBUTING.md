@@ -40,6 +40,7 @@ Keep commits focused and messages descriptive. A commit should do one thing; a P
 ## Submitting a pull request
 
 - Fill out the PR template completely.
-- Link any related issues.
+- Link any related issues (if any).
 - Be ready for review feedback. We may request for changes to better fit Encore.
+- We may reject your PR if it doesn't follow our standards.
 - Small, focused PRs get reviewed faster than large ones.
