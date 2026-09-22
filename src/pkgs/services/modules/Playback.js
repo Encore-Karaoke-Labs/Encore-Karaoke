@@ -12,6 +12,205 @@ const GUIDE_CLARITY_THRESHOLD = 0.5;
 const MIN_VOCAL_HZ = 75;
 const MAX_VOCAL_HZ = 1200;
 
+const MAJOR_PROFILE = [
+  0.238, 0.006, 0.111, 0.006, 0.137, 0.094, 0.016, 0.214, 0.009, 0.08, 0.008,
+  0.081,
+];
+const MINOR_PROFILE = [
+  0.222, 0.009, 0.099, 0.141, 0.015, 0.092, 0.019, 0.198, 0.052, 0.038, 0.05,
+  0.065,
+];
+
+const MAJOR_ROOT_NAMES = [
+  "C",
+  "Db",
+  "D",
+  "Eb",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "Ab",
+  "A",
+  "Bb",
+  "B",
+];
+const MINOR_ROOT_NAMES = [
+  "C",
+  "C#",
+  "D",
+  "Eb",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "G#",
+  "A",
+  "Bb",
+  "B",
+];
+
+const MAJOR_SCALE_STEPS = [0, 2, 4, 5, 7, 9, 11];
+const MINOR_SCALE_STEPS = [0, 2, 3, 5, 7, 8, 10, 11];
+
+/**
+ * Pre-computes normalized correlation vectors for all 24 keys (12 major, 12 minor).
+ * Evaluated once at module load to guarantee zero runtime allocation and maximum throughput.
+ */
+const KEY_CANDIDATES = (() => {
+  const candidates = [];
+
+  const precompute = (baseProfile, rootNames, scale, steps) => {
+    const mean = baseProfile.reduce((acc, v) => acc + v, 0) / 12;
+    const variance = baseProfile.reduce(
+      (acc, v) => acc + Math.pow(v - mean, 2),
+      0,
+    );
+    const stdDev = Math.sqrt(variance);
+
+    for (let root = 0; root < 12; root++) {
+      const normalizedWeights = new Float64Array(12);
+      for (let i = 0; i < 12; i++) {
+        const profileIndex = (i - root + 12) % 12;
+        normalizedWeights[i] = (baseProfile[profileIndex] - mean) / stdDev;
+      }
+
+      const rootName = rootNames[root];
+      const keyName = `${rootName} ${scale === "major" ? "Major" : "Minor"}`;
+      const allowedPitchClasses = steps
+        .map((s) => (root + s) % 12)
+        .sort((a, b) => a - b);
+
+      candidates.push({
+        root: rootName,
+        scale,
+        pitchClass: root,
+        key: keyName,
+        shortKey: scale === "major" ? rootName : `${rootName}m`,
+        weights: normalizedWeights,
+        allowedPitchClasses,
+      });
+    }
+  };
+
+  precompute(MAJOR_PROFILE, MAJOR_ROOT_NAMES, "major", MAJOR_SCALE_STEPS);
+  precompute(MINOR_PROFILE, MINOR_ROOT_NAMES, "minor", MINOR_SCALE_STEPS);
+
+  return candidates;
+})();
+
+/**
+ * Calculates Pearson correlation coefficient between a normalized chroma vector and candidate weights.
+ */
+function correlateChroma(normChroma, candidateWeights) {
+  let r = 0;
+  for (let i = 0; i < 12; i++) {
+    r += normChroma[i] * candidateWeights[i];
+  }
+  return r;
+}
+
+/**
+ * Detects the musical key of a parsed MIDI file using duration-weighted chroma
+ * distribution and Albrecht-Shanahan correlation analysis.
+ *
+ * @param {Object} parsedMidi - BasicMIDI parsed instance.
+ * @param {Array<Array<Object>>} channels - Array of note arrays per channel.
+ * @returns {Object|null} Detected key details.
+ */
+function detectMidiKey(parsedMidi, channels) {
+  if (!channels || !Array.isArray(channels)) return null;
+
+  let maxTime = 0;
+  let totalNotes = 0;
+
+  for (let i = 0; i < 16; i++) {
+    if (i === 9) continue; // Skip drum channel
+    const notes = channels[i];
+    if (!notes || notes.length === 0) continue;
+
+    for (let n = 0; n < notes.length; n++) {
+      const end = notes[n].start + notes[n].length;
+      if (end > maxTime) maxTime = end;
+      totalNotes++;
+    }
+  }
+
+  if (totalNotes < 8 || maxTime <= 0) return null;
+
+  const initialCutoff = maxTime > 40 ? maxTime * 0.6 : maxTime;
+
+  const chromaFull = new Float64Array(12);
+  const chromaInitial = new Float64Array(12);
+
+  for (let i = 0; i < 16; i++) {
+    if (i === 9) continue;
+    const notes = channels[i];
+    if (!notes || notes.length === 0) continue;
+
+    for (let n = 0; n < notes.length; n++) {
+      const note = notes[n];
+      const pitch = note.midiNote;
+      if (pitch < 12 || pitch > 127) continue;
+
+      const pitchClass = pitch % 12;
+      const duration = Math.max(0.05, Math.min(note.length || 0.1, 8.0));
+
+      // Bass notes (< C3 / MIDI 48) strongly reinforce the fundamental chord roots
+      const weight = pitch < 48 ? duration * 1.3 : duration;
+
+      chromaFull[pitchClass] += weight;
+      if (note.start <= initialCutoff) {
+        chromaInitial[pitchClass] += weight;
+      }
+    }
+  }
+
+  const findBestCandidate = (chroma) => {
+    let sum = 0;
+    for (let i = 0; i < 12; i++) sum += chroma[i];
+    if (sum === 0) return null;
+
+    const mean = sum / 12;
+    let variance = 0;
+    for (let i = 0; i < 12; i++) {
+      variance += Math.pow(chroma[i] - mean, 2);
+    }
+    if (variance === 0) return null;
+
+    const stdDev = Math.sqrt(variance);
+    const normChroma = new Float64Array(12);
+    for (let i = 0; i < 12; i++) {
+      normChroma[i] = (chroma[i] - mean) / stdDev;
+    }
+
+    let bestCandidate = null;
+    let highestR = -Infinity;
+
+    for (let i = 0; i < KEY_CANDIDATES.length; i++) {
+      const cand = KEY_CANDIDATES[i];
+      const r = correlateChroma(normChroma, cand.weights);
+      if (r > highestR) {
+        highestR = r;
+        bestCandidate = cand;
+      }
+    }
+
+    return bestCandidate ? { ...bestCandidate, correlation: highestR } : null;
+  };
+
+  const keyInitial = findBestCandidate(chromaInitial);
+  const keyFull = findBestCandidate(chromaFull);
+
+  // If the initial section has strong confidence (>= 0.5), use it to preserve original key
+  // against late-song modulations common in videoke tracks.
+  if (keyInitial && keyInitial.correlation >= 0.5) {
+    return keyInitial;
+  }
+
+  return keyFull || keyInitial;
+}
+
 /**
  * Attempts to detect the correct text encoding for MIDI lyrics data to prevent mojibake.
  *
@@ -205,7 +404,6 @@ export class FortePlayback {
         const batchStartTime = performance.now();
         const foundNotes = [];
 
-        // Work until we hit a 5ms computation limit
         while (i < endSample && performance.now() - batchStartTime < 5) {
           const chunk = channelData.subarray(i, i + bufferSize);
           const [pitch, clarity] = detector.findPitch(chunk, sampleRate);
@@ -276,7 +474,6 @@ export class FortePlayback {
         }
 
         lastAnalyzedTime = i / sampleRate;
-        // Yield
         await new Promise((r) => setTimeout(r, 0));
       }
     };
@@ -418,6 +615,10 @@ export class FortePlayback {
       tempoChanges: [],
       initialBpm: 120,
       keyRange: { min: 0, max: 127 },
+      key: null,
+      scale: null,
+      root: null,
+      pitchClass: null,
     };
     this.state.playback.decodedLyrics = [];
     this.state.playback.lyricsEncoding = "utf-8";
@@ -733,6 +934,22 @@ export class FortePlayback {
           }
         });
 
+        let noteChannels = null;
+        try {
+          if (typeof parsedMidi.getNoteTimes === "function") {
+            noteChannels = parsedMidi.getNoteTimes();
+          }
+        } catch (e) {
+          logVerboseWarn("Failed to extract note times from MIDI:", e);
+        }
+
+        const detectedKey = detectMidiKey(parsedMidi, noteChannels);
+        if (detectedKey) {
+          logVerbose(
+            `Detected MIDI Key: ${detectedKey.key} (correlation: ${detectedKey.correlation.toFixed(3)})`,
+          );
+        }
+
         this.state.playback.midiInfo = {
           ticks: rawLyrics
             .map((msg) => msg.ticks)
@@ -744,6 +961,10 @@ export class FortePlayback {
               ? Math.round(parsedMidi.tempoChanges[0].tempo || 120)
               : 120,
           keyRange: parsedMidi.keyRange || { min: 0, max: 127 },
+          key: detectedKey ? detectedKey.key : null,
+          scale: detectedKey ? detectedKey.scale : null,
+          root: detectedKey ? detectedKey.root : null,
+          pitchClass: detectedKey ? detectedKey.pitchClass : null,
         };
 
         if (rawLyrics.length > 0) {
@@ -751,8 +972,8 @@ export class FortePlayback {
             .filter((l) => l.ticks !== undefined)
             .map((l) => parsedMidi.midiTicksToSeconds(l.ticks));
 
-          if (lyricTimes.length > 5) {
-            const channels = parsedMidi.getNoteTimes();
+          if (lyricTimes.length > 5 && noteChannels) {
+            const channels = noteChannels;
             let validChannels = [];
 
             let manualChannel = "auto";
@@ -856,7 +1077,6 @@ export class FortePlayback {
             }
 
             if (manualChannel === "auto") {
-              // PLATINUM likes to put their guides on Channel 1
               if (isPlatinum && channels[0] && channels[0].length > 0) {
                 logVerbose("This is a PLATINUM file");
                 validChannels.push({
@@ -867,20 +1087,10 @@ export class FortePlayback {
               } else {
                 const candidateChannels = [];
 
-                // Choirs, Voice Oohs, Synth Voice / Solo Vox
-                // Oboe, Clarinet, Piccolo, Flute, Recorder, Pan Flute, Whistle, Ocarina
-                // Square Lead, Saw Wave Lead, Voice Lead
                 const highPriorityInstruments = [
                   52, 53, 54, 68, 71, 72, 73, 74, 75, 78, 79, 80, 81, 85,
                 ];
-
-                // Nylon/Steel Acoustic Guitars (often mock-melody)
-                // Muted Trumpet
-                // Soprano, Alto, Tenor Saxes
                 const medPriorityInstruments = [24, 25, 59, 64, 65, 66];
-
-                // Acoustic, Electric, and Synth Basses
-                // String Ensembles / Synth Strings (usually chords/pads)
                 const penalizedInstruments = [
                   32, 33, 34, 35, 36, 37, 38, 39, 48, 49, 50, 51,
                 ];
@@ -1256,6 +1466,28 @@ export class FortePlayback {
         activeMidiNotes: new Set(),
         details: { accuracy: 0 },
       });
+
+      if (
+        this.state.playback.isMidi &&
+        this.state.playback.midiInfo &&
+        this.state.playback.midiInfo.pitchClass !== null
+      ) {
+        const transposedPc =
+          (this.state.playback.midiInfo.pitchClass +
+            this.state.playback.transpose +
+            24) %
+          12;
+        const isMinor = this.state.playback.midiInfo.scale === "minor";
+        const rootNames = isMinor ? MINOR_ROOT_NAMES : MAJOR_ROOT_NAMES;
+        const steps = isMinor ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
+
+        this.state.scoring.currentKeyName = `${rootNames[transposedPc]} ${
+          isMinor ? "Minor" : "Major"
+        }`;
+        this.state.scoring.allowedPitchClasses = steps
+          .map((s) => (transposedPc + s) % 12)
+          .sort((a, b) => a - b);
+      }
     }
 
     if (this.state.playback.isMidi) {
@@ -1460,7 +1692,7 @@ export class FortePlayback {
 
     if (this.state.playback.status === "stopped") return;
     this.state.playback.status = "stopped";
-    this.state.playback.isAnalyzing = false; // Gracefully terminate active streaming loops
+    this.state.playback.isAnalyzing = false;
 
     if (this.state.scoring.meydaAnalyzer)
       this.state.scoring.meydaAnalyzer.stop();
@@ -1577,6 +1809,21 @@ export class FortePlayback {
           this.state.scoring.allowedPitchClasses.map(
             (pc) => (pc + transposeDelta + 24) % 12,
           );
+      }
+
+      // Keep key string up-to-date in scoring state when transposed
+      if (
+        this.state.playback.isMidi &&
+        this.state.playback.midiInfo &&
+        this.state.playback.midiInfo.pitchClass !== null
+      ) {
+        const transposedPc =
+          (this.state.playback.midiInfo.pitchClass + clamped + 24) % 12;
+        const isMinor = this.state.playback.midiInfo.scale === "minor";
+        const rootNames = isMinor ? MINOR_ROOT_NAMES : MAJOR_ROOT_NAMES;
+        this.state.scoring.currentKeyName = `${rootNames[transposedPc]} ${
+          isMinor ? "Minor" : "Major"
+        }`;
       }
     }
 
