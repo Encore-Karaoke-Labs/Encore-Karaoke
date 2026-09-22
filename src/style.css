@@ -7,6 +7,7 @@
 /* Shell & Screens */
 @import "./styles/menu.css";
 @import "./styles/setup.css";
+@import "./styles/help.css";
 @import "./styles/player.css";
 @import "./styles/forte-roll.css";
 @import "./styles/search-queue.css";
