@@ -14,12 +14,32 @@ const PITCH_CLASSES = [
   "A#",
   "B",
 ];
+
+// Temperley key profiles
 const MAJOR_PROFILE = [
   5.0, 2.0, 3.5, 2.0, 4.5, 4.0, 2.0, 4.5, 2.0, 3.5, 1.5, 4.0,
 ];
 const MINOR_PROFILE = [
   5.0, 2.0, 3.5, 4.5, 2.0, 4.0, 2.0, 4.5, 3.5, 2.0, 1.5, 4.0,
 ];
+
+// Pre-computed profile statistics to eliminate redundant loops per frame
+const MAJOR_MEAN = MAJOR_PROFILE.reduce((a, b) => a + b, 0) / 12;
+const MINOR_MEAN = MINOR_PROFILE.reduce((a, b) => a + b, 0) / 12;
+
+const MAJOR_STD = Math.sqrt(
+  MAJOR_PROFILE.reduce((acc, v) => acc + Math.pow(v - MAJOR_MEAN, 2), 0),
+);
+const MINOR_STD = Math.sqrt(
+  MINOR_PROFILE.reduce((acc, v) => acc + Math.pow(v - MINOR_MEAN, 2), 0),
+);
+
+const NORMALIZED_MAJOR = MAJOR_PROFILE.map((v) => (v - MAJOR_MEAN) / MAJOR_STD);
+const NORMALIZED_MINOR = MINOR_PROFILE.map((v) => (v - MINOR_MEAN) / MINOR_STD);
+
+const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
+// Natural minor + harmonic minor leading tone (11) for accurate vocal cadences
+const MINOR_SCALE_INTERVALS = [0, 2, 3, 5, 7, 8, 10, 11];
 
 const GUIDE_CLARITY_THRESHOLD = 0.5;
 const MIC_CLARITY_THRESHOLD = 0.85;
@@ -32,51 +52,49 @@ const MIN_VOCAL_HZ = 75;
 const MAX_VOCAL_HZ = 1200;
 
 /**
- * Calculates the Pearson correlation coefficient between an audio chroma profile and a reference profile.
- *
- * @param {number[]} chroma - The current 12-bin chroma vector.
- * @param {number[]} profile - The reference key profile (Major/Minor).
- * @returns {number} The correlation score (-1.0 to 1.0).
- */
-function getPearsonCorrelation(chroma, profile) {
-  let sumC = 0,
-    sumP = 0,
-    sumCP = 0,
-    sumC2 = 0,
-    sumP2 = 0;
-  for (let i = 0; i < 12; i++) {
-    sumC += chroma[i];
-    sumP += profile[i];
-    sumCP += chroma[i] * profile[i];
-    sumC2 += chroma[i] * chroma[i];
-    sumP2 += profile[i] * profile[i];
-  }
-  const denom = Math.sqrt(
-    (12 * sumC2 - sumC * sumC) * (12 * sumP2 - sumP * sumP),
-  );
-  if (denom === 0) return 0;
-  return (12 * sumCP - sumC * sumP) / denom;
-}
-
-/**
  * Analyzes a chroma distribution array to determine the most likely active musical key.
  *
- * @param {number[]} chromaArray - The aggregated chroma bins.
+ * @param {number[]} chromaArray - The aggregated 12-bin chroma vector.
  * @returns {{root: number, mode: string, name: string, correlation: number}} The estimated key data.
  */
 function detectMusicalKey(chromaArray) {
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += chromaArray[i];
+  if (sum === 0) {
+    return { root: 0, mode: "Major", name: "Unknown", correlation: 0 };
+  }
+
+  const mean = sum / 12;
+  let variance = 0;
+  for (let i = 0; i < 12; i++) {
+    variance += Math.pow(chromaArray[i] - mean, 2);
+  }
+  if (variance === 0) {
+    return { root: 0, mode: "Major", name: "Unknown", correlation: 0 };
+  }
+
+  const std = Math.sqrt(variance);
+  const normChroma = new Float32Array(12);
+  for (let i = 0; i < 12; i++) {
+    normChroma[i] = (chromaArray[i] - mean) / std;
+  }
+
   let bestCorrelation = -1;
   let bestKeyIndex = 0;
   let bestMode = "Major";
 
   for (let rootIndex = 0; rootIndex < 12; rootIndex++) {
-    const shiftedChroma = [];
+    let majorDot = 0;
+    let minorDot = 0;
+
     for (let j = 0; j < 12; j++) {
-      shiftedChroma.push(chromaArray[(rootIndex + j) % 12]);
+      const chromaVal = normChroma[(rootIndex + j) % 12];
+      majorDot += chromaVal * NORMALIZED_MAJOR[j];
+      minorDot += chromaVal * NORMALIZED_MINOR[j];
     }
 
-    const majorCorr = getPearsonCorrelation(shiftedChroma, MAJOR_PROFILE);
-    const minorCorr = getPearsonCorrelation(shiftedChroma, MINOR_PROFILE);
+    const majorCorr = majorDot / 12;
+    const minorCorr = minorDot / 12;
 
     if (majorCorr > bestCorrelation) {
       bestCorrelation = majorCorr;
@@ -89,6 +107,7 @@ function detectMusicalKey(chromaArray) {
       bestMode = "Minor";
     }
   }
+
   return {
     root: bestKeyIndex,
     mode: bestMode,
@@ -111,6 +130,8 @@ export class ForteScoring {
 
     this.micAnalyserBuffer = null;
     this.guideAnalyserBuffer = null;
+    this.currentRootIndex = null;
+    this.currentMode = null;
   }
 
   /**
@@ -324,6 +345,44 @@ export class ForteScoring {
       // Key-Aware Scoring Fallback
       this.state.scoring.frameCount++;
 
+      // Seed key immediately from pre-analyzed MIDI metadata if not yet initialized
+      if (
+        !this.state.scoring.currentKeyName &&
+        this.state.playback.isMidi &&
+        this.state.playback.midiInfo?.pitchClass !== null &&
+        this.state.playback.midiInfo?.pitchClass !== undefined
+      ) {
+        const transposedRoot =
+          (this.state.playback.midiInfo.pitchClass +
+            this.state.playback.transpose +
+            24) %
+          12;
+        const mode =
+          this.state.playback.midiInfo.scale === "minor" ? "Minor" : "Major";
+
+        this.currentRootIndex = transposedRoot;
+        this.currentMode = mode;
+        this.state.scoring.currentKeyName = `${PITCH_CLASSES[transposedRoot]} ${mode}`;
+
+        const intervals =
+          mode === "Major" ? MAJOR_SCALE_INTERVALS : MINOR_SCALE_INTERVALS;
+        this.state.scoring.allowedPitchClasses = intervals.map(
+          (interval) => (transposedRoot + interval) % 12,
+        );
+
+        // Pre-fill history to anchor dynamic votes
+        this.state.scoring.keyHistory = Array(6).fill({
+          root: transposedRoot,
+          mode,
+          name: this.state.scoring.currentKeyName,
+          correlation: 1.0,
+        });
+
+        logVerbose(
+          `Key-Aware Scoring seeded from MIDI analysis: ${this.state.scoring.currentKeyName}`,
+        );
+      }
+
       if (this.state.scoring.frameCount % 3 === 0) {
         if (this.state.playback.isMidi) {
           for (let i = 0; i < 12; i++) {
@@ -363,48 +422,47 @@ export class ForteScoring {
 
           const votes = {};
           let maxVotes = 0;
-          let votedKey = null;
           let votedRoot = 0;
           let votedMode = "";
 
           for (const k of this.state.scoring.keyHistory) {
             if (k.name === "Unknown") continue;
-            votes[k.name] = (votes[k.name] || 0) + 1;
-            if (votes[k.name] > maxVotes) {
-              maxVotes = votes[k.name];
-              votedKey = k.name;
+            const keyId = `${k.root}_${k.mode}`;
+            votes[keyId] = (votes[keyId] || 0) + 1;
+            if (votes[keyId] > maxVotes) {
+              maxVotes = votes[keyId];
               votedRoot = k.root;
               votedMode = k.mode;
             }
           }
 
-          if (votedKey) {
-            if (!this.state.scoring.currentKeyName && maxVotes >= 2) {
-              this.state.scoring.currentKeyName = votedKey;
-              const intervals =
-                votedMode === "Major"
-                  ? [0, 2, 4, 5, 7, 9, 11]
-                  : [0, 2, 3, 5, 7, 8, 10];
-              this.state.scoring.allowedPitchClasses = intervals.map(
-                (interval) => (votedRoot + interval) % 12,
-              );
-              logVerbose(
-                `Initial Key Locked: ${votedKey} (${maxVotes}/6 votes)`,
-              );
-            } else if (
-              this.state.scoring.currentKeyName !== votedKey &&
-              maxVotes >= 4
+          if (maxVotes >= 2) {
+            const isPitchOrModeDifferent =
+              this.currentRootIndex !== votedRoot ||
+              this.currentMode !== votedMode;
+
+            // Lock initial key on 2 votes, require 4 votes to confirm live modulation
+            if (
+              !this.state.scoring.currentKeyName ||
+              (isPitchOrModeDifferent && maxVotes >= 4)
             ) {
-              this.state.scoring.currentKeyName = votedKey;
+              const wasInitialLock = !this.state.scoring.currentKeyName;
+              this.currentRootIndex = votedRoot;
+              this.currentMode = votedMode;
+              this.state.scoring.currentKeyName = `${PITCH_CLASSES[votedRoot]} ${votedMode}`;
+
               const intervals =
                 votedMode === "Major"
-                  ? [0, 2, 4, 5, 7, 9, 11]
-                  : [0, 2, 3, 5, 7, 8, 10];
+                  ? MAJOR_SCALE_INTERVALS
+                  : MINOR_SCALE_INTERVALS;
               this.state.scoring.allowedPitchClasses = intervals.map(
                 (interval) => (votedRoot + interval) % 12,
               );
+
               logVerbose(
-                `Key Modulation Confirmed: ${votedKey} (${maxVotes}/6 votes)`,
+                wasInitialLock
+                  ? `Initial Key Locked: ${this.state.scoring.currentKeyName} (${maxVotes}/6 votes)`
+                  : `Key Modulation Confirmed: ${this.state.scoring.currentKeyName} (${maxVotes}/6 votes)`,
               );
             }
           }
@@ -454,7 +512,6 @@ export class ForteScoring {
       this.state.scoring.micPitchHistory.shift();
     }
 
-    // Assign Hit/Miss states directly onto the state object for the PianoRoll to render
     if (this.state.ui.pianoRollVisible && hasGuideNotes) {
       const currentNote = this.state.playback.guideNotes.find(
         (n) =>
