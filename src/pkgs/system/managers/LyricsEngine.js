@@ -380,7 +380,7 @@ export default class LyricsEngine {
         let val = firstTc.tempo || firstTc.bpm || 120;
         displayBpm = val > 1000 ? Math.round(60000000 / val) : Math.round(val);
       }
-      dom.introMeta.text(`BPM: ${displayBpm}`);
+      dom.introMeta.text(`BPM: ${displayBpm} | ${midiInfo.key}`);
 
       let fullMetadataString = "";
       while (
