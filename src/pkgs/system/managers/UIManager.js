@@ -77,6 +77,7 @@ export default class UIManager {
     this.buildQR();
     this.buildSetupUI();
     this.buildLyricCustomizerUI();
+    this.buildHelpUI();
     this.monitorFullscreenState();
   }
 
@@ -135,6 +136,227 @@ export default class UIManager {
     dom.setupContainer = new Html("div")
       .classOn("setup-container")
       .appendTo(dom.setupScreen);
+  }
+
+  buildHelpUI() {
+    const dom = this.ctx.dom;
+
+    dom.helpOverlay = new Html("div")
+      .classOn("help-screen-overlay", "hidden")
+      .appendTo(this.ctx.wrapper);
+
+    const headerBar = new Html("div")
+      .classOn("help-header-bar")
+      .appendTo(dom.helpOverlay);
+
+    const titleGroup = new Html("div")
+      .classOn("help-header-titles")
+      .appendTo(headerBar);
+
+    new Html("h2").text("ENCORE SYSTEM GUIDE").appendTo(titleGroup);
+
+    const headerControls = new Html("div")
+      .classOn("help-header-controls")
+      .appendTo(headerBar);
+
+    const hintBadge = new Html("div")
+      .classOn("help-hint-badge")
+      .appendTo(headerControls);
+
+    hintBadge.html("PRESS <kbd>F1</kbd> OR <kbd>ESC</kbd> TO CLOSE");
+
+    const bentoGrid = new Html("div")
+      .classOn("help-bento-grid")
+      .appendTo(dom.helpOverlay);
+
+    const leftCard = new Html("div")
+      .classOn("help-card-keybinds")
+      .appendTo(bentoGrid);
+
+    const sections = [
+      {
+        title: "Song Selection & Reservation",
+        items: [
+          { key: "0 – 9", desc: "Type 6-digit song number" },
+          { key: "ENTER", desc: "Play or reserve highlighted song" },
+          { key: "BACKSPACE", desc: "Delete entered digit / clear input" },
+          { key: "Y", desc: "Open song & YouTube search" },
+          { key: "Q", desc: "Open Reservations menu" },
+        ],
+      },
+      {
+        title: "Live Playback & Mic Balance",
+        items: [
+          { key: "SPACE", desc: "Pause / Resume" },
+          { key: "ESC", desc: "Stop song / return to Main Menu" },
+          { key: "▲ / ▼", desc: "Change key / scroll down" },
+          { key: "◀ / ▶", desc: "Multiplex pan (Instrumental / Vocal)" },
+          { key: "- / =", desc: "Music volume" },
+          {
+            key: "SHIFT + - / =",
+            desc: "Microphone volume",
+          },
+          { key: "[ / ]", desc: "Cycle BGVs / MV drift sync offset" },
+        ],
+      },
+      {
+        title: "Forte Engine & Audio Effects",
+        items: [
+          { key: "C", desc: "Toggle Chorus backing vocals" },
+          { key: "G", desc: "Adjust guide melody" },
+          { key: "; / '", desc: "Cycle live MIDI drum kits" },
+          { key: "L", desc: "Customize lyrics" },
+        ],
+      },
+      {
+        title: "Miscellaneous & Extras",
+        items: [
+          { key: "L", desc: "Customize lyrics" },
+          {
+            key: "R",
+            desc: "Instant song recording / see saved session takes",
+          },
+          { key: "S", desc: "Open Sessions menu" },
+          { key: "B", desc: "Broadcast karaoke stream" },
+          { key: "T", desc: "Open multiplayer session chat" },
+          { key: "F2", desc: "Open Setup" },
+          { key: "F11", desc: "Toggle borderless fullscreen" },
+          { key: "F1", desc: "Toggle this guide" },
+        ],
+      },
+    ];
+
+    sections.forEach((sec) => {
+      const secEl = new Html("div")
+        .classOn("keybind-section")
+        .appendTo(leftCard);
+
+      new Html("h4")
+        .classOn("keybind-section-title")
+        .text(sec.title)
+        .appendTo(secEl);
+
+      const list = new Html("div").classOn("keybind-list").appendTo(secEl);
+
+      sec.items.forEach((item) => {
+        const row = new Html("div").classOn("keybind-row").appendTo(list);
+
+        const kbdWrap = new Html("div")
+          .classOn("keybind-kbd-wrap")
+          .appendTo(row);
+
+        item.key.split(" / ").forEach((part, i) => {
+          if (i > 0)
+            new Html("span")
+              .text("/")
+              .styleJs({ opacity: "0.4", margin: "0 2px" })
+              .appendTo(kbdWrap);
+          new Html("kbd").text(part).appendTo(kbdWrap);
+        });
+
+        new Html("span").classOn("keybind-desc").text(item.desc).appendTo(row);
+      });
+    });
+
+    const rightCard = new Html("div")
+      .classOn("help-card-support")
+      .appendTo(bentoGrid);
+
+    const bannerImg = new Html("img")
+      .attr({
+        src: "/assets/img/support/support_card.jpg",
+        alt: "Encore Support Card",
+      })
+      .appendTo(rightCard);
+
+    bannerImg.elm.onerror = () => {
+      bannerImg.styleJs({ display: "none" });
+      rightCard.styleJs({
+        background:
+          "radial-gradient(circle at top right, #1a2542 0%, #080d1a 100%)",
+      });
+    };
+
+    bannerImg.elm.onload = () => {
+      bannerImg.classOn("loaded");
+    };
+
+    const supportContent = new Html("div")
+      .classOn("support-content")
+      .appendTo(rightCard);
+
+    const iconWrap = new Html("div")
+      .classOn("support-icon-wrap")
+      .appendTo(supportContent);
+
+    new Html("ion-icon")
+      .attr({ name: "logo-facebook" })
+      .styleJs({ color: "#1877f2", fontSize: "2rem" })
+      .appendTo(iconWrap);
+
+    new Html("h3")
+      .classOn("support-title")
+      .text("Contact Encore Support")
+      .appendTo(supportContent);
+
+    new Html("p")
+      .classOn("support-desc")
+      .text(
+        "Need technical assistance or have feedback? Message our team directly through the official Encore Karaoke Facebook page.",
+      )
+      .appendTo(supportContent);
+
+    const visitBtn = new Html("div")
+      .classOn("support-btn")
+      .html(
+        '<span>MESSAGE ON FACEBOOK</span> <ion-icon name="open-outline" style="font-size: 1.2rem; margin-left: 0.4rem;"></ion-icon>',
+      )
+      .appendTo(supportContent);
+
+    const openSupportLink = () => {
+      const url = "https://www.facebook.com/encorevideoke/";
+      if (window.desktopIntegration?.openExternal) {
+        window.desktopIntegration.openExternal(url);
+      } else if (window.desktopIntegration?.ipc?.send) {
+        window.desktopIntegration.ipc.send("open-external", url);
+      } else {
+        window.open(url, "_blank");
+      }
+    };
+
+    rightCard.on("click", openSupportLink);
+    visitBtn.on("click", (e) => {
+      e.stopPropagation();
+      openSupportLink();
+    });
+  }
+
+  toggleHelpOverlay(visible) {
+    const state = this.ctx.state;
+    const dom = this.ctx.dom;
+
+    const shouldShow = visible !== undefined ? visible : !state.isHelpModalOpen;
+    state.isHelpModalOpen = shouldShow;
+
+    if (state.currentSongIsMultiplexed) {
+      this.ctx.services.Forte.togglePianoRollVisibility(!shouldShow);
+    }
+
+    if (this._helpAnimTimeout) clearTimeout(this._helpAnimTimeout);
+
+    if (shouldShow) {
+      dom.helpOverlay.classOff("hidden", "closing");
+      // Force browser synchronous reflow so transform starts at -100%
+      void dom.helpOverlay.elm.offsetHeight;
+      dom.helpOverlay.classOn("open");
+    } else {
+      dom.helpOverlay.classOff("open");
+      dom.helpOverlay.classOn("closing");
+      this._helpAnimTimeout = setTimeout(() => {
+        dom.helpOverlay.classOn("hidden");
+        dom.helpOverlay.classOff("closing");
+      }, 350);
+    }
   }
 
   buildUI() {

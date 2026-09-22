@@ -62,6 +62,7 @@ class EncoreController {
       volume: config.audioConfig?.mix?.instrumental?.volume ?? 1,
       videoSyncOffset: config.videoConfig?.syncOffset || 0,
       isStreamModalOpen: false,
+      isHelpModalOpen: false,
 
       systemFonts: ["Radio Canada"],
       lyricFontFamily: config.videoConfig?.lyricFontFamily || "Radio Canada",

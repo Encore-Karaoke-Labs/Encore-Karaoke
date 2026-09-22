@@ -123,6 +123,21 @@ export default class InputManager {
       }
     }
 
+    if (state.isHelpModalOpen) {
+      e.preventDefault();
+      if (e.key === "Escape" || e.key === "F1") {
+        ui.toggleHelpOverlay(false);
+      }
+      return;
+    }
+
+    if (e.key === "F1") {
+      e.preventDefault();
+      if (state.mode === "setup" || state.isStreamModalOpen) return;
+      ui.toggleHelpOverlay(!state.isHelpModalOpen);
+      return;
+    }
+
     if (e.key === "F2") {
       e.preventDefault();
       if (
