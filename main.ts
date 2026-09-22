@@ -2356,6 +2356,18 @@ void app.whenReady().then(() => {
     },
   );
 
+  ipcMain.on("open-external", (_event: IpcMainEvent, url: string) => {
+    if (
+      typeof url === "string" &&
+      (url.startsWith("https://") ||
+        url.startsWith("http://") ||
+        url.startsWith("mailto:"))
+    ) {
+      logger.info("SYSTEM", `Opening external URL: ${url}`);
+      void shell.openExternal(url);
+    }
+  });
+
   ipcMain.on(
     "libmgr-open-folder",
     (_event: IpcMainEvent, targetPath: string) => {

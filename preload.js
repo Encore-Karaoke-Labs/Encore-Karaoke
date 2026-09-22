@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld("desktopIntegration", {
       ipcRenderer.removeListener(channel, callback);
     },
   },
+  openExternal: (url) => {
+    ipcRenderer.send("open-external", url);
+  },
 });
 
 contextBridge.exposeInMainWorld("deepLink", {
