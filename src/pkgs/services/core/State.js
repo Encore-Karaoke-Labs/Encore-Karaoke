@@ -71,6 +71,10 @@ export const state = {
       tempoChanges: [],
       initialBpm: 120,
       keyRange: { min: 0, max: 127 },
+      key: null,
+      scale: null,
+      root: null,
+      pitchClass: null,
     },
   },
   recording: {
