@@ -713,20 +713,28 @@ export class FortePlayback {
 
         let primaryLyricTrackEvents = [];
         let highestLyricScore = 0;
+        let bestTrackHasExplicitLyrics = false;
 
         parsedMidi.tracks.forEach((midiTrack) => {
           let trackLyricScore = 0;
-          let hasExplicitLyrics = false;
+          const explicitLyricEvents = [];
+          const textEvents = [];
 
-          const trackTextEvents = midiTrack.events.filter((e) => {
+          midiTrack.events.forEach((e) => {
             if (e.statusByte === midiMessageTypes.lyric) {
-              hasExplicitLyrics = true;
-              return true;
+              explicitLyricEvents.push(e);
+            } else if (e.statusByte === midiMessageTypes.text) {
+              textEvents.push(e);
             }
-            return e.statusByte === midiMessageTypes.text;
           });
 
-          trackTextEvents.forEach((e) => {
+          const hasExplicitLyrics = explicitLyricEvents.length > 0;
+
+          const candidateEvents = hasExplicitLyrics
+            ? explicitLyricEvents
+            : textEvents;
+
+          candidateEvents.forEach((e) => {
             if (!e.data || e.data.length === 0) return;
             const firstChar = String.fromCharCode(e.data[0]);
             if (firstChar !== "@" && firstChar !== "#") trackLyricScore++;
@@ -739,11 +747,12 @@ export class FortePlayback {
 
           if (isValidLyricTrack && trackLyricScore > highestLyricScore) {
             highestLyricScore = trackLyricScore;
-            primaryLyricTrackEvents = trackTextEvents;
+            primaryLyricTrackEvents = candidateEvents;
+            bestTrackHasExplicitLyrics = hasExplicitLyrics;
           }
         });
 
-        if (highestLyricScore > 0) {
+        if (highestLyricScore > 0 && !bestTrackHasExplicitLyrics) {
           parsedMidi.isKaraokeFile = true;
         }
 
@@ -812,6 +821,13 @@ export class FortePlayback {
           (e) => {
             if (this.state.playback.status === "stopped") return;
             if (!e || !e.event) return;
+
+            if (
+              bestTrackHasExplicitLyrics &&
+              e.event.statusByte === midiMessageTypes.text
+            ) {
+              return;
+            }
 
             const dataArray = e.event.data;
             if (!dataArray || !(dataArray instanceof Uint8Array)) return;
@@ -890,11 +906,11 @@ export class FortePlayback {
         rawTrackEvents.forEach((message) => {
           if (!message.data) return;
           if (
-            !parsedMidi.isKaraokeFile &&
-            highestLyricScore === 0 &&
+            (bestTrackHasExplicitLyrics || !parsedMidi.isKaraokeFile) &&
             message.statusByte === midiMessageTypes.text
-          )
+          ) {
             return;
+          }
 
           let text = decoder.decode(message.data);
 
