@@ -242,6 +242,75 @@ function detectEncoding(uint8Array) {
   return "utf-8";
 }
 
+/**
+ * Detects structural delimiter artifacts
+ * that appear consistently across syllables or lines.
+ *
+ * @param {Array<Object>} rawEvents - Array of MIDI lyric events.
+ * @param {TextDecoder} decoder - Active text decoder.
+ * @returns {Array<string>} Array of single-character artifact strings to strip.
+ */
+function detectPervasiveArtifacts(rawEvents, decoder) {
+  const SAFE_CHAR_REGEX = /[\p{L}\p{N}\s.,!?'"’‘“”():;\[\]{}\/\-—–~#@]/u;
+
+  const eventCounts = new Map();
+  const lineCounts = new Map();
+  let validEventCount = 0;
+  let lineCount = 0;
+
+  const currentLineChars = new Set();
+
+  for (const msg of rawEvents) {
+    if (!msg.data || msg.data.byteLength === 0) continue;
+    const str = decoder.decode(msg.data);
+    if (!str || str.trim().length === 0) continue;
+
+    validEventCount++;
+    const charsInEvent = new Set();
+
+    for (let i = 0; i < str.length; i++) {
+      const ch = str[i];
+
+      if (ch === "/" || ch === "\\" || ch === "\n" || ch === "\r") {
+        lineCount++;
+        for (const c of currentLineChars) {
+          lineCounts.set(c, (lineCounts.get(c) || 0) + 1);
+        }
+        currentLineChars.clear();
+        continue;
+      }
+
+      if (SAFE_CHAR_REGEX.test(ch)) continue;
+
+      charsInEvent.add(ch);
+      currentLineChars.add(ch);
+    }
+
+    for (const ch of charsInEvent) {
+      eventCounts.set(ch, (eventCounts.get(ch) || 0) + 1);
+    }
+  }
+
+  if (currentLineChars.size > 0) {
+    lineCount++;
+    for (const c of currentLineChars) {
+      lineCounts.set(c, (lineCounts.get(c) || 0) + 1);
+    }
+  }
+
+  const detected = [];
+  for (const [ch, count] of eventCounts.entries()) {
+    const eventRatio = validEventCount > 0 ? count / validEventCount : 0;
+    const lineRatio = lineCount > 0 ? (lineCounts.get(ch) || 0) / lineCount : 0;
+
+    if ((eventRatio >= 0.2 || lineRatio >= 0.4) && count >= 4) {
+      detected.push(ch);
+    }
+  }
+
+  return detected;
+}
+
 export class FortePlayback {
   /**
    * Initializes the Playback Controller.
@@ -622,6 +691,7 @@ export class FortePlayback {
     };
     this.state.playback.decodedLyrics = [];
     this.state.playback.lyricsEncoding = "utf-8";
+    this.state.playback.artifactRegex = null;
     this.state.playback.transpose = 0;
     this.state.playback.isMultiplexed = false;
     this.state.playback.isPlatinum = false;
@@ -836,8 +906,8 @@ export class FortePlayback {
               this.state.playback.lyricsEncoding,
             ).decode(dataArray);
 
-            if (this.state.playback.isPlatinum) {
-              text = text.replace(/\^/g, "");
+            if (this.state.playback.artifactRegex) {
+              text = text.replace(this.state.playback.artifactRegex, "");
             }
 
             const cleanText = text.replace(/[\r\n\/\\]/g, "");
@@ -900,6 +970,21 @@ export class FortePlayback {
           totalLength > 0 ? detectEncoding(combinedBuffer) : "utf-8";
         const decoder = new TextDecoder(this.state.playback.lyricsEncoding);
 
+        const detectedArtifacts = detectPervasiveArtifacts(
+          rawTrackEvents,
+          decoder,
+        );
+
+        let artifactRegex = null;
+        if (detectedArtifacts.length > 0) {
+          const escaped = detectedArtifacts
+            .map((c) => c.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"))
+            .join("");
+          artifactRegex = new RegExp(`[${escaped}]`, "g");
+          logVerbose("Detected pervasive lyric artifacts:", detectedArtifacts);
+        }
+        this.state.playback.artifactRegex = artifactRegex;
+
         const rawLyrics = [];
         this.state.playback.decodedLyrics = [];
 
@@ -914,8 +999,8 @@ export class FortePlayback {
 
           let text = decoder.decode(message.data);
 
-          if (isPlatinum) {
-            text = text.replace(/\^/g, "");
+          if (artifactRegex) {
+            text = text.replace(artifactRegex, "");
           }
 
           const clean = text.replace(/[\r\n\/\\]/g, "");
