@@ -398,6 +398,33 @@ const bonjourId = `encore-link-${crypto.randomUUID()}`;
 
 const fileToken = crypto.randomUUID();
 
+let latestOverlayState: { type: string; payload?: unknown } | null = null;
+const sseOverlayClients = new Set<Response>();
+
+function broadcastOverlayLyrics(data: {
+  type: string;
+  payload?: unknown;
+}): void {
+  const msg = `data: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseOverlayClients) {
+    try {
+      client.write(msg);
+    } catch {
+      sseOverlayClients.delete(client);
+    }
+  }
+}
+
+const overlayHeartbeat = setInterval(() => {
+  for (const client of sseOverlayClients) {
+    try {
+      client.write(": ping\n\n");
+    } catch {
+      sseOverlayClients.delete(client);
+    }
+  }
+}, 20000);
+
 // Pre-compute CRC32 table for maximum performance
 const crcTable = new Uint32Array(256);
 for (let i = 0; i < 256; i++) {
@@ -815,6 +842,35 @@ server.post("/auth/verify-hash", (req: Request, res: Response) => {
   res.json({ valid: computedHash === hash });
 });
 
+server.get("/overlay/lyrics/stream", (_req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.flushHeaders?.();
+
+  sseOverlayClients.add(res);
+
+  if (latestOverlayState) {
+    res.write(`data: ${JSON.stringify(latestOverlayState)}\n\n`);
+  } else {
+    res.write(`data: ${JSON.stringify({ type: "clear" })}\n\n`);
+  }
+
+  _req.on("close", () => {
+    sseOverlayClients.delete(res);
+  });
+});
+
+server.get("/overlay/lyrics", (_req: Request, res: Response) => {
+  const overlayFile = path.join(__dirname, "resources/overlay.html");
+  if (fs.existsSync(overlayFile)) {
+    res.sendFile(overlayFile);
+  } else {
+    res.status(404).send("Overlay not found.");
+  }
+});
+
 const titleBarHeight = 55;
 let zoomFactor = Config.getItem("zoomLevel") as number | null;
 if (zoomFactor === null || zoomFactor === undefined) {
@@ -1123,6 +1179,19 @@ void app.whenReady().then(() => {
       relayUrl: RELAY_URL,
       roomCode: activeRoomCode,
     });
+  });
+
+  ipcMain.on(
+    "overlay-lyrics-update",
+    (_event: IpcMainEvent, payload: unknown) => {
+      latestOverlayState = { type: "lyrics", payload };
+      broadcastOverlayLyrics(latestOverlayState);
+    },
+  );
+
+  ipcMain.on("overlay-lyrics-clear", () => {
+    latestOverlayState = null;
+    broadcastOverlayLyrics({ type: "clear" });
   });
 
   ipcMain.on("deep-link-ready", () => {
@@ -2720,6 +2789,7 @@ void app.whenReady().then(() => {
 });
 
 app.on("before-quit", () => {
+  clearInterval(overlayHeartbeat);
   if (kioskEnabled && process.platform === "win32") {
     exec("explorer.exe", (error) => {
       if (error) {
