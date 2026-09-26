@@ -217,6 +217,8 @@ export default class LyricsEngine {
 
   reset() {
     this.cleanupEvents();
+    this.clearOverlayLyrics();
+    this._hasBroadcastInitialLyrics = false;
     this.currentSongLineIndex = 0;
 
     this.romajiCache = {};
@@ -306,6 +308,86 @@ export default class LyricsEngine {
     const configuredColors = this.ctx.config.videoConfig?.lyricColors || {};
     const colorKey = configuredColors[role] || defaultMappings[role] || "white";
     return COLOR_PALETTES[colorKey] || COLOR_PALETTES.white;
+  }
+
+  broadcastOverlayLyrics() {
+    if (!this.renderableLines || this.renderableLines.length === 0) return;
+
+    const isMidi = Boolean(this.ctx.state.currentSongIsMIDI);
+    const isLine1Active = isMidi
+      ? this.currentSongLineIndex % 2 === 0
+      : !this.isLrcLine2Active;
+
+    const isDuet = Boolean(this.ctx.state.isDuet);
+
+    const formatLine = (renderableLine, fallbackRomaji = "") => {
+      if (!renderableLine || !renderableLine.syllables) return null;
+
+      const segments = [];
+      for (const s of renderableLine.syllables) {
+        if (s.isHidden) continue;
+        segments.push({
+          text: s.casedText || s.text || "",
+          ruby: s.furigana || null,
+          role: isDuet ? s.duetRole || "default" : "default",
+        });
+      }
+
+      let romaji = "";
+      if (renderableLine.rows) {
+        const parts = [];
+        for (const r of renderableLine.rows) {
+          if (r.romajiChunks) {
+            for (const c of r.romajiChunks) {
+              if (c.romaji && c.romaji.trim()) parts.push(c.romaji.trim());
+            }
+          }
+        }
+        romaji = parts.join(" ");
+      }
+
+      if (!romaji && fallbackRomaji) {
+        romaji = fallbackRomaji;
+      }
+
+      return {
+        segments,
+        romaji,
+        isNext: Boolean(renderableLine.isNextLine),
+        isPrevious: Boolean(renderableLine.isPreviousLine),
+      };
+    };
+
+    const line1 = formatLine(
+      this.renderableLines[0],
+      this.currentLrcLine1?.romanized,
+    );
+    const line2 = formatLine(
+      this.renderableLines[1],
+      this.currentLrcLine2?.romanized,
+    );
+
+    const payload = {
+      activeLine: isLine1Active ? 1 : 2,
+      line1,
+      line2,
+      isDuet: isDuet,
+      isInterlude: Boolean(this.ctx.state.isInterludeActive),
+    };
+
+    if (window.lyricsOverlay?.sendUpdate) {
+      window.lyricsOverlay.sendUpdate(payload);
+    } else if (window.desktopIntegration?.ipc?.send) {
+      window.desktopIntegration.ipc.send("overlay-lyrics-update", payload);
+    }
+  }
+
+  clearOverlayLyrics() {
+    if (window.lyricsOverlay?.sendClear) {
+      window.lyricsOverlay.sendClear();
+    } else if (window.desktopIntegration?.ipc?.send) {
+      window.desktopIntegration.ipc.send("overlay-lyrics-clear");
+    }
   }
 
   async setupLyrics(song, pbState) {
@@ -627,6 +709,9 @@ export default class LyricsEngine {
       this._resolveRomajiForLine(2);
 
       this.resizeLyricsCanvas();
+      this.calculateLyricLayout();
+      this.broadcastOverlayLyrics();
+      this._hasBroadcastInitialLyrics = true;
 
       this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
     } else if (song.lrcPath) {
@@ -684,6 +769,10 @@ export default class LyricsEngine {
         this.nextLineFadeDurationMs = 500;
 
         this.resizeLyricsCanvas();
+        this.calculateLyricLayout();
+        this.broadcastOverlayLyrics();
+        this._hasBroadcastInitialLyrics = true;
+
         this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
 
         if (this.parsedLrc[0].time > 4.0)
@@ -769,6 +858,7 @@ export default class LyricsEngine {
             ) {
               this.calculateLyricLayout();
               this.requestCanvasCacheUpdate = true;
+              this.broadcastOverlayLyrics();
             }
           });
         }
@@ -1730,6 +1820,15 @@ export default class LyricsEngine {
       this.currentMediaTime = currentTime;
       this.lastMediaTimeUpdate = performance.now();
 
+      if (
+        !this._hasBroadcastInitialLyrics &&
+        this.renderableLines &&
+        this.renderableLines.length > 0
+      ) {
+        this._hasBroadcastInitialLyrics = true;
+        this.broadcastOverlayLyrics();
+      }
+
       if (this.midiLines && this.midiLines.length > 0) {
         let newLineIndex = Math.max(0, this.currentSongLineIndex);
 
@@ -1786,6 +1885,7 @@ export default class LyricsEngine {
           this.calculateLyricLayout();
           this.requestCanvasCacheUpdate = true;
           this._resolveRomajiForLine(this.currentSongLineIndex + 2);
+          this.broadcastOverlayLyrics();
         }
       }
 
@@ -1820,12 +1920,14 @@ export default class LyricsEngine {
               this.tempTips = structuredClone(INTERLUDE_TIPS);
             this.ctx.dom.interludeOverlay.classOn("visible");
             this.ctx.dom.lyricsCanvas.styleJs({ opacity: "0" });
+            this.broadcastOverlayLyrics();
           }
         } else {
           if (this.ctx.state.isInterludeActive) {
             this.ctx.state.isInterludeActive = false;
             this.ctx.dom.interludeOverlay.classOff("visible");
             this.ctx.dom.lyricsCanvas.styleJs({ opacity: "1" });
+            this.broadcastOverlayLyrics();
           }
         }
       }
@@ -1908,6 +2010,7 @@ export default class LyricsEngine {
             this.nextLineFadeDurationMs = 500;
           }
           this.calculateLyricLayout();
+          this.broadcastOverlayLyrics();
         }
       }
     };
