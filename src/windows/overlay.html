@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Encore Lyric Overlay</title>
+    <style>
+      :root {
+        /* Encore Karaoke Lyric Overlay */
+        --font-family:
+          "Radio Canada", "Noto Sans JP", "Hiragino Kaku Gothic ProN",
+          "Yu Gothic", "Meiryo", system-ui, sans-serif;
+        --font-size: 40px;
+        --font-weight: 800;
+        --line-height: 1.35;
+        --text-align: center;
+
+        /* Spacing & Sizing */
+        --line-gap: 16px;
+        --container-max-width: 1400px;
+        --container-padding: 16px 28px;
+
+        /* Default & Active Line Colors */
+        --color-default: #ffffff;
+        --color-active: #ffffff;
+        --stroke-active: #010141;
+        --stroke-width-active: 6px;
+        --shadow-active: 0 4px 12px rgba(0, 0, 0, 0.85);
+        --scale-active: 1;
+        --opacity-active: 1;
+
+        /* Upcoming / Next Line */
+        --color-next: #ffffff;
+        --stroke-next: rgba(1, 1, 65, 0.7);
+        --stroke-width-next: 5px;
+        --shadow-next: 0 2px 6px rgba(0, 0, 0, 0.6);
+        --scale-next: 0.96;
+        --opacity-next: 0.6;
+
+        /* Furigana (Ruby) */
+        --ruby-font-size: 0.48em;
+        --ruby-font-weight: 700;
+        --ruby-color-active: #ffffff;
+        --ruby-stroke-active: #01012b;
+        --ruby-color-next: #ffffff;
+        --ruby-stroke-next: rgba(1, 1, 45, 0.7);
+
+        /* Romaji Subtitle Line */
+        --romaji-font-size: 0.42em;
+        --romaji-font-weight: 600;
+        --romaji-color-active: #ffffff;
+        --romaji-color-next: rgba(255, 255, 255, 0.65);
+        --romaji-margin-top: 2px;
+
+        /* Duet Role Accent Colors */
+        --color-role-m: #66e6ff;
+        --color-role-f: #ffff33;
+        --color-role-m2: #ff6666;
+        --color-role-f2: #66ff66;
+        --color-role-a: #ffb233;
+
+        /* Lyric Container (if you want a background in the lyrics) */
+        --box-bg: transparent; /* e.g., rgba(8, 8, 16, 0.65) */
+        --box-border: none; /* e.g., 1px solid rgba(255, 255, 255, 0.15) */
+        --box-radius: 16px;
+        --box-backdrop-filter: none; /* e.g., blur(12px) */
+        --box-shadow: none;
+
+        /* Status Badge */
+        --status-font-size: 15px;
+        --status-bg: rgba(0, 0, 0, 0.7);
+        --status-color: #ffffff;
+        --status-border: 1px solid rgba(255, 255, 255, 0.2);
+
+        /* Transitions */
+        --transition-duration: 0.3s;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        width: 100vw;
+        height: 100vh;
+        background: transparent !important;
+        overflow: hidden;
+        font-family: var(--font-family);
+        color: var(--color-default);
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #overlay-root {
+        width: 100%;
+        max-width: var(--container-max-width);
+        padding: var(--container-padding);
+        margin: 0;
+        background: var(--box-bg);
+        border: var(--box-border);
+        border-radius: var(--box-radius);
+        backdrop-filter: var(--box-backdrop-filter);
+        -webkit-backdrop-filter: var(--box-backdrop-filter);
+        box-shadow: var(--box-shadow);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: var(--line-gap);
+        text-align: var(--text-align);
+        transition:
+          opacity var(--transition-duration) ease,
+          transform var(--transition-duration) ease;
+      }
+
+      #overlay-root.interlude {
+        opacity: 0.15;
+        transform: scale(0.98);
+      }
+
+      #overlay-root.hidden {
+        opacity: 0;
+        transform: scale(0.97);
+        pointer-events: none;
+      }
+
+      .lyric-line {
+        color: var(--color-default);
+        font-size: var(--font-size);
+        font-weight: var(--font-weight);
+        line-height: var(--line-height);
+        transition:
+          color var(--transition-duration) ease,
+          -webkit-text-stroke var(--transition-duration) ease,
+          transform var(--transition-duration) cubic-bezier(0.2, 0, 0.1, 1),
+          opacity var(--transition-duration) ease;
+        min-height: 1.4em;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .lyric-content {
+        display: inline-block;
+        paint-order: stroke fill;
+      }
+
+      .lyric-line.active {
+        color: var(--color-active);
+        -webkit-text-stroke: var(--stroke-width-active) var(--stroke-active);
+        text-shadow: var(--shadow-active);
+        transform: scale(var(--scale-active));
+        opacity: var(--opacity-active);
+      }
+      .lyric-line.active ruby rt {
+        color: var(--ruby-color-active);
+        -webkit-text-stroke: 2px var(--ruby-stroke-active);
+      }
+      .lyric-line.active .romaji {
+        color: var(--romaji-color-active);
+      }
+
+      .lyric-line.next {
+        color: var(--color-next);
+        -webkit-text-stroke: var(--stroke-width-next) var(--stroke-next);
+        text-shadow: var(--shadow-next);
+        transform: scale(var(--scale-next));
+        opacity: var(--opacity-next);
+      }
+      .lyric-line.next ruby rt {
+        color: var(--ruby-color-next);
+        -webkit-text-stroke: 1.5px var(--ruby-stroke-next);
+      }
+      .lyric-line.next .romaji {
+        color: var(--romaji-color-next);
+      }
+
+      .lyric-line.empty {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+
+      ruby {
+        ruby-align: center;
+        ruby-position: over;
+        padding: 0 1px;
+      }
+      rt {
+        font-size: var(--ruby-font-size);
+        font-weight: var(--ruby-font-weight);
+        line-height: 1;
+        paint-order: stroke fill;
+        user-select: none;
+      }
+
+      .romaji {
+        font-size: var(--romaji-font-size);
+        font-weight: var(--romaji-font-weight);
+        margin-top: var(--romaji-margin-top);
+        letter-spacing: 0.04em;
+        -webkit-text-stroke: 0;
+        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+        user-select: none;
+      }
+
+      .segment[data-role="m"] {
+        color: var(--color-role-m);
+      }
+      .segment[data-role="f"] {
+        color: var(--color-role-f);
+      }
+      .segment[data-role="m2"] {
+        color: var(--color-role-m2);
+      }
+      .segment[data-role="f2"] {
+        color: var(--color-role-f2);
+      }
+      .segment[data-role="a"] {
+        color: var(--color-role-a);
+      }
+
+      #status-badge {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translateX(-50%) translateY(-50%);
+        background: var(--status-bg);
+        color: var(--status-color);
+        border: var(--status-border);
+        border-radius: 20px;
+        padding: 6px 14px;
+        font-size: var(--status-font-size);
+        font-weight: 600;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.5s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
+      #status-badge.visible {
+        opacity: 1;
+      }
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #89cff0;
+        animation: pulse 1.6s infinite ease-in-out;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 0.3;
+          transform: scale(0.9);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.1);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status-badge" class="visible">
+      <span class="status-dot"></span>
+      <span id="status-text">Waiting for Encore...</span>
+    </div>
+
+    <div id="overlay-root" class="hidden">
+      <div id="line-1" class="lyric-line empty">
+        <div class="lyric-content"></div>
+        <div class="romaji"></div>
+      </div>
+      <div id="line-2" class="lyric-line empty">
+        <div class="lyric-content"></div>
+        <div class="romaji"></div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const root = document.getElementById("overlay-root");
+        const line1El = document.getElementById("line-1");
+        const line2El = document.getElementById("line-2");
+        const statusBadge = document.getElementById("status-badge");
+        const statusText = document.getElementById("status-text");
+
+        let disconnectTimer = null;
+
+        function showStatus(text) {
+          statusText.textContent = text;
+          statusBadge.classList.add("visible");
+        }
+
+        function hideStatus() {
+          statusBadge.classList.remove("visible");
+        }
+
+        function escapeHtml(str) {
+          return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+        }
+
+        function renderLine(lineEl, lineData, isActive) {
+          const contentEl = lineEl.querySelector(".lyric-content");
+          const romajiEl = lineEl.querySelector(".romaji");
+
+          if (
+            !lineData ||
+            !lineData.segments ||
+            lineData.segments.length === 0
+          ) {
+            lineEl.className = "lyric-line empty";
+            contentEl.innerHTML = "";
+            romajiEl.textContent = "";
+            return;
+          }
+
+          lineEl.className = "lyric-line " + (isActive ? "active" : "next");
+
+          let html = "";
+          for (let i = 0; i < lineData.segments.length; i++) {
+            const seg = lineData.segments[i];
+            const textEscaped = escapeHtml(seg.text || "");
+            const roleAttr =
+              seg.role && seg.role !== "default"
+                ? ' data-role="' + escapeHtml(seg.role) + '"'
+                : "";
+
+            if (seg.ruby) {
+              const rubyEscaped = escapeHtml(seg.ruby);
+              html +=
+                '<span class="segment"' +
+                roleAttr +
+                "><ruby>" +
+                textEscaped +
+                "<rt>" +
+                rubyEscaped +
+                "</rt></ruby></span>";
+            } else {
+              html +=
+                '<span class="segment"' +
+                roleAttr +
+                ">" +
+                textEscaped +
+                "</span>";
+            }
+          }
+
+          contentEl.innerHTML = html;
+          romajiEl.textContent = lineData.romaji || "";
+        }
+
+        function updateOverlay(payload) {
+          hideStatus();
+
+          if (
+            !payload ||
+            payload.type === "clear" ||
+            (!payload.line1 && !payload.line2)
+          ) {
+            root.classList.add("hidden");
+            renderLine(line1El, null, false);
+            renderLine(line2El, null, false);
+            return;
+          }
+
+          root.classList.remove("hidden");
+          if (payload.isInterlude) {
+            root.classList.add("interlude");
+          } else {
+            root.classList.remove("interlude");
+          }
+
+          const activeLine = payload.activeLine || 1;
+          renderLine(line1El, payload.line1, activeLine === 1);
+          renderLine(line2El, payload.line2, activeLine === 2);
+        }
+
+        function connectSSE() {
+          const evtSource = new EventSource("/overlay/lyrics/stream");
+
+          evtSource.onopen = function () {
+            if (disconnectTimer) {
+              clearTimeout(disconnectTimer);
+              disconnectTimer = null;
+            }
+            showStatus("Encore Connected");
+            setTimeout(function () {
+              if (!root.classList.contains("hidden")) {
+                hideStatus();
+              }
+            }, 1800);
+          };
+
+          evtSource.onmessage = function (e) {
+            try {
+              const data = JSON.parse(e.data);
+              if (data.type === "lyrics") {
+                updateOverlay(data.payload);
+              } else if (data.type === "clear") {
+                updateOverlay(null);
+              }
+            } catch (err) {
+              console.error("SSE parsing error", err);
+            }
+          };
+
+          evtSource.onerror = function () {
+            if (!disconnectTimer) {
+              disconnectTimer = setTimeout(function () {
+                showStatus("Waiting for Encore...");
+                root.classList.add("hidden");
+              }, 2500);
+            }
+          };
+        }
+
+        connectSSE();
+      })();
+    </script>
+  </body>
+</html>
