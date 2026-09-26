@@ -40,6 +40,11 @@ contextBridge.exposeInMainWorld("romanization", {
   romanize: async (rawJapanese) => ipcRenderer.invoke("romanize", rawJapanese),
 });
 
+contextBridge.exposeInMainWorld("lyricsOverlay", {
+  sendUpdate: (payload) => ipcRenderer.send("overlay-lyrics-update", payload),
+  sendClear: () => ipcRenderer.send("overlay-lyrics-clear"),
+});
+
 contextBridge.exposeInMainWorld("networking", {
   port: async () => ipcRenderer.invoke("get-port"),
   accessToken: async () => ipcRenderer.invoke("get-file-token"),
