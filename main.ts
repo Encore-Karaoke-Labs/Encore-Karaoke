@@ -863,7 +863,7 @@ server.get("/overlay/lyrics/stream", (_req: Request, res: Response) => {
 });
 
 server.get("/overlay/lyrics", (_req: Request, res: Response) => {
-  const overlayFile = path.join(__dirname, "resources/overlay.html");
+  const overlayFile = path.join(__dirname, "resources/lyrics.html");
   if (fs.existsSync(overlayFile)) {
     res.sendFile(overlayFile);
   } else {
