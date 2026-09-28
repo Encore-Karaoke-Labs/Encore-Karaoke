@@ -45,6 +45,11 @@ contextBridge.exposeInMainWorld("lyricsOverlay", {
   sendClear: () => ipcRenderer.send("overlay-lyrics-clear"),
 });
 
+contextBridge.exposeInMainWorld("setlistOverlay", {
+  sendUpdate: (payload) => ipcRenderer.send("overlay-setlist-update", payload),
+  sendClear: () => ipcRenderer.send("overlay-setlist-clear"),
+});
+
 contextBridge.exposeInMainWorld("networking", {
   port: async () => ipcRenderer.invoke("get-port"),
   accessToken: async () => ipcRenderer.invoke("get-file-token"),
