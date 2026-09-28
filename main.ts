@@ -415,12 +415,36 @@ function broadcastOverlayLyrics(data: {
   }
 }
 
+let latestSetlistState: { type: string; payload?: unknown } | null = null;
+const sseSetlistClients = new Set<Response>();
+
+function broadcastOverlaySetlist(data: {
+  type: string;
+  payload?: unknown;
+}): void {
+  const msg = `data: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseSetlistClients) {
+    try {
+      client.write(msg);
+    } catch {
+      sseSetlistClients.delete(client);
+    }
+  }
+}
+
 const overlayHeartbeat = setInterval(() => {
   for (const client of sseOverlayClients) {
     try {
       client.write(": ping\n\n");
     } catch {
       sseOverlayClients.delete(client);
+    }
+  }
+  for (const client of sseSetlistClients) {
+    try {
+      client.write(": ping\n\n");
+    } catch {
+      sseSetlistClients.delete(client);
     }
   }
 }, 20000);
@@ -871,6 +895,37 @@ server.get("/overlay/lyrics", (_req: Request, res: Response) => {
   }
 });
 
+server.get("/overlay/setlist/stream", (_req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.flushHeaders?.();
+
+  sseSetlistClients.add(res);
+
+  if (latestSetlistState) {
+    res.write(`data: ${JSON.stringify(latestSetlistState)}\n\n`);
+  } else {
+    res.write(
+      `data: ${JSON.stringify({ type: "setlist", payload: { nowPlaying: null, queue: [], total: 0 } })}\n\n`,
+    );
+  }
+
+  _req.on("close", () => {
+    sseSetlistClients.delete(res);
+  });
+});
+
+server.get("/overlay/setlist", (_req: Request, res: Response) => {
+  const overlayFile = path.join(__dirname, "resources/setlist.html");
+  if (fs.existsSync(overlayFile)) {
+    res.sendFile(overlayFile);
+  } else {
+    res.status(404).send("Setlist overlay not found.");
+  }
+});
+
 const titleBarHeight = 55;
 let zoomFactor = Config.getItem("zoomLevel") as number | null;
 if (zoomFactor === null || zoomFactor === undefined) {
@@ -1192,6 +1247,22 @@ void app.whenReady().then(() => {
   ipcMain.on("overlay-lyrics-clear", () => {
     latestOverlayState = null;
     broadcastOverlayLyrics({ type: "clear" });
+  });
+
+  ipcMain.on(
+    "overlay-setlist-update",
+    (_event: IpcMainEvent, payload: unknown) => {
+      latestSetlistState = { type: "setlist", payload };
+      broadcastOverlaySetlist(latestSetlistState);
+    },
+  );
+
+  ipcMain.on("overlay-setlist-clear", () => {
+    latestSetlistState = {
+      type: "setlist",
+      payload: { nowPlaying: null, queue: [], total: 0 },
+    };
+    broadcastOverlaySetlist(latestSetlistState);
   });
 
   ipcMain.on("deep-link-ready", () => {
