@@ -55,7 +55,7 @@ export default class SessionManager {
 
     const participants = SessionsSvc?.state?.participants || [];
     const currentCount = Math.max(1, participants.length);
-    const maxCapacity = 8;
+    const maxCapacity = 10;
 
     let detailsText = "Session Lounge";
     let stateText = state.isSessionHost ? `Hosting a Session` : `In a Session`;
