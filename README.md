@@ -25,6 +25,7 @@
   - Sing with friends and family across the world with Encore Sessions! Perfect for OFWs, LDRs, or remote karaoke hangouts with friends!
   - Queue, Cheer, and Chat in the room just like a real karaoke box.
   - Have fun with a sprinkle of competition with a score leaderboard!
+  - Invite your friends without even having to send a link with Discord Game Invite support.
 - **EnMoku! (Mobile Remote Control)**
   - No more passing a bulky songbook around! Just scan the QR code on the screen to connect your smartphone.
   - No additional app installs needed! EnMoku works straight in your web browser. (Chromium-based browsers (e.g., Chrome, Edge) and Firefox)
