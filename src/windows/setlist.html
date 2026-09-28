@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Encore Setlist Overlay</title>
+    <style>
+      @font-face {
+        font-family: "Radio Canada";
+        font-style: normal;
+        font-weight: 400;
+        src:
+          url("/assets/fonts/RadioCanada-Regular.ttf") format("truetype"),
+          url("/assets/fonts/radio-canada-v26-latin-regular.woff2")
+            format("woff2");
+      }
+      @font-face {
+        font-family: "Radio Canada";
+        font-style: normal;
+        font-weight: 600;
+        src: url("/assets/fonts/radio-canada-v26-latin-600.woff2")
+          format("woff2");
+      }
+      @font-face {
+        font-family: "Rajdhani";
+        font-style: normal;
+        font-weight: 600;
+        src:
+          url("/assets/fonts/Rajdhani-Regular.ttf") format("truetype"),
+          url("/assets/fonts/rajdhani-v17-latin-600.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Rajdhani";
+        font-style: normal;
+        font-weight: 700;
+        src:
+          url("/assets/fonts/Rajdhani-Bold.ttf") format("truetype"),
+          url("/assets/fonts/rajdhani-v17-latin-700.woff2") format("woff2");
+      }
+
+      :root {
+        /* --- Typography --- */
+        --font-header: "Rajdhani", sans-serif;
+        --font-body:
+          "Radio Canada", "Noto Sans JP", "Noto Sans SC", "Noto Sans KR",
+          "Meiryo", system-ui, sans-serif;
+
+        /* Sizing */
+        --overlay-width: 100%;
+        --overlay-height: 100%;
+        --overlay-padding: 0px;
+        --panel-padding: 14px 16px;
+        --panel-radius: 0px;
+
+        /* Metrics */
+        --item-height: 44px;
+        --item-gap: 4px;
+        --format-badge-width: 46px;
+        --song-code-width: 52px;
+
+        /* Colors */
+        --bg-overlay: rgba(8, 8, 16, 0.94);
+        --border-overlay: 1px solid rgba(255, 255, 255, 0.12);
+
+        --bg-now-playing: #0e1220;
+        --border-now-playing: 1px solid #89cff0;
+
+        --bg-item: rgba(255, 255, 255, 0.03);
+        --border-item: 1px solid rgba(255, 255, 255, 0.06);
+
+        --color-accent: #89cff0;
+        --color-gold: #ffd700;
+        --color-text-main: #ffffff;
+        --color-text-dim: rgba(255, 255, 255, 0.55);
+        --color-text-code: #89cff0;
+
+        /* Format Badges */
+        --badge-mtv: #2f6cd1;
+        --badge-midi: #d12f9e;
+        --badge-mp: #2fd147;
+        --badge-rs: #b02fd1;
+        --badge-yt: #cc0000;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: var(--overlay-padding);
+        width: 100vw;
+        height: 100vh;
+        background: transparent !important;
+        overflow: hidden;
+      }
+
+      #setlist-card {
+        width: var(--overlay-width);
+        height: var(--overlay-height);
+        background: var(--bg-overlay);
+        border: var(--border-overlay);
+        border-radius: var(--panel-radius);
+        padding: var(--panel-padding);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow: hidden;
+      }
+
+      /* Header Bar */
+      .setlist-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        flex-shrink: 0;
+      }
+
+      .setlist-title {
+        font-family: var(--font-header);
+        font-size: 1.35rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: var(--color-accent);
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .queue-count-pill {
+        font-family: var(--font-header);
+        font-size: 0.95rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        color: var(--color-gold);
+        line-height: 1;
+      }
+
+      /* Now Playing Banner */
+      .now-playing-wrapper {
+        display: none;
+        flex-shrink: 0;
+      }
+
+      .now-playing-wrapper.active {
+        display: block;
+      }
+
+      .now-playing-card {
+        background: var(--bg-now-playing);
+        border: var(--border-now-playing);
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .now-playing-label {
+        font-family: var(--font-header);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: var(--color-gold);
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* Grid Row Structure */
+      .song-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        overflow: hidden;
+      }
+
+      .format-badge {
+        width: var(--format-badge-width);
+        min-width: var(--format-badge-width);
+        max-width: var(--format-badge-width);
+        height: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-family: var(--font-header);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        border-radius: 2px;
+        color: #ffffff;
+        flex-shrink: 0;
+      }
+
+      .song-code {
+        width: var(--song-code-width);
+        min-width: var(--song-code-width);
+        max-width: var(--song-code-width);
+        font-family: var(--font-header);
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        color: var(--color-text-code);
+        flex-shrink: 0;
+        text-align: left;
+      }
+
+      .song-title-group {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .song-title {
+        font-family: var(--font-body);
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--color-text-main);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.25;
+      }
+
+      .song-artist {
+        font-family: var(--font-body);
+        font-size: 0.78rem;
+        font-weight: 400;
+        color: var(--color-text-dim);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.2;
+      }
+
+      /* Up Next Section */
+      .queue-section-header {
+        font-family: var(--font-header);
+        font-size: 0.85rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: var(--color-text-dim);
+        text-transform: uppercase;
+        flex-shrink: 0;
+        padding-top: 2px;
+      }
+
+      /* Virtual Scroll Container */
+      .virtual-scroll-container {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        position: relative;
+        padding-right: 2px;
+      }
+
+      .virtual-scroll-container::-webkit-scrollbar {
+        width: 3px;
+      }
+      .virtual-scroll-container::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      .virtual-spacer {
+        width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+      }
+
+      .virtual-content {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--item-gap);
+      }
+
+      .queue-item {
+        height: var(--item-height);
+        background: var(--bg-item);
+        border: var(--border-item);
+        padding: 0 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-sizing: border-box;
+      }
+
+      .queue-order {
+        font-family: var(--font-header);
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--color-accent);
+        min-width: 22px;
+        flex-shrink: 0;
+        text-align: left;
+      }
+
+      /* Empty State */
+      .empty-state {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-body);
+        font-size: 0.9rem;
+        color: var(--color-text-dim);
+      }
+
+      /* Status Badge */
+      #status-badge {
+        position: fixed;
+        bottom: 8px;
+        right: 8px;
+        background: #000000;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+        padding: 4px 8px;
+        font-family: var(--font-body);
+        font-size: 11px;
+        font-weight: 400;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+      }
+
+      #status-badge.visible {
+        opacity: 1;
+      }
+
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--color-accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="setlist-card">
+      <div class="setlist-header">
+        <span class="setlist-title">SETLIST</span>
+        <span id="queue-counter" class="queue-count-pill">0 SONGS</span>
+      </div>
+
+      <div id="now-playing-container" class="now-playing-wrapper">
+        <div class="now-playing-card">
+          <div class="now-playing-label">NOW PLAYING</div>
+          <div class="song-row">
+            <span id="np-format" class="format-badge"></span>
+            <span id="np-code" class="song-code"></span>
+            <div class="song-title-group">
+              <span id="np-title" class="song-title"></span>
+              <span id="np-artist" class="song-artist"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="queue-section-header">UP NEXT</div>
+
+      <div id="scroll-container" class="virtual-scroll-container">
+        <div id="virtual-spacer" class="virtual-spacer"></div>
+        <div id="virtual-content" class="virtual-content"></div>
+        <div id="empty-state" class="empty-state" style="display: none">
+          Queue is empty
+        </div>
+      </div>
+    </div>
+
+    <div id="status-badge" class="visible">
+      <span class="status-dot"></span>
+      <span id="status-text">Waiting for Encore...</span>
+    </div>
+
+    <script>
+      (function () {
+        const statusBadge = document.getElementById("status-badge");
+        const statusText = document.getElementById("status-text");
+        const queueCounter = document.getElementById("queue-counter");
+
+        const npContainer = document.getElementById("now-playing-container");
+        const npFormat = document.getElementById("np-format");
+        const npCode = document.getElementById("np-code");
+        const npTitle = document.getElementById("np-title");
+        const npArtist = document.getElementById("np-artist");
+
+        const scrollContainer = document.getElementById("scroll-container");
+        const virtualSpacer = document.getElementById("virtual-spacer");
+        const virtualContent = document.getElementById("virtual-content");
+        const emptyState = document.getElementById("empty-state");
+
+        let currentQueue = [];
+        let disconnectTimer = null;
+        let isVirtualScrollActive = false;
+
+        const ITEM_HEIGHT = 44;
+        const ITEM_GAP = 4;
+        const TOTAL_ITEM_HEIGHT = ITEM_HEIGHT + ITEM_GAP;
+        const OVERSCAN = 3;
+
+        function escapeHtml(str) {
+          return String(str || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+        }
+
+        function showStatus(text) {
+          statusText.textContent = text;
+          statusBadge.classList.add("visible");
+        }
+
+        function hideStatus() {
+          statusBadge.classList.remove("visible");
+        }
+
+        function renderVirtualList() {
+          const totalCount = currentQueue.length;
+          virtualSpacer.style.height = totalCount * TOTAL_ITEM_HEIGHT + "px";
+
+          if (totalCount === 0) {
+            emptyState.style.display = "flex";
+            virtualContent.innerHTML = "";
+            return;
+          }
+
+          emptyState.style.display = "none";
+          const scrollTop = scrollContainer.scrollTop;
+          const clientHeight = scrollContainer.clientHeight || 400;
+
+          const startIndex = Math.max(
+            0,
+            Math.floor(scrollTop / TOTAL_ITEM_HEIGHT) - OVERSCAN,
+          );
+          const endIndex = Math.min(
+            totalCount,
+            Math.ceil((scrollTop + clientHeight) / TOTAL_ITEM_HEIGHT) +
+              OVERSCAN,
+          );
+
+          virtualContent.style.transform = `translateY(${startIndex * TOTAL_ITEM_HEIGHT}px)`;
+
+          let html = "";
+          for (let i = startIndex; i < endIndex; i++) {
+            const item = currentQueue[i];
+            const codeDisplay = item.code ? escapeHtml(item.code) : "------";
+
+            html += `
+              <div class="queue-item">
+                <span class="queue-order">#${item.order || i + 1}</span>
+                <span class="format-badge" style="background-color: ${escapeHtml(item.formatColor || "#B02FD1")}">${escapeHtml(item.formatLabel || "RS")}</span>
+                <span class="song-code">${codeDisplay}</span>
+                <div class="song-title-group">
+                  <span class="song-title">${escapeHtml(item.title)}</span>
+                  <span class="song-artist">${escapeHtml(item.artist)}</span>
+                </div>
+              </div>
+            `;
+          }
+          virtualContent.innerHTML = html;
+        }
+
+        scrollContainer.addEventListener("scroll", () => {
+          if (!isVirtualScrollActive) {
+            requestAnimationFrame(() => {
+              renderVirtualList();
+              isVirtualScrollActive = false;
+            });
+            isVirtualScrollActive = true;
+          }
+        });
+
+        window.addEventListener("resize", () => {
+          renderVirtualList();
+        });
+
+        function updateUI(payload) {
+          hideStatus();
+
+          if (!payload) {
+            currentQueue = [];
+            npContainer.classList.remove("active");
+            queueCounter.textContent = "0 SONGS";
+            renderVirtualList();
+            return;
+          }
+
+          if (payload.nowPlaying) {
+            npContainer.classList.add("active");
+            npTitle.textContent = payload.nowPlaying.title || "";
+            npArtist.textContent = payload.nowPlaying.artist || "";
+            npCode.textContent = payload.nowPlaying.code || "------";
+            npFormat.textContent = payload.nowPlaying.formatLabel || "RS";
+            npFormat.style.backgroundColor =
+              payload.nowPlaying.formatColor || "#B02FD1";
+          } else {
+            npContainer.classList.remove("active");
+          }
+
+          currentQueue = Array.isArray(payload.queue) ? payload.queue : [];
+          queueCounter.textContent = `${currentQueue.length} SONG${currentQueue.length === 1 ? "" : "S"}`;
+          renderVirtualList();
+        }
+
+        function connectSSE() {
+          const evtSource = new EventSource("/overlay/setlist/stream");
+
+          evtSource.onopen = function () {
+            if (disconnectTimer) {
+              clearTimeout(disconnectTimer);
+              disconnectTimer = null;
+            }
+            showStatus("Encore Connected");
+            setTimeout(hideStatus, 1500);
+          };
+
+          evtSource.onmessage = function (e) {
+            try {
+              const data = JSON.parse(e.data);
+              if (data.type === "setlist") {
+                updateUI(data.payload);
+              }
+            } catch (err) {
+              console.error("SSE parse error", err);
+            }
+          };
+
+          evtSource.onerror = function () {
+            if (!disconnectTimer) {
+              disconnectTimer = setTimeout(function () {
+                showStatus("Waiting for Encore...");
+              }, 2500);
+            }
+          };
+        }
+
+        connectSSE();
+      })();
+    </script>
+  </body>
+</html>
