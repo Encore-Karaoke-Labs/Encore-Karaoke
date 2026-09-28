@@ -158,10 +158,13 @@ export default class PlaybackManager {
 
     if (state.isDriveDisconnected) return;
 
+    state.currentSong = song;
     state.isTransitioning = true;
     modules.recorder.setSongInfo(song);
     if (root.games) root.games.broadcastPlaybackState("playing", song);
     this.cleanupPlayerEvents();
+
+    root.syncSetlistOverlay?.();
 
     if (!song.path.startsWith("yt://")) {
       try {
@@ -175,6 +178,8 @@ export default class PlaybackManager {
           "[PlaybackManager] Drive disconnected during track load:",
           err,
         );
+        state.currentSong = null;
+        root.syncSetlistOverlay?.();
         state.isTransitioning = false;
         modules.driveRecovery?.handleDriveDisconnected();
         return;
@@ -210,11 +215,14 @@ export default class PlaybackManager {
       this.boundDuetEvent,
     );
 
+    state.currentSong = song;
     state.currentSongIsYouTube = song.path.startsWith("yt://");
     state.currentSongIsMV = !!song.videoPath;
     state.currentSongIsStandaloneVideo =
       state.currentSongIsMV && song.path === song.videoPath;
     state.reservationNumber = "";
+
+    this.ctx.root.syncSetlistOverlay?.();
 
     root.ui.setMode("player");
     if (state.currentSongIsYouTube) {
@@ -573,6 +581,9 @@ export default class PlaybackManager {
     const dom = this.ctx.dom;
     const modules = this.ctx.modules;
 
+    state.currentSong = null;
+    this.ctx.root.syncSetlistOverlay?.();
+
     this.ctx.wrapper.classOff("mode-player-cdg");
     this.ctx.wrapper.classOff("mode-player-youtube");
     this.ctx.wrapper.classOff("mode-player-no-lyrics");
@@ -617,6 +628,8 @@ export default class PlaybackManager {
     state.currentSongIsMV = false;
     state.currentSongIsYouTube = false;
     state.currentSongIsMultiplexed = false;
+    state.currentSong = null;
+    this.ctx.root.syncSetlistOverlay?.();
 
     state.pendingLyricCustomizerOpen = false;
     if (this.ctx.state.isLyricCustomizerVisible) {
@@ -746,6 +759,7 @@ export default class PlaybackManager {
 
     if (state.reservationQueue.length > 0) {
       const next = state.reservationQueue.shift();
+      this.ctx.root.syncSetlistOverlay?.();
       this.ctx.modules.infoBar.showDefault();
       setTimeout(() => this.startPlayer(next), 250);
     } else {

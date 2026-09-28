@@ -57,7 +57,6 @@ class EncoreController {
       songNumber: "",
       highlightedIndex: -1,
       reservationNumber: "",
-      reservationQueue: [],
       windowsVolume: 1,
       volume: config.audioConfig?.mix?.instrumental?.volume ?? 1,
       videoSyncOffset: config.videoConfig?.syncOffset || 0,
@@ -102,6 +101,48 @@ class EncoreController {
       songList: [],
       songMap: new Map(),
     };
+
+    this._isSetlistSyncQueued = false;
+    this.queueSetlistSync = () => {
+      if (this._isSetlistSyncQueued) return;
+      this._isSetlistSyncQueued = true;
+      queueMicrotask(() => {
+        this._isSetlistSyncQueued = false;
+        this.syncSetlistOverlay();
+      });
+    };
+
+    const createObservedQueue = (initialArray) => {
+      return new Proxy(initialArray, {
+        set: (target, property, value, receiver) => {
+          const result = Reflect.set(target, property, value, receiver);
+          // Trigger when an item is added, replaced, or array length changes
+          if (property === "length" || !isNaN(Number(property))) {
+            this.queueSetlistSync();
+          }
+          return result;
+        },
+        deleteProperty: (target, property) => {
+          const result = Reflect.deleteProperty(target, property);
+          this.queueSetlistSync();
+          return result;
+        },
+      });
+    };
+
+    let _rawReservationQueue = [];
+    let _observedReservationQueue = createObservedQueue(_rawReservationQueue);
+
+    Object.defineProperty(this.state, "reservationQueue", {
+      get: () => _observedReservationQueue,
+      set: (newQueue) => {
+        _rawReservationQueue = Array.isArray(newQueue) ? newQueue : [];
+        _observedReservationQueue = createObservedQueue(_rawReservationQueue);
+        this.queueSetlistSync();
+      },
+      configurable: true,
+      enumerable: true,
+    });
 
     this.dom = {};
 
@@ -166,6 +207,48 @@ class EncoreController {
     this.context.modules.lyrics = this.lyrics;
 
     this.boundKeydown = (e) => this.input.handleKeyDown(e);
+  }
+
+  syncSetlistOverlay() {
+    if (!window.setlistOverlay?.sendUpdate) return;
+
+    const isSession = Boolean(
+      this.state.isSessionActive && this.services.SessionsSvc,
+    );
+    const queueList = isSession
+      ? this.services.SessionsSvc.state.queue || []
+      : this.state.reservationQueue || [];
+
+    const isPlaying =
+      Boolean(this.state.currentSong) && !this.state.isScoreScreenActive;
+    const currentSong = isPlaying ? this.state.currentSong : null;
+
+    const formatSong = (s) => {
+      if (!s) return null;
+      const fmt = this.library ? this.library.getFormatInfo(s) : null;
+      return {
+        code: s.code
+          ? String(s.code).padStart(6, "0")
+          : s.path?.startsWith("yt://")
+            ? "YT"
+            : "",
+        title: s.title || "Unknown Title",
+        artist: s.artist || "Unknown Artist",
+        formatLabel: fmt?.label || "RS",
+        formatColor: fmt?.color || "#B02FD1",
+        isYouTube: Boolean(s.path?.startsWith("yt://")),
+        isMV: Boolean(s.videoPath),
+      };
+    };
+
+    window.setlistOverlay.sendUpdate({
+      nowPlaying: formatSong(currentSong),
+      queue: queueList.map((item, idx) => ({
+        ...formatSong(item),
+        order: idx + 1,
+      })),
+      total: queueList.length,
+    });
   }
 
   handleDeepLink(url) {
@@ -432,6 +515,8 @@ class EncoreController {
         this.context.wrapper.classOff("loading");
         this.services.Ui.transition("fadeIn", this.context.wrapper);
         this.ui.setMode("menu");
+
+        this.syncSetlistOverlay();
 
         // Signal Main Process that boot sequence is complete
         if (window.deepLink?.signalReady) {
