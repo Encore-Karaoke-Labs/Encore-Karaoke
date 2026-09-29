@@ -322,6 +322,7 @@
         right: 8px;
         background: #000000;
         border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
         color: #ffffff;
         padding: 4px 8px;
         font-family: var(--font-body);
@@ -342,7 +343,21 @@
       .status-dot {
         width: 6px;
         height: 6px;
+        border-radius: 50%;
         background: var(--color-accent);
+        animation: pulse 1.6s infinite ease-in-out;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 0.3;
+          transform: scale(0.9);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.1);
+        }
       }
     </style>
   </head>
