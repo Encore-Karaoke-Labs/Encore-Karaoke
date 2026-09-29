@@ -43,6 +43,9 @@
   - Record your best vocal performances directly to your hard drive with the press of a button.
 - **Live Streaming with RTMP**
   - Live stream your karaoke sessions to your fans directly inside of Encore!
+- **Built-in OBS Overlays**
+  - Comes with a setlist overlay, so you don't have to alt-tab to update your queue!
+  - Comes with a lyric overlay, so your viewers can sing along with you!
 - **Pitch & Latency Control**
   - Adjust pitch (transpose) and tempo on the fly.
   - Calibrate your microphone and signal chain's latency quickly.
