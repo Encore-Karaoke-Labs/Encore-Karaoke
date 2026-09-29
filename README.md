@@ -195,7 +195,7 @@ For the best experience contributing towards Encore, we recommend using [Visual 
 - **[Stariix](https://www.youtube.com/@Stariixy)**:
   - 3D BGV development
   - Voice provider for Encore's score sounds
-  - Creator and designer behind Encore's mascot, Akiyama Hoshi
+  - Creator and designer behind Encore's mascots, Akiyama Hoshi & Kurayami Kai
 - **[MTSyntho](https://github.com/MTSyntho)**
   - Provided resources for Linux support
 - **[prjoni99](https://github.com/prjoni99)**:
