@@ -72,8 +72,6 @@
 
 ---
 
-<br>
-
 # Getting Started
 
 ## Library Setup
