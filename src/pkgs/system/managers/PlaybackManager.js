@@ -618,6 +618,7 @@ export default class PlaybackManager {
     if (dom.interludeOverlay) dom.interludeOverlay.classOff("visible");
     if (dom.lyricsCanvas)
       dom.lyricsCanvas.styleJs({ opacity: "1", pointerEvents: "all" });
+    if (this.ctx.root.lyrics) this.ctx.root.lyrics.reset();
 
     if (state.currentSongIsYouTube) {
       try {
