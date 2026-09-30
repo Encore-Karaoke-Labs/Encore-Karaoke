@@ -528,14 +528,6 @@ export default class InputManager {
       !isSearchInputFocused &&
       !state.isSearchOverlayVisible
     ) {
-      if (state.isSessionActive) {
-        modules.infoBar.showTemp(
-          "STREAM",
-          "Streaming is disabled during an active Session.",
-          3000,
-        );
-        return;
-      }
       if (!state.isTypingNumber) {
         e.preventDefault();
         modules.stream.toggleStreamModal();
