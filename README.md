@@ -18,9 +18,20 @@
 
 ## Key Features
 
+### Core Singing Experience
+
 - **Real-Time Scoring**
   - With our **Forte Audio Engine** powered by the Web Audio API, Encore actively listens to your microphone.
   - Features live pitch tracking, real-time key-modulation detection, and a visual pitch guide overlay so you know exactly when to hit those high notes (only in Multiplex & MIDI tracks).
+- **Pitch & Latency Control**
+  - Adjust pitch (transpose) and tempo on the fly.
+  - Calibrate your microphone and signal chain's latency quickly.
+- **Japanese & Korean Romanization**
+  - Love singing K-pop but can't read the language? What about your favorite anime openings? Encore automatically generates romanized lyrics for Japanese and Korean in real time.
+  - Also supports Furigana (Ruby text) for MIDI karaoke files.
+
+### Social & Remote Karaoke
+
 - **Encore Sessions (Virtual Karaoke Rooms)**
   - Sing with friends and family across the world with Encore Sessions! Perfect for OFWs, LDRs, or remote karaoke hangouts with friends!
   - Queue, Cheer, and Chat in the room just like a real karaoke box.
@@ -32,6 +43,11 @@
   - Queue tracks, send "Cheers", chat with the room, and turn your phone into a camera in one tap!
   - Use your phone as a virtual shaker!
   - Works seamlessly on your local network, with a Cloud tunnel fallback for devices not on the same network.
+- **Discord Rich Presence**
+  - Automatically shows what you're singing on your Discord status.
+
+### Media Support & Playback
+
 - **Versatile Media Support (MTVs & Multiplex)**
   - Supports MIDI karaoke (`.mid`, `.kar`) with SoundFont (`.sf2`, `.sf3` & `.dls`) playback.
   - Supports audio tracks (`.mp3`, `.wav`, `.m4a`, `.ogg`) paired with `.lrc` lyrics or CDG.
@@ -39,6 +55,9 @@
   - Full support for **Multiplex tracks** (pan left/right to toggle the guide vocal).
 - **Native YouTube Integration**
   - Don't have a song in your local library? Search YouTube directly from the player or your phone and queue it up instantly.
+
+### Recording, Streaming & Creator Tools
+
 - **Instant Recording**
   - Record your best vocal performances directly to your hard drive with the press of a button.
 - **Live Streaming with RTMP**
@@ -47,17 +66,13 @@
   - Comes with a setlist overlay, so you don't have to alt-tab to update your queue!
   - Comes with a lyric overlay, so your viewers can sing along with you!
 - **OBS Scene Automation**
-  - Switch to different OBS scenes automatically as you go through your karaoke session!
-- **Pitch & Latency Control**
-  - Adjust pitch (transpose) and tempo on the fly.
-  - Calibrate your microphone and signal chain's latency quickly.
-- **Japanese & Korean Romanization**
-  - Love singing K-pop but can't read the language? What about your favorite anime openings? Encore automatically generates romanized lyrics for Japanese and Korean in real time.
-  - Also supports Furigana (Ruby text) for MIDI karaoke files.
-- **Discord Rich Presence**
-  - Automatically shows what you're singing on your Discord status.
+  - Switch to different OBS scenes automatically as you go through your karaoke.
+
+<br>
 
 ---
+
+<br>
 
 # Getting Started
 
