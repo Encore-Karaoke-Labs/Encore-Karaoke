@@ -68,8 +68,6 @@
 - **OBS Scene Automation**
   - Switch to different OBS scenes automatically as you go through your karaoke.
 
-<br>
-
 ---
 
 # Getting Started
