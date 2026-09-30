@@ -96,15 +96,6 @@ export default class StreamManager {
     const shouldOpen =
       forceState !== null ? forceState : !state.isStreamModalOpen;
 
-    if (shouldOpen && state.isSessionActive) {
-      this.ctx.modules.infoBar.showTemp(
-        "STREAM",
-        "Broadcast tools are not allowed during an active Session.",
-        4000,
-      );
-      return;
-    }
-
     state.isStreamModalOpen = shouldOpen;
 
     if (shouldOpen) {
@@ -536,6 +527,14 @@ export default class StreamManager {
    * Direct RTMP Broadcast View.
    */
   renderDirectView() {
+    if (this.ctx.state.isSessionActive) {
+      this.ctx.modules.infoBar.showTemp(
+        "STREAM",
+        "Streaming is disabled during an active Session.",
+        3000,
+      );
+      return;
+    }
     const dom = this.ctx.dom;
     if (!dom.streamHeader || !dom.streamContentArea) return;
 
