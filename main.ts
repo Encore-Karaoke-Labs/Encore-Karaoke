@@ -31,6 +31,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import OBSWebSocket, { EventSubscription } from "obs-websocket-js";
 import PDFDocument from "pdfkit";
 import qrcode from "qrcode";
 import { Server as SocketIOServer, type Socket } from "socket.io";
@@ -448,6 +449,210 @@ const overlayHeartbeat = setInterval(() => {
     }
   }
 }, 20000);
+
+let obsClient: OBSWebSocket | null = null;
+let obsConnected = false;
+let obsReconnecting = false;
+let obsReconnectTimer: NodeJS.Timeout | null = null;
+let obsScenes: string[] = [];
+let obsCurrentScene = "";
+let obsLastError: string | null = null;
+
+interface OBSConfig {
+  host?: string;
+  port?: number;
+  password?: string;
+  enabled?: boolean;
+  autoReconnect?: boolean;
+  scenes?: {
+    idle?: string;
+    singing?: string;
+    score?: string;
+  };
+}
+
+function getStoredOBSConfig(): OBSConfig {
+  return (
+    (Config.getItem("obsConfig") as OBSConfig) || {
+      host: "127.0.0.1",
+      port: 4455,
+      password: "",
+      enabled: false,
+      autoReconnect: true,
+      scenes: { idle: "", singing: "", score: "" },
+    }
+  );
+}
+
+function broadcastOBSStatus(): void {
+  if (appViewWebContents && !appViewWebContents.isDestroyed()) {
+    appViewWebContents.send("obs-status-update", {
+      connected: obsConnected,
+      reconnecting: obsReconnecting,
+      currentScene: obsCurrentScene,
+      scenes: obsScenes,
+      error: obsLastError,
+    });
+  }
+}
+
+async function connectOBS(cfg?: {
+  host?: string;
+  port?: number;
+  password?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (obsReconnectTimer) {
+    clearTimeout(obsReconnectTimer);
+    obsReconnectTimer = null;
+  }
+
+  const stored = getStoredOBSConfig();
+  const host = cfg?.host ?? stored.host ?? "127.0.0.1";
+  const port = cfg?.port ?? stored.port ?? 4455;
+  const password = cfg?.password ?? stored.password ?? "";
+
+  if (obsClient) {
+    try {
+      await obsClient.disconnect();
+    } catch {}
+    obsClient = null;
+  }
+
+  obsClient = new OBSWebSocket();
+
+  obsClient.on("ConnectionClosed", (error) => {
+    logger.warn(
+      "OBS",
+      `Connection closed: ${error?.message || "Unknown reason"}`,
+    );
+    obsConnected = false;
+    obsCurrentScene = "";
+    obsScenes = [];
+    obsLastError = error?.message || "Connection closed";
+    broadcastOBSStatus();
+
+    const currentConfig = getStoredOBSConfig();
+    if (currentConfig.autoReconnect && !obsReconnecting) {
+      scheduleOBSReconnect();
+    }
+  });
+
+  obsClient.on("CurrentProgramSceneChanged", (data) => {
+    obsCurrentScene = data.sceneName;
+    if (appViewWebContents && !appViewWebContents.isDestroyed()) {
+      appViewWebContents.send("obs-scene-changed", data.sceneName);
+    }
+  });
+
+  obsClient.on("SceneListChanged", async () => {
+    if (!obsClient || !obsConnected) return;
+    try {
+      const list = await obsClient.call("GetSceneList");
+      obsScenes = (list.scenes as Array<{ sceneName: string }>).map(
+        (s) => s.sceneName,
+      );
+      if (appViewWebContents && !appViewWebContents.isDestroyed()) {
+        appViewWebContents.send("obs-scenes-update", obsScenes);
+      }
+    } catch (e) {
+      logger.error(
+        "OBS",
+        `Failed to refresh scene list: ${(e as Error).message}`,
+      );
+    }
+  });
+
+  try {
+    logger.info("OBS", `Connecting to ws://${host}:${port}...`);
+    obsLastError = null;
+    await obsClient.connect(`ws://${host}:${port}`, password, {
+      eventSubscriptions: EventSubscription.All | EventSubscription.Scenes,
+      rpcVersion: 1,
+    });
+
+    obsConnected = true;
+    obsReconnecting = false;
+    logger.info("OBS", "Connected successfully to OBS Studio.");
+
+    const list = await obsClient.call("GetSceneList");
+    obsCurrentScene = list.currentProgramSceneName;
+    obsScenes = (list.scenes as Array<{ sceneName: string }>).map(
+      (s) => s.sceneName,
+    );
+
+    broadcastOBSStatus();
+    return { success: true };
+  } catch (err) {
+    const error = err as Error & { code?: number };
+    obsConnected = false;
+    obsLastError = error.message || "Failed to connect to OBS.";
+    logger.error("OBS", `Connection error: ${obsLastError}`);
+    broadcastOBSStatus();
+
+    // Error code 4009 = Authentication Failed
+    const currentConfig = getStoredOBSConfig();
+    if (error.code !== 4009 && currentConfig.autoReconnect) {
+      scheduleOBSReconnect();
+    }
+
+    return { success: false, error: obsLastError };
+  }
+}
+
+function scheduleOBSReconnect(): void {
+  if (obsReconnectTimer) clearTimeout(obsReconnectTimer);
+  obsReconnecting = true;
+  broadcastOBSStatus();
+
+  obsReconnectTimer = setTimeout(async () => {
+    logger.info("OBS", "Attempting automatic reconnection to OBS...");
+    await connectOBS();
+  }, 5000);
+}
+
+async function disconnectOBS(): Promise<void> {
+  if (obsReconnectTimer) {
+    clearTimeout(obsReconnectTimer);
+    obsReconnectTimer = null;
+  }
+  obsReconnecting = false;
+  if (obsClient) {
+    try {
+      await obsClient.disconnect();
+    } catch {}
+    obsClient = null;
+  }
+  obsConnected = false;
+  obsCurrentScene = "";
+  obsScenes = [];
+  obsLastError = null;
+  broadcastOBSStatus();
+}
+
+async function triggerOBSSceneForState(
+  state: "idle" | "singing" | "score",
+): Promise<void> {
+  if (!obsClient || !obsConnected) return;
+  const cfg = getStoredOBSConfig();
+  const targetScene = cfg.scenes?.[state];
+
+  if (!targetScene || targetScene.trim() === "" || targetScene === "__none__") {
+    return;
+  }
+
+  try {
+    logger.info(
+      "OBS",
+      `Automating scene switch -> [${state.toUpperCase()}]: "${targetScene}"`,
+    );
+    await obsClient.call("SetCurrentProgramScene", { sceneName: targetScene });
+  } catch (err) {
+    logger.error(
+      "OBS",
+      `Failed to set scene "${targetScene}": ${(err as Error).message}`,
+    );
+  }
+}
 
 // Pre-compute CRC32 table for maximum performance
 const crcTable = new Uint32Array(256);
@@ -1264,6 +1469,48 @@ void app.whenReady().then(() => {
     };
     broadcastOverlaySetlist(latestSetlistState);
   });
+
+  ipcMain.handle("obs-connect", async (_event, config) => {
+    return await connectOBS(config);
+  });
+
+  ipcMain.handle("obs-disconnect", async () => {
+    await disconnectOBS();
+    return { success: true };
+  });
+
+  ipcMain.handle("obs-get-status", () => {
+    return {
+      connected: obsConnected,
+      reconnecting: obsReconnecting,
+      currentScene: obsCurrentScene,
+      scenes: obsScenes,
+      error: obsLastError,
+    };
+  });
+
+  ipcMain.handle("obs-set-scene", async (_event, sceneName: string) => {
+    if (!obsClient || !obsConnected) return false;
+    try {
+      await obsClient.call("SetCurrentProgramScene", { sceneName });
+      return true;
+    } catch (e) {
+      logger.error("OBS", `Manual scene switch error: ${(e as Error).message}`);
+      return false;
+    }
+  });
+
+  ipcMain.on(
+    "obs-trigger-state",
+    (_event, state: "idle" | "singing" | "score") => {
+      void triggerOBSSceneForState(state);
+    },
+  );
+
+  const initialObsConfig = getStoredOBSConfig();
+  if (initialObsConfig.enabled) {
+    void connectOBS();
+  }
 
   ipcMain.on("deep-link-ready", () => {
     logger.info("DEEPLINK", "Boot process is complete.");
