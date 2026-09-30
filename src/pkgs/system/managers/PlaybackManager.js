@@ -164,6 +164,7 @@ export default class PlaybackManager {
     if (root.games) root.games.broadcastPlaybackState("playing", song);
     this.cleanupPlayerEvents();
 
+    window.obs?.triggerState?.("singing");
     root.syncSetlistOverlay?.();
 
     if (!song.path.startsWith("yt://")) {
@@ -782,6 +783,7 @@ export default class PlaybackManager {
     const root = this.ctx.root;
 
     state.isScoreScreenActive = true;
+    window.obs?.triggerState?.("score");
     if (root.games)
       root.games.broadcastPlaybackState("score_screen", scoreData);
     dom.postSongScreen.classOff("show-leaderboard");

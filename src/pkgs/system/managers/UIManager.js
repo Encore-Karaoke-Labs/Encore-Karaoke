@@ -1322,6 +1322,7 @@ export default class UIManager {
       dom.setupScreen.classOff("hidden");
       this.ctx.root.setup.open();
     } else if (newMode === "menu") {
+      window.obs?.triggerState?.("idle");
       if (this._menuExitTimer) {
         clearTimeout(this._menuExitTimer);
         this._menuExitTimer = null;
