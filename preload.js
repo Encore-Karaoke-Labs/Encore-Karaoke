@@ -50,6 +50,29 @@ contextBridge.exposeInMainWorld("setlistOverlay", {
   sendClear: () => ipcRenderer.send("overlay-setlist-clear"),
 });
 
+contextBridge.exposeInMainWorld("obs", {
+  connect: (config) => ipcRenderer.invoke("obs-connect", config),
+  disconnect: () => ipcRenderer.invoke("obs-disconnect"),
+  getStatus: () => ipcRenderer.invoke("obs-get-status"),
+  setScene: (sceneName) => ipcRenderer.invoke("obs-set-scene", sceneName),
+  triggerState: (state) => ipcRenderer.send("obs-trigger-state", state),
+  onStatusUpdate: (callback) => {
+    const listener = (_e, data) => callback(data);
+    ipcRenderer.on("obs-status-update", listener);
+    return () => ipcRenderer.removeListener("obs-status-update", listener);
+  },
+  onScenesUpdate: (callback) => {
+    const listener = (_e, data) => callback(data);
+    ipcRenderer.on("obs-scenes-update", listener);
+    return () => ipcRenderer.removeListener("obs-scenes-update", listener);
+  },
+  onSceneChanged: (callback) => {
+    const listener = (_e, data) => callback(data);
+    ipcRenderer.on("obs-scene-changed", listener);
+    return () => ipcRenderer.removeListener("obs-scene-changed", listener);
+  },
+});
+
 contextBridge.exposeInMainWorld("networking", {
   port: async () => ipcRenderer.invoke("get-port"),
   accessToken: async () => ipcRenderer.invoke("get-file-token"),
