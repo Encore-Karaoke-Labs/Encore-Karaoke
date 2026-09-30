@@ -9,14 +9,37 @@ export default class StreamManager {
     this.isStreaming = false;
     this.streamRecorder = null;
     this.streamStartTime = null;
-    this.streamInterval = null;
+    this.modalView = "selection"; // "selection" | "obs" | "direct"
 
+    // Direct RTMP Configuration
     const cfg = this.ctx.config?.streamConfig || {};
     this.rtmpUrl = cfg.rtmpUrl || "";
     this.streamKey = cfg.streamKey || "";
     this.videoBitrate = cfg.videoBitrate || 3500000;
     this.isKeyVisible = false;
 
+    // OBS WebSocket Configuration
+    const obsCfg = this.ctx.config?.obsConfig || {};
+    this.obsHost = obsCfg.host || "127.0.0.1";
+    this.obsPort = obsCfg.port || 4455;
+    this.obsPassword = obsCfg.password || "";
+    this.obsAutoReconnect = obsCfg.autoReconnect ?? true;
+    this.obsScenesConfig = obsCfg.scenes || {
+      idle: "",
+      singing: "",
+      score: "",
+    };
+    this.isObsPasswordVisible = false;
+
+    this.obsStatus = {
+      connected: false,
+      reconnecting: false,
+      currentScene: "",
+      scenes: [],
+      error: null,
+    };
+
+    // Telemetry & Stats
     this.latestStats = null;
     this.statEls = {};
     this.statsTimer = null;
@@ -24,6 +47,7 @@ export default class StreamManager {
     this.currentBitrateKbps = 0;
     this.lastChunkTime = null;
 
+    // Direct RTMP Telemetry Listeners
     window.desktopIntegration?.ipc?.on?.("stream-stats", (_e, stats) => {
       this.latestStats = stats;
       this.updateStatsUI();
@@ -37,10 +61,35 @@ export default class StreamManager {
         }
       },
     );
+
+    window.obs?.getStatus?.().then((status) => {
+      if (status) this.obsStatus = status;
+    });
+
+    window.obs?.onStatusUpdate?.((status) => {
+      this.obsStatus = status;
+      if (this.ctx.state.isStreamModalOpen && this.modalView === "obs") {
+        this.renderObsView();
+      }
+    });
+
+    window.obs?.onScenesUpdate?.((scenes) => {
+      this.obsStatus.scenes = scenes;
+      if (this.ctx.state.isStreamModalOpen && this.modalView === "obs") {
+        this.renderObsView();
+      }
+    });
+
+    window.obs?.onSceneChanged?.((sceneName) => {
+      this.obsStatus.currentScene = sceneName;
+      if (this.ctx.state.isStreamModalOpen && this.modalView === "obs") {
+        this.renderObsView();
+      }
+    });
   }
 
   /**
-   * Opens or closes the RTMP Live Stream Modal.
+   * Opens or closes the Broadcast Modal.
    */
   toggleStreamModal(forceState = null) {
     const state = this.ctx.state;
@@ -50,7 +99,7 @@ export default class StreamManager {
     if (shouldOpen && state.isSessionActive) {
       this.ctx.modules.infoBar.showTemp(
         "STREAM",
-        "Live streaming is not allowed during an active Session.",
+        "Broadcast tools are not allowed during an active Session.",
         4000,
       );
       return;
@@ -60,33 +109,453 @@ export default class StreamManager {
 
     if (shouldOpen) {
       this.ctx.dom.streamModal.classOff("hidden");
-      this.renderStreamModal();
+      this.modalView = this.isStreaming ? "direct" : "selection";
+      this.render();
     } else {
       this.ctx.dom.streamModal.classOn("hidden");
     }
   }
 
   /**
-   * Renders the RTMP Configuration Modal UI.
+   * Renders the current view inside the modal.
    */
-  renderStreamModal() {
+  render() {
+    if (this.modalView === "obs") {
+      this.renderObsView();
+    } else if (this.modalView === "direct") {
+      this.renderDirectView();
+    } else {
+      this.renderSelectionView();
+    }
+  }
+
+  /**
+   * Mode Selection Screen
+   */
+  renderSelectionView() {
     const dom = this.ctx.dom;
     if (!dom.streamHeader || !dom.streamContentArea) return;
 
     dom.streamHeader.clear();
     dom.streamContentArea.clear();
 
-    new Html("h1").text("LIVE BROADCAST").appendTo(dom.streamHeader);
+    new Html("h1").text("BROADCAST & STREAMING").appendTo(dom.streamHeader);
+    new Html("p")
+      .text("Configure automation tools or live ingest for stream broadcasts.")
+      .appendTo(dom.streamHeader);
+
+    const selectionArea = new Html("div")
+      .classOn("stream-selection-area")
+      .appendTo(dom.streamContentArea);
+
+    const tileContainer = new Html("div")
+      .classOn("session-tile-container")
+      .appendTo(selectionArea);
+
+    // OBS Tile
+    const obsTile = new Html("div")
+      .classOn("session-tile")
+      .appendTo(tileContainer);
+
+    new Html("div")
+      .classOn("session-tile-icon")
+      .html(
+        '<ion-icon name="desktop-outline" style="font-size: 3rem;"></ion-icon>',
+      )
+      .appendTo(obsTile);
+
+    new Html("div")
+      .classOn("session-tile-title")
+      .text("OBS INTEGRATION")
+      .appendTo(obsTile);
+
+    new Html("div")
+      .classOn("session-tile-desc")
+      .text("Automate scene switching and manage live browser overlays")
+      .appendTo(obsTile);
+
+    obsTile.on("click", () => {
+      this.modalView = "obs";
+      this.render();
+    });
+
+    const directTile = new Html("div")
+      .classOn("session-tile")
+      .appendTo(tileContainer);
+
+    new Html("div")
+      .classOn("session-tile-icon")
+      .html(
+        '<ion-icon name="radio-outline" style="font-size: 3rem;"></ion-icon>',
+      )
+      .appendTo(directTile);
+
+    new Html("div")
+      .classOn("session-tile-title")
+      .text("DIRECT BROADCAST")
+      .appendTo(directTile);
+
+    new Html("div")
+      .classOn("session-tile-desc")
+      .text("Stream audio and visual canvas directly to RTMP ingest")
+      .appendTo(directTile);
+
+    directTile.on("click", () => {
+      this.modalView = "direct";
+      this.render();
+    });
+
+    const btnRow = new Html("div")
+      .classOn("session-btn-row")
+      .appendTo(selectionArea);
+
+    new Html("button")
+      .classOn("session-btn", "danger")
+      .text("CANCEL")
+      .on("click", () => this.toggleStreamModal(false))
+      .appendTo(btnRow);
+  }
+
+  /**
+   * OBS Integration View.
+   */
+  renderObsView() {
+    const dom = this.ctx.dom;
+    if (!dom.streamHeader || !dom.streamContentArea) return;
+
+    dom.streamHeader.clear();
+    dom.streamContentArea.clear();
+
+    new Html("h1").text("OBS INTEGRATION").appendTo(dom.streamHeader);
+    new Html("p")
+      .text("Automate scene changes and get browser overlays.")
+      .appendTo(dom.streamHeader);
+
+    const contentArea = new Html("div")
+      .classOn("stream-content-area")
+      .styleJs({ padding: "0" })
+      .appendTo(dom.streamContentArea);
+
+    const leftCol = new Html("div").classOn("stream-col").appendTo(contentArea);
+    const rightCol = new Html("div")
+      .classOn("stream-col")
+      .appendTo(contentArea);
+
+    new Html("div")
+      .classOn("stream-section-title")
+      .text("CONNECTION CONFIGURATION")
+      .appendTo(leftCol);
+
+    const hostRow = new Html("div")
+      .styleJs({ display: "flex", gap: "1rem" })
+      .appendTo(leftCol);
+
+    const hostGroup = new Html("div")
+      .classOn("stream-form-group")
+      .styleJs({ flex: "2" })
+      .appendTo(hostRow);
+
+    new Html("label")
+      .classOn("stream-form-label")
+      .text("Server IP / Host")
+      .appendTo(hostGroup);
+
+    const hostInput = new Html("input")
+      .classOn("stream-input")
+      .attr({ type: "text", value: this.obsHost, placeholder: "127.0.0.1" })
+      .appendTo(hostGroup);
+
+    hostInput.on("input", () => {
+      this.obsHost = hostInput.getValue().trim();
+      this.saveObsConfig();
+    });
+
+    const portGroup = new Html("div")
+      .classOn("stream-form-group")
+      .styleJs({ flex: "1" })
+      .appendTo(hostRow);
+
+    new Html("label")
+      .classOn("stream-form-label")
+      .text("Port")
+      .appendTo(portGroup);
+
+    const portInput = new Html("input")
+      .classOn("stream-input")
+      .attr({
+        type: "number",
+        value: String(this.obsPort),
+        placeholder: "4455",
+      })
+      .appendTo(portGroup);
+
+    portInput.on("input", () => {
+      this.obsPort = parseInt(portInput.getValue().trim(), 10) || 4455;
+      this.saveObsConfig();
+    });
+
+    const pwGroup = new Html("div")
+      .classOn("stream-form-group")
+      .appendTo(leftCol);
+    new Html("label")
+      .classOn("stream-form-label")
+      .text("Server Password")
+      .appendTo(pwGroup);
+
+    const pwWrapper = new Html("div")
+      .classOn("stream-input-wrapper")
+      .styleJs({
+        position: "relative",
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+      })
+      .appendTo(pwGroup);
+
+    const pwInput = new Html("input")
+      .classOn("stream-input")
+      .attr({
+        type: this.isObsPasswordVisible ? "text" : "password",
+        value: this.obsPassword,
+        placeholder: "Leave empty if password is disabled in OBS",
+      })
+      .appendTo(pwWrapper);
+
+    pwInput.on("input", () => {
+      this.obsPassword = pwInput.getValue();
+      this.saveObsConfig();
+    });
+
+    const togglePwBtn = new Html("button")
+      .classOn("stream-key-action-btn")
+      .styleJs({ position: "absolute", right: "10px" })
+      .text(this.isObsPasswordVisible ? "HIDE" : "SHOW")
+      .on("click", (e) => {
+        e.stopPropagation();
+        this.isObsPasswordVisible = !this.isObsPasswordVisible;
+        pwInput.attr({ type: this.isObsPasswordVisible ? "text" : "password" });
+        togglePwBtn.text(this.isObsPasswordVisible ? "HIDE" : "SHOW");
+      })
+      .appendTo(pwWrapper);
+
+    const autoRecRow = new Html("label")
+      .classOn("stream-checkbox-row")
+      .appendTo(leftCol);
+
+    const autoRecCheckbox = new Html("input")
+      .attr({ type: "checkbox" })
+      .appendTo(autoRecRow);
+
+    if (this.obsAutoReconnect) autoRecCheckbox.elm.checked = true;
+
+    autoRecCheckbox.on("change", () => {
+      this.obsAutoReconnect = autoRecCheckbox.elm.checked;
+      this.saveObsConfig();
+    });
+
+    new Html("span")
+      .text("Automatically reconnect if OBS starts later or restarts")
+      .appendTo(autoRecRow);
+
+    new Html("div")
+      .classOn("stream-section-title")
+      .styleJs({ marginTop: "0.25rem" })
+      .text("CONNECTION STATUS")
+      .appendTo(leftCol);
+
+    const statusBox = new Html("div")
+      .classOn("stream-status-box")
+      .appendTo(leftCol);
+
+    let statusTitle = "DISCONNECTED";
+    let statusClass = "status-disconnected";
+    let statusDesc = "Not connected to OBS Studio.";
+
+    if (this.obsStatus.connected) {
+      statusTitle = "CONNECTED TO OBS STUDIO";
+      statusClass = "status-connected";
+      statusDesc = `Target: ws://${this.obsHost}:${this.obsPort} | Active Scene: ${this.obsStatus.currentScene || "None"}`;
+    } else if (this.obsStatus.reconnecting) {
+      statusTitle = "CONNECTING / RECONNECTING...";
+      statusClass = "status-connecting";
+      statusDesc = `Attempting connection to ws://${this.obsHost}:${this.obsPort}. Make sure OBS is running with WebSocket enabled.`;
+    } else if (this.obsStatus.error) {
+      statusTitle = "CONNECTION FAILED";
+      statusClass = "status-error";
+      statusDesc = this.obsStatus.error;
+    }
+
+    statusBox.classOn(statusClass);
+    new Html("div")
+      .classOn("stream-status-header-text")
+      .text(statusTitle)
+      .appendTo(statusBox);
+    new Html("div")
+      .classOn("stream-status-desc-text")
+      .text(statusDesc)
+      .appendTo(statusBox);
+
+    const connBtnRow = new Html("div")
+      .styleJs({ display: "flex", gap: "1rem", marginTop: "auto" })
+      .appendTo(leftCol);
+
+    if (!this.obsStatus.connected) {
+      new Html("button")
+        .classOn("session-btn", "primary")
+        .text("CONNECT TO OBS")
+        .on("click", async () => {
+          this.saveObsConfig(true);
+          await window.obs?.connect({
+            host: this.obsHost,
+            port: this.obsPort,
+            password: this.obsPassword,
+          });
+        })
+        .appendTo(connBtnRow);
+    } else {
+      new Html("button")
+        .classOn("session-btn", "danger")
+        .text("DISCONNECT")
+        .on("click", async () => {
+          this.saveObsConfig(false);
+          await window.obs?.disconnect();
+        })
+        .appendTo(connBtnRow);
+    }
+
+    new Html("div")
+      .classOn("stream-section-title")
+      .text("AUTOMATED SCENE SWITCHING")
+      .appendTo(rightCol);
+
+    const scenesAvailable =
+      this.obsStatus.connected && this.obsStatus.scenes.length > 0;
+
+    const buildSceneSelect = (label, stateKey) => {
+      const row = new Html("div")
+        .classOn("stream-scene-row")
+        .appendTo(rightCol);
+      new Html("span").classOn("stream-scene-label").text(label).appendTo(row);
+
+      const select = new Html("select")
+        .classOn("stream-select", "stream-scene-select")
+        .appendTo(row);
+
+      if (!scenesAvailable) {
+        select.elm.disabled = true;
+        new Html("option")
+          .text(this.obsStatus.connected ? "No scenes" : "Connect to OBS first")
+          .appendTo(select);
+        return;
+      }
+
+      const defaultOpt = new Html("option")
+        .attr({ value: "__none__" })
+        .text("— None / Keep Scene —")
+        .appendTo(select);
+
+      const currentSelected = this.obsScenesConfig[stateKey] || "__none__";
+
+      this.obsStatus.scenes.forEach((sc) => {
+        const opt = new Html("option")
+          .attr({ value: sc })
+          .text(sc)
+          .appendTo(select);
+        if (sc === currentSelected) {
+          opt.elm.selected = true;
+        }
+      });
+
+      if (currentSelected === "__none__") defaultOpt.elm.selected = true;
+
+      select.on("change", () => {
+        this.obsScenesConfig[stateKey] = select.getValue();
+        this.saveObsConfig();
+      });
+    };
+
+    buildSceneSelect("Idle (Main Menu)", "idle");
+    buildSceneSelect("Singing (Playing)", "singing");
+    buildSceneSelect("Score Screen", "score");
+
+    new Html("div")
+      .classOn("stream-section-title")
+      .styleJs({ marginTop: "0.25rem" })
+      .text("BROWSER OVERLAY SOURCES")
+      .appendTo(rightCol);
+
+    const port = this.ctx.state.actualPort || 9864;
+    const lyricsUrl = `http://127.0.0.1:${port}/overlay/lyrics`;
+    const setlistUrl = `http://127.0.0.1:${port}/overlay/setlist`;
+
+    const buildOverlayCard = (title, url) => {
+      const row = new Html("div")
+        .classOn("stream-overlay-row")
+        .appendTo(rightCol);
+      const textGroup = new Html("div")
+        .classOn("stream-overlay-text-group")
+        .appendTo(row);
+      new Html("span")
+        .classOn("stream-overlay-name")
+        .text(title)
+        .appendTo(textGroup);
+      new Html("span")
+        .classOn("stream-overlay-url")
+        .text(url)
+        .appendTo(textGroup);
+
+      const copyBtn = new Html("button")
+        .classOn("stream-key-action-btn", "stream-overlay-copy-btn")
+        .text("COPY")
+        .on("click", async () => {
+          try {
+            await navigator.clipboard.writeText(url);
+            copyBtn.text("COPIED!");
+            setTimeout(() => copyBtn.text("COPY"), 2000);
+          } catch {}
+        })
+        .appendTo(row);
+    };
+
+    buildOverlayCard("Live Lyrics", lyricsUrl);
+    buildOverlayCard("Queue & Setlist", setlistUrl);
+
+    const btnRow = new Html("div").classOn("stream-btn-row").appendTo(rightCol);
+
+    new Html("button")
+      .classOn("session-btn")
+      .text("CLOSE")
+      .on("click", () => {
+        this.modalView = "selection";
+        this.render();
+      })
+      .appendTo(btnRow);
+  }
+
+  /**
+   * Direct RTMP Broadcast View.
+   */
+  renderDirectView() {
+    const dom = this.ctx.dom;
+    if (!dom.streamHeader || !dom.streamContentArea) return;
+
+    dom.streamHeader.clear();
+    dom.streamContentArea.clear();
+
+    new Html("h1").text("DIRECT RTMP BROADCAST").appendTo(dom.streamHeader);
     new Html("p")
       .text("Stream live karaoke performances.")
       .appendTo(dom.streamHeader);
 
-    const leftCol = new Html("div")
-      .classOn("stream-col")
+    const contentArea = new Html("div")
+      .classOn("stream-content-area")
+      .styleJs({ padding: "0" })
       .appendTo(dom.streamContentArea);
+
+    const leftCol = new Html("div").classOn("stream-col").appendTo(contentArea);
     const rightCol = new Html("div")
       .classOn("stream-col")
-      .appendTo(dom.streamContentArea);
+      .appendTo(contentArea);
 
     new Html("div")
       .classOn("stream-section-title")
@@ -112,11 +581,6 @@ export default class StreamManager {
       .appendTo(urlGroup);
 
     if (this.isStreaming) urlInput.elm.disabled = true;
-
-    urlInput.on("keydown", (e) => {
-      e.stopPropagation();
-      if (e.key === "Escape") urlInput.elm.blur();
-    });
 
     urlInput.on("input", () => {
       this.rtmpUrl = urlInput.getValue().trim();
@@ -152,27 +616,12 @@ export default class StreamManager {
 
     if (this.isStreaming) keyInput.elm.disabled = true;
 
-    keyInput.on("keydown", (e) => {
-      e.stopPropagation();
-      if (e.key === "Escape") keyInput.elm.blur();
-    });
-
     keyInput.on("input", () => {
       this.streamKey = keyInput.getValue().trim();
     });
 
     const keyActions = new Html("div")
       .classOn("stream-key-actions")
-      .styleJs({
-        position: "absolute",
-        right: "10px",
-        top: "50%",
-        transform: "translateY(-50%)",
-        display: "flex",
-        alignItems: "center",
-        gap: "10px",
-        zIndex: "10",
-      })
       .appendTo(keyWrapper);
 
     const pasteKeyBtn = new Html("button")
@@ -271,7 +720,7 @@ export default class StreamManager {
       bChip.on("click", () => {
         if (this.isStreaming) return;
         this.videoBitrate = b.value;
-        this.renderStreamModal();
+        this.renderDirectView();
       });
     });
 
@@ -290,14 +739,21 @@ export default class StreamManager {
       • Ensure your RTMP ingest URL points to your nearest streaming server to minimize latency.<br>
       • Live streaming cannot be activated during an active Sessions room due to privacy reasons.<br>
       • <strong>Be sure to take the Mic Latency test in the Setup!</strong>
-      `);
+    `);
 
     const btnRow = new Html("div").classOn("stream-btn-row").appendTo(rightCol);
 
     new Html("button")
       .classOn("session-btn")
       .text("CLOSE")
-      .on("click", () => this.toggleStreamModal(false))
+      .on("click", () => {
+        if (this.isStreaming) {
+          this.toggleStreamModal(false);
+        } else {
+          this.modalView = "selection";
+          this.render();
+        }
+      })
       .appendTo(btnRow);
 
     new Html("button")
@@ -306,11 +762,11 @@ export default class StreamManager {
       .on("click", async () => {
         if (this.isStreaming) {
           await this.stopStream();
-          this.renderStreamModal();
+          this.renderDirectView();
         } else {
           this.saveConfig();
           const ok = await this.startStream();
-          if (ok) this.renderStreamModal();
+          if (ok) this.renderDirectView();
         }
       })
       .appendTo(btnRow);
@@ -326,8 +782,28 @@ export default class StreamManager {
     });
   }
 
+  saveObsConfig(enabledOverride = null) {
+    const currentStored = this.ctx.config?.obsConfig || {};
+    const isEnabled =
+      enabledOverride !== null
+        ? enabledOverride
+        : (currentStored.enabled ?? false);
+
+    const newCfg = {
+      host: this.obsHost,
+      port: this.obsPort,
+      password: this.obsPassword,
+      autoReconnect: this.obsAutoReconnect,
+      enabled: isEnabled,
+      scenes: this.obsScenesConfig,
+    };
+
+    this.ctx.config.obsConfig = newCfg;
+    window.config?.setItem?.("obsConfig", newCfg);
+  }
+
   /**
-   * Starts broadcasting by hooking the live canvas & mixed audio to FFmpeg.
+   * Starts broadcasting via FFmpeg.
    */
   async startStream() {
     if (this.isStreaming) return false;
@@ -442,7 +918,7 @@ export default class StreamManager {
   }
 
   /**
-   * Updates the telemetry labels in-place without rebuilding the DOM.
+   * Updates telemetry labels.
    */
   updateStatsUI() {
     if (!this.statEls.health) return;
@@ -552,7 +1028,12 @@ export default class StreamManager {
   handleKeyDown(e) {
     if (e.key === "Escape") {
       e.preventDefault();
-      this.toggleStreamModal(false);
+      if (this.modalView !== "selection" && !this.isStreaming) {
+        this.modalView = "selection";
+        this.render();
+      } else {
+        this.toggleStreamModal(false);
+      }
     }
   }
 
