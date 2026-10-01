@@ -783,6 +783,7 @@ export default class PlaybackManager {
     const root = this.ctx.root;
 
     state.isScoreScreenActive = true;
+    root.syncSetlistOverlay?.();
     window.obs?.triggerState?.("score");
     if (root.games)
       root.games.broadcastPlaybackState("score_screen", scoreData);
