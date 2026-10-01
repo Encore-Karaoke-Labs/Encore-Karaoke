@@ -234,6 +234,8 @@ export default class SessionManager {
     state.knownParticipants = [...newParticipants];
     this.updateDiscordSessionRPC();
 
+    root.queueSetlistSync();
+
     if (state.isSessionModalOpen && state.sessionModalView === "active") {
       this.renderSessionView("active");
     }
@@ -443,6 +445,8 @@ export default class SessionManager {
     state.sessionRoomId = null;
     state.knownParticipants = [];
     this.updateDiscordSessionRPC();
+
+    root.queueSetlistSync();
 
     root.ui.stopLoungeBackground();
     this.ctx.services.Forte.clearRemoteStreams();

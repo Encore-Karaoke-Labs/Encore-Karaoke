@@ -215,29 +215,51 @@ class EncoreController {
     const isSession = Boolean(
       this.state.isSessionActive && this.services.SessionsSvc,
     );
+    const sessionState = isSession ? this.services.SessionsSvc.state : null;
+
     const queueList = isSession
-      ? this.services.SessionsSvc.state.queue || []
+      ? sessionState?.queue || []
       : this.state.reservationQueue || [];
 
-    const isPlaying =
-      Boolean(this.state.currentSong) && !this.state.isScoreScreenActive;
-    const currentSong = isPlaying ? this.state.currentSong : null;
+    let currentSong = null;
+    if (!this.state.isScoreScreenActive) {
+      if (isSession) {
+        if (sessionState?.mode === "performance") {
+          currentSong =
+            sessionState.nowPlaying || this.state.currentSong || null;
+        }
+      } else if (this.state.currentSong) {
+        currentSong = this.state.currentSong;
+      }
+    }
 
     const formatSong = (s) => {
       if (!s) return null;
-      const fmt = this.library ? this.library.getFormatInfo(s) : null;
+
+      let enriched = s;
+      if (s.code && this.state.songMap) {
+        const localMatch =
+          this.state.songMap.get(Number(s.code)) ||
+          this.state.songMap.get(String(s.code));
+        if (localMatch) {
+          enriched = { ...localMatch, ...s };
+        }
+      }
+
+      const fmt = this.library ? this.library.getFormatInfo(enriched) : null;
       return {
-        code: s.code
-          ? String(s.code).padStart(6, "0")
-          : s.path?.startsWith("yt://")
+        code: enriched.code
+          ? String(enriched.code).padStart(6, "0")
+          : enriched.path?.startsWith("yt://")
             ? "YT"
             : "",
-        title: s.title || "Unknown Title",
-        artist: s.artist || "Unknown Artist",
+        title: enriched.title || "Unknown Title",
+        artist: enriched.artist || "Unknown Artist",
+        singer: enriched.requesterNickname || enriched.singer || null,
         formatLabel: fmt?.label || "RS",
         formatColor: fmt?.color || "#B02FD1",
-        isYouTube: Boolean(s.path?.startsWith("yt://")),
-        isMV: Boolean(s.videoPath),
+        isYouTube: Boolean(enriched.path?.startsWith("yt://")),
+        isMV: Boolean(enriched.videoPath),
       };
     };
 
