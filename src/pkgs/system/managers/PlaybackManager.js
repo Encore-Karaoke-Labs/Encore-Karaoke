@@ -239,7 +239,7 @@ export default class PlaybackManager {
       song.type === "kar" ||
       song.path.toLowerCase().endsWith(".mid") ||
       song.path.toLowerCase().endsWith(".kar");
-    const hasLyrics = Boolean(song.lrcPath || isMidi);
+    const hasLyrics = Boolean(song.lrcPath || isMidi || song.midiGuidePath);
 
     if (!hasLyrics && !state.currentSongIsYouTube && !song.cdgPath) {
       this.ctx.wrapper.classOn("mode-player-no-lyrics");
@@ -349,11 +349,17 @@ export default class PlaybackManager {
         chorusUrl = (await NetworkingUtility.getFileLink(song.chorusPath)).href;
       }
 
+      let midiGuideUrl = null;
+      if (song.midiGuidePath) {
+        midiGuideUrl = (await NetworkingUtility.getFileLink(song.midiGuidePath))
+          .href;
+      }
+
       if (isStandaloneMV && this.mvPlayer) {
-        await Forte.loadTrack(this.mvPlayer, chorusUrl);
+        await Forte.loadTrack(this.mvPlayer, chorusUrl, midiGuideUrl);
       } else {
         const trackUrl = await NetworkingUtility.getFileLink(song.path);
-        await Forte.loadTrack(trackUrl.href, chorusUrl);
+        await Forte.loadTrack(trackUrl.href, chorusUrl, midiGuideUrl);
       }
 
       const pbState = Forte.getPlaybackState();
