@@ -313,7 +313,7 @@ export default class LyricsEngine {
   broadcastOverlayLyrics() {
     if (!this.renderableLines || this.renderableLines.length === 0) return;
 
-    const isMidi = Boolean(this.ctx.state.currentSongIsMIDI);
+    const isMidi = Boolean(this.midiLines && this.midiLines.length > 0);
     const isLine1Active = isMidi
       ? this.currentSongLineIndex % 2 === 0
       : !this.isLrcLine2Active;
@@ -444,7 +444,10 @@ export default class LyricsEngine {
       return time;
     };
 
-    if (pbState.isMidi) {
+    const hasMidiLyrics =
+      pbState.isMidi ||
+      Boolean(pbState.decodedLyrics && pbState.decodedLyrics.length > 0);
+    if (hasMidiLyrics) {
       dom.lyricsCanvas.styleJs({ display: "block" });
       const midiInfo = pbState.midiInfo;
       let ppqm = midiInfo.timeDivision || 480;
@@ -909,7 +912,7 @@ export default class LyricsEngine {
       this.lyricsCtx.scale(dpr, dpr);
     }
 
-    if (this.ctx.state.currentSongIsMIDI && this.midiLines) {
+    if (this.midiLines && this.midiLines.length > 0) {
       const idx = this.currentSongLineIndex;
       const isLastLine =
         this.midiLines.length >= 2 && idx === this.midiLines.length - 1;
@@ -1307,7 +1310,7 @@ export default class LyricsEngine {
       });
     };
 
-    if (this.ctx.state.currentSongIsMIDI) {
+    if (this.midiLines && this.midiLines.length > 0) {
       const isLastLine =
         this.midiLines &&
         this.midiLines.length >= 2 &&
@@ -1657,12 +1660,11 @@ export default class LyricsEngine {
       return;
     }
 
+    const isMidiMode = Boolean(this.midiLines && this.midiLines.length > 0);
     const isLrcMode =
-      !this.ctx.state.currentSongIsMIDI &&
-      this.parsedLrc &&
-      this.parsedLrc.length > 0;
+      !isMidiMode && this.parsedLrc && this.parsedLrc.length > 0;
 
-    if (this.ctx.state.currentSongIsMIDI || isLrcMode) {
+    if (isMidiMode || isLrcMode) {
       if (!this.renderableLines) {
         this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
         return;
