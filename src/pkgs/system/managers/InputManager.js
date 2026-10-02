@@ -626,7 +626,7 @@ export default class InputManager {
 
     const pbState = Forte.getPlaybackState();
 
-    if (!state.currentSongIsMIDI || !pbState.hasGuideNotes) {
+    if (!pbState.hasGuideNotes) {
       modules.infoBar.showTemp(
         "MELODY",
         "Not available for this format.",
