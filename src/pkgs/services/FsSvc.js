@@ -471,6 +471,7 @@ const pkg = {
           cdgPath: toAbsolute(toRelative(song.cdgPath)),
           videoPath: toAbsolute(toRelative(song.videoPath)),
           chorusPath: toAbsolute(toRelative(song.chorusPath)),
+          midiGuidePath: toAbsolute(toRelative(song.midiGuidePath)),
         };
       };
 
@@ -541,11 +542,29 @@ const pkg = {
 
         const fileNameLower = nfc(file.name).toLowerCase();
         if (manifestBgvFiles.has(fileNameLower)) return false;
+        if (fileNameLower.includes(".chorus.")) return false;
+        if (
+          fileNameLower.includes(".guide.") ||
+          fileNameLower.includes(".melody.")
+        )
+          return false;
 
         const ext = nfc(file.name).split(".").pop().toLowerCase();
 
-        if (audioExtensions.has(ext) || ext === "mid" || ext === "kar") {
+        if (audioExtensions.has(ext)) {
           return true;
+        }
+
+        if (ext === "mid" || ext === "kar") {
+          const lastDot = file.name.lastIndexOf(".");
+          const basename =
+            lastDot > -1 ? file.name.substring(0, lastDot) : file.name;
+          const hasAudioSibling = Array.from(audioExtensions).some(
+            (aExt) =>
+              Boolean(findSibling(`${basename}.${aExt}`)) ||
+              Boolean(findSibling(`${basename}.multiplexed.${aExt}`)),
+          );
+          return !hasAudioSibling;
         }
 
         if (videoExtensions.has(ext)) {
@@ -616,6 +635,14 @@ const pkg = {
               if (chorusName) break;
             }
 
+            const midiGuideName =
+              findSibling(`${basename}.guide.mid`) ||
+              findSibling(`${basename}.guide.kar`) ||
+              findSibling(`${basename}.melody.mid`) ||
+              findSibling(`${basename}.melody.kar`) ||
+              findSibling(`${basename}.mid`) ||
+              findSibling(`${basename}.kar`);
+
             let songData = null;
             let artist = "Unknown Artist";
             let title = basename.replace(/\[.*?\]/g, "").trim();
@@ -625,9 +652,11 @@ const pkg = {
             const isVideo = videoExtensions.has(extension);
             const hasLrc = Boolean(lrcName);
             const hasCdg = Boolean(cdgName);
+            const hasMidiGuide = Boolean(midiGuideName);
 
             if (
-              (audioExtensions.has(extension) && (hasLrc || hasCdg)) ||
+              (audioExtensions.has(extension) &&
+                (hasLrc || hasCdg || hasMidiGuide)) ||
               isVideo
             ) {
               if (state.buildAbortController?.signal.aborted) {
@@ -643,6 +672,7 @@ const pkg = {
                       : "audio",
                 lrcPath: lrcName,
                 cdgPath: isVideo ? null : cdgName,
+                midiGuidePath: midiGuideName,
               };
 
               if (isVideo) {
@@ -783,6 +813,7 @@ const pkg = {
                 cdgPath: songData.cdgPath,
                 videoPath: videoName,
                 chorusPath: chorusName,
+                midiGuidePath: songData.midiGuidePath,
               };
             }
             return null;
@@ -814,6 +845,7 @@ const pkg = {
             cdgPath: parsedData.cdgPath,
             videoPath: parsedData.videoPath,
             chorusPath: parsedData.chorusPath,
+            midiGuidePath: parsedData.midiGuidePath,
           };
 
           newSongList.push(newSongObj);
@@ -836,6 +868,7 @@ const pkg = {
                 cdgPath: toRelative(s.cdgPath),
                 videoPath: toRelative(s.videoPath),
                 chorusPath: toRelative(s.chorusPath),
+                midiGuidePath: toRelative(s.midiGuidePath),
               }));
 
         state.songList = newSongList.map(hydrateSong);
