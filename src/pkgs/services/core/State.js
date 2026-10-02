@@ -40,6 +40,7 @@ export const state = {
     midiGain: null,
     sequencer: null,
     isMidi: false,
+    hasMidiGuide: false,
     midiOutputs: [],
     currentMidiDeviceId: "internal",
     isMultiplexed: false,
