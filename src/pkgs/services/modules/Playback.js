@@ -955,20 +955,6 @@ export class FortePlayback {
       this.pianoRoll.render(currentTime);
     }
 
-    if (
-      this.state.playback.hasMidiGuide &&
-      this.state.playback.sequencer &&
-      !this.state.playback.isMidi
-    ) {
-      if (!this.audioElement.paused) {
-        const seqDrift =
-          currentTime - this.state.playback.sequencer.currentTime;
-        if (Math.abs(seqDrift) > 0.05) {
-          this.state.playback.sequencer.currentTime = currentTime;
-        }
-      }
-    }
-
     if (this.state.scoring.enabled) {
       if (now - this.lastScoreTime > 33) {
         this.scoring.updateScore(currentTime);
