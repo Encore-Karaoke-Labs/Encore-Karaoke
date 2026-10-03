@@ -5,11 +5,14 @@ const INTERLUDE_TIPS = [
   "Take a deep breath and get ready for the next verse.",
   "”Maybe there's only a dark road up ahead. But you still have to believe and keep going. Believe that the stars will light your path, even a little bit.” - Kaori Miyazono, Your Lie in April",
   "”Music speaks louder than words” - Kousei Arima, Your Lie in April",
-  "Grab a drink and rest your vocal cords.",
   "”Rock resonates as the music of the perpetual underdog. Is it really rock if it's sung by life's winners?” - Hitori Gotoh, Bocchi The Rock!",
+  "”Wonderhoy!” - Emu Otori of WonderlandsxShowtime, Project SEKAI",
+  "Grab a drink and rest your vocal cords.",
   "TIP: You can search for songs by title, artist, or song number by pressing Y.",
-  "TIP: Press F2 to enter the setup menu in the Main Menu.",
+  "TIP: Press F2 to enter the Setup in the Main Menu.",
+  "TIP: Press F1 to learn more about Encore's keybinds!",
   "TIP: Adjust the instrumental volume using the - and = keys.",
+  "TIP: Adjust the mic volume by holding Shift and using the - and = keys.",
 ];
 
 const EXPERIMENTAL_INTERLUDES = [
