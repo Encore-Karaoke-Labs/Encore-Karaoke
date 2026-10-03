@@ -163,7 +163,7 @@ export default class UIManager {
       .classOn("help-hint-badge")
       .appendTo(headerControls);
 
-    hintBadge.html("PRESS <kbd>F1</kbd> OR <kbd>ESC</kbd> TO CLOSE");
+    hintBadge.html("<kbd>ESC</kbd> CLOSE");
 
     const bentoGrid = new Html("div")
       .classOn("help-bento-grid")
