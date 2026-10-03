@@ -399,7 +399,7 @@ export default class UIManager {
 
     dom.idleHint = new Html("div")
       .classOn("idle-hint")
-      .html("PRESS <kbd>▼</kbd> TO CONTINUE")
+      .html("PRESS <kbd>▼</kbd> TO CONTINUE, <kbd>F1</kbd> FOR HELP")
       .appendTo(dom.overlay);
 
     dom.searchUi = new Html("div").classOn("search-ui").appendTo(wrapper);
