@@ -955,6 +955,20 @@ export class FortePlayback {
       this.pianoRoll.render(currentTime);
     }
 
+    if (
+      this.state.playback.hasMidiGuide &&
+      this.state.playback.sequencer &&
+      !this.state.playback.isMidi
+    ) {
+      if (!this.audioElement.paused) {
+        const seqDrift =
+          currentTime - this.state.playback.sequencer.currentTime;
+        if (Math.abs(seqDrift) > 0.05) {
+          this.state.playback.sequencer.currentTime = currentTime;
+        }
+      }
+    }
+
     if (this.state.scoring.enabled) {
       if (now - this.lastScoreTime > 33) {
         this.scoring.updateScore(currentTime);
@@ -1553,6 +1567,7 @@ export class FortePlayback {
             this.audioCore.context,
             "pitch-shifter-processor",
           );
+          this.audioPitchNode.connect(this.audioCore.masterGain);
         }
 
         const currentTranspose = this.state.playback.transpose || 0;
@@ -1565,7 +1580,6 @@ export class FortePlayback {
           );
 
         this.sourceNode.connect(this.audioPitchNode);
-        this.audioPitchNode.connect(this.audioCore.masterGain);
         this.sourceNode.connect(this.state.scoring.musicAnalyser);
 
         if (this.state.recording.trackDelayNode) {
@@ -1573,19 +1587,24 @@ export class FortePlayback {
         }
       }
 
+      const resumeTime =
+        this.state.playback.status === "paused" &&
+        this.state.playback.pauseTime !== undefined
+          ? this.state.playback.pauseTime
+          : this.audioElement.currentTime || 0;
+
+      this.audioElement.currentTime = resumeTime;
+
       if (this.state.playback.hasMidiGuide && this.state.playback.sequencer) {
-        this.state.playback.sequencer.currentTime =
-          this.audioElement.currentTime || 0;
-        this.state.playback.sequencer.playbackRate =
-          this.audioElement.playbackRate || 1.0;
+        this.state.playback.sequencer.playbackRate = 1.0;
         this.state.playback.sequencer.play();
+        this.state.playback.sequencer.currentTime = resumeTime;
       }
 
       this.audioElement.onended = () => {
         if (this.state.playback.status === "playing") this.stopTrack();
       };
 
-      this.audioElement.currentTime = this.state.playback.pauseTime || 0;
       this.audioElement
         .play()
         .catch((e) => console.error("[FORTE SVC] Playback error:", e));
@@ -1836,11 +1855,6 @@ export class FortePlayback {
       this.audioPitchNode.parameters
         .get("pitchFactor")
         .setValueAtTime(pitchFactor, this.audioCore.context.currentTime);
-    }
-
-    if (this.audioElement) {
-      this.audioElement.playbackRate = 1.0;
-      this.audioElement.preservesPitch = true;
     }
 
     if (this.state.playback.synthesizer) {
