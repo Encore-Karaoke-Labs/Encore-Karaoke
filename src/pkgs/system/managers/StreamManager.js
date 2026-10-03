@@ -46,6 +46,7 @@ export default class StreamManager {
     this.totalBytesSent = 0;
     this.currentBitrateKbps = 0;
     this.lastChunkTime = null;
+    this.lastNavSfxTime = 0;
 
     // Direct RTMP Telemetry Listeners
     window.desktopIntegration?.ipc?.on?.("stream-stats", (_e, stats) => {
@@ -86,6 +87,20 @@ export default class StreamManager {
         this.renderObsView();
       }
     });
+  }
+
+  /**
+   * Plays a navigation sound effect.
+   * @param {string} sfxName - The name of the wav file (without extension)
+   */
+  playNavSfx(sfxName) {
+    if (this.ctx.state.isNavSfxEnabled === false) return;
+
+    const now = Date.now();
+    if (now - this.lastNavSfxTime < 80) return;
+
+    this.lastNavSfxTime = now;
+    this.ctx.services.Forte?.playSfx(`/assets/audio/${sfxName}.wav`);
   }
 
   /**
@@ -146,6 +161,7 @@ export default class StreamManager {
     // OBS Tile
     const obsTile = new Html("div")
       .classOn("session-tile")
+      .attr({ tabindex: "0" })
       .appendTo(tileContainer);
 
     new Html("div")
@@ -172,6 +188,7 @@ export default class StreamManager {
 
     const directTile = new Html("div")
       .classOn("session-tile")
+      .attr({ tabindex: "0" })
       .appendTo(tileContainer);
 
     new Html("div")
@@ -711,6 +728,7 @@ export default class StreamManager {
     bitrates.forEach((b) => {
       const bChip = new Html("div")
         .classOn("stream-bitrate-chip")
+        .attr({ tabindex: "0" })
         .text(b.label)
         .appendTo(bitrateRow);
 
@@ -1025,6 +1043,8 @@ export default class StreamManager {
   }
 
   handleKeyDown(e) {
+    const dom = this.ctx.dom;
+
     if (e.key === "Escape") {
       e.preventDefault();
       if (this.modalView !== "selection" && !this.isStreaming) {
@@ -1033,6 +1053,69 @@ export default class StreamManager {
       } else {
         this.toggleStreamModal(false);
       }
+      return;
+    }
+
+    const modalEl = dom.streamContentArea?.elm;
+    if (!modalEl) return;
+
+    const focusables = Array.from(
+      modalEl.querySelectorAll(
+        "button:not([disabled]), input:not([disabled]), select:not([disabled]), .session-tile, .stream-bitrate-chip",
+      ),
+    );
+    if (!focusables.length) return;
+
+    const activeEl = document.activeElement;
+    const currentIndex = focusables.indexOf(activeEl);
+    const isInput = activeEl && activeEl.tagName === "INPUT";
+    const isSelect = activeEl && activeEl.tagName === "SELECT";
+    const isCustomClickable =
+      activeEl &&
+      (activeEl.classList.contains("session-tile") ||
+        activeEl.classList.contains("stream-bitrate-chip"));
+
+    if (e.key === "Enter") {
+      if (isCustomClickable) {
+        e.preventDefault();
+        activeEl.click();
+      } else if (isInput && activeEl.type === "checkbox") {
+        e.preventDefault();
+        activeEl.click();
+      } else if (isInput) {
+        e.preventDefault();
+        const primaryBtn = modalEl.querySelector(
+          ".session-btn.primary, .session-btn.danger",
+        );
+        if (primaryBtn) primaryBtn.click();
+      }
+      return;
+    }
+
+    const isTextInput =
+      isInput && !["checkbox", "radio", "button"].includes(activeEl.type);
+    if (isTextInput && ["ArrowLeft", "ArrowRight"].includes(e.key)) {
+      return;
+    }
+
+    if (isSelect && ["ArrowUp", "ArrowDown"].includes(e.key)) {
+      return;
+    }
+    if (["ArrowDown", "ArrowRight", "Tab"].includes(e.key)) {
+      e.preventDefault();
+      this.playNavSfx("nav");
+      let nextIndex = currentIndex + 1;
+      if (nextIndex >= focusables.length || currentIndex === -1) nextIndex = 0;
+      focusables[nextIndex].focus();
+    } else if (
+      ["ArrowUp", "ArrowLeft"].includes(e.key) ||
+      (e.key === "Tab" && e.shiftKey)
+    ) {
+      e.preventDefault();
+      this.playNavSfx("nav");
+      let nextIndex = currentIndex - 1;
+      if (nextIndex < 0) nextIndex = focusables.length - 1;
+      focusables[nextIndex].focus();
     }
   }
 

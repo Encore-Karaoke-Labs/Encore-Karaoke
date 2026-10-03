@@ -92,16 +92,6 @@ export default class InputManager {
       return;
     }
 
-    if (
-      document.activeElement &&
-      document.activeElement.classList.contains("stream-input")
-    ) {
-      if (e.key === "Escape") {
-        document.activeElement.blur();
-      }
-      return;
-    }
-
     const isSearchInputFocused =
       dom.searchInput && document.activeElement === dom.searchInput.elm;
 
