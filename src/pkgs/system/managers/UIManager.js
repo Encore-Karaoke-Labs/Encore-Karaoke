@@ -189,7 +189,7 @@ export default class UIManager {
         items: [
           { key: "SPACE", desc: "Pause / Resume" },
           { key: "ESC", desc: "Stop song / return to Main Menu" },
-          { key: "▲ / ▼", desc: "Change key / scroll down" },
+          { key: "▲ / ▼", desc: "Change key / scroll song list" },
           { key: "◀ / ▶", desc: "Multiplex pan (Instrumental / Vocal)" },
           { key: "- / =", desc: "Music volume" },
           {
