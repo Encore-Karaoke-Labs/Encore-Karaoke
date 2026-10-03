@@ -1597,8 +1597,10 @@ export class FortePlayback {
 
       if (this.state.playback.hasMidiGuide && this.state.playback.sequencer) {
         this.state.playback.sequencer.playbackRate = 1.0;
+        if (this.state.playback.status !== "paused") {
+          this.state.playback.sequencer.currentTime = resumeTime;
+        }
         this.state.playback.sequencer.play();
-        this.state.playback.sequencer.currentTime = resumeTime;
       }
 
       this.audioElement.onended = () => {

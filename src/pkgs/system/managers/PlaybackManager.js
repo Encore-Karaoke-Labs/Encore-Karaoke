@@ -579,6 +579,14 @@ export default class PlaybackManager {
 
       Forte.playTrack();
 
+      const input = this.ctx.root.input;
+      if (input && pbState.hasGuideNotes) {
+        const level = input.guideMelodyLevels?.[input.currentGuideMelodyIndex];
+        if (level) {
+          Forte.setGuideTrackVolume(level.value);
+        }
+      }
+
       modules.infoBar.showDefault();
     }
   }
