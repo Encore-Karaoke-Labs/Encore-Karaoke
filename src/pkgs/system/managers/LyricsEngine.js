@@ -4,7 +4,7 @@ const INTERLUDE_TIPS = [
   "TIP: You can use your phone to queue songs by scanning the QR code!",
   "Take a deep breath and get ready for the next verse.",
   "”Maybe there's only a dark road up ahead. But you still have to believe and keep going. Believe that the stars will light your path, even a little bit.” - Kaori Miyazono, Your Lie in April",
-  "”Music speaks louder than words” - Kousei Arima, Your Lie in April",
+  "”Music speaks louder than words.” - Kousei Arima, Your Lie in April",
   "”Rock resonates as the music of the perpetual underdog. Is it really rock if it's sung by life's winners?” - Hitori Gotoh, Bocchi The Rock!",
   "”Wonderhoy!” - Emu Otori of WonderlandsxShowtime, Project SEKAI",
   "”Tomorrow will always be a better way.” - Haruka Kiritani of MORE MORE JUMP! (and formerly, ASRUN), Project SEKAI",
