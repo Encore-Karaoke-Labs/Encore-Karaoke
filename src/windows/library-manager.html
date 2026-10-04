@@ -52,8 +52,8 @@
       }
 
       ::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
+        width: 6px;
+        height: 6px;
       }
 
       ::-webkit-scrollbar-track {
@@ -131,6 +131,7 @@
         border-radius: 6px;
         transition: all 0.2s ease;
         outline: none;
+        cursor: default;
       }
 
       .window-controls button:hover {
@@ -202,6 +203,7 @@
         border-bottom: 3px solid transparent;
         border-radius: 0;
         transition: 0.2s;
+        cursor: default;
       }
       .tab-btn:hover {
         color: #fff;
@@ -245,6 +247,7 @@
         padding: 10px;
         border-radius: 6px;
         transition: all 0.2s;
+        cursor: default;
       }
       button.action-btn:hover {
         background: var(--accent);
@@ -293,7 +296,7 @@
           background 0.2s ease,
           border-color 0.2s ease,
           box-shadow 0.2s ease;
-        cursor: pointer;
+        cursor: default;
       }
 
       .lib-item:hover {
@@ -327,28 +330,7 @@
 
       .lib-item.active-lib .lib-status-indicator {
         background: var(--success);
-        border-color: #6eff48;
-        box-shadow:
-          0 0 6px rgba(57, 255, 20, 0.9),
-          0 0 14px rgba(57, 255, 20, 0.45),
-          inset 0 1px 2px rgba(255, 255, 255, 0.8);
-        animation: led-glow 2.8s infinite ease-in-out;
-      }
-
-      @keyframes led-glow {
-        0%,
-        100% {
-          box-shadow:
-            0 0 6px rgba(57, 255, 20, 0.9),
-            0 0 12px rgba(57, 255, 20, 0.4),
-            inset 0 1px 2px rgba(255, 255, 255, 0.8);
-        }
-        50% {
-          box-shadow:
-            0 0 10px rgba(57, 255, 20, 1),
-            0 0 18px rgba(57, 255, 20, 0.65),
-            inset 0 1px 2px #fff;
-        }
+        border-color: var(--success);
       }
 
       .lib-item.selected {
@@ -427,7 +409,6 @@
 
       .lib-item.selected .lib-focus-notch {
         opacity: 1;
-        filter: drop-shadow(0 0 4px var(--accent));
       }
 
       .editor-group {
@@ -499,11 +480,6 @@
         flex: 1;
         overflow-y: auto;
       }
-      .song-row {
-        padding: 8px 10px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        font-family: monospace;
-      }
 
       /* Consistent Section Headers */
       .pane-header-bar {
@@ -541,6 +517,68 @@
         transition: color 0.25s ease;
       }
 
+      .vlist-spacer {
+        width: 100%;
+        pointer-events: none;
+        visibility: hidden;
+      }
+      .vlist-content {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        will-change: transform;
+      }
+
+      #song-list-container {
+        padding: 0;
+        position: relative;
+        overflow-y: auto;
+      }
+
+      #song-search-input {
+        width: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #fff;
+        font-family: "Rajdhani", sans-serif;
+        font-size: 1.15rem;
+        padding: 10px 14px;
+        border-radius: 6px;
+        box-sizing: border-box;
+        transition:
+          border-color 0.2s ease,
+          background 0.2s ease;
+      }
+      #song-search-input:focus {
+        outline: none;
+        border-color: var(--accent);
+        background: rgba(0, 0, 0, 0.7);
+      }
+      #song-search-input:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .song-row {
+        height: 36px;
+        box-sizing: border-box;
+        padding: 0 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        font-family: monospace;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        user-select: text;
+        transition: background 0.12s ease;
+      }
+      .song-row:hover {
+        background: rgba(137, 207, 240, 0.06);
+      }
+
       .bgv-category {
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 6px;
@@ -564,22 +602,68 @@
         min-width: 200px;
         padding: 5px 10px;
       }
+      .bgv-count-badge {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--accent);
+        background: rgba(137, 207, 240, 0.1);
+        border: 1px solid rgba(137, 207, 240, 0.25);
+        padding: 3px 10px;
+        border-radius: 12px;
+        white-space: nowrap;
+      }
+      .bgv-virtual-viewport {
+        position: relative;
+        overflow-y: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.25);
+        box-sizing: border-box;
+      }
       .bgv-file-row {
+        height: 34px;
+        box-sizing: border-box;
         display: flex;
         justify-content: space-between;
-        padding: 5px 10px;
+        align-items: center;
+        padding: 0 10px;
         background: rgba(0, 0, 0, 0.3);
-        margin-bottom: 5px;
-        border-radius: 4px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         font-family: monospace;
         font-size: 0.9rem;
-        word-break: break-all;
+        user-select: text;
+        transition: background 0.12s ease;
+      }
+      .bgv-file-row:last-child {
+        border-bottom: none;
+      }
+      .bgv-file-row:hover {
+        background: rgba(137, 207, 240, 0.06);
+      }
+      .bgv-file-row span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+        margin-right: 12px;
       }
       .bgv-file-row button {
         background: transparent;
         border: none;
         color: var(--danger);
         font-weight: bold;
+        cursor: default;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        transition:
+          background 0.15s,
+          color 0.15s;
+        flex-shrink: 0;
+      }
+      .bgv-file-row button:hover {
+        background: rgba(255, 85, 85, 0.2);
+        color: #ff7777;
       }
 
       .toast {
@@ -604,6 +688,11 @@
         color: var(--text-muted);
         padding: 50px 20px;
         font-size: 1.4rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
       }
 
       .modal-overlay {
@@ -694,7 +783,7 @@
         display: flex;
         align-items: flex-start;
         gap: 12px;
-        cursor: pointer;
+        cursor: default;
         user-select: none;
       }
 
@@ -707,7 +796,7 @@
         border: 1px solid rgba(255, 255, 255, 0.25);
         border-radius: 4px;
         margin: 2px 0 0 0;
-        cursor: pointer;
+        cursor: default;
         display: grid;
         place-content: center;
         flex-shrink: 0;
@@ -916,11 +1005,52 @@
         </div>
 
         <div id="tab-songs" class="tab-content">
-          <p style="margin-top: 0; color: var(--text-muted)">
-            Showing audio and video files found in the root directory. Songs
-            inside subfolders are ignored.
-          </p>
-          <div class="data-list" id="song-list-container">Loading songs...</div>
+          <div class="pane-header-bar" style="margin-bottom: 12px">
+            <p class="pane-header-desc">
+              Showing audio and video files found in the root directory. Songs
+              inside subfolders are ignored.
+            </p>
+            <div class="pane-header-actions">
+              <span
+                id="song-total-count"
+                style="
+                  font-weight: 700;
+                  color: var(--accent);
+                  font-size: 1rem;
+                  letter-spacing: 1px;
+                "
+                >0 FILES</span
+              >
+            </div>
+          </div>
+
+          <div style="margin-bottom: 15px">
+            <input
+              type="text"
+              id="song-search-input"
+              placeholder="Filter files by name..."
+              oninput="onSongSearchInput(this.value)"
+              onkeydown="
+                if (event.key === 'Escape') {
+                  this.value = '';
+                  onSongSearchInput('');
+                }
+              "
+            />
+          </div>
+
+          <div
+            class="data-list"
+            id="song-list-container"
+            style="display: none; padding: 0"
+          >
+            <div id="song-vlist-spacer" class="vlist-spacer"></div>
+            <div id="song-vlist-content" class="vlist-content"></div>
+          </div>
+
+          <div id="song-status-display" class="empty-state">
+            Scanning directory...
+          </div>
         </div>
 
         <div id="tab-bgvs" class="tab-content">
@@ -1001,6 +1131,181 @@
       let bgvData = [];
       let bgvSaveTimeout = null;
       let manifestSaveTimeout = null;
+
+      let songIndex = []; // Pre-normalized array of { raw: string, lower: string }
+      let filteredIndices = null; // Int array of matched indices in songIndex, null = all
+      let activeSongScanToken = 0;
+      let songSearchDebounceTimer = null;
+      let songListScrollAttached = false;
+      const SONG_ROW_HEIGHT = 36;
+      const SONG_OVERSCAN = 8;
+
+      let bgvVirtualLists = {};
+
+      /**
+       * Reusable Virtual List component with free Samsung Smart Fridge (?)
+       */
+      class VirtualList {
+        constructor({
+          container,
+          itemHeight,
+          maxHeight = Infinity,
+          overscan = 5,
+          items = [],
+          renderItem,
+          onEmpty,
+        }) {
+          this.container = container;
+          this.itemHeight = itemHeight;
+          this.maxHeight = maxHeight;
+          this.overscan = overscan;
+          this.items = items;
+          this.renderItem = renderItem;
+          this.onEmpty = onEmpty;
+
+          this.renderedStart = -1;
+          this.renderedEnd = -1;
+          this.ticking = false;
+
+          this.initDOM();
+          this.attachEvents();
+          this.render();
+        }
+
+        initDOM() {
+          this.container.innerHTML = "";
+          this.container.style.position = "relative";
+
+          this.spacer = document.createElement("div");
+          this.spacer.className = "vlist-spacer";
+
+          this.content = document.createElement("div");
+          this.content.className = "vlist-content";
+
+          this.container.appendChild(this.spacer);
+          this.container.appendChild(this.content);
+        }
+
+        attachEvents() {
+          this.scrollListener = () => {
+            if (!this.ticking) {
+              requestAnimationFrame(() => {
+                this.updateVisibleRange();
+                this.ticking = false;
+              });
+              this.ticking = true;
+            }
+          };
+          this.container.addEventListener("scroll", this.scrollListener, {
+            passive: true,
+          });
+
+          if (typeof ResizeObserver !== "undefined") {
+            this.resizeObserver = new ResizeObserver(() => {
+              if (this.container.clientHeight > 0) {
+                this.updateVisibleRange(true);
+              }
+            });
+            this.resizeObserver.observe(this.container);
+          }
+        }
+
+        setItems(newItems, preserveScroll = false) {
+          this.items = newItems || [];
+          if (!preserveScroll) {
+            this.container.scrollTop = 0;
+          }
+          this.renderedStart = -1;
+          this.renderedEnd = -1;
+          this.render();
+        }
+
+        render() {
+          if (!this.items || this.items.length === 0) {
+            this.spacer.style.height = "0px";
+            this.content.innerHTML = "";
+            this.content.style.transform = "translateY(0px)";
+            this.container.style.overflowY = "hidden";
+            if (this.onEmpty) {
+              const emptyEl =
+                typeof this.onEmpty === "function"
+                  ? this.onEmpty()
+                  : this.onEmpty;
+              if (typeof emptyEl === "string") {
+                this.content.innerHTML = emptyEl;
+              } else if (emptyEl) {
+                this.content.appendChild(emptyEl);
+              }
+            }
+            return;
+          }
+
+          const totalHeight = this.items.length * this.itemHeight;
+          this.spacer.style.height = `${totalHeight}px`;
+
+          if (Number.isFinite(this.maxHeight)) {
+            if (totalHeight > this.maxHeight) {
+              this.container.style.height = `${this.maxHeight}px`;
+              this.container.style.overflowY = "auto";
+            } else {
+              this.container.style.height = `${totalHeight}px`;
+              this.container.style.overflowY = "hidden";
+            }
+          } else {
+            this.container.style.overflowY = "auto";
+          }
+
+          this.updateVisibleRange(true);
+        }
+
+        updateVisibleRange(force = false) {
+          if (!this.items || this.items.length === 0) return;
+
+          const clientHeight = this.container.clientHeight;
+          if (clientHeight === 0) return;
+
+          const scrollTop = this.container.scrollTop;
+          const start = Math.max(
+            0,
+            Math.floor(scrollTop / this.itemHeight) - this.overscan,
+          );
+          const end = Math.min(
+            this.items.length,
+            Math.ceil((scrollTop + clientHeight) / this.itemHeight) +
+              this.overscan,
+          );
+
+          if (
+            !force &&
+            start === this.renderedStart &&
+            end === this.renderedEnd
+          ) {
+            return;
+          }
+
+          this.renderedStart = start;
+          this.renderedEnd = end;
+
+          const fragment = document.createDocumentFragment();
+          for (let i = start; i < end; i++) {
+            const itemEl = this.renderItem(this.items[i], i);
+            fragment.appendChild(itemEl);
+          }
+
+          this.content.innerHTML = "";
+          this.content.appendChild(fragment);
+          this.content.style.transform = `translateY(${start * this.itemHeight}px)`;
+        }
+
+        destroy() {
+          if (this.scrollListener) {
+            this.container.removeEventListener("scroll", this.scrollListener);
+          }
+          if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+          }
+        }
+      }
 
       const AVAILABLE_FLAGS = [
         {
@@ -1249,32 +1554,255 @@
           target.classList.add("active");
           triggerEntranceAnimation(target);
         }
-      }
 
-      async function loadSongs() {
-        const container = document.getElementById("song-list-container");
-        container.innerHTML = "Scanning directory...";
-        const songs = await ipc.invoke(
-          "libmgr-get-library-contents",
-          selectedLib.path,
-        );
-
-        if (songs.length === 0) {
-          container.innerHTML =
-            "<div class='empty-state'>No valid media files found in the root directory.</div>";
-          return;
-        }
-
-        container.innerHTML = "";
-        songs.forEach((song) => {
-          const row = document.createElement("div");
-          row.className = "song-row";
-          row.innerText = song;
-          container.appendChild(row);
+        requestAnimationFrame(() => {
+          if (tabId === "songs") {
+            renderSongVirtualList();
+          } else if (tabId === "bgvs") {
+            Object.values(bgvVirtualLists).forEach((vl) => {
+              if (vl) vl.updateVisibleRange(true);
+            });
+          }
         });
       }
 
-      /* Overview / Details Autosave Logic */
+      function showSongState(state, message = "") {
+        const container = document.getElementById("song-list-container");
+        const statusEl = document.getElementById("song-status-display");
+        const counterEl = document.getElementById("song-total-count");
+        const searchInput = document.getElementById("song-search-input");
+
+        if (state === "scanning") {
+          container.style.display = "none";
+          statusEl.style.display = "flex";
+          statusEl.innerHTML = "Scanning directory...";
+          if (counterEl) counterEl.innerText = "SCANNING...";
+          if (searchInput) searchInput.disabled = true;
+        } else if (state === "ready") {
+          statusEl.style.display = "none";
+          container.style.display = "block";
+          if (searchInput) searchInput.disabled = false;
+        } else if (state === "empty") {
+          container.style.display = "none";
+          statusEl.style.display = "flex";
+          statusEl.innerHTML = escapeHtml(
+            message || "No valid media files found in the root directory.",
+          );
+          if (counterEl) counterEl.innerText = "0 FILES";
+          if (searchInput) searchInput.disabled = false;
+        } else if (state === "error") {
+          container.style.display = "none";
+          statusEl.style.display = "flex";
+          statusEl.innerHTML = `
+            <div style="color:var(--danger); margin-bottom:12px;">${escapeHtml(message || "Failed to scan directory.")}</div>
+            <button class="action-btn outline" onclick="loadSongs()">Retry</button>
+          `;
+          if (counterEl) counterEl.innerText = "ERROR";
+          if (searchInput) searchInput.disabled = true;
+        }
+      }
+
+      async function loadSongs() {
+        const token = ++activeSongScanToken;
+        const targetPath = selectedLib?.path;
+
+        if (!targetPath) {
+          showSongState("empty", "No library selected.");
+          return;
+        }
+
+        const searchInput = document.getElementById("song-search-input");
+        if (searchInput) searchInput.value = "";
+        filteredIndices = null;
+
+        showSongState("scanning");
+
+        try {
+          const songs = await ipc.invoke(
+            "libmgr-get-library-contents",
+            targetPath,
+          );
+
+          if (token !== activeSongScanToken) return;
+
+          const rawList = Array.isArray(songs) ? songs : [];
+
+          songIndex = new Array(rawList.length);
+          for (let i = 0; i < rawList.length; i++) {
+            const raw = rawList[i];
+            songIndex[i] = {
+              raw: raw,
+              lower: raw.toLowerCase(),
+            };
+          }
+
+          if (songIndex.length === 0) {
+            showSongState(
+              "empty",
+              "No valid media files found in the root directory.",
+            );
+          } else {
+            showSongState("ready");
+            attachSongListEvents();
+            updateSongCounter();
+            renderSongVirtualList(true);
+          }
+        } catch (err) {
+          if (token !== activeSongScanToken) return;
+          console.error("Failed to load library songs:", err);
+          showSongState("error", err?.message || String(err));
+        }
+      }
+
+      function attachSongListEvents() {
+        const container = document.getElementById("song-list-container");
+        if (!container || songListScrollAttached) return;
+
+        let ticking = false;
+        container.addEventListener(
+          "scroll",
+          () => {
+            if (!ticking) {
+              requestAnimationFrame(() => {
+                renderSongVirtualList(false);
+                ticking = false;
+              });
+              ticking = true;
+            }
+          },
+          { passive: true },
+        );
+
+        if (typeof ResizeObserver !== "undefined") {
+          const ro = new ResizeObserver(() => {
+            if (container.clientHeight > 0) {
+              renderSongVirtualList(false);
+            }
+          });
+          ro.observe(container);
+        }
+
+        songListScrollAttached = true;
+      }
+
+      function renderSongVirtualList(resetScroll = false) {
+        const container = document.getElementById("song-list-container");
+        const spacer = document.getElementById("song-vlist-spacer");
+        const content = document.getElementById("song-vlist-content");
+
+        if (!container || !spacer || !content) return;
+
+        if (resetScroll) {
+          container.scrollTop = 0;
+        }
+
+        const total =
+          filteredIndices !== null ? filteredIndices.length : songIndex.length;
+
+        if (total === 0) {
+          spacer.style.height = "0px";
+          content.style.transform = "translateY(0px)";
+          content.innerHTML =
+            "<div class='empty-state' style='padding:40px'>No matching media files found.</div>";
+          return;
+        }
+
+        spacer.style.height = `${total * SONG_ROW_HEIGHT}px`;
+
+        const clientHeight = container.clientHeight;
+        if (clientHeight === 0) return; // Tab is hidden
+
+        const scrollTop = container.scrollTop;
+        const start = Math.max(
+          0,
+          Math.floor(scrollTop / SONG_ROW_HEIGHT) - SONG_OVERSCAN,
+        );
+        const end = Math.min(
+          total,
+          Math.ceil((scrollTop + clientHeight) / SONG_ROW_HEIGHT) +
+            SONG_OVERSCAN,
+        );
+
+        const fragment = document.createDocumentFragment();
+        for (let i = start; i < end; i++) {
+          const itemIdx = filteredIndices !== null ? filteredIndices[i] : i;
+          const songRaw = songIndex[itemIdx].raw;
+
+          const row = document.createElement("div");
+          row.className = "song-row";
+          row.title = songRaw;
+          row.textContent = songRaw;
+          fragment.appendChild(row);
+        }
+
+        content.innerHTML = "";
+        content.appendChild(fragment);
+        content.style.transform = `translateY(${start * SONG_ROW_HEIGHT}px)`;
+      }
+
+      function updateSongCounter() {
+        const counterEl = document.getElementById("song-total-count");
+        if (!counterEl) return;
+
+        const count =
+          filteredIndices !== null ? filteredIndices.length : songIndex.length;
+        counterEl.innerText = `${count.toLocaleString()} ${count === 1 ? "FILE" : "FILES"}`;
+      }
+
+      /**
+       * Search algoritm para hanapin ang pag-ibig niya
+       */
+      function onSongSearchInput(query) {
+        if (songSearchDebounceTimer) {
+          clearTimeout(songSearchDebounceTimer);
+        }
+        songSearchDebounceTimer = setTimeout(() => {
+          songSearchDebounceTimer = null;
+          performSongSearch(query);
+        }, 75);
+      }
+
+      function performSongSearch(query) {
+        if (!songIndex || songIndex.length === 0) return;
+
+        const raw = (query || "").trim().toLowerCase();
+        if (!raw) {
+          filteredIndices = null;
+        } else {
+          const terms = raw.split(/\s+/).filter(Boolean);
+          const termCount = terms.length;
+          const total = songIndex.length;
+          const matched = [];
+
+          if (termCount === 1) {
+            const t0 = terms[0];
+            for (let i = 0; i < total; i++) {
+              if (songIndex[i].lower.includes(t0)) {
+                matched.push(i);
+              }
+            }
+          } else {
+            for (let i = 0; i < total; i++) {
+              const str = songIndex[i].lower;
+              let match = true;
+              for (let t = 0; t < termCount; t++) {
+                if (!str.includes(terms[t])) {
+                  match = false;
+                  break;
+                }
+              }
+              if (match) {
+                matched.push(i);
+              }
+            }
+          }
+          filteredIndices = matched;
+        }
+
+        updateSongCounter();
+        renderSongVirtualList(true);
+      }
+
       function setOverviewStatus(state) {
         const el = document.getElementById("overview-status");
         if (!el) return;
@@ -1394,12 +1922,21 @@
         }
       }
 
-      /* BGV Autosave Logic */
+      function destroyBgvVirtualLists() {
+        Object.values(bgvVirtualLists).forEach((vl) => {
+          if (vl && typeof vl.destroy === "function") {
+            vl.destroy();
+          }
+        });
+        bgvVirtualLists = {};
+      }
+
       function renderBgvs() {
+        destroyBgvVirtualLists();
         const container = document.getElementById("bgv-container");
         container.innerHTML = "";
 
-        if (bgvData.length === 0) {
+        if (!bgvData || bgvData.length === 0) {
           container.innerHTML =
             "<div class='empty-state' style='padding:20px'>No BGV Categories defined.</div>";
           return;
@@ -1409,35 +1946,55 @@
           const catDiv = document.createElement("div");
           catDiv.className = "bgv-category";
 
-          let html = `
-          <div class="bgv-category-header">
-            <input type="text" value="${escapeHtml(cat.BGV_CATEGORY || "")}" 
-              oninput="updateBgvCategoryName(${cIdx}, this.value)" 
-              onchange="flushBgvAutoSave()" 
-              onblur="flushBgvAutoSave()"
-              placeholder="Category Name (e.g. KPOP)">
-            <div style="display: flex; gap: 10px; align-items: center;">
-              <button class="action-btn outline" style="padding: 5px 10px; font-size: 0.9rem;" onclick="addVideoToCategory(${cIdx})">+ Add Videos</button>
-              <button class="action-btn danger" style="padding: 5px 10px; font-size: 0.9rem;" onclick="confirmRemoveBgvCategory(${cIdx})">Delete Category</button>
-            </div>
-          </div>
-        `;
+          const videoCount = cat.BGV_LIST ? cat.BGV_LIST.length : 0;
 
-          if (!cat.BGV_LIST || cat.BGV_LIST.length === 0) {
-            html += `<div style="color:var(--text-muted); font-size: 0.9rem; padding: 5px;">No videos in this category.</div>`;
-          } else {
-            cat.BGV_LIST.forEach((vid, vIdx) => {
-              html += `
-              <div class="bgv-file-row">
-                <span>${escapeHtml(vid)}</span>
-                <button onclick="removeVideoFromCategory(${cIdx}, ${vIdx})">✕</button>
+          catDiv.innerHTML = `
+            <div class="bgv-category-header">
+              <input type="text" value="${escapeHtml(cat.BGV_CATEGORY || "")}" 
+                oninput="updateBgvCategoryName(${cIdx}, this.value)" 
+                onchange="flushBgvAutoSave()" 
+                onblur="flushBgvAutoSave()"
+                placeholder="Category Name (e.g. KPOP)">
+              <span class="bgv-count-badge" id="bgv-badge-${cIdx}">${videoCount.toLocaleString()} ${videoCount === 1 ? "video" : "videos"}</span>
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="action-btn outline" style="padding: 5px 10px; font-size: 0.9rem;" onclick="addVideoToCategory(${cIdx})">+ Add Videos</button>
+                <button class="action-btn danger" style="padding: 5px 10px; font-size: 0.9rem;" onclick="confirmRemoveBgvCategory(${cIdx})">Delete Category</button>
               </div>
-            `;
+            </div>
+            <div class="bgv-category-body" id="bgv-body-${cIdx}"></div>
+          `;
+
+          container.appendChild(catDiv);
+
+          const bodyEl = catDiv.querySelector(`#bgv-body-${cIdx}`);
+          if (!cat.BGV_LIST || cat.BGV_LIST.length === 0) {
+            bodyEl.innerHTML = `<div style="color:var(--text-muted); font-size: 0.9rem; padding: 10px;">No videos in this category.</div>`;
+          } else {
+            const viewportEl = document.createElement("div");
+            viewportEl.className = "bgv-virtual-viewport";
+            viewportEl.id = `bgv-viewport-${cIdx}`;
+            bodyEl.appendChild(viewportEl);
+
+            bgvVirtualLists[cIdx] = new VirtualList({
+              container: viewportEl,
+              itemHeight: 34,
+              maxHeight: 272,
+              overscan: 4,
+              items: cat.BGV_LIST,
+              renderItem: (vid, vIdx) => {
+                const row = document.createElement("div");
+                row.className = "bgv-file-row";
+                row.title = vid;
+                row.innerHTML = `
+                  <span>${escapeHtml(vid)}</span>
+                  <button type="button" tabindex="-1" onclick="removeVideoFromCategory(${cIdx}, ${vIdx})" title="Remove video">✕</button>
+                `;
+                return row;
+              },
+              onEmpty: () =>
+                `<div style="color:var(--text-muted); font-size: 0.9rem; padding: 10px;">No videos in this category.</div>`,
             });
           }
-
-          catDiv.innerHTML = html;
-          container.appendChild(catDiv);
         });
       }
 
@@ -1524,7 +2081,21 @@
       function removeVideoFromCategory(cIdx, vIdx) {
         if (bgvData[cIdx]?.BGV_LIST) {
           bgvData[cIdx].BGV_LIST.splice(vIdx, 1);
-          renderBgvs();
+          if (bgvData[cIdx].BGV_LIST.length === 0) {
+            renderBgvs();
+          } else {
+            const badge = document.getElementById(`bgv-badge-${cIdx}`);
+            if (badge) {
+              const count = bgvData[cIdx].BGV_LIST.length;
+              badge.innerText = `${count.toLocaleString()} ${count === 1 ? "video" : "videos"}`;
+            }
+            const vl = bgvVirtualLists[cIdx];
+            if (vl) {
+              vl.setItems(bgvData[cIdx].BGV_LIST, true);
+            } else {
+              renderBgvs();
+            }
+          }
           queueBgvAutoSave(true);
         }
       }
