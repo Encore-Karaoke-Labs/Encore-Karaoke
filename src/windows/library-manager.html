@@ -158,11 +158,7 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        background: radial-gradient(
-          circle at top right,
-          rgba(137, 207, 240, 0.05),
-          transparent
-        );
+        background: var(--bg-dark);
       }
 
       .tabs-header {
@@ -261,37 +257,154 @@
       }
 
       .lib-item {
-        padding: 12px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
         margin-bottom: 8px;
         border-radius: 6px;
-        border-left: 4px solid transparent;
-        transition: 0.2s;
         background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        transition:
+          background 0.2s ease,
+          border-color 0.2s ease,
+          box-shadow 0.2s ease;
+        cursor: pointer;
       }
+
       .lib-item:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.16);
+      }
+
+      .lib-status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
         background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7);
+        flex-shrink: 0;
+        transition:
+          background 0.25s ease,
+          border-color 0.25s ease,
+          box-shadow 0.25s ease;
       }
-      .lib-item.selected {
-        background: rgba(137, 207, 240, 0.15);
-        border-left-color: var(--accent);
-      }
+
       .lib-item.active-lib {
-        border-left-color: var(--success);
+        background: rgba(57, 255, 20, 0.04);
+        border-color: rgba(57, 255, 20, 0.3);
       }
+
+      .lib-item.active-lib:hover {
+        background: rgba(57, 255, 20, 0.07);
+        border-color: rgba(57, 255, 20, 0.45);
+      }
+
+      .lib-item.active-lib .lib-status-indicator {
+        background: var(--success);
+        border-color: #6eff48;
+        box-shadow:
+          0 0 6px rgba(57, 255, 20, 0.9),
+          0 0 14px rgba(57, 255, 20, 0.45),
+          inset 0 1px 2px rgba(255, 255, 255, 0.8);
+        animation: led-glow 2.8s infinite ease-in-out;
+      }
+
+      @keyframes led-glow {
+        0%,
+        100% {
+          box-shadow:
+            0 0 6px rgba(57, 255, 20, 0.9),
+            0 0 12px rgba(57, 255, 20, 0.4),
+            inset 0 1px 2px rgba(255, 255, 255, 0.8);
+        }
+        50% {
+          box-shadow:
+            0 0 10px rgba(57, 255, 20, 1),
+            0 0 18px rgba(57, 255, 20, 0.65),
+            inset 0 1px 2px #fff;
+        }
+      }
+
+      .lib-item.selected {
+        background: rgba(137, 207, 240, 0.12);
+        border-color: var(--accent);
+        box-shadow: 0 0 12px rgba(137, 207, 240, 0.1);
+      }
+
+      .lib-item.selected:hover {
+        background: rgba(137, 207, 240, 0.16);
+      }
+
+      .lib-item.active-lib.selected {
+        background: rgba(137, 207, 240, 0.14);
+        border-color: var(--accent);
+        box-shadow:
+          0 0 15px rgba(137, 207, 240, 0.15),
+          inset 0 0 10px rgba(57, 255, 20, 0.04);
+      }
+
+      .lib-item.active-lib.selected:hover {
+        background: rgba(137, 207, 240, 0.18);
+      }
+
+      .lib-item-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
       .lib-item-title {
-        font-size: 1.2rem;
+        font-size: 1.15rem;
         font-weight: 700;
-        margin-bottom: 4px;
+        color: var(--text-main);
+        margin-bottom: 2px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        letter-spacing: 0.5px;
+        transition: color 0.2s ease;
       }
+
+      .lib-item:hover .lib-item-title,
+      .lib-item.selected .lib-item-title {
+        color: #fff;
+      }
+
+      .lib-item.selected .lib-item-title {
+        text-shadow: 0 0 10px rgba(137, 207, 240, 0.35);
+      }
+
       .lib-item-path {
         font-size: 0.85rem;
         color: var(--text-muted);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        font-family: monospace;
+        opacity: 0.85;
+        transition: color 0.2s ease;
+      }
+
+      .lib-item.selected .lib-item-path {
+        color: rgba(226, 232, 240, 0.7);
+      }
+
+      .lib-focus-notch {
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        color: var(--accent);
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+      }
+
+      .lib-item.selected .lib-focus-notch {
+        opacity: 1;
+        filter: drop-shadow(0 0 4px var(--accent));
       }
 
       .editor-group {
@@ -1019,9 +1132,17 @@
           };
 
           item.innerHTML = `
-          <div class="lib-item-title">${escapeHtml(lib.manifest.title || "Unknown Library")}</div>
-          <div class="lib-item-path">${escapeHtml(lib.path)}</div>
-        `;
+            <div class="lib-status-indicator" title="${isActive ? "Currently Active Engine Library" : "Standby"}"></div>
+            <div class="lib-item-info">
+              <div class="lib-item-title">${escapeHtml(lib.manifest.title || "Unknown Library")}</div>
+              <div class="lib-item-path">${escapeHtml(lib.path)}</div>
+            </div>
+            <div class="lib-focus-notch">
+              <svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+                <path d="M1 1.5L5.5 6L1 10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          `;
           container.appendChild(item);
         });
       }
