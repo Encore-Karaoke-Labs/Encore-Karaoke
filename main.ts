@@ -381,7 +381,7 @@ if (initialDeepLink) {
 
 // Initialization
 const versionInformation: VersionInformation = {
-  number: "1.13.0",
+  number: "1.14.0",
   channel: "BETA",
   codename: "Pisces",
 };
