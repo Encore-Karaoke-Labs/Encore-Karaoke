@@ -80,7 +80,7 @@
 Encore automatically scans your local drives for a folder named **`EncoreLibrary`**, or you can use the Library Manager to import your library.
 
 <div align="center">
-  <img alt="Encore Library Manager" src="readme/library-manager.png" style="border-radius: 15px; margin-bottom: 20px; margin-top: 20px;" />
+  <img alt="Encore Library Manager" src="readme/library-manager.jpg" style="border-radius: 15px; margin-bottom: 20px; margin-top: 20px;" />
 </div>
 
 To build your library, structure your files like this:
