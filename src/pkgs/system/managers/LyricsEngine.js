@@ -7,6 +7,7 @@ const INTERLUDE_TIPS = [
   "”Music speaks louder than words” - Kousei Arima, Your Lie in April",
   "”Rock resonates as the music of the perpetual underdog. Is it really rock if it's sung by life's winners?” - Hitori Gotoh, Bocchi The Rock!",
   "”Wonderhoy!” - Emu Otori of WonderlandsxShowtime, Project SEKAI",
+  "”Tomorrow will always be a better way.” - Haruka Kiritani of MORE MORE JUMP! (and formerly, ASRUN), Project SEKAI",
   "Grab a drink and rest your vocal cords.",
   "TIP: You can search for songs by title, artist, or song number by pressing Y.",
   "TIP: Press F2 to enter the Setup in the Main Menu.",
