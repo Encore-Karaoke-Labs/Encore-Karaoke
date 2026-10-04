@@ -147,7 +147,7 @@ export default class StreamManager {
 
     new Html("h1").text("BROADCAST & STREAMING").appendTo(dom.streamHeader);
     new Html("p")
-      .text("Configure automation tools or live ingest for stream broadcasts.")
+      .text("Configure tools for live streaming.")
       .appendTo(dom.streamHeader);
 
     const selectionArea = new Html("div")
@@ -205,7 +205,7 @@ export default class StreamManager {
 
     new Html("div")
       .classOn("session-tile-desc")
-      .text("Stream audio and visual canvas directly to RTMP ingest")
+      .text("Stream your Encore session directly.")
       .appendTo(directTile);
 
     directTile.on("click", () => {
