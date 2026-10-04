@@ -157,6 +157,7 @@
         flex: 1;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
         background: radial-gradient(
           circle at top right,
           rgba(137, 207, 240, 0.05),
@@ -169,6 +170,7 @@
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         padding: 0 30px;
         background: rgba(0, 0, 0, 0.2);
+        flex-shrink: 0;
       }
       .tab-btn {
         background: transparent;
@@ -190,6 +192,18 @@
         color: var(--accent);
         border-bottom-color: var(--accent);
       }
+
+      @keyframes entrance {
+        0% {
+          opacity: 0;
+          transform: translateY(40px);
+        }
+        100% {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
       .tab-content {
         padding: 30px;
         flex: 1;
@@ -199,6 +213,7 @@
       .tab-content.active {
         display: flex;
         flex-direction: column;
+        animation: entrance 0.35s cubic-bezier(0.08, 0.82, 0.17, 1) both;
       }
 
       button.action-btn {
@@ -950,6 +965,13 @@
           closeConfirmModal();
         });
 
+      function triggerEntranceAnimation(element) {
+        if (!element) return;
+        element.style.animation = "none";
+        void element.offsetHeight;
+        element.style.animation = "";
+      }
+
       async function loadData() {
         appData = await ipc.invoke("libmgr-get-config");
 
@@ -1042,6 +1064,11 @@
         setBgvStatus("idle");
         renderBgvs();
         loadSongs();
+
+        const activeTab = document.querySelector(".tab-content.active");
+        if (activeTab) {
+          triggerEntranceAnimation(activeTab);
+        }
       }
 
       function onFlagChange() {
@@ -1052,14 +1079,32 @@
 
       function switchTab(tabId) {
         flushAllAutoSaves();
-        document
-          .querySelectorAll(".tab-btn")
-          .forEach((b) => b.classList.remove("active"));
+        const tabButtons = document.querySelectorAll(".tab-btn");
+        tabButtons.forEach((b) => b.classList.remove("active"));
         document
           .querySelectorAll(".tab-content")
           .forEach((c) => c.classList.remove("active"));
-        event.target.classList.add("active");
-        document.getElementById("tab-" + tabId).classList.add("active");
+
+        const clickedBtn =
+          typeof event !== "undefined" && event?.target
+            ? event.target.closest(".tab-btn")
+            : null;
+
+        if (clickedBtn) {
+          clickedBtn.classList.add("active");
+        } else {
+          const tabNames = ["overview", "songs", "bgvs"];
+          const idx = tabNames.indexOf(tabId);
+          if (idx !== -1 && tabButtons[idx]) {
+            tabButtons[idx].classList.add("active");
+          }
+        }
+
+        const target = document.getElementById("tab-" + tabId);
+        if (target) {
+          target.classList.add("active");
+          triggerEntranceAnimation(target);
+        }
       }
 
       async function loadSongs() {
