@@ -5,6 +5,7 @@ const INTERLUDE_TIPS = [
   "”Music speaks louder than words.” - Kousei Arima, Your Lie in April",
   "”Rock resonates as the music of the perpetual underdog. Is it really rock if it's sung by life's winners?” - Hitori Gotoh, Bocchi The Rock!",
   "”Wonderhoy!” - Emu Otori of WonderlandsxShowtime, Project SEKAI",
+  "”You don't become an idol simply because of looks. You have to have heart as well. Having the desire to work hard for your fans—that is the most important thing an idol can have.” Shizuku Hinomori of MORE MORE JUMP!, Project SEKAI",
   "”Tomorrow will always be a better day.” - Haruka Kiritani of MORE MORE JUMP!, Project SEKAI",
   "”Remember, an idol is someone who gives hope to their fans.” - Airi Momoi of MORE MORE JUMP!, Project SEKAI",
   "TIP: You can use your phone to queue songs by scanning the QR code!",
