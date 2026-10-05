@@ -89,7 +89,7 @@ To build your library, structure your files like this:
 D:/EncoreLibrary/                                             # Should work for any folder
  ├── manifest.json                                            # Metadata and BGV (Background Video) configs
  ├── [Your Artist] - [Song].mp3                               # Audio file (Compatible with ID3 tags)
- ├── [Your Artist] - [Song].lrc                               # Matching LRC lyrics file
+ ├── [Your Artist] - [Song].lrc/.mid                          # Matching LRC lyrics file (or MIDI guide)
  ├── [Your Artist] - [Song].cdg                               # or matching CDG file
  ├── [Your Artist] - [Song].mp4                               # Video files for MTV
  ├── [Your Artist] - [Song].mid/.kar                          # MIDI files
