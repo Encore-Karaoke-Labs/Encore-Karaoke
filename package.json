@@ -74,17 +74,17 @@
     "localforage": "^1.10.0",
     "marked": "^18.0.10",
     "mime-types": "^3.0.2",
+    "obs-websocket-js": "^5.0.8",
     "peerjs": "^1.5.5",
     "pitchy": "^4.1.0",
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
-    "spessasynth_core": "^4.3.20",
+    "spessasynth_core": "^4.3.22",
     "spessasynth_lib": "^4.3.14",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.68.0",
-    "youtube-search-api": "^2.0.1",
-    "obs-websocket-js": "^5.0.8"
+    "youtube-search-api": "^2.0.1"
   },
   "overrides": {
     "@electron/rebuild": "4.2.0",
