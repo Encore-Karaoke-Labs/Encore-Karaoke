@@ -7,7 +7,7 @@ const INTERLUDE_TIPS = [
   "”Wonderhoy!” - Emu Otori of WonderlandsxShowtime, Project SEKAI",
   "”Tomorrow will always be a better day.” - Haruka Kiritani of MORE MORE JUMP! (and formerly, ASRUN), Project SEKAI",
   "TIP: You can use your phone to queue songs by scanning the QR code!",
-  "TIP: You can search for songs by title, artist, or song number by pressing Y.",
+  "TIP: You can search for songs by title, artist, or song number by pressing Y. You can search by acronym too!",
   "TIP: Press F2 to enter the Setup in the Main Menu.",
   "TIP: Press F1 to learn more about Encore's keybinds!",
   "TIP: Adjust the instrumental volume using the - and = keys.",
