@@ -130,6 +130,7 @@ const pkg = {
     },
 
     setMultiplexPan: (panValue) => playback.setMultiplexPan(panValue),
+    setSkipToFirstNoteOn: (enable) => playback.setSkipToFirstNoteOn(enable),
     setTranspose: (semitones) => playback.setTranspose(semitones),
     setGuideTrackVolume: (volume) => playback.setGuideTrackVolume(volume),
 

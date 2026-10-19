@@ -426,7 +426,8 @@ export class FortePlayback {
       this.state.playback.synthesizer,
     );
     this.state.playback.sequencer.loop = false;
-    this.state.playback.sequencer.skipToFirstNoteOn = false;
+    this.state.playback.sequencer.skipToFirstNoteOn =
+      this.state.playback.skipToFirstNoteOn;
 
     this.synthesizer.connectSequencerToMidiOutput(
       this.state.playback.sequencer,
@@ -1792,6 +1793,18 @@ export class FortePlayback {
       );
     }
     this.dispatchUpdate();
+  }
+
+  /**
+   * Configures whether the MIDI sequencer skips leading silence to the first note-on event.
+   *
+   * @param {boolean} enable - Whether to skip to the first note on.
+   */
+  setSkipToFirstNoteOn(enable) {
+    this.state.playback.skipToFirstNoteOn = Boolean(enable);
+    if (this.state.playback.sequencer) {
+      this.state.playback.sequencer.skipToFirstNoteOn = Boolean(enable);
+    }
   }
 
   /**

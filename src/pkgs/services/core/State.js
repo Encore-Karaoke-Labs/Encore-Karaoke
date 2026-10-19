@@ -41,6 +41,7 @@ export const state = {
     sequencer: null,
     isMidi: false,
     hasMidiGuide: false,
+    skipToFirstNoteOn: false,
     midiOutputs: [],
     currentMidiDeviceId: "internal",
     isMultiplexed: false,
