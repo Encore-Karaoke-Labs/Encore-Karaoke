@@ -458,6 +458,12 @@ class EncoreController {
     }
 
     const libraryInfo = this.library.libraryInfo;
+    const skipToFirst = Boolean(
+      libraryInfo?.manifest?.flags?.skipToFirstNoteOn,
+    );
+    if (this.services.Forte?.setSkipToFirstNoteOn) {
+      this.services.Forte.setSkipToFirstNoteOn(skipToFirst);
+    }
     if (libraryInfo?.manifest?.additionalContents?.bgvCategories) {
       const enableDefaultBgv =
         libraryInfo?.manifest?.flags?.enableDefaultCategories ?? true;
