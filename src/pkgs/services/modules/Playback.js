@@ -426,7 +426,7 @@ export class FortePlayback {
       this.state.playback.synthesizer,
     );
     this.state.playback.sequencer.loop = false;
-    this.state.playback.sequencer.skipToFirstNoteOn = !isCompanion;
+    this.state.playback.sequencer.skipToFirstNoteOn = false;
 
     this.synthesizer.connectSequencerToMidiOutput(
       this.state.playback.sequencer,
