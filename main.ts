@@ -112,6 +112,7 @@ export interface LibraryFlags {
   enableMtvCategory?: boolean;
   enableDefaultCategories?: boolean;
   isSongHub?: boolean;
+  skipToFirstNoteOn?: boolean;
   [key: string]: unknown;
 }
 
@@ -2738,6 +2739,7 @@ void app.whenReady().then(() => {
             enableMtvCategory: true,
             enableDefaultCategories: true,
             isSongHub: false,
+            skipToFirstNoteOn: false,
           },
           additionalContents: { bgvCategories: [], bumperImages: [] },
         };
