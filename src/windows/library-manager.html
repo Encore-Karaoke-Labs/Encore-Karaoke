@@ -1541,6 +1541,13 @@
             "When enabled, Encore will load its default background video categories, such as <b>3D</b>.",
           defaultValue: true,
         },
+        {
+          key: "skipToFirstNoteOn",
+          title: "Skip Leading Silence (First Note-On)",
+          description:
+            "When enabled, MIDI playback immediately jumps to the first note played.",
+          defaultValue: false,
+        },
       ];
 
       function renderFlags() {
