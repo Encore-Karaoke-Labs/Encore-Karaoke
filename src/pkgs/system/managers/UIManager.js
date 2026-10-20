@@ -600,20 +600,51 @@ export default class UIManager {
       }
     });
 
-    // Intro Card
     dom.introCard = new Html("div").classOn("intro-card").appendTo(wrapper);
     const introContent = new Html("div")
       .classOn("intro-card-content")
       .appendTo(dom.introCard);
+
+    const introLeft = new Html("div")
+      .classOn("intro-card-left")
+      .appendTo(introContent);
+
     dom.introTitle = new Html("div")
       .classOn("intro-card-title")
-      .appendTo(introContent);
+      .appendTo(introLeft);
+
     dom.introArtist = new Html("div")
-      .classOn("intro-card-artist")
-      .appendTo(introContent);
+      .classOn("intro-card-artist-meta")
+      .appendTo(introLeft);
+
     dom.introMeta = new Html("div")
-      .classOn("intro-card-meta")
+      .classOn("intro-card-meta-list")
+      .appendTo(introLeft);
+
+    dom.introBadges = new Html("div")
+      .classOn("intro-card-badges")
       .appendTo(introContent);
+
+    dom.introBpmBadge = new Html("div")
+      .classOn("intro-badge", "intro-badge-bpm")
+      .appendTo(dom.introBadges);
+
+    dom.introKeyBadge = new Html("div")
+      .classOn("intro-badge", "intro-badge-key")
+      .appendTo(dom.introBadges);
+
+    new Html("div").classOn("intro-card-divider").appendTo(introContent);
+
+    const introRight = new Html("div")
+      .classOn("intro-card-right")
+      .appendTo(introContent);
+
+    dom.introSlogan = new Html("div")
+      .classOn("intro-card-slogan")
+      .html(
+        'Be the <span class="slogan-gold">star</span><br>that shines <span class="slogan-gold">bright.</span>',
+      )
+      .appendTo(introRight);
 
     // Interlude
     dom.interludeOverlay = new Html("div")

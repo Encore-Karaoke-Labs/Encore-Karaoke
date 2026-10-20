@@ -464,30 +464,32 @@
 /* -- Title Card -- */
 .intro-card {
   position: absolute;
-  top: 25%;
+  top: 50%;
   left: 0;
   width: 100%;
-  padding: 3rem 10%;
+  padding: 2.2rem 6%;
   background: linear-gradient(
     90deg,
-    rgba(10, 10, 20, 0.5) 0%,
-    rgba(10, 10, 20, 0.9) 20%,
-    rgba(15, 23, 42, 0.95) 50%,
-    rgba(10, 10, 20, 0.9) 80%,
-    rgba(10, 10, 20, 0.5) 100%
+    rgba(10, 10, 20, 0.4) 0%,
+    rgba(10, 10, 25, 0.9) 15%,
+    rgba(18, 26, 48, 0.96) 50%,
+    rgba(10, 10, 25, 0.9) 85%,
+    rgba(10, 10, 20, 0.4) 100%
   );
-  border-top: 2px solid rgba(137, 207, 240, 0.3);
-  border-bottom: 2px solid rgba(137, 207, 240, 0.3);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-  text-align: center;
+  border-top: 2px solid rgba(137, 207, 240, 0.4);
+  border-bottom: 2px solid rgba(137, 207, 240, 0.4);
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.75),
+    inset 0 0 25px rgba(137, 207, 240, 0.08);
   font-family: "Rajdhani", sans-serif;
   color: white;
   z-index: 16;
   opacity: 0;
-  transform: translateZ(0) scaleY(0);
+  transform: translateY(-50%) translateZ(0) scaleY(0);
   pointer-events: none;
   display: flex;
   justify-content: center;
+  align-items: center;
   overflow: hidden;
   will-change: transform, opacity;
   backface-visibility: hidden;
@@ -505,98 +507,184 @@
     forwards;
 }
 
-.intro-card.visible .intro-card-title {
-  animation: introTextSlideInRight 0.38s cubic-bezier(0.165, 0.84, 0.44, 1)
-    0.22s both;
+.intro-card.visible .intro-card-left {
+  animation: introTextSlideInRight 0.38s cubic-bezier(0.165, 0.84, 0.44, 1) 0.2s
+    both;
 }
 
-.intro-card.visible .intro-card-artist {
+.intro-card.visible .intro-card-badges {
   animation: introTextSlideInRight 0.38s cubic-bezier(0.165, 0.84, 0.44, 1)
-    0.28s both;
+    0.26s both;
 }
 
-.intro-card.visible .intro-card-meta {
+.intro-card.visible .intro-card-divider {
+  animation: fadeIn 0.35s ease 0.28s both;
+}
+
+.intro-card.visible .intro-card-right {
   animation: introTextSlideInRight 0.38s cubic-bezier(0.165, 0.84, 0.44, 1)
-    0.34s both;
+    0.32s both;
 }
 
 .intro-card.exiting {
   opacity: 1;
-  transform: translateZ(0) scaleY(1);
+  transform: translateY(-50%) translateZ(0) scaleY(1);
   animation: introBackdropOut 0.3s cubic-bezier(0.87, 0, 0.13, 1) 0.35s both;
 }
 
-.intro-card.exiting .intro-card-title,
-.intro-card.exiting .intro-card-artist,
-.intro-card.exiting .intro-card-meta {
-  opacity: 1;
-  transform: translate3d(0, 0, 0);
-}
-
-.intro-card.exiting .intro-card-title {
+.intro-card.exiting .intro-card-left {
   animation: introTextSlideOutLeft 0.3s cubic-bezier(0.87, 0, 0.13, 1) 0s both;
 }
 
-.intro-card.exiting .intro-card-artist {
+.intro-card.exiting .intro-card-badges {
   animation: introTextSlideOutLeft 0.3s cubic-bezier(0.87, 0, 0.13, 1) 0.04s
     both;
 }
 
-.intro-card.exiting .intro-card-meta {
+.intro-card.exiting .intro-card-divider {
+  animation: fadeOut 0.25s ease 0.04s both;
+}
+
+.intro-card.exiting .intro-card-right {
   animation: introTextSlideOutLeft 0.3s cubic-bezier(0.87, 0, 0.13, 1) 0.08s
     both;
 }
-
 .intro-card-content {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 0.5rem;
-  max-width: 1200px;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1400px;
+  gap: 2.5rem;
+}
+
+.intro-card-left {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 0.4rem;
 }
 
 .intro-card-title {
-  font-size: 5.5rem;
+  font-size: 4.8rem;
   font-weight: 800;
-  letter-spacing: 0.05em;
-  line-height: 1.1;
+  letter-spacing: 0.03em;
+  line-height: 1.05;
+  color: #ffffff;
   text-shadow:
-    0 0 12px rgba(137, 207, 240, 0.45),
-    0 4px 8px rgba(0, 0, 0, 0.8);
-  opacity: 0;
-  will-change: transform, opacity;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
+    0 0 16px rgba(137, 207, 240, 0.5),
+    0 4px 10px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-.intro-card-artist {
-  font-size: 2rem;
-  font-weight: 500;
-  color: #e2e8f0;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 0.25rem 2rem;
-  border-radius: 50px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  margin-top: 0.5rem;
-  opacity: 0;
-  will-change: transform, opacity;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
+.intro-card-meta-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.3rem;
 }
 
-.intro-card-meta {
-  font-size: 1.25rem;
+.intro-meta-row {
+  font-size: 1.55rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.intro-meta-label {
+  color: #ffd700;
   font-weight: 700;
-  color: #f7b733;
-  margin-top: 1rem;
-  letter-spacing: 0.2em;
+  min-width: 75px;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.35);
+}
+
+.intro-meta-value {
+  color: #ffffff;
+  text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.intro-card-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.intro-badge {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.65);
+  border: 2px solid rgba(137, 207, 240, 0.45);
+  box-shadow: 0 0 12px rgba(137, 207, 240, 0.25);
+  border-radius: 50px;
+  padding: 0.4rem 1.8rem;
+  min-width: 130px;
+  text-align: center;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0;
-  will-change: transform, opacity;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
+}
+
+.intro-badge-bpm {
+  color: #89cff0;
+}
+
+.intro-badge-key {
+  color: #ffffff;
+}
+
+.intro-card-divider {
+  width: 2px;
+  height: 120px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(137, 207, 240, 0.4) 20%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(137, 207, 240, 0.4) 80%,
+    transparent 100%
+  );
+  margin: 0 0.5rem;
+  flex-shrink: 0;
+}
+
+.intro-card-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  flex-shrink: 0;
+  padding-left: 0.5rem;
+}
+
+.intro-card-slogan {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 2.1rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #ffffff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
+}
+
+.intro-card-slogan .slogan-gold {
+  color: #ffd700;
+  font-weight: 800;
+  text-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
 }
 
 /* -- Interludes -- */

@@ -413,13 +413,69 @@ export default class PlaybackManager {
       }
 
       dom.introTitle.text(this.truncateTitleIfNeeded(song.title));
-      dom.introArtist.text(song.artist);
-      dom.introCard.classOff("exiting").classOn("visible");
-      dom.lyricsCanvas.styleJs({ opacity: "0" });
+
+      if (dom.introArtist) {
+        dom.introArtist.clear();
+
+        const singer = song.artist || song.singer || "Unknown Artist";
+        const composer = song.composer || song.music;
+        const lyricist = song.lyricist || song.lyrics;
+
+        const artistRow = new Html("div")
+          .classOn("intro-meta-row")
+          .appendTo(dom.introArtist);
+
+        new Html("span")
+          .classOn("intro-meta-label")
+          .text("ARTIST:")
+          .appendTo(artistRow);
+
+        new Html("span")
+          .classOn("intro-meta-value")
+          .text(singer)
+          .appendTo(artistRow);
+
+        if (composer && composer !== singer) {
+          const compRow = new Html("div")
+            .classOn("intro-meta-row")
+            .appendTo(dom.introArtist);
+          new Html("span")
+            .classOn("intro-meta-label")
+            .text("MUSIC:")
+            .appendTo(compRow);
+          new Html("span")
+            .classOn("intro-meta-value")
+            .text(composer)
+            .appendTo(compRow);
+        }
+
+        if (lyricist && lyricist !== singer) {
+          const lyrRow = new Html("div")
+            .classOn("intro-meta-row")
+            .appendTo(dom.introArtist);
+          new Html("span")
+            .classOn("intro-meta-label")
+            .text("LYRICS:")
+            .appendTo(lyrRow);
+          new Html("span")
+            .classOn("intro-meta-value")
+            .text(lyricist)
+            .appendTo(lyrRow);
+        }
+      }
 
       state.currentBpm = pbState.midiInfo
         ? pbState.midiInfo.initialBpm || 120
         : 120;
+      const initialBpm = Math.round(state.currentBpm);
+      const songKey = song.key || pbState.midiInfo?.key || "C";
+
+      if (dom.introBpmBadge) dom.introBpmBadge.text(`${initialBpm} BPM`);
+      if (dom.introKeyBadge) dom.introKeyBadge.text(songKey);
+
+      dom.introCard.classOff("exiting").classOn("visible");
+      dom.lyricsCanvas.styleJs({ opacity: "0" });
+
       this.boundTempoUpdate = (e) => {
         state.currentBpm = e.detail.bpm;
       };

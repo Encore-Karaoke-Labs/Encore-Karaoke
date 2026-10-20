@@ -224,22 +224,22 @@
 @keyframes introBackdropIn {
   0% {
     opacity: 0;
-    transform: translateZ(0) scaleY(0);
+    transform: translateY(-50%) translateZ(0) scaleY(0);
   }
   100% {
     opacity: 1;
-    transform: translateZ(0) scaleY(1);
+    transform: translateY(-50%) translateZ(0) scaleY(1);
   }
 }
 
 @keyframes introBackdropOut {
   0% {
     opacity: 1;
-    transform: translateZ(0) scaleY(1);
+    transform: translateY(-50%) translateZ(0) scaleY(1);
   }
   100% {
     opacity: 0;
-    transform: translateZ(0) scaleY(0);
+    transform: translateY(-50%) translateZ(0) scaleY(0);
   }
 }
 
