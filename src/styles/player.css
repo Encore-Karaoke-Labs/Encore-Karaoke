@@ -619,25 +619,29 @@
 .intro-card-badges {
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
-  align-items: center;
+  gap: 0.75rem;
+  align-items: stretch;
   justify-content: center;
   flex-shrink: 0;
+  width: 165px;
 }
 
 .intro-badge {
-  font-size: 1.45rem;
+  font-size: 1.4rem;
   font-weight: 700;
   color: #ffffff;
   background: rgba(0, 0, 0, 0.65);
   border: 2px solid rgba(137, 207, 240, 0.45);
-  box-shadow: 0 0 12px rgba(137, 207, 240, 0.25);
   border-radius: 50px;
-  padding: 0.4rem 1.8rem;
-  min-width: 130px;
-  text-align: center;
+  padding: 0.4rem 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .intro-badge-bpm {
