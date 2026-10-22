@@ -88,6 +88,7 @@ class EncoreController {
 
       isScoreFanfareEnabled: config.audioConfig?.enableScoreFanfare ?? true,
       isScoreNarrationEnabled: config.audioConfig?.enableScoreNarration ?? true,
+      isScoreHudEnabled: config.audioConfig?.enableScoreHud ?? true,
       isNavSfxEnabled: config.audioConfig?.enableNavSfx ?? true,
       isNumberSfxEnabled: config.audioConfig?.enableNumberSfx ?? true,
       isScoreScreenActive: false,

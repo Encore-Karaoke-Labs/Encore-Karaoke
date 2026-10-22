@@ -775,6 +775,22 @@ export default class SetupManager {
                 },
               },
               {
+                id: "enable_score_hud",
+                label: "Display Live Score",
+                type: "select",
+                options: [
+                  { value: false, label: "No" },
+                  { value: true, label: "Yes" },
+                ],
+                get: () => this.ctx.config.audioConfig?.enableScoreHud ?? true,
+                set: (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.enableScoreHud = v;
+                  this.ctx.state.isScoreHudEnabled = v;
+                  window.config.setItem("audioConfig.enableScoreHud", v);
+                },
+              },
+              {
                 id: "guide_channel",
                 label: "Guide Melody Channel",
                 type: "select",

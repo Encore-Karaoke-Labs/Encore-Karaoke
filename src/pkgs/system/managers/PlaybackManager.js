@@ -404,10 +404,12 @@ export default class PlaybackManager {
       }
 
       if (!state.currentSongIsYouTube) {
-        if (
+        const isScoringActive =
           this.ctx.config.audioConfig?.enableScoring !== false ||
-          state.isSessionActive
-        ) {
+          state.isSessionActive;
+        const isHudVisible = state.isScoreHudEnabled ?? true;
+
+        if (isScoringActive && isHudVisible) {
           modules.scoreHud.show(0);
         }
       }
@@ -564,8 +566,11 @@ export default class PlaybackManager {
         (this.ctx.config.audioConfig?.enableScoring !== false ||
           state.isSessionActive)
       ) {
-        this.boundScoreUpdate = (e) =>
-          modules.scoreHud.show(e.detail.finalScore);
+        this.boundScoreUpdate = (e) => {
+          if (state.isScoreHudEnabled ?? true) {
+            modules.scoreHud.show(e.detail.finalScore);
+          }
+        };
         document.addEventListener(
           "Encore.Forte.Scoring.Update",
           this.boundScoreUpdate,
