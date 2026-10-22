@@ -22,7 +22,7 @@ export class InfoBarModule {
 
     this.cycleInterval = null;
     this.currentCycleView = "UP_NEXT"; // "UP_NEXT" | "NOW_PLAYING"
-    this.cycleDuration = 5000; // Time in ms between views
+    this.cycleDuration = 10000; // Time in ms between views
     this._isInternalCycleUpdate = false;
   }
 
