@@ -1541,11 +1541,30 @@ export class FortePlayback {
 
         leftGain.connect(monoMixer);
         rightGain.connect(monoMixer);
-        monoMixer.connect(this.audioCore.masterGain);
+
+        if (!this.audioPitchNode) {
+          this.audioPitchNode = new AudioWorkletNode(
+            this.audioCore.context,
+            "pitch-shifter-processor",
+          );
+          this.audioPitchNode.connect(this.audioCore.masterGain);
+        }
+
+        const currentTranspose = this.state.playback.transpose || 0;
+        const initialPitchFactor = Math.pow(2, currentTranspose / 12);
+        this.audioPitchNode.parameters
+          .get("pitchFactor")
+          .setValueAtTime(
+            initialPitchFactor,
+            this.audioCore.context.currentTime,
+          );
+
+        monoMixer.connect(this.audioPitchNode);
 
         if (this.state.recording.trackDelayNode) {
-          splitter.connect(this.state.recording.trackDelayNode, 0);
+          this.audioPitchNode.connect(this.state.recording.trackDelayNode);
         }
+
         this.setMultiplexPan(this.state.playback.multiplexPan);
       } else {
         if (!this.audioPitchNode) {

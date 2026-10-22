@@ -247,7 +247,10 @@ export class ForteScoring {
         isGuideNoteActive =
           guideClarity >= GUIDE_CLARITY_THRESHOLD && guidePitch > 50;
         if (isGuideNoteActive) {
-          targetMidiPitch = 12 * Math.log2(guidePitch / 440) + 69;
+          targetMidiPitch =
+            12 * Math.log2(guidePitch / 440) +
+            69 +
+            this.state.playback.transpose;
         }
       }
 
