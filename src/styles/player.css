@@ -838,16 +838,35 @@
 }
 
 .info-bar-label {
-  flex: 0 0 160px;
+  flex: 0 0 170px;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
   background: rgba(0, 0, 0, 0.3);
   font-size: 1.2rem;
   font-weight: 700;
   color: #ffd700;
-  letter-spacing: 0.1rem;
+  letter-spacing: 0.08rem;
   border-right: 1px solid rgba(255, 255, 255, 0.2);
+  user-select: none;
+}
+
+.info-bar-label-icon {
+  font-size: 1.35rem;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffd700;
+  filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.3));
+  transform: translateY(-0.5px);
+}
+
+.info-bar-label-text {
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .info-bar-content {

@@ -1,5 +1,44 @@
 import Html from "../libs/html.js";
 
+export const DEFAULT_INFO_BAR_ICON = "information-circle";
+
+/**
+ * IonIcon name mapping for standard Encore InfoBar message labels.
+ */
+export const INFO_BAR_LABEL_ICONS = {
+  // Playback & Queue
+  CURRENT: "musical-notes-outline",
+  "UP NEXT": "play-forward",
+  PAUSED: "pause",
+  PAUSE: "pause",
+  "AUTO SKIP": "play-skip-forward",
+  EXTENDED: "time",
+
+  // Audio, Sound Engine & Balance
+  VOLUME: "volume-high",
+  "MIC VOLUME": "mic",
+  TRANSPOSE: "swap-vertical",
+  BALANCE: "git-compare",
+  CHORUS: "people",
+  MELODY: "musical-notes",
+  RHYTHM: "pulse-outline",
+
+  // Visuals & Video
+  BGV: "videocam",
+  "VIDEO SYNC": "sync",
+  LYRICS: "text",
+  FULLSCREEN: "scan",
+
+  // Sessions, Recordings & Operations
+  RECORDING: "radio-button-on",
+  RESERVING: "bookmark",
+  QUEUE: "list",
+  SESSIONS: "people-circle",
+  SETUP: "settings",
+  UPDATE: "cloud-download",
+  ERROR: "alert-circle",
+};
+
 /**
  * InfoBar module for displaying song information, playback state, and recording status
  */
@@ -18,12 +57,44 @@ export class InfoBarModule {
     this.contentEl = null;
     this.timeout = null;
     this.isTempVisible = false;
-    this.persistentState = { label: "", content: "" };
+    this.persistentState = { label: "", content: "", icon: null };
+    this.defaultIcon = DEFAULT_INFO_BAR_ICON;
 
     this.cycleInterval = null;
     this.currentCycleView = "UP_NEXT"; // "UP_NEXT" | "NOW_PLAYING"
     this.cycleDuration = 10000; // Time in ms between views
     this._isInternalCycleUpdate = false;
+  }
+
+  /**
+   * Resolves the appropriate IonIcon name for a given label.
+   * @param {string} label - The message label
+   * @param {string|null} customIcon - Optional explicit icon override
+   * @returns {string} - IonIcon name
+   */
+  resolveIcon(label, customIcon = null) {
+    if (customIcon) return customIcon;
+    if (!label) return this.defaultIcon;
+    const normalizedKey = String(label).trim().toUpperCase();
+    return INFO_BAR_LABEL_ICONS[normalizedKey] || this.defaultIcon;
+  }
+
+  /**
+   * Updates the label DOM element with an icon and label text.
+   * @param {string} label - The label string to display
+   * @param {string|null} customIcon - Optional custom icon
+   */
+  renderLabel(label, customIcon = null) {
+    if (!this.labelEl) return;
+    if (!label && label !== 0) {
+      this.labelEl.html("");
+      return;
+    }
+
+    const iconName = this.resolveIcon(label, customIcon);
+    this.labelEl.html(
+      `<ion-icon class="info-bar-label-icon" name="${iconName}"></ion-icon><span class="info-bar-label-text">${label}</span>`,
+    );
   }
 
   /**
@@ -42,14 +113,15 @@ export class InfoBarModule {
    * Display persistent information in the InfoBar.
    * @param {string} label - The label to display
    * @param {string} content - The HTML content to display
+   * @param {string|null} [icon=null] - Optional IonIcon name override
    */
-  show(label, content) {
+  show(label, content, icon = null) {
     if (!this._isInternalCycleUpdate) {
       this.stopCycle();
     }
-    this.persistentState = { label, content };
+    this.persistentState = { label, content, icon };
     if (!this.isTempVisible && this.labelEl && this.contentEl) {
-      this.labelEl.text(label);
+      this.renderLabel(label, icon);
       this.contentEl.html(content);
     }
   }
@@ -59,17 +131,18 @@ export class InfoBarModule {
    * @param {string} label - The label to display
    * @param {string} content - The HTML content to display
    * @param {number} duration - Duration in milliseconds before auto-dismissing
+   * @param {string|null} [icon=null] - Optional IonIcon name override
    */
-  showTemp(label, content, duration) {
+  showTemp(label, content, duration, icon = null) {
     if (this.timeout) clearTimeout(this.timeout);
     this.isTempVisible = true;
-    this.labelEl.text(label);
+    this.renderLabel(label, icon);
     this.contentEl.html(content);
     this.bar.classOn("temp-visible");
     this.timeout = setTimeout(() => {
       this.isTempVisible = false;
       this.timeout = null;
-      this.labelEl.text(this.persistentState.label);
+      this.renderLabel(this.persistentState.label, this.persistentState.icon);
       this.contentEl.html(this.persistentState.content);
       this.bar.classOff("temp-visible");
     }, duration);
