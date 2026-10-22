@@ -666,6 +666,7 @@ export default class PlaybackManager {
     const dom = this.ctx.dom;
     const modules = this.ctx.modules;
 
+    modules.infoBar?.stopCycle?.();
     state.currentSong = null;
     this.ctx.root.syncSetlistOverlay?.();
 
