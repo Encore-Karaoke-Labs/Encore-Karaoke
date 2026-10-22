@@ -155,13 +155,42 @@ class EncoreController {
     this.scoreHud = new ScoreHUDModule();
 
     this.infoBar = new InfoBarModule(
-      () => ({
-        reservationQueue:
-          this.state.isSessionActive && this.services.SessionsSvc
-            ? this.services.SessionsSvc.state.queue
-            : this.state.reservationQueue,
-        songMap: this.state.songMap,
-      }),
+      () => {
+        const isSession = Boolean(
+          this.state.isSessionActive && this.services.SessionsSvc,
+        );
+        const sessionState = isSession ? this.services.SessionsSvc.state : null;
+
+        let currentSong = null;
+        if (!this.state.isScoreScreenActive) {
+          if (isSession) {
+            if (sessionState?.mode === "performance") {
+              currentSong =
+                sessionState.nowPlaying || this.state.currentSong || null;
+            }
+          } else if (this.state.currentSong) {
+            currentSong = this.state.currentSong;
+          }
+        }
+
+        if (currentSong && currentSong.code && this.state.songMap) {
+          const localMatch =
+            this.state.songMap.get(Number(currentSong.code)) ||
+            this.state.songMap.get(String(currentSong.code));
+          if (localMatch) {
+            currentSong = { ...localMatch, ...currentSong };
+          }
+        }
+
+        return {
+          currentSong,
+          reservationQueue: isSession
+            ? sessionState?.queue || []
+            : this.state.reservationQueue || [],
+          songMap: this.state.songMap,
+          mode: this.state.mode,
+        };
+      },
       () =>
         this.recorder?.isRecording && this.recorder?.mediaRecorder
           ? `REC <span style="color: #ff5555">●</span> ${this.recorder.getRecordingTimeString()}`
@@ -581,6 +610,7 @@ class EncoreController {
     if (this.recorder.isRecording) this.recorder.stop();
     this.bgv.stop();
     this.services.Forte.stopTrack();
+    this.infoBar?.destroy?.();
     this.context.wrapper.cleanup();
   }
 }
