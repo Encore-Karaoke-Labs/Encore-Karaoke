@@ -103,7 +103,7 @@ export default class SessionManager {
 
     if (state.isSessionActive && state.sessionRoomId === roomCode) {
       this.ctx.modules.infoBar.showTemp(
-        "SESSION",
+        "SESSIONS",
         "Already connected to this Session.",
         3000,
       );
@@ -112,7 +112,7 @@ export default class SessionManager {
 
     if (state.isSessionActive) {
       this.ctx.modules.infoBar.showTemp(
-        "SESSION",
+        "SESSIONS",
         "Already connected to a Session.",
         3000,
       );
