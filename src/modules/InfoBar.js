@@ -97,8 +97,6 @@ export class InfoBarModule {
     const { reservationQueue } = this.getState();
     if (reservationQueue.length > 0) {
       const nextSong = reservationQueue[0];
-      const extra =
-        reservationQueue.length > 1 ? ` (+${reservationQueue.length - 1})` : "";
       const codeSpan = nextSong.code
         ? `<span class="info-bar-code">${String(nextSong.code).padStart(6, "0")}</span>`
         : `<span class="info-bar-code is-youtube">YT</span>`;
@@ -109,9 +107,48 @@ export class InfoBarModule {
         fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
       }
 
+      const upcomingSongs = reservationQueue.slice(1);
+      let upcomingHtml = "";
+
+      if (upcomingSongs.length > 0) {
+        const MAX_UPCOMING = 5;
+        const displaySongs = upcomingSongs.slice(0, MAX_UPCOMING);
+        const remainingCount = upcomingSongs.length - displaySongs.length;
+
+        const codeBadges = displaySongs
+          .map((s) => {
+            const isYt =
+              !s.code ||
+              (typeof s.path === "string" && s.path.startsWith("yt://"));
+            const codeText = s.code ? String(s.code).padStart(6, "0") : "YT";
+            const ytClass = isYt ? " is-youtube" : "";
+            const safeTitle =
+              `${s.title || "Unknown"} - ${s.artist || "Unknown"}`.replace(
+                /"/g,
+                "&quot;",
+              );
+            return `<span class="info-bar-upcoming-code${ytClass}" title="${safeTitle}">${codeText}</span>`;
+          })
+          .join("");
+
+        const moreBadge =
+          remainingCount > 0
+            ? `<span class="info-bar-upcoming-more">+${remainingCount}</span>`
+            : "";
+
+        upcomingHtml = `
+          <div class="info-bar-upcoming">
+            <div class="info-bar-upcoming-list">
+              ${codeBadges}
+              ${moreBadge}
+            </div>
+          </div>
+        `;
+      }
+
       this.show(
         "UP NEXT",
-        `${codeSpan} ${fmtBadge} <span class="info-bar-title">${nextSong.title}</span> <span class="info-bar-artist">- ${nextSong.artist}${extra}</span>`,
+        `<div class="info-bar-current">${codeSpan} ${fmtBadge} <span class="info-bar-title">${nextSong.title}</span> <span class="info-bar-artist">- ${nextSong.artist}</span></div>${upcomingHtml}`,
       );
       this.showBar();
     } else {

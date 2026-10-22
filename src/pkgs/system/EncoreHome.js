@@ -110,6 +110,9 @@ class EncoreController {
       queueMicrotask(() => {
         this._isSetlistSyncQueued = false;
         this.syncSetlistOverlay();
+        if (this.state.mode === "player") {
+          this.infoBar?.showDefault();
+        }
       });
     };
 
