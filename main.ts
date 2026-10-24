@@ -1218,8 +1218,15 @@ function popOutAppView(): void {
   popoutWindow.on("resize", updatePopoutBounds);
   popoutWindow.on("maximize", updatePopoutBounds);
   popoutWindow.on("unmaximize", updatePopoutBounds);
-  popoutWindow.on("enter-full-screen", updatePopoutBounds);
-  popoutWindow.on("leave-full-screen", updatePopoutBounds);
+  popoutWindow.on("enter-full-screen", () => {
+    updatePopoutBounds();
+    targetAppView.webContents.send("fullscreen-state-changed", true);
+  });
+
+  popoutWindow.on("leave-full-screen", () => {
+    updatePopoutBounds();
+    targetAppView.webContents.send("fullscreen-state-changed", false);
+  });
   updatePopoutBounds();
 
   if (!controlView) {
