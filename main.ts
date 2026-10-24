@@ -1378,11 +1378,22 @@ const createWindow = (): void => {
   localAppView.webContents.setZoomFactor(zoomFactor as number);
 
   const reloadPage = (): void => {
-    if (!kioskEnabled) localAppView.webContents.reload();
+    if (!kioskEnabled) {
+      if (isPoppedOut) {
+        controlView?.webContents.reload();
+      } else {
+        localAppView.webContents.reload();
+      }
+    }
   };
 
   win.on("focus", () => {
-    localAppView.webContents.focus();
+    if (isPoppedOut) {
+      controlView?.webContents.focus();
+    } else {
+      localAppView.webContents.focus();
+    }
+
     globalShortcut.register("CommandOrControl+0", resetZoom);
     globalShortcut.register("CommandOrControl+plus", addZoom);
     globalShortcut.register("CommandOrControl+=", addZoom);
