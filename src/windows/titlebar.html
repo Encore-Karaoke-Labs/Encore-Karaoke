@@ -402,6 +402,21 @@
           npSeparator.style.display = "none";
         }
       });
+
+      function togglePopout() {
+        window.desktopIntegration.ipc.send("popout-toggle");
+      }
+
+      const popoutBtn = document.getElementById("popout-btn");
+      window.desktopIntegration.ipc.on(
+        "popout-state-changed",
+        (_event, isPoppedOut) => {
+          if (popoutBtn) {
+            popoutBtn.innerText = isPoppedOut ? "DOCK" : "POPOUT";
+            popoutBtn.classList.toggle("active", isPoppedOut);
+          }
+        },
+      );
     </script>
   </body>
 </html>
