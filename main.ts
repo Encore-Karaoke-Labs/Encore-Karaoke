@@ -1458,9 +1458,16 @@ const createWindow = (): void => {
         }
         event.preventDefault();
       }
+
       if (input.key === "F11") {
         if (!kioskEnabled) {
-          win.setFullScreen(!win.isFullScreen());
+          const targetWin =
+            BrowserWindow.getFocusedWindow() ??
+            (isPoppedOut ? popoutWindow : win);
+
+          if (targetWin && !targetWin.isDestroyed()) {
+            targetWin.setFullScreen(!targetWin.isFullScreen());
+          }
         }
         event.preventDefault();
       }
