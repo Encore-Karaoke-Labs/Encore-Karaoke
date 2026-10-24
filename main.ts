@@ -270,6 +270,13 @@ let appViewWebContents: WebContents | null = null;
 let libraryManagerWin: BrowserWindow | null = null;
 let isSongbookBuildActive = false;
 
+let mainWindow: BrowserWindow | null = null;
+let appView: WebContentsView | null = null;
+let controlView: WebContentsView | null = null;
+let popoutWindow: BrowserWindow | null = null;
+let isPoppedOut = false;
+let updateMainWindowBounds: () => void = () => {};
+
 let ffmpegStreamProcess: ChildProcess | null = null;
 let streamHeaderChunk: Buffer | null = null;
 
@@ -1170,6 +1177,104 @@ const reduceZoom = (): number => {
   return zoomFactor as number;
 };
 
+function popOutAppView(): void {
+  if (isPoppedOut || !mainWindow || !appView) return;
+
+  const targetAppView = appView;
+  isPoppedOut = true;
+
+  mainWindow.contentView.removeChildView(targetAppView);
+
+  popoutWindow = new BrowserWindow({
+    title: "Encore Karaoke - Screen Display",
+    width: 1280,
+    height: 720,
+    backgroundColor: "#000000",
+    autoHideMenuBar: true,
+    ...(process.platform === "win32"
+      ? { icon: path.join(__dirname, "resources/icon.ico") }
+      : process.platform === "linux"
+        ? { icon: path.join(__dirname, "resources/icon.png") }
+        : {}),
+    webPreferences: {
+      spellcheck: false,
+      backgroundThrottling: false,
+    },
+  });
+
+  popoutWindow.contentView.addChildView(targetAppView);
+
+  const updatePopoutBounds = (): void => {
+    if (!popoutWindow || popoutWindow.isDestroyed()) return;
+    const bounds = popoutWindow.getContentBounds();
+    targetAppView.setBounds({
+      x: 0,
+      y: 0,
+      width: bounds.width,
+      height: bounds.height,
+    });
+  };
+
+  popoutWindow.on("resize", updatePopoutBounds);
+  popoutWindow.on("maximize", updatePopoutBounds);
+  popoutWindow.on("unmaximize", updatePopoutBounds);
+  popoutWindow.on("enter-full-screen", updatePopoutBounds);
+  popoutWindow.on("leave-full-screen", updatePopoutBounds);
+  updatePopoutBounds();
+
+  if (!controlView) {
+    controlView = new WebContentsView({
+      webPreferences: {
+        spellcheck: false,
+        backgroundThrottling: false,
+      },
+    });
+  }
+  mainWindow.contentView.addChildView(controlView);
+  updateMainWindowBounds();
+  void controlView.webContents.loadURL("https://example.com");
+
+  popoutWindow.on("closed", () => {
+    popoutWindow = null;
+    if (isPoppedOut) {
+      dockBackAppView();
+    }
+  });
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("popout-state-changed", true);
+  }
+  logger.info(
+    "POPOUT",
+    "Encore UI reparented to secondary window. Main window loaded example.com.",
+  );
+}
+
+function dockBackAppView(): void {
+  if (!isPoppedOut || !mainWindow || !appView) return;
+
+  const targetAppView = appView;
+  isPoppedOut = false;
+
+  if (popoutWindow && !popoutWindow.isDestroyed()) {
+    popoutWindow.contentView.removeChildView(targetAppView);
+    popoutWindow.close();
+    popoutWindow = null;
+  }
+
+  if (controlView) {
+    mainWindow.contentView.removeChildView(controlView);
+  }
+
+  mainWindow.contentView.addChildView(targetAppView);
+  updateMainWindowBounds();
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("popout-state-changed", false);
+  }
+  logger.info("POPOUT", "Encore UI docked back to main window.");
+}
+
 // Main App Startup
 const createWindow = (): void => {
   const shouldStartFullscreen = getBooleanSetting(
@@ -1196,7 +1301,10 @@ const createWindow = (): void => {
     },
   });
 
-  const appView = new WebContentsView({
+  mainWindow = win;
+
+  // Local const avoids any "possibly null" errors inside createWindow
+  const localAppView = new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       spellcheck: false,
@@ -1204,10 +1312,12 @@ const createWindow = (): void => {
     },
   });
 
-  win.contentView.addChildView(appView);
-  appViewWebContents = appView.webContents;
+  appView = localAppView;
+  appViewWebContents = localAppView.webContents;
 
-  appView.webContents.on(
+  win.contentView.addChildView(localAppView);
+
+  localAppView.webContents.on(
     "did-start-navigation",
     (_event, _url, _isInPlace, isMainFrame) => {
       if (isMainFrame) {
@@ -1216,21 +1326,24 @@ const createWindow = (): void => {
     },
   );
 
-  const updateBounds = (): void => {
+  updateMainWindowBounds = (): void => {
+    if (!win || win.isDestroyed()) return;
     const bounds = win.getContentBounds();
     if (bounds.width === 0 || bounds.height === 0) return;
 
     const isFullScreen = win.isFullScreen() || win.isKiosk();
+    const currentActiveView = isPoppedOut ? controlView : localAppView;
+    if (!currentActiveView) return;
 
     if (isFullScreen) {
-      appView.setBounds({
+      currentActiveView.setBounds({
         x: 0,
         y: 0,
         width: bounds.width,
         height: bounds.height,
       });
     } else {
-      appView.setBounds({
+      currentActiveView.setBounds({
         x: 0,
         y: titleBarHeight,
         width: bounds.width,
@@ -1239,20 +1352,20 @@ const createWindow = (): void => {
     }
   };
 
-  win.on("resize", updateBounds);
-  win.on("maximize", updateBounds);
+  win.on("resize", updateMainWindowBounds);
+  win.on("maximize", updateMainWindowBounds);
   win.on("enter-full-screen", () => {
-    updateBounds();
-    appView.webContents.send("fullscreen-state-changed", true);
+    updateMainWindowBounds();
+    localAppView.webContents.send("fullscreen-state-changed", true);
   });
 
   win.on("leave-full-screen", () => {
-    updateBounds();
-    appView.webContents.send("fullscreen-state-changed", false);
+    updateMainWindowBounds();
+    localAppView.webContents.send("fullscreen-state-changed", false);
   });
-  win.on("restore", () => setTimeout(updateBounds, 50));
-  win.on("show", () => setTimeout(updateBounds, 50));
-  updateBounds();
+  win.on("restore", () => setTimeout(updateMainWindowBounds, 50));
+  win.on("show", () => setTimeout(updateMainWindowBounds, 50));
+  updateMainWindowBounds();
 
   if (shouldStartFullscreen && !kioskEnabled) {
     win.setFullScreen(true);
@@ -1261,15 +1374,15 @@ const createWindow = (): void => {
   void win.loadURL(
     `file://${__dirname}/resources/titlebar.html?platform=${process.platform}`,
   );
-  void appView.webContents.loadURL(`http://127.0.0.1:${PORT}/index.html`);
-  appView.webContents.setZoomFactor(zoomFactor as number);
+  void localAppView.webContents.loadURL(`http://127.0.0.1:${PORT}/index.html`);
+  localAppView.webContents.setZoomFactor(zoomFactor as number);
 
   const reloadPage = (): void => {
-    if (!kioskEnabled) appView.webContents.reload();
+    if (!kioskEnabled) localAppView.webContents.reload();
   };
 
   win.on("focus", () => {
-    appView.webContents.focus();
+    localAppView.webContents.focus();
     globalShortcut.register("CommandOrControl+0", resetZoom);
     globalShortcut.register("CommandOrControl+plus", addZoom);
     globalShortcut.register("CommandOrControl+=", addZoom);
@@ -1304,9 +1417,9 @@ const createWindow = (): void => {
     }
   }
 
-  appView.webContents.on("devtools-opened", () => {
+  localAppView.webContents.on("devtools-opened", () => {
     const css = `:root { --sys-color-base: var(--ref-palette-neutral100); } .-theme-with-dark-background { --sys-color-base: var(--ref-palette-secondary25); } body { --default-font-family: system-ui,sans-serif; }`;
-    void appView.webContents.devToolsWebContents?.executeJavaScript(
+    void localAppView.webContents.devToolsWebContents?.executeJavaScript(
       `const s = document.createElement('style'); s.innerHTML = '${css.replaceAll("\n", " ")}'; document.body.append(s); document.body.classList.remove('platform-windows');`,
     );
   });
@@ -1327,10 +1440,10 @@ const createWindow = (): void => {
           event.preventDefault();
           return;
         }
-        if (appView.webContents.isDevToolsOpened()) {
-          appView.webContents.closeDevTools();
+        if (localAppView.webContents.isDevToolsOpened()) {
+          localAppView.webContents.closeDevTools();
         } else {
-          appView.webContents.openDevTools({ mode: "detach" });
+          localAppView.webContents.openDevTools({ mode: "detach" });
         }
         event.preventDefault();
       }
@@ -1344,7 +1457,7 @@ const createWindow = (): void => {
   };
 
   win.webContents.on("before-input-event", handleSpecialKeys);
-  appView.webContents.on("before-input-event", handleSpecialKeys);
+  localAppView.webContents.on("before-input-event", handleSpecialKeys);
 };
 
 if (isLowLatency) {
@@ -1452,6 +1565,16 @@ void app.whenReady().then(() => {
     });
   });
 
+  ipcMain.on("popout-toggle", () => {
+    if (isPoppedOut) {
+      dockBackAppView();
+    } else {
+      popOutAppView();
+    }
+  });
+
+  ipcMain.handle("popout-get-status", () => isPoppedOut);
+
   ipcMain.on(
     "overlay-lyrics-update",
     (_event: IpcMainEvent, payload: unknown) => {
@@ -1550,14 +1673,9 @@ void app.whenReady().then(() => {
     });
   });
 
-  ipcMain.on("simulate-key", (event: IpcMainEvent, keyChar: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-
-    const view = win.contentView.children[0] as WebContentsView | undefined;
-
-    if (view) {
-      view.webContents
+  ipcMain.on("simulate-key", (_event: IpcMainEvent, keyChar: string) => {
+    if (appViewWebContents && !appViewWebContents.isDestroyed()) {
+      appViewWebContents
         .executeJavaScript(
           `
       if (document.activeElement) document.activeElement.blur();
