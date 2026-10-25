@@ -275,6 +275,7 @@ let appView: WebContentsView | null = null;
 let controlView: WebContentsView | null = null;
 let popoutWindow: BrowserWindow | null = null;
 let isPoppedOut = false;
+let isAppQuitting = false;
 let updateMainWindowBounds: () => void = () => {};
 
 let ffmpegStreamProcess: ChildProcess | null = null;
@@ -1243,8 +1244,15 @@ function popOutAppView(): void {
 
   popoutWindow.on("closed", () => {
     popoutWindow = null;
-    if (isPoppedOut) {
+    if (
+      isPoppedOut &&
+      !isAppQuitting &&
+      mainWindow &&
+      !mainWindow.isDestroyed()
+    ) {
       dockBackAppView();
+    } else {
+      isPoppedOut = false;
     }
   });
 
@@ -1258,27 +1266,39 @@ function popOutAppView(): void {
 }
 
 function dockBackAppView(): void {
-  if (!isPoppedOut || !mainWindow || !appView) return;
+  if (isAppQuitting || !mainWindow || mainWindow.isDestroyed()) {
+    isPoppedOut = false;
+    popoutWindow = null;
+    return;
+  }
+
+  if (!isPoppedOut || !appView) return;
 
   const targetAppView = appView;
   isPoppedOut = false;
 
   if (popoutWindow && !popoutWindow.isDestroyed()) {
-    popoutWindow.contentView.removeChildView(targetAppView);
-    popoutWindow.close();
+    try {
+      popoutWindow.contentView.removeChildView(targetAppView);
+      popoutWindow.close();
+    } catch {}
     popoutWindow = null;
   }
 
-  if (controlView) {
-    mainWindow.contentView.removeChildView(controlView);
+  if (controlView && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.contentView.removeChildView(controlView);
+    } catch {}
   }
 
-  mainWindow.contentView.addChildView(targetAppView);
-  updateMainWindowBounds();
-
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("popout-state-changed", false);
+  if (!mainWindow.isDestroyed()) {
+    try {
+      mainWindow.contentView.addChildView(targetAppView);
+      updateMainWindowBounds();
+      mainWindow.webContents.send("popout-state-changed", false);
+    } catch {}
   }
+
   logger.info("POPOUT", "Encore UI docked back to main window.");
 }
 
@@ -1310,7 +1330,14 @@ const createWindow = (): void => {
 
   mainWindow = win;
 
-  // Local const avoids any "possibly null" errors inside createWindow
+  win.on("closed", () => {
+    mainWindow = null;
+    if (popoutWindow && !popoutWindow.isDestroyed()) {
+      popoutWindow.close();
+      popoutWindow = null;
+    }
+  });
+
   const localAppView = new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -3365,6 +3392,7 @@ void app.whenReady().then(() => {
 });
 
 app.on("before-quit", () => {
+  isAppQuitting = true;
   clearInterval(overlayHeartbeat);
   if (kioskEnabled && process.platform === "win32") {
     exec("explorer.exe", (error) => {
