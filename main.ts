@@ -1288,10 +1288,7 @@ function popOutAppView(): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("popout-state-changed", true);
   }
-  logger.info(
-    "POPOUT",
-    "Encore UI reparented to secondary window. Main window loaded example.com.",
-  );
+  logger.info("POPOUT", "Encore popped out to secondary window.");
 }
 
 function dockBackAppView(): void {
@@ -1329,7 +1326,7 @@ function dockBackAppView(): void {
     } catch {}
   }
 
-  logger.info("POPOUT", "Encore UI docked back to main window.");
+  logger.info("POPOUT", "Encore docked back to main window.");
 }
 
 // Main App Startup
