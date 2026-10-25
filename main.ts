@@ -1183,15 +1183,23 @@ function popOutAppView(): void {
 
   const targetAppView = appView;
   isPoppedOut = true;
+  Config.setItem("popoutEnabled", true);
 
   mainWindow.contentView.removeChildView(targetAppView);
 
+  const savedBounds = Config.getItem("popoutBounds") as
+    { x: number; y: number; width: number; height: number } | undefined;
+  const savedFullscreen = getBooleanSetting(Config.getItem("popoutFullscreen"));
+
   popoutWindow = new BrowserWindow({
     title: "Encore Karaoke - Screen Display",
-    width: 1280,
-    height: 720,
+    x: savedBounds?.x,
+    y: savedBounds?.y,
+    width: savedBounds?.width ?? 1280,
+    height: savedBounds?.height ?? 720,
     backgroundColor: "#000000",
     autoHideMenuBar: true,
+    alwaysOnTop: false,
     ...(process.platform === "win32"
       ? { icon: path.join(__dirname, "resources/icon.ico") }
       : process.platform === "linux"
@@ -1216,19 +1224,40 @@ function popOutAppView(): void {
     });
   };
 
-  popoutWindow.on("resize", updatePopoutBounds);
+  const savePopoutWindowState = (): void => {
+    if (!popoutWindow || popoutWindow.isDestroyed()) return;
+    const isFS = popoutWindow.isFullScreen();
+    Config.setItem("popoutFullscreen", isFS);
+    if (!isFS) {
+      Config.setItem("popoutBounds", popoutWindow.getBounds());
+    }
+  };
+
+  popoutWindow.on("resize", () => {
+    updatePopoutBounds();
+    savePopoutWindowState();
+  });
+  popoutWindow.on("move", savePopoutWindowState);
   popoutWindow.on("maximize", updatePopoutBounds);
   popoutWindow.on("unmaximize", updatePopoutBounds);
+
   popoutWindow.on("enter-full-screen", () => {
     updatePopoutBounds();
+    savePopoutWindowState();
     targetAppView.webContents.send("fullscreen-state-changed", true);
   });
 
   popoutWindow.on("leave-full-screen", () => {
     updatePopoutBounds();
+    savePopoutWindowState();
     targetAppView.webContents.send("fullscreen-state-changed", false);
   });
+
   updatePopoutBounds();
+
+  if (savedFullscreen) {
+    popoutWindow.setFullScreen(true);
+  }
 
   if (!controlView) {
     controlView = new WebContentsView({
@@ -1276,6 +1305,7 @@ function dockBackAppView(): void {
 
   const targetAppView = appView;
   isPoppedOut = false;
+  Config.setItem("popoutEnabled", false);
 
   if (popoutWindow && !popoutWindow.isDestroyed()) {
     try {
@@ -1400,6 +1430,17 @@ const createWindow = (): void => {
   win.on("restore", () => setTimeout(updateMainWindowBounds, 50));
   win.on("show", () => setTimeout(updateMainWindowBounds, 50));
   updateMainWindowBounds();
+
+  win.webContents.on("did-finish-load", () => {
+    win.webContents.send("popout-state-changed", isPoppedOut);
+  });
+
+  const shouldStartPoppedOut = getBooleanSetting(
+    Config.getItem("popoutEnabled"),
+  );
+  if (shouldStartPoppedOut && !kioskEnabled) {
+    popOutAppView();
+  }
 
   if (shouldStartFullscreen && !kioskEnabled) {
     win.setFullScreen(true);

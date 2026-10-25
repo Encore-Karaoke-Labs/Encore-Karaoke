@@ -408,6 +408,16 @@
       }
 
       const popoutBtn = document.getElementById("popout-btn");
+
+      window.desktopIntegration.ipc
+        .invoke("popout-get-status")
+        .then((isPoppedOut) => {
+          if (popoutBtn && isPoppedOut) {
+            popoutBtn.innerText = "DOCK";
+            popoutBtn.classList.add("active");
+          }
+        });
+
       window.desktopIntegration.ipc.on(
         "popout-state-changed",
         (_event, isPoppedOut) => {
