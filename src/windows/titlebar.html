@@ -413,7 +413,7 @@
         .invoke("popout-get-status")
         .then((isPoppedOut) => {
           if (popoutBtn && isPoppedOut) {
-            popoutBtn.innerText = "DOCK";
+            popoutBtn.innerText = "RESTORE";
             popoutBtn.classList.add("active");
           }
         });
@@ -422,7 +422,7 @@
         "popout-state-changed",
         (_event, isPoppedOut) => {
           if (popoutBtn) {
-            popoutBtn.innerText = isPoppedOut ? "DOCK" : "POP OUT";
+            popoutBtn.innerText = isPoppedOut ? "RESTORE" : "POP OUT";
             popoutBtn.classList.toggle("active", isPoppedOut);
           }
         },
