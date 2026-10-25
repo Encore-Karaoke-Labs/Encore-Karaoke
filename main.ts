@@ -1269,7 +1269,7 @@ function popOutAppView(): void {
   }
   mainWindow.contentView.addChildView(controlView);
   updateMainWindowBounds();
-  void controlView.webContents.loadURL("https://example.com");
+  void controlView.webContents.loadURL(`http://127.0.0.1:${PORT}/remote`);
 
   popoutWindow.on("closed", () => {
     popoutWindow = null;
