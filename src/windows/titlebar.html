@@ -315,7 +315,7 @@
           class="popout-btn"
           title="Pop out karaoke screen"
         >
-          POPOUT
+          POP OUT
         </button>
         <button
           tabindex="-1"
@@ -422,7 +422,7 @@
         "popout-state-changed",
         (_event, isPoppedOut) => {
           if (popoutBtn) {
-            popoutBtn.innerText = isPoppedOut ? "DOCK" : "POPOUT";
+            popoutBtn.innerText = isPoppedOut ? "DOCK" : "POP OUT";
             popoutBtn.classList.toggle("active", isPoppedOut);
           }
         },
