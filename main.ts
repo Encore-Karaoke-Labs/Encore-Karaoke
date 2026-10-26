@@ -274,6 +274,7 @@ let mainWindow: BrowserWindow | null = null;
 let appView: WebContentsView | null = null;
 let controlView: WebContentsView | null = null;
 let popoutWindow: BrowserWindow | null = null;
+let popoutSaveTimeout: ReturnType<typeof setTimeout>;
 let isPoppedOut = false;
 let isAppQuitting = false;
 let updateMainWindowBounds: () => void = () => {};
@@ -1224,20 +1225,31 @@ function popOutAppView(): void {
     });
   };
 
-  const savePopoutWindowState = (): void => {
-    if (!popoutWindow || popoutWindow.isDestroyed()) return;
-    const isFS = popoutWindow.isFullScreen();
-    Config.setItem("popoutFullscreen", isFS);
-    if (!isFS) {
-      Config.setItem("popoutBounds", popoutWindow.getBounds());
+  const savePopoutWindowState = (debounced: boolean = false): void => {
+    clearTimeout(popoutSaveTimeout);
+    let actualFunction = (): void => {
+      if (!popoutWindow || popoutWindow.isDestroyed()) return;
+      const isFS = popoutWindow.isFullScreen();
+      Config.setItem("popoutFullscreen", isFS);
+      if (!isFS) {
+        Config.setItem("popoutBounds", popoutWindow.getBounds());
+      }
+      logger.debug("POPOUT", "Saved state!");
+    };
+    if (!debounced) {
+      actualFunction();
+      return;
     }
+    popoutSaveTimeout = setTimeout(actualFunction, 30);
   };
 
   popoutWindow.on("resize", () => {
     updatePopoutBounds();
     savePopoutWindowState();
   });
-  popoutWindow.on("move", savePopoutWindowState);
+  popoutWindow.on("move", () => {
+    savePopoutWindowState(true);
+  });
   popoutWindow.on("maximize", updatePopoutBounds);
   popoutWindow.on("unmaximize", updatePopoutBounds);
 
