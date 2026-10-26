@@ -1,0 +1,418 @@
+:root {
+  --bg-color: #0a0a14;
+  --bg-secondary: #141423;
+  --primary: #89cff0;
+  --secondary: #ffd700;
+  --text: #ffffff;
+  --text-dim: rgba(255, 255, 255, 0.6);
+  --border: rgba(255, 255, 255, 0.15);
+  --btn-bg: rgba(255, 255, 255, 0.05);
+  --btn-active: rgba(137, 207, 240, 0.2);
+  --radius: 12px;
+  --header-height: 60px;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+body {
+  font-family: "Rajdhani", sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text);
+  margin: 0;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  position: relative;
+}
+
+.view-container {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+.view {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-color);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Left Pane: Remote */
+#remote-view {
+  position: relative;
+  width: 400px;
+  border-right: 1px solid var(--border);
+  z-index: 1;
+}
+
+#remote-view-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.remote-title-desktop {
+  color: var(--primary);
+  font-size: 2.5rem;
+  letter-spacing: 5px;
+  font-weight: 800;
+  text-shadow: 0 0 15px rgba(137, 207, 240, 0.4);
+  text-align: center;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+/* Song Digits Buffer */
+.input-display {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.input-display-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 1.5px;
+}
+
+.input-display-digits {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Buttons & Grids */
+button {
+  font-family: "Rajdhani", sans-serif;
+  background: var(--btn-bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1.2rem;
+  height: 60px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+}
+
+button:active {
+  transform: scale(0.96);
+  background: var(--btn-active);
+  border-color: var(--primary);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--bg-color);
+  border: none;
+}
+
+.btn-secondary {
+  background: var(--secondary);
+  color: var(--bg-color);
+  border: none;
+}
+
+.btn-danger {
+  color: #ff5555;
+  border-color: rgba(255, 85, 85, 0.3);
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.span-4 {
+  grid-column: span 4;
+}
+
+.remote-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 400px;
+  padding-bottom: 2rem;
+}
+
+.numpad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.numpad-btn {
+  font-size: 1.8rem;
+  height: 70px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.controls-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.control-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.playback-features-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.feature-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  height: 75px;
+  background: rgba(137, 207, 240, 0.08);
+  border-color: rgba(137, 207, 240, 0.2);
+  color: var(--primary);
+  padding: 0.4rem;
+}
+
+.feature-btn:active {
+  background: rgba(137, 207, 240, 0.2);
+  border-color: var(--primary);
+}
+
+/* SVG Mask Icon: Inherits button text color (currentColor) */
+.svg-icon {
+  display: inline-block;
+  width: 1.6rem;
+  height: 1.6rem;
+  background-color: currentColor;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.icon-record {
+  width: 1.8rem;
+  height: 1.8rem;
+  -webkit-mask-image: url("/assets/img/icons/svg/radio-button-on.svg");
+  mask-image: url("/assets/img/icons/svg/radio-button-on.svg");
+}
+
+.icon-melody {
+  -webkit-mask-image: url("/assets/img/icons/svg/musical-notes.svg");
+  mask-image: url("/assets/img/icons/svg/musical-notes.svg");
+}
+
+.icon-rhythm {
+  -webkit-mask-image: url("/assets/img/icons/svg/pulse.svg");
+  mask-image: url("/assets/img/icons/svg/pulse.svg");
+}
+
+.icon-chorus {
+  -webkit-mask-image: url("/assets/img/icons/svg/people.svg");
+  mask-image: url("/assets/img/icons/svg/people.svg");
+}
+
+.icon-bgv {
+  -webkit-mask-image: url("/assets/img/icons/svg/videocam.svg");
+  mask-image: url("/assets/img/icons/svg/videocam.svg");
+}
+
+/* Right Pane: Songbook */
+#songlist-view {
+  position: relative;
+  flex: 1;
+  z-index: 2;
+  border-left: none;
+}
+
+.library-header {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.library-tabs {
+  display: flex;
+  width: 100%;
+}
+
+.library-tab {
+  flex: 1;
+  text-align: center;
+  padding: 1rem 0;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--primary);
+  border-bottom: 3px solid var(--primary);
+  background: rgba(137, 207, 240, 0.05);
+  letter-spacing: 1px;
+}
+
+.search-row {
+  padding: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.search-bar {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: white;
+  padding: 0.5rem 1rem;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.1rem;
+  outline: none;
+}
+
+.search-bar:focus {
+  border-color: var(--primary);
+}
+
+.library-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.virtual-scroller {
+  position: relative;
+  overflow-y: auto;
+  width: 100%;
+  height: 100%;
+}
+
+.virtual-scroller-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+.song-item {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding: 0.8rem;
+  cursor: pointer;
+  height: 75px;
+  box-sizing: border-box;
+}
+
+.song-item:hover,
+.song-item:active {
+  background: var(--btn-active);
+}
+
+.song-code {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--primary);
+  width: 74px;
+  flex-shrink: 0;
+  margin-right: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.format-badge {
+  display: inline-block;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  margin-right: 6px;
+  vertical-align: middle;
+  line-height: 1.2;
+  min-width: 32px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  letter-spacing: 0.5px;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translate(-50%, 100px);
+  background: rgba(20, 20, 30, 0.95);
+  border: 1px solid var(--primary);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-weight: 700;
+  opacity: 0;
+  transition: all 0.3s;
+  z-index: 9999;
+}
+
+.toast.show {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+.toast.error {
+  border-color: #ff5555;
+  color: #ff5555;
+}
