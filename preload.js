@@ -31,8 +31,8 @@ contextBridge.exposeInMainWorld("deepLink", {
 
 contextBridge.exposeInMainWorld("karaoke", {
   togglePlayPause: () => ipcRenderer.invoke("karaoke:play-pause"),
-  inputNumber: (number, enter = false) =>
-    ipcRenderer.invoke("karaoke:input-number", { number, enter }),
+  playOrReserveSong: (songOrCode) =>
+    ipcRenderer.invoke("karaoke:play-or-reserve-song", songOrCode),
   getPlaybackInfo: () => ipcRenderer.invoke("karaoke:get-playback-info"),
   getSongList: (options = { offset: 0, limit: 100 }) =>
     ipcRenderer.invoke("karaoke:get-song-list", options),

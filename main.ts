@@ -1811,19 +1811,14 @@ void app.whenReady().then(() => {
     });
   }
 
-  // 1. Play / Pause
   ipcMain.handle("karaoke:play-pause", async () => {
     return await requestAppView("play-pause");
   });
 
-  // 2. Input Number
   ipcMain.handle(
-    "karaoke:input-number",
-    async (
-      _event: IpcMainInvokeEvent,
-      payload: { number: string | number; enter?: boolean } | string | number,
-    ) => {
-      return await requestAppView("input-number", payload);
+    "karaoke:play-or-reserve-song",
+    async (_event: IpcMainInvokeEvent, songOrCode: unknown) => {
+      return await requestAppView("play-or-reserve-song", songOrCode);
     },
   );
 

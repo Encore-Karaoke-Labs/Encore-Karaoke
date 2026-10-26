@@ -371,30 +371,47 @@ class EncoreController {
         };
       }
 
-      case "input-number": {
-        const raw =
-          typeof payload === "object" && payload !== null
-            ? payload.number
-            : payload;
-        const shouldEnter =
-          typeof payload === "object" && payload !== null
-            ? Boolean(payload.enter)
-            : false;
-        const digits = String(raw ?? "").replace(/\D/g, "");
+      case "play-or-reserve-song": {
+        let song = payload;
 
-        for (const digit of digits) {
-          this.input.handleDigitInput(digit);
+        if (typeof payload === "string" || typeof payload === "number") {
+          const str = String(payload).trim();
+          song =
+            this.state.songMap.get(str) ||
+            this.state.songMap.get(Number(str)) ||
+            this.state.songMap.get(str.padStart(6, "0")) ||
+            null;
         }
 
-        if (shouldEnter) {
-          this.input.handleEnter();
+        if (!song) {
+          return { success: false, reason: "Song not found." };
         }
 
-        return {
-          mode: this.state.mode,
-          songNumber: this.state.songNumber,
-          reservationNumber: this.state.reservationNumber,
-        };
+        if (this.state.mode === "menu") {
+          this.ui.menuTransitionSource = "list";
+          this.state.songNumber = "";
+          this.state.isTypingNumber = false;
+          this.playback.startPlayer(song);
+          return { success: true, action: "playing", song };
+        }
+
+        if (this.state.mode.startsWith("player")) {
+          if (this.state.isSessionActive) {
+            this.sessions.reserveSongInSession(song);
+          } else {
+            this.state.reservationQueue.push(song);
+
+            const fmt = this.library.getFormatInfo(song);
+            const codeDisplay = song.code
+              ? String(song.code).padStart(6, "0")
+              : "YT";
+            const html = `<span class="info-bar-code">${codeDisplay}</span> <span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span> <span class="info-bar-title">${song.title}</span><span class="info-bar-artist">- ${song.artist}</span>`;
+            this.infoBar.showTemp("RESERVED", html, 3000);
+          }
+          return { success: true, action: "queued", song };
+        }
+
+        return { success: false, reason: "Invalid app state." };
       }
 
       case "get-playback-info": {
