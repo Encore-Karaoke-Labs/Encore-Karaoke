@@ -358,6 +358,156 @@ class EncoreController {
     }
   }
 
+  async handleIpcCommand(action, payload) {
+    switch (action) {
+      case "play-pause": {
+        if (this.state.mode === "player") {
+          this.playback.togglePause();
+        }
+        const pb = this.services.Forte.getPlaybackState();
+        return {
+          status: pb?.status || "stopped",
+          mode: this.state.mode,
+        };
+      }
+
+      case "input-number": {
+        const raw =
+          typeof payload === "object" && payload !== null
+            ? payload.number
+            : payload;
+        const shouldEnter =
+          typeof payload === "object" && payload !== null
+            ? Boolean(payload.enter)
+            : false;
+        const digits = String(raw ?? "").replace(/\D/g, "");
+
+        for (const digit of digits) {
+          this.input.handleDigitInput(digit);
+        }
+
+        if (shouldEnter) {
+          this.input.handleEnter();
+        }
+
+        return {
+          mode: this.state.mode,
+          songNumber: this.state.songNumber,
+          reservationNumber: this.state.reservationNumber,
+        };
+      }
+
+      case "get-playback-info": {
+        const pb = this.services.Forte.getPlaybackState();
+        let currentSong = this.state.currentSong || null;
+
+        if (currentSong && currentSong.code && this.state.songMap) {
+          const match =
+            this.state.songMap.get(Number(currentSong.code)) ||
+            this.state.songMap.get(String(currentSong.code));
+          if (match) currentSong = { ...match, ...currentSong };
+        }
+
+        const fmt = currentSong
+          ? this.library.getFormatInfo(currentSong)
+          : null;
+
+        return {
+          mode: this.state.mode,
+          status:
+            pb?.status ||
+            (this.state.currentSongIsYouTube ? "playing" : "stopped"),
+          currentTime: pb?.currentTime ?? 0,
+          duration: pb?.duration ?? 0,
+          currentSong: currentSong
+            ? {
+                code: currentSong.code
+                  ? String(currentSong.code).padStart(6, "0")
+                  : null,
+                title: currentSong.title,
+                artist: currentSong.artist,
+                format: fmt?.label || "RS",
+                isYouTube: Boolean(this.state.currentSongIsYouTube),
+                isMV: Boolean(this.state.currentSongIsMV),
+                isMIDI: Boolean(this.state.currentSongIsMIDI),
+              }
+            : null,
+          volume: this.state.volume,
+          transpose: pb?.transpose ?? 0,
+          multiplexPan: pb?.multiplexPan ?? 0,
+          score: pb?.score?.finalScore ?? 0,
+          isDuet: Boolean(this.state.isDuet),
+          queueLength: this.state.reservationQueue.length,
+        };
+      }
+
+      case "get-song-list": {
+        const offset = Math.max(0, Number(payload?.offset) || 0);
+        const limit =
+          payload?.limit !== undefined && payload?.limit !== null
+            ? Number(payload.limit)
+            : 100;
+        const total = this.state.songList.length;
+
+        const slice =
+          limit > 0
+            ? this.state.songList.slice(offset, offset + limit)
+            : this.state.songList.slice(offset);
+
+        return {
+          total,
+          offset,
+          limit,
+          songs: slice.map((s) => {
+            const fmt = this.library.getFormatInfo(s);
+            return {
+              code: String(s.code).padStart(6, "0"),
+              title: s.title,
+              artist: s.artist,
+              format: fmt.label,
+              formatColor: fmt.color,
+            };
+          }),
+        };
+      }
+
+      case "search-songs": {
+        const query =
+          typeof payload === "object" && payload !== null
+            ? payload.query
+            : String(payload || "");
+        const limit = Number(payload?.limit) || 50;
+
+        if (!query.trim()) {
+          return { query: "", results: [] };
+        }
+
+        const rawResults = await this.library.getLocalSearchResults(query);
+        const sliced = rawResults.slice(0, limit).map((s) => {
+          const fmt = this.library.getFormatInfo(s);
+          return {
+            code: String(s.code).padStart(6, "0"),
+            title: s.title,
+            artist: s.artist,
+            displayRomaTitle: s.displayRomaTitle || null,
+            displayRomaArtist: s.displayRomaArtist || null,
+            format: fmt.label,
+            formatColor: fmt.color,
+          };
+        });
+
+        return {
+          query,
+          count: sliced.length,
+          results: sliced,
+        };
+      }
+
+      default:
+        throw new Error(`Unsupported IPC action: ${action}`);
+    }
+  }
+
   async init() {
     this.context.wrapper = new Html("div").classOn("full-ui").appendTo("body");
     this.context.wrapper.classOn("loading");
@@ -490,6 +640,25 @@ class EncoreController {
       );
     }
 
+    // Karaoke External IPC Listener Registration
+    this._karaokeIpcListener = async (_event, req) => {
+      const { replyChannel, action, payload } = req;
+      try {
+        const result = await this.handleIpcCommand(action, payload);
+        this.services.Ui?.ipc?.send?.(replyChannel, result) ??
+          window.desktopIntegration?.ipc?.send(replyChannel, result);
+      } catch (err) {
+        const errorPayload = { error: err.message };
+        this.services.Ui?.ipc?.send?.(replyChannel, errorPayload) ??
+          window.desktopIntegration?.ipc?.send(replyChannel, errorPayload);
+      }
+    };
+
+    window.desktopIntegration?.ipc?.on(
+      "karaoke:request",
+      this._karaokeIpcListener,
+    );
+
     const libraryInfo = this.library.libraryInfo;
     const skipToFirst = Boolean(
       libraryInfo?.manifest?.flags?.skipToFirstNoteOn,
@@ -598,6 +767,13 @@ class EncoreController {
 
   destroy() {
     if (this._deepLinkCleanup) this._deepLinkCleanup();
+    if (this._karaokeIpcListener) {
+      window.desktopIntegration?.ipc?.off(
+        "karaoke:request",
+        this._karaokeIpcListener,
+      );
+      this._karaokeIpcListener = null;
+    }
     if (this.boundKeydown)
       window.removeEventListener("keydown", this.boundKeydown);
     if (this.stream) this.stream.destroy();
