@@ -1274,13 +1274,16 @@ function popOutAppView(): void {
 
   controlView = new WebContentsView({
     webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
       spellcheck: false,
       backgroundThrottling: false,
     },
   });
   mainWindow.contentView.addChildView(controlView);
   updateMainWindowBounds();
-  void controlView.webContents.loadURL(`http://127.0.0.1:${PORT}/remote`);
+  void controlView.webContents.loadURL(
+    `http://127.0.0.1:${PORT}/control/index.html`,
+  );
 
   popoutWindow.on("close", () => {
     if (isAppQuitting) return;

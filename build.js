@@ -118,6 +118,7 @@ Promise.all([buildMain, buildPreload, buildOS, buildWindows, buildCSS])
     copyRecursiveSync("src/libs", "dist/resources/static/libs");
     copyRecursiveSync("src/assets", "dist/resources/static/assets");
     copyRecursiveSync("src/remote", "dist/resources/static/remote");
+    copyRecursiveSync("src/control", "dist/resources/static/control");
     copyRecursiveSync("src/games", "dist/resources/static/games");
 
     const binDir = path.join("dist", "resources", "bin");
