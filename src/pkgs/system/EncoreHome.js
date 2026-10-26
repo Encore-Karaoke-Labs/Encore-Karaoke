@@ -461,13 +461,41 @@ class EncoreController {
           songs: slice.map((s) => {
             const fmt = this.library.getFormatInfo(s);
             return {
+              ...s, // Preserve path, chorusPath, videoPath, type, etc.
               code: String(s.code).padStart(6, "0"),
-              title: s.title,
-              artist: s.artist,
               format: fmt.label,
               formatColor: fmt.color,
             };
           }),
+        };
+      }
+
+      case "search-songs": {
+        const query =
+          typeof payload === "object" && payload !== null
+            ? payload.query
+            : String(payload || "");
+        const limit = Number(payload?.limit) || 50;
+
+        if (!query.trim()) {
+          return { query: "", results: [] };
+        }
+
+        const rawResults = await this.library.getLocalSearchResults(query);
+        const sliced = rawResults.slice(0, limit).map((s) => {
+          const fmt = this.library.getFormatInfo(s);
+          return {
+            ...s,
+            code: String(s.code).padStart(6, "0"),
+            format: fmt.label,
+            formatColor: fmt.color,
+          };
+        });
+
+        return {
+          query,
+          count: sliced.length,
+          results: sliced,
         };
       }
 
