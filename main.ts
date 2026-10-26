@@ -1848,6 +1848,33 @@ void app.whenReady().then(() => {
     },
   );
 
+  ipcMain.handle(
+    "karaoke:key-change",
+    async (
+      _event: IpcMainInvokeEvent,
+      payload?: "up" | "down" | number | { step?: number; value?: number },
+    ) => {
+      return await requestAppView("key-change", payload);
+    },
+  );
+
+  ipcMain.handle(
+    "karaoke:toggle-chorus",
+    async (_event: IpcMainInvokeEvent, enabled?: boolean) => {
+      return await requestAppView("toggle-chorus", enabled);
+    },
+  );
+
+  ipcMain.handle(
+    "karaoke:guide-melody",
+    async (
+      _event: IpcMainInvokeEvent,
+      payload?: "cycle" | "OFF" | "SOFT" | "NORMAL" | "STRONG" | number,
+    ) => {
+      return await requestAppView("guide-melody", payload);
+    },
+  );
+
   ipcMain.on("deep-link-ready", () => {
     logger.info("DEEPLINK", "Boot process is complete.");
     isRendererReady = true;
