@@ -503,6 +503,160 @@ class EncoreController {
         };
       }
 
+      case "key-change": {
+        if (this.state.mode !== "player") {
+          return { success: false, reason: "Not in player mode." };
+        }
+
+        if (
+          this.state.currentSongIsYouTube ||
+          this.state.currentSongIsStandaloneVideo
+        ) {
+          this.infoBar.showTemp(
+            "TRANSPOSE",
+            "Not available for this format.",
+            3000,
+          );
+          return { success: false, reason: "Not available for this format." };
+        }
+
+        const Forte = this.services.Forte;
+        const cur = Forte.getPlaybackState().transpose || 0;
+        let next = cur;
+
+        if (typeof payload === "number") {
+          next = cur + payload;
+        } else if (payload === "up") {
+          next = cur + 1;
+        } else if (payload === "down") {
+          next = cur - 1;
+        } else if (typeof payload === "object" && payload !== null) {
+          if (payload.value !== undefined) next = Number(payload.value);
+          else if (payload.step !== undefined)
+            next = cur + Number(payload.step);
+        } else {
+          next = cur + 1;
+        }
+
+        next = Math.max(-24, Math.min(24, Math.round(next)));
+        Forte.setTranspose(next);
+
+        let left = 50;
+        let width = 0;
+        if (next > 0) width = (next / 24) * 50;
+        else if (next < 0) {
+          width = (Math.abs(next) / 24) * 50;
+          left = 50 - width;
+        }
+
+        const html = `<div class="transpose-display"><div class="transpose-min">-24</div><div class="transpose-slider-container"><div class="transpose-slider-center-line"></div><div class="transpose-slider-fill" style="left: ${left}%; width: ${width}%;"></div></div><div class="transpose-max">+24</div><span class="transpose-value">${(next > 0 ? "+" : "") + next} st</span></div>`;
+        this.infoBar.showTemp("TRANSPOSE", html, 3000);
+
+        return { success: true, transpose: next };
+      }
+
+      case "toggle-chorus": {
+        if (this.state.mode !== "player") {
+          return { success: false, reason: "Not in player mode." };
+        }
+
+        const Forte = this.services.Forte;
+        const pbState = Forte.getPlaybackState();
+
+        if (!this.state.currentSongIsMIDI || !pbState.hasChorus) {
+          this.infoBar.showTemp(
+            "CHORUS",
+            "Not available for this format.",
+            3000,
+          );
+          return { success: false, reason: "Not available for this format." };
+        }
+
+        let isEnabled;
+        if (typeof payload === "boolean") {
+          const currentState = Boolean(
+            this.playback?.chorusElement && !this.playback.chorusElement.paused,
+          );
+          isEnabled =
+            currentState === payload ? currentState : Forte.toggleChorus();
+        } else {
+          isEnabled = Forte.toggleChorus();
+        }
+
+        const html = `
+          <div class="volume-display" style="display: flex; align-items: center; justify-content: center; width: 100%;">
+            <div style="font-weight: 700; color: #ffd700; font-size: 1.2rem;">CHORUS ${isEnabled ? "ON" : "OFF"}</div>
+          </div>
+        `;
+        this.infoBar.showTemp("CHORUS", html, 3000);
+
+        return { success: true, isChorusEnabled: isEnabled };
+      }
+
+      case "guide-melody": {
+        if (this.state.mode !== "player") {
+          return { success: false, reason: "Not in player mode." };
+        }
+
+        const Forte = this.services.Forte;
+        const pbState = Forte.getPlaybackState();
+
+        if (!pbState.hasGuideNotes) {
+          this.infoBar.showTemp(
+            "MELODY",
+            "Not available for this format.",
+            3000,
+          );
+          return { success: false, reason: "Not available for this format." };
+        }
+
+        const levels = this.input.guideMelodyLevels;
+        let selectedLevel;
+
+        if (payload === undefined || payload === "cycle") {
+          this.input.currentGuideMelodyIndex =
+            (this.input.currentGuideMelodyIndex + 1) % levels.length;
+          selectedLevel = levels[this.input.currentGuideMelodyIndex];
+        } else if (typeof payload === "string") {
+          const upper = payload.toUpperCase();
+          const matchIdx = levels.findIndex((l) => l.label === upper);
+          if (matchIdx !== -1) {
+            this.input.currentGuideMelodyIndex = matchIdx;
+            selectedLevel = levels[matchIdx];
+          }
+        } else if (typeof payload === "number") {
+          if (payload >= 0 && payload < levels.length) {
+            this.input.currentGuideMelodyIndex = payload;
+            selectedLevel = levels[payload];
+          } else {
+            const clamped = Math.max(0, Math.min(127, Math.round(payload)));
+            selectedLevel = { label: `${clamped}`, value: clamped };
+          }
+        }
+
+        if (!selectedLevel) {
+          selectedLevel = levels[this.input.currentGuideMelodyIndex];
+        }
+
+        Forte.setGuideTrackVolume(selectedLevel.value);
+
+        const html = `
+          <div class="volume-display" style="display: flex; align-items: center; width: 100%; gap: 1rem;">
+            <div style="font-weight: 700; color: #ffd700; width: 85px; text-align: left;">${selectedLevel.label}</div>
+            <div class="volume-slider-container" style="flex-grow: 1; height: 12px; background-color: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; overflow: hidden;">
+              <div class="volume-slider-fill" style="height: 100%; background-color: #ffd700; border-radius: 6px; transition: width 0.1s linear; width: ${(selectedLevel.value / 127) * 100}%"></div>
+            </div>
+          </div>
+        `;
+        this.infoBar.showTemp("MELODY", html, 3000);
+
+        return {
+          success: true,
+          label: selectedLevel.label,
+          volume: selectedLevel.value,
+        };
+      }
+
       default:
         throw new Error(`Unsupported IPC action: ${action}`);
     }
