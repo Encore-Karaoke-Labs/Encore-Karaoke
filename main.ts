@@ -1186,6 +1186,7 @@ function popOutAppView(): void {
   isPoppedOut = true;
   Config.setItem("popoutEnabled", true);
 
+  // Detach the main app view from main window
   mainWindow.contentView.removeChildView(targetAppView);
 
   const savedBounds = Config.getItem("popoutBounds") as
@@ -1271,20 +1272,17 @@ function popOutAppView(): void {
     popoutWindow.setFullScreen(true);
   }
 
-  if (!controlView) {
-    controlView = new WebContentsView({
-      webPreferences: {
-        spellcheck: false,
-        backgroundThrottling: false,
-      },
-    });
-  }
+  controlView = new WebContentsView({
+    webPreferences: {
+      spellcheck: false,
+      backgroundThrottling: false,
+    },
+  });
   mainWindow.contentView.addChildView(controlView);
   updateMainWindowBounds();
   void controlView.webContents.loadURL(`http://127.0.0.1:${PORT}/remote`);
 
-  popoutWindow.on("closed", () => {
-    popoutWindow = null;
+  popoutWindow.on("close", () => {
     if (
       isPoppedOut &&
       !isAppQuitting &&
@@ -1292,9 +1290,11 @@ function popOutAppView(): void {
       !mainWindow.isDestroyed()
     ) {
       dockBackAppView();
-    } else {
-      isPoppedOut = false;
     }
+  });
+
+  popoutWindow.on("closed", () => {
+    popoutWindow = null;
   });
 
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1312,6 +1312,8 @@ function dockBackAppView(): void {
 
   if (!isPoppedOut || !appView) return;
 
+  clearTimeout(popoutSaveTimeout);
+
   const targetAppView = appView;
   isPoppedOut = false;
   Config.setItem("popoutEnabled", false);
@@ -1320,14 +1322,25 @@ function dockBackAppView(): void {
     try {
       popoutWindow.contentView.removeChildView(targetAppView);
       popoutWindow.close();
-    } catch {}
+    } catch (e) {
+      logger.error("POPOUT", `Error closing popout window: ${e}`);
+    }
     popoutWindow = null;
   }
 
-  if (controlView && !mainWindow.isDestroyed()) {
+  if (controlView) {
     try {
-      mainWindow.contentView.removeChildView(controlView);
-    } catch {}
+      if (!mainWindow.isDestroyed()) {
+        mainWindow.contentView.removeChildView(controlView);
+      }
+      if (!controlView.webContents.isDestroyed()) {
+        controlView.webContents.stop();
+        controlView.webContents.close();
+      }
+    } catch (e) {
+      logger.error("POPOUT", `Error destroying controlView: ${e}`);
+    }
+    controlView = null;
   }
 
   if (!mainWindow.isDestroyed()) {
@@ -1335,7 +1348,9 @@ function dockBackAppView(): void {
       mainWindow.contentView.addChildView(targetAppView);
       updateMainWindowBounds();
       mainWindow.webContents.send("popout-state-changed", false);
-    } catch {}
+    } catch (e) {
+      logger.error("POPOUT", `Error re-docking appView: ${e}`);
+    }
   }
 
   logger.info("POPOUT", "Encore docked back to main window.");
@@ -1371,6 +1386,10 @@ const createWindow = (): void => {
 
   win.on("closed", () => {
     mainWindow = null;
+    if (controlView && !controlView.webContents.isDestroyed()) {
+      controlView.webContents.close();
+      controlView = null;
+    }
     if (popoutWindow && !popoutWindow.isDestroyed()) {
       popoutWindow.close();
       popoutWindow = null;
