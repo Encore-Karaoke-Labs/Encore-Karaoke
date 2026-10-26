@@ -104,14 +104,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function reserveSong(song) {
     try {
-      await window.karaoke.inputNumber(song.code, true);
-      showToast(`Queued: ${song.title}`);
+      const res = await window.karaoke.playOrReserveSong(song);
+      if (res && res.success) {
+        showToast(
+          res.action === "playing"
+            ? `Playing: ${song.title}`
+            : `Queued: ${song.title}`,
+        );
+      } else {
+        showToast(res?.reason || "Could not reserve song.", true);
+      }
     } catch {
       showToast("Reservation failed.", true);
     }
   }
 
-  // Exact song item renderer matching the remote reference
   const songScroller = new VirtualScroller(
     "song-scroller-container",
     "songs-list",
@@ -136,7 +143,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
   );
 
-  // Fetch full songbook over IPC
   try {
     const res = await window.karaoke.getSongList({ offset: 0, limit: 0 });
     fullSongList = res.songs || [];
@@ -145,7 +151,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("[Control] Failed to load songbook:", err);
   }
 
-  // Update Play/Pause button text based on live status
   async function syncPlaybackState() {
     try {
       const info = await window.karaoke.getPlaybackInfo();
@@ -158,7 +163,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   setInterval(syncPlaybackState, 1000);
   syncPlaybackState();
 
-  // All remote buttons hooked directly through IPC
   document.querySelectorAll("button[data-type]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const type = btn.dataset.type;
@@ -169,7 +173,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           if (inputBuffer.length < 6) inputBuffer += value;
           else inputBuffer = inputBuffer.slice(1) + value;
           updateBufferUI();
-          await window.karaoke.inputNumber(value, false);
+          window.desktopIntegration?.ipc?.send("simulate-key", value);
           break;
 
         case "backspace":
@@ -236,7 +240,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  // Debounced search via IPC
   let searchTimeout;
   searchInput.addEventListener("input", (e) => {
     const q = e.target.value;
