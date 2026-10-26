@@ -1228,7 +1228,7 @@ function popOutAppView(): void {
 
   const savePopoutWindowState = (debounced: boolean = false): void => {
     clearTimeout(popoutSaveTimeout);
-    let actualFunction = (): void => {
+    const actualFunction = (): void => {
       if (!popoutWindow || popoutWindow.isDestroyed()) return;
       const isFS = popoutWindow.isFullScreen();
       Config.setItem("popoutFullscreen", isFS);
