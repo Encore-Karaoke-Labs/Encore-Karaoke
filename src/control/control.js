@@ -181,14 +181,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           break;
 
         case "reserve":
-          if (!inputBuffer) {
-            window.desktopIntegration?.ipc?.send("simulate-key", "Enter");
-          } else {
-            await window.karaoke.inputNumber(inputBuffer, true);
-            showToast(`Code entered: ${inputBuffer}`);
-            inputBuffer = "";
-            updateBufferUI();
-          }
+          window.desktopIntegration?.ipc?.send("simulate-key", "Enter");
+          inputBuffer = "";
+          updateBufferUI();
           break;
 
         case "stop":
