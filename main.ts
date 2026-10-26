@@ -1283,14 +1283,15 @@ function popOutAppView(): void {
   void controlView.webContents.loadURL(`http://127.0.0.1:${PORT}/remote`);
 
   popoutWindow.on("close", () => {
-    if (
-      isPoppedOut &&
-      !isAppQuitting &&
-      mainWindow &&
-      !mainWindow.isDestroyed()
-    ) {
-      dockBackAppView();
+    if (isAppQuitting) return;
+
+    if (isPoppedOut && mainWindow && !mainWindow.isDestroyed()) {
+      dockBackAppView(true);
     }
+  });
+
+  popoutWindow.on("closed", () => {
+    popoutWindow = null;
   });
 
   popoutWindow.on("closed", () => {
@@ -1303,7 +1304,7 @@ function popOutAppView(): void {
   logger.info("POPOUT", "Encore popped out to secondary window.");
 }
 
-function dockBackAppView(): void {
+function dockBackAppView(userInitiated: boolean = true): void {
   if (isAppQuitting || !mainWindow || mainWindow.isDestroyed()) {
     isPoppedOut = false;
     popoutWindow = null;
@@ -1316,7 +1317,10 @@ function dockBackAppView(): void {
 
   const targetAppView = appView;
   isPoppedOut = false;
-  Config.setItem("popoutEnabled", false);
+
+  if (userInitiated && !isAppQuitting) {
+    Config.setItem("popoutEnabled", false);
+  }
 
   if (popoutWindow && !popoutWindow.isDestroyed()) {
     try {
@@ -1328,6 +1332,7 @@ function dockBackAppView(): void {
     popoutWindow = null;
   }
 
+  // 2. Properly destroy and dereference controlView
   if (controlView) {
     try {
       if (!mainWindow.isDestroyed()) {
@@ -1784,14 +1789,18 @@ void app.whenReady().then(() => {
     }
   });
   ipcMain.on("window-close", (event: IpcMainEvent) => {
-    BrowserWindow.fromWebContents(event.sender)?.close();
+    const senderWin = BrowserWindow.fromWebContents(event.sender);
+    if (senderWin === mainWindow) {
+      isAppQuitting = true;
+      app.quit();
+    } else {
+      senderWin?.close();
+    }
   });
 
-  ipcMain.on("app-close", (event: IpcMainEvent) => {
-    BrowserWindow.fromWebContents(event.sender)?.close();
-    BrowserWindow.getAllWindows().forEach((w) => {
-      w.close();
-    });
+  ipcMain.on("app-close", () => {
+    isAppQuitting = true;
+    app.quit();
   });
 
   ipcMain.on("simulate-key", (_event: IpcMainEvent, keyChar: string) => {
