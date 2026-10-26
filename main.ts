@@ -1772,6 +1772,82 @@ void app.whenReady().then(() => {
     void connectOBS();
   }
 
+  /**
+   * Dispatches an IPC command to the main Encore app renderer view and waits for the reply.
+   */
+  function requestAppView<T = unknown>(
+    action: string,
+    payload?: unknown,
+  ): Promise<T> {
+    return new Promise((resolve, reject) => {
+      if (!appViewWebContents || appViewWebContents.isDestroyed()) {
+        return reject(
+          new Error("Encore app view is not initialized or is destroyed."),
+        );
+      }
+
+      const correlationId = crypto.randomUUID();
+      const replyChannel = `karaoke:reply:${correlationId}`;
+
+      const timeout = setTimeout(() => {
+        ipcMain.removeAllListeners(replyChannel);
+        reject(new Error(`IPC request timeout waiting for action: ${action}`));
+      }, 6000);
+
+      ipcMain.once(replyChannel, (_event: IpcMainEvent, response: T) => {
+        clearTimeout(timeout);
+        resolve(response);
+      });
+
+      appViewWebContents.send("karaoke:request", {
+        correlationId,
+        replyChannel,
+        action,
+        payload,
+      });
+    });
+  }
+
+  // 1. Play / Pause
+  ipcMain.handle("karaoke:play-pause", async () => {
+    return await requestAppView("play-pause");
+  });
+
+  // 2. Input Number
+  ipcMain.handle(
+    "karaoke:input-number",
+    async (
+      _event: IpcMainInvokeEvent,
+      payload: { number: string | number; enter?: boolean } | string | number,
+    ) => {
+      return await requestAppView("input-number", payload);
+    },
+  );
+
+  ipcMain.handle("karaoke:get-playback-info", async () => {
+    return await requestAppView("get-playback-info");
+  });
+
+  ipcMain.handle(
+    "karaoke:get-song-list",
+    async (
+      _event: IpcMainInvokeEvent,
+      options?: { offset?: number; limit?: number },
+    ) => {
+      return await requestAppView("get-song-list", options);
+    },
+  );
+
+  ipcMain.handle(
+    "karaoke:search-songs",
+    async (
+      _event: IpcMainInvokeEvent,
+      payload: { query: string; limit?: number } | string,
+    ) => {
+      return await requestAppView("search-songs", payload);
+    },
+  );
+
   ipcMain.on("deep-link-ready", () => {
     logger.info("DEEPLINK", "Boot process is complete.");
     isRendererReady = true;
