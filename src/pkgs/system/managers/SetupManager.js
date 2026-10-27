@@ -319,19 +319,29 @@ export default class SetupManager {
       value: d.deviceId,
     }));
 
-    const midiDeviceOptions =
+    // Hardware devices only (excludes "internal")
+    const hardwareMidiDevices =
       this.midiOutputDevices && this.midiOutputDevices.length > 0
-        ? this.midiOutputDevices.map((d) => ({
-            label: d.name || "Internal Synthesizer",
-            value: d.id,
-          }))
-        : [{ label: "Internal Synthesizer", value: "internal" }];
+        ? this.midiOutputDevices
+            .filter((d) => d.id !== "internal")
+            .map((d) => ({
+              label: d.name || `MIDI Device (${d.id})`,
+              value: d.id,
+            }))
+        : [];
 
-    const port1Options = midiDeviceOptions;
-    const extraPortOptions = [
-      { label: "Disabled / None", value: "none" },
-      ...midiDeviceOptions,
+    const mainMidiOptions = [
+      { label: "Internal Synthesizer", value: "internal" },
+      ...hardwareMidiDevices,
     ];
+
+    const secondaryPortOptions = [
+      { label: "Disabled / None", value: "none" },
+      ...hardwareMidiDevices,
+    ];
+
+    const isExternalOutput = this.getMidiPortConfig(0) !== "internal";
+
     const serverOptions =
       this.updateServers && this.updateServers.length > 0
         ? this.updateServers.map((s) => ({ label: s.host, value: s.id }))
@@ -464,36 +474,50 @@ export default class SetupManager {
               },
               {
                 id: "midi_out_port_1",
-                label: "MIDI Port 1 (Ch. 1-16 / Port A)",
+                label: "Main MIDI Output",
                 type: "select",
-                options: port1Options,
+                options: mainMidiOptions,
                 get: () => this.getMidiPortConfig(0),
-                set: (v) => this.updateMidiPortConfig(0, v),
+                set: (v) => {
+                  this.updateMidiPortConfig(0, v);
+                  this.buildSettingsMap();
+                  if (
+                    this.setupState.submenuIndex >=
+                    this.getSubmenuItems(this.setupState.activeMenuId).length
+                  ) {
+                    this.setupState.submenuIndex = 0;
+                  }
+                  this.renderView();
+                },
               },
-              {
-                id: "midi_out_port_2",
-                label: "MIDI Port 2 (Ch. 17-32 / Port B)",
-                type: "select",
-                options: extraPortOptions,
-                get: () => this.getMidiPortConfig(1),
-                set: (v) => this.updateMidiPortConfig(1, v),
-              },
-              {
-                id: "midi_out_port_3",
-                label: "MIDI Port 3 (Ch. 33-48 / Port C)",
-                type: "select",
-                options: extraPortOptions,
-                get: () => this.getMidiPortConfig(2),
-                set: (v) => this.updateMidiPortConfig(2, v),
-              },
-              {
-                id: "midi_out_port_4",
-                label: "MIDI Port 4 (Ch. 49-64 / Port D)",
-                type: "select",
-                options: extraPortOptions,
-                get: () => this.getMidiPortConfig(3),
-                set: (v) => this.updateMidiPortConfig(3, v),
-              },
+              ...(isExternalOutput
+                ? [
+                    {
+                      id: "midi_out_port_2",
+                      label: "MIDI Port 2 (Ch. 17-32 / Port B)",
+                      type: "select",
+                      options: secondaryPortOptions,
+                      get: () => this.getMidiPortConfig(1),
+                      set: (v) => this.updateMidiPortConfig(1, v),
+                    },
+                    {
+                      id: "midi_out_port_3",
+                      label: "MIDI Port 3 (Ch. 33-48 / Port C)",
+                      type: "select",
+                      options: secondaryPortOptions,
+                      get: () => this.getMidiPortConfig(2),
+                      set: (v) => this.updateMidiPortConfig(2, v),
+                    },
+                    {
+                      id: "midi_out_port_4",
+                      label: "MIDI Port 4 (Ch. 49-64 / Port D)",
+                      type: "select",
+                      options: secondaryPortOptions,
+                      get: () => this.getMidiPortConfig(3),
+                      set: (v) => this.updateMidiPortConfig(3, v),
+                    },
+                  ]
+                : []),
               {
                 id: "rescan_midi_devices",
                 label: "Rescan MIDI Ports",
