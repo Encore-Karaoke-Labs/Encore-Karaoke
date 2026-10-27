@@ -80,8 +80,8 @@
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
-    "spessasynth_core": "^4.3.22",
-    "spessasynth_lib": "^4.3.14",
+    "spessasynth_core": "^4.4.1",
+    "spessasynth_lib": "^4.4.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.68.0",
     "youtube-search-api": "^2.0.1"
