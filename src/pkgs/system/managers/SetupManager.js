@@ -336,7 +336,7 @@ export default class SetupManager {
     ];
 
     const secondaryPortOptions = [
-      { label: "Disabled / None", value: "none" },
+      { label: "Disabled", value: "none" },
       ...hardwareMidiDevices,
     ];
 
@@ -494,7 +494,7 @@ export default class SetupManager {
                 ? [
                     {
                       id: "midi_out_port_2",
-                      label: "MIDI Port 2 (Ch. 17-32 / Port B)",
+                      label: "MIDI Port 2 (Ch. 17-32)",
                       type: "select",
                       options: secondaryPortOptions,
                       get: () => this.getMidiPortConfig(1),
@@ -502,7 +502,7 @@ export default class SetupManager {
                     },
                     {
                       id: "midi_out_port_3",
-                      label: "MIDI Port 3 (Ch. 33-48 / Port C)",
+                      label: "MIDI Port 3 (Ch. 33-48)",
                       type: "select",
                       options: secondaryPortOptions,
                       get: () => this.getMidiPortConfig(2),
@@ -510,7 +510,7 @@ export default class SetupManager {
                     },
                     {
                       id: "midi_out_port_4",
-                      label: "MIDI Port 4 (Ch. 49-64 / Port D)",
+                      label: "MIDI Port 4 (Ch. 49-64)",
                       type: "select",
                       options: secondaryPortOptions,
                       get: () => this.getMidiPortConfig(3),
