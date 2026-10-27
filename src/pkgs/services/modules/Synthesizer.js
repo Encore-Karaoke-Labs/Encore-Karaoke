@@ -108,26 +108,15 @@ export const STANDARD_GM_DRUM_PRESETS = [
  * Safely binds an event callback to a SpessaSynth v4 event handler.
  */
 export function bindSpessaEvent(handler, eventName, id, callback) {
-  if (!handler || !handler.events) {
+  if (!handler || typeof handler.addEvent !== "function") {
+    console.warn(`Invalid SpessaSynth handler for event '${eventName}'`);
     return;
   }
 
-  if (handler.events[eventName] !== undefined) {
-    try {
-      if (typeof handler.addEvent === "function") {
-        handler.addEvent(eventName, id, callback);
-        return;
-      }
-      if (typeof handler.events[eventName].set === "function") {
-        handler.events[eventName].set(id, callback);
-      } else {
-        handler.events[eventName][id] = callback;
-      }
-    } catch (e) {
-      logVerboseWarn(`Error binding event '${eventName}': ${e.message}`);
-    }
-  } else {
-    logVerboseWarn(`Event '${eventName}' does not exist on this handler.`);
+  try {
+    handler.addEvent(eventName, id, callback);
+  } catch (e) {
+    console.warn(`Error binding event '${eventName}':`, e);
   }
 }
 
