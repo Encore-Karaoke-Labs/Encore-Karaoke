@@ -218,11 +218,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           break;
 
         case "toggle_melody":
-          await window.karaoke.setGuideMelody();
+          window.desktopIntegration?.ipc?.send("simulate-key", "g");
           break;
 
         case "cycle_rhythm":
-          window.desktopIntegration?.ipc?.send("simulate-key", "'");
+          window.desktopIntegration?.ipc?.send("simulate-key", "\u0027");
           break;
 
         case "toggle_chorus":

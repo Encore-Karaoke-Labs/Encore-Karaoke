@@ -1910,8 +1910,8 @@ void app.whenReady().then(() => {
         .executeJavaScript(
           `
       if (document.activeElement) document.activeElement.blur();
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: '${keyChar}', bubbles: true, cancelable: true }));
-      window.dispatchEvent(new KeyboardEvent('keyup', { key: '${keyChar}', bubbles: true, cancelable: true }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: "${keyChar}", bubbles: true, cancelable: true }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: "${keyChar}", bubbles: true, cancelable: true }));
     `,
         )
         .catch((err: unknown) => console.error("Simulate key error:", err));
