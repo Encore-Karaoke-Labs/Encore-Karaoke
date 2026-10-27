@@ -240,7 +240,8 @@ export class ForteSynthesizer {
     const output = this.midiDeviceHandler.outputs.get(deviceId);
     if (output) {
       try {
-        output.connect(sequencer);
+        sequencer.externalMIDIPlayback = true;
+        output.connect(sequencer, 0);
         logVerbose(
           `Connected sequencer to external MIDI output: ${output.name || deviceId}`,
         );
@@ -266,6 +267,7 @@ export class ForteSynthesizer {
     const output = this.midiDeviceHandler.outputs.get(deviceId);
     if (output) {
       try {
+        sequencer.externalMIDIPlayback = false;
         output.disconnect(sequencer);
         logVerbose(
           `Disconnected sequencer from external MIDI output: ${output.name || deviceId}`,
