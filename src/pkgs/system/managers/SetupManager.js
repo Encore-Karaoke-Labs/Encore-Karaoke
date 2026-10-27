@@ -336,7 +336,7 @@ export default class SetupManager {
     ];
 
     const secondaryPortOptions = [
-      { label: "Disabled", value: "none" },
+      { label: "None", value: "none" },
       ...hardwareMidiDevices,
     ];
 
