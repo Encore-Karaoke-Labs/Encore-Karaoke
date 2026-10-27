@@ -156,6 +156,17 @@ export class ForteSynthesizer {
   }
 
   /**
+   * Returns true if external MIDI playback is currently active (Port 1 is external).
+   * @returns {boolean}
+   */
+  hasExternalMidiDevice() {
+    const mainId =
+      this.state.playback.currentMidiDeviceIds?.[0] ||
+      this.state.playback.currentMidiDeviceId;
+    return Boolean(mainId && mainId !== "internal" && mainId !== "none");
+  }
+
+  /**
    * Loads the SpessaSynth processor and the default SoundFont.
    */
   async initialize() {
@@ -243,11 +254,17 @@ export class ForteSynthesizer {
   connectSequencerToMidiOutput(sequencer) {
     if (!sequencer || !this.midiDeviceHandler) return;
 
+    if (!this.hasExternalMidiDevice()) {
+      sequencer.externalMIDIPlayback = false;
+      return;
+    }
+
+    sequencer.externalMIDIPlayback = true;
+
     const deviceIds = this.state.playback.currentMidiDeviceIds || [
-      this.state.playback.currentMidiDeviceId || "internal",
+      this.state.playback.currentMidiDeviceId,
     ];
 
-    let hasExternal = false;
     for (let port = 0; port < 4; port++) {
       const deviceId = deviceIds[port];
       if (!deviceId || deviceId === "internal" || deviceId === "none") continue;
@@ -256,20 +273,17 @@ export class ForteSynthesizer {
       if (output) {
         try {
           output.connect(sequencer, port * 16);
-          hasExternal = true;
           logVerbose(
             `Connected sequencer to external MIDI Port ${port + 1} (offset ${port * 16}): ${output.name || deviceId}`,
           );
         } catch (e) {
           console.error(
-            `[FORTE SVC] Failed to connect sequencer to MIDI output on Port ${port + 1}:`,
+            `[FORTE SVC] Failed to connect sequencer to Port ${port + 1}:`,
             e,
           );
         }
       }
     }
-
-    sequencer.externalMIDIPlayback = hasExternal;
   }
 
   /**
@@ -280,7 +294,7 @@ export class ForteSynthesizer {
     if (!sequencer || !this.midiDeviceHandler) return;
 
     const deviceIds = this.state.playback.currentMidiDeviceIds || [
-      this.state.playback.currentMidiDeviceId || "internal",
+      this.state.playback.currentMidiDeviceId,
     ];
 
     for (let port = 0; port < 4; port++) {
@@ -296,7 +310,7 @@ export class ForteSynthesizer {
           );
         } catch (e) {
           console.warn(
-            `[FORTE SVC] Failed to disconnect sequencer from MIDI output on Port ${port + 1}:`,
+            `[FORTE SVC] Failed to disconnect sequencer from Port ${port + 1}:`,
             e,
           );
         }
@@ -307,10 +321,79 @@ export class ForteSynthesizer {
   }
 
   /**
+   * Sends initial channel controllers, drum kits, transpose, and volume to a newly connected port.
+   */
+  initExternalDevicePort(deviceId, portIndex) {
+    if (
+      !this.midiDeviceHandler ||
+      !deviceId ||
+      deviceId === "internal" ||
+      deviceId === "none"
+    )
+      return;
+    const output = this.midiDeviceHandler.outputs.get(deviceId);
+    if (!output?.port?.send) return;
+
+    const channelOffset = portIndex * 16;
+
+    if (
+      this.state.playback.guideVolume !== undefined &&
+      Array.isArray(this.state.playback.guideChannels)
+    ) {
+      for (const ch of this.state.playback.guideChannels) {
+        if (ch.index >= channelOffset && ch.index < channelOffset + 16) {
+          const portCh = ch.index - channelOffset;
+          output.port.send([0xb0 | portCh, midiControllers.expression, 127]);
+          output.port.send([
+            0xb0 | portCh,
+            midiControllers.mainVolume,
+            Math.floor(this.state.playback.guideVolume),
+          ]);
+        }
+      }
+    }
+
+    if (this.state.playback.lockedDrumPresets) {
+      for (const [chStr, preset] of Object.entries(
+        this.state.playback.lockedDrumPresets,
+      )) {
+        const ch = parseInt(chStr, 10);
+        if (ch >= channelOffset && ch < channelOffset + 16) {
+          const portCh = ch - channelOffset;
+          const prog = Math.max(0, Math.min(127, preset.program ?? 0));
+          const rawB = Math.floor(preset.bankMSB ?? 0);
+          const bMSB = rawB >= 128 ? 0 : Math.max(0, Math.min(127, rawB));
+          const bLSB = Math.max(
+            0,
+            Math.min(127, Math.floor(preset.bankLSB ?? 0)),
+          );
+
+          output.port.send([0xb0 | portCh, midiControllers.bankSelect, bMSB]);
+          output.port.send([
+            0xb0 | portCh,
+            midiControllers.bankSelectLSB,
+            bLSB,
+          ]);
+          output.port.send([0xc0 | portCh, prog]);
+        }
+      }
+    }
+
+    if (
+      this.state.playback.transpose !== undefined &&
+      this.state.playback.transpose !== 0
+    ) {
+      this.sendExternalTranspose(this.state.playback.transpose);
+    }
+    if (this.state.playback.volume !== undefined) {
+      this.sendExternalMasterVolume(this.state.playback.volume);
+    }
+  }
+
+  /**
    * Sets the active MIDI output destination for a specific port (0-3).
    * @param {string} deviceId - Hardware port ID, "internal", or "none".
-   * @param {number} [port=0] - Port index (0 = Port 1, 1 = Port 2, etc.)
-   * @returns {boolean} Success status.
+   * @param {number} [port=0] - Port index (0 = Main / Port 1, 1 = Port 2, etc.)
    */
   setMidiOutputDevice(deviceId, port = 0) {
     const portIndex = Math.max(0, Math.min(3, Math.floor(port || 0)));
@@ -325,11 +408,54 @@ export class ForteSynthesizer {
     }
 
     const prevDeviceId = this.state.playback.currentMidiDeviceIds[portIndex];
-    if (prevDeviceId === deviceId) return true;
-
     const currentSequencer = this.state.playback.sequencer;
 
-    // Disconnect previous device on this specific port if external
+    if (portIndex === 0) {
+      if (prevDeviceId === deviceId) return true;
+
+      if (deviceId === "internal") {
+        if (currentSequencer) {
+          this.disconnectSequencerFromMidiOutput(currentSequencer);
+        }
+        this.state.playback.currentMidiDeviceId = "internal";
+        this.state.playback.currentMidiDeviceIds[0] = "internal";
+
+        logVerbose(
+          "Switched Main MIDI Output to Internal Synthesizer (disabling external MIDI).",
+        );
+        this.dispatchUpdate();
+        return true;
+      }
+
+      if (
+        prevDeviceId &&
+        prevDeviceId !== "internal" &&
+        prevDeviceId !== "none" &&
+        this.midiDeviceHandler &&
+        currentSequencer
+      ) {
+        const prevOutput = this.midiDeviceHandler.outputs.get(prevDeviceId);
+        if (prevOutput) {
+          try {
+            prevOutput.disconnect(currentSequencer);
+          } catch (e) {}
+        }
+      }
+
+      this.state.playback.currentMidiDeviceId = deviceId;
+      this.state.playback.currentMidiDeviceIds[0] = deviceId;
+
+      if (currentSequencer) {
+        this.connectSequencerToMidiOutput(currentSequencer);
+      }
+
+      this.initExternalDevicePort(deviceId, 0);
+      this.dispatchUpdate();
+      return true;
+    }
+
+    if (prevDeviceId === deviceId) return true;
+
     if (
       prevDeviceId &&
       prevDeviceId !== "internal" &&
@@ -343,7 +469,7 @@ export class ForteSynthesizer {
           prevOutput.disconnect(currentSequencer);
         } catch (e) {
           console.warn(
-            `[FORTE SVC] Error disconnecting previous MIDI output on Port ${portIndex + 1}:`,
+            `[FORTE SVC] Error disconnecting Port ${portIndex + 1}:`,
             e,
           );
         }
@@ -351,108 +477,31 @@ export class ForteSynthesizer {
     }
 
     this.state.playback.currentMidiDeviceIds[portIndex] = deviceId;
-    if (portIndex === 0) {
-      this.state.playback.currentMidiDeviceId = deviceId;
-    }
-
-    const hasExternal = this.state.playback.currentMidiDeviceIds.some(
-      (id) => id && id !== "internal" && id !== "none",
-    );
 
     if (
+      this.hasExternalMidiDevice() &&
       deviceId &&
-      deviceId !== "internal" &&
       deviceId !== "none" &&
+      deviceId !== "internal" &&
       this.midiDeviceHandler &&
       currentSequencer
     ) {
       const newOutput = this.midiDeviceHandler.outputs.get(deviceId);
       if (newOutput) {
         try {
-          currentSequencer.externalMIDIPlayback = true;
           newOutput.connect(currentSequencer, portIndex * 16);
           logVerbose(
-            `Connected MIDI Port ${portIndex + 1} (offset ${portIndex * 16}) to: ${newOutput.name || deviceId}`,
+            `Connected Port ${portIndex + 1} (offset ${portIndex * 16}) to: ${newOutput.name || deviceId}`,
           );
-
-          const channelOffset = portIndex * 16;
-
-          if (
-            this.state.playback.guideVolume !== undefined &&
-            Array.isArray(this.state.playback.guideChannels)
-          ) {
-            for (const ch of this.state.playback.guideChannels) {
-              if (ch.index >= channelOffset && ch.index < channelOffset + 16) {
-                const portCh = ch.index - channelOffset;
-                newOutput.port.send([
-                  0xb0 | portCh,
-                  midiControllers.expression,
-                  127,
-                ]);
-                newOutput.port.send([
-                  0xb0 | portCh,
-                  midiControllers.mainVolume,
-                  Math.floor(this.state.playback.guideVolume),
-                ]);
-              }
-            }
-          }
-
-          if (this.state.playback.lockedDrumPresets) {
-            for (const [chStr, preset] of Object.entries(
-              this.state.playback.lockedDrumPresets,
-            )) {
-              const ch = parseInt(chStr, 10);
-              if (ch >= channelOffset && ch < channelOffset + 16) {
-                const portCh = ch - channelOffset;
-                const prog = Math.max(0, Math.min(127, preset.program ?? 0));
-                const rawB = Math.floor(preset.bankMSB ?? 0);
-                const bMSB = rawB >= 128 ? 0 : Math.max(0, Math.min(127, rawB));
-                const bLSB = Math.max(
-                  0,
-                  Math.min(127, Math.floor(preset.bankLSB ?? 0)),
-                );
-
-                newOutput.port.send([
-                  0xb0 | portCh,
-                  midiControllers.bankSelect,
-                  bMSB,
-                ]);
-                newOutput.port.send([
-                  0xb0 | portCh,
-                  midiControllers.bankSelectLSB,
-                  bLSB,
-                ]);
-                newOutput.port.send([0xc0 | portCh, prog]);
-              }
-            }
-          }
-
-          if (
-            this.state.playback.transpose !== undefined &&
-            this.state.playback.transpose !== 0
-          ) {
-            this.sendExternalTranspose(this.state.playback.transpose);
-          }
-
-          if (this.state.playback.volume !== undefined) {
-            this.sendExternalMasterVolume(this.state.playback.volume);
-          }
+          this.initExternalDevicePort(deviceId, portIndex);
         } catch (e) {
           console.error(
-            `[FORTE SVC] Failed to connect MIDI output on Port ${portIndex + 1}:`,
+            `[FORTE SVC] Failed to connect Port ${portIndex + 1}:`,
             e,
           );
           return false;
         }
       }
-    } else {
-      if (currentSequencer) {
-        currentSequencer.externalMIDIPlayback = hasExternal;
-      }
-      logVerbose(
-        `Switched MIDI Port ${portIndex + 1} to: ${deviceId === "none" ? "Disabled" : "Internal Synthesizer"}`,
-      );
     }
 
     this.dispatchUpdate();
@@ -595,9 +644,10 @@ export class ForteSynthesizer {
    * @param {number|null} [targetPort=null] - Target port (0-3). If null, broadcasts to all unique external ports.
    */
   sendExternalMidiMessage(message, targetPort = null) {
-    if (!this.midiDeviceHandler) return;
+    if (!this.midiDeviceHandler || !this.hasExternalMidiDevice()) return;
+
     const deviceIds = this.state.playback.currentMidiDeviceIds || [
-      this.state.playback.currentMidiDeviceId || "internal",
+      this.state.playback.currentMidiDeviceId,
     ];
 
     if (targetPort !== null && targetPort >= 0 && targetPort < 4) {
@@ -609,7 +659,7 @@ export class ForteSynthesizer {
             output.port.send(message);
           } catch (e) {
             logVerboseWarn(
-              `[FORTE SVC] Failed to send MIDI message to Port ${targetPort + 1}:`,
+              `[FORTE SVC] Failed to send MIDI to Port ${targetPort + 1}:`,
               e,
             );
           }
@@ -634,7 +684,7 @@ export class ForteSynthesizer {
             output.port.send(message);
           } catch (e) {
             logVerboseWarn(
-              `[FORTE SVC] Failed to broadcast MIDI message to ${deviceId}:`,
+              `[FORTE SVC] Failed to broadcast MIDI to ${deviceId}:`,
               e,
             );
           }
@@ -978,14 +1028,7 @@ export class ForteSynthesizer {
    * @returns {Array<Object>} Array of drum preset objects
    */
   getAvailableDrumPresets() {
-    const deviceIds = this.state.playback.currentMidiDeviceIds || [
-      this.state.playback.currentMidiDeviceId || "internal",
-    ];
-    const isExternal = deviceIds.some(
-      (id) => id && id !== "internal" && id !== "none",
-    );
-
-    if (isExternal) {
+    if (this.hasExternalMidiDevice()) {
       return STANDARD_GM_DRUM_PRESETS;
     }
 
