@@ -263,6 +263,37 @@ export default class SetupManager {
     return menu.items || [];
   }
 
+  getMidiPortConfig(port) {
+    const devs = this.ctx.config.audioConfig?.midiOutputDevices;
+    if (Array.isArray(devs) && devs[port] !== undefined) return devs[port];
+    if (port === 0)
+      return this.ctx.config.audioConfig?.midiOutputDevice || "internal";
+    return "none";
+  }
+
+  updateMidiPortConfig(port, value) {
+    this.ctx.config.audioConfig ??= {};
+    this.ctx.config.audioConfig.midiOutputDevices ??= [
+      this.ctx.config.audioConfig.midiOutputDevice || "internal",
+      "none",
+      "none",
+      "none",
+    ];
+    this.ctx.config.audioConfig.midiOutputDevices[port] = value;
+    if (port === 0) {
+      this.ctx.config.audioConfig.midiOutputDevice = value;
+      window.config.setItem("audioConfig.midiOutputDevice", value);
+    }
+    window.config.setItem(
+      "audioConfig.midiOutputDevices",
+      this.ctx.config.audioConfig.midiOutputDevices,
+    );
+    if (this.ctx.services.Forte.setMidiOutputDevice) {
+      this.ctx.services.Forte.setMidiOutputDevice(value, port);
+    }
+    this.renderView();
+  }
+
   buildSettingsMap() {
     this.DASHBOARD_TILES = [
       { id: "library", label: "Library & Storage", icon: "folder" },
@@ -288,7 +319,7 @@ export default class SetupManager {
       value: d.deviceId,
     }));
 
-    const midiOptions =
+    const midiDeviceOptions =
       this.midiOutputDevices && this.midiOutputDevices.length > 0
         ? this.midiOutputDevices.map((d) => ({
             label: d.name || "Internal Synthesizer",
@@ -296,6 +327,11 @@ export default class SetupManager {
           }))
         : [{ label: "Internal Synthesizer", value: "internal" }];
 
+    const port1Options = midiDeviceOptions;
+    const extraPortOptions = [
+      { label: "Disabled / None", value: "none" },
+      ...midiDeviceOptions,
+    ];
     const serverOptions =
       this.updateServers && this.updateServers.length > 0
         ? this.updateServers.map((s) => ({ label: s.host, value: s.id }))
@@ -427,21 +463,36 @@ export default class SetupManager {
                 },
               },
               {
-                id: "midi_out_device",
-                label: "MIDI Output / Synthesizer",
+                id: "midi_out_port_1",
+                label: "MIDI Port 1 (Ch. 1-16 / Port A)",
                 type: "select",
-                options: midiOptions,
-                get: () =>
-                  this.ctx.config.audioConfig?.midiOutputDevice || "internal",
-                set: (v) => {
-                  this.ctx.config.audioConfig ??= {};
-                  this.ctx.config.audioConfig.midiOutputDevice = v;
-                  window.config.setItem("audioConfig.midiOutputDevice", v);
-                  if (this.ctx.services.Forte.setMidiOutputDevice) {
-                    this.ctx.services.Forte.setMidiOutputDevice(v);
-                  }
-                  this.renderView();
-                },
+                options: port1Options,
+                get: () => this.getMidiPortConfig(0),
+                set: (v) => this.updateMidiPortConfig(0, v),
+              },
+              {
+                id: "midi_out_port_2",
+                label: "MIDI Port 2 (Ch. 17-32 / Port B)",
+                type: "select",
+                options: extraPortOptions,
+                get: () => this.getMidiPortConfig(1),
+                set: (v) => this.updateMidiPortConfig(1, v),
+              },
+              {
+                id: "midi_out_port_3",
+                label: "MIDI Port 3 (Ch. 33-48 / Port C)",
+                type: "select",
+                options: extraPortOptions,
+                get: () => this.getMidiPortConfig(2),
+                set: (v) => this.updateMidiPortConfig(2, v),
+              },
+              {
+                id: "midi_out_port_4",
+                label: "MIDI Port 4 (Ch. 49-64 / Port D)",
+                type: "select",
+                options: extraPortOptions,
+                get: () => this.getMidiPortConfig(3),
+                set: (v) => this.updateMidiPortConfig(3, v),
               },
               {
                 id: "rescan_midi_devices",

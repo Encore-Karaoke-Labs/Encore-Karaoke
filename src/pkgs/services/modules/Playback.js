@@ -1982,6 +1982,12 @@ export class FortePlayback {
       duration,
       currentDeviceId: this.state.playback.currentDeviceId,
       currentMidiDeviceId: this.state.playback.currentMidiDeviceId,
+      currentMidiDeviceIds: this.state.playback.currentMidiDeviceIds || [
+        this.state.playback.currentMidiDeviceId || "internal",
+        "none",
+        "none",
+        "none",
+      ],
       midiOutputs: this.state.playback.midiOutputs,
       isMidi: this.state.playback.isMidi,
       isMultiplexed: this.state.playback.isMultiplexed,

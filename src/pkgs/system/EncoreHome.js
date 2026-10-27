@@ -779,9 +779,18 @@ class EncoreController {
     if (micDevice) await this.services.Forte.setMicDevice(micDevice);
     else await this.services.Forte.setMicDevice("default");
 
-    const savedMidiDevice = this.config.audioConfig?.midiOutputDevice;
-    if (savedMidiDevice && this.services.Forte.setMidiOutputDevice) {
-      await this.services.Forte.setMidiOutputDevice(savedMidiDevice);
+    const savedMidiDevices = this.config.audioConfig?.midiOutputDevices || [
+      this.config.audioConfig?.midiOutputDevice || "internal",
+      "none",
+      "none",
+      "none",
+    ];
+    if (this.services.Forte.setMidiOutputDevice) {
+      for (let port = 0; port < 4; port++) {
+        const dev =
+          savedMidiDevices[port] ?? (port === 0 ? "internal" : "none");
+        await this.services.Forte.setMidiOutputDevice(dev, port);
+      }
     }
 
     const savedChain = this.config.audioConfig?.vocalChain || [];

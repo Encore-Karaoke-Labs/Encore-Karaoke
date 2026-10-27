@@ -103,8 +103,8 @@ const pkg = {
       audioCore.setPlaybackDevice(deviceId, dispatchPlaybackUpdate),
 
     getMidiOutputDevices: () => synthesizer.getMidiOutputDevices(),
-    setMidiOutputDevice: (deviceId) =>
-      synthesizer.setMidiOutputDevice(deviceId),
+    setMidiOutputDevice: (deviceId, port = 0) =>
+      synthesizer.setMidiOutputDevice(deviceId, port),
 
     setPianoRollContainer: (containerSelector) =>
       pianoRoll.setContainer(containerSelector),
