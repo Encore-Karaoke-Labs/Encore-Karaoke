@@ -328,6 +328,7 @@ export class FortePlayback {
     scoring,
     pianoRoll,
     dispatchUpdate,
+    harana,
   ) {
     this.state = state;
     this.audioCore = audioCore;
@@ -335,12 +336,15 @@ export class FortePlayback {
     this.scoring = scoring;
     this.pianoRoll = pianoRoll;
     this.dispatchUpdate = dispatchUpdate;
+    this.harana = harana;
 
     this.sourceNode = null;
     this.audioElement = null;
     this.animationFrameId = null;
     this.lastScoreTime = 0;
     this.guideVolumeSwitchTimeout = null;
+    this.loadingPromise = null;
+    this.loadId = 0;
 
     this.timingLoop = this.timingLoop.bind(this);
   }
@@ -887,6 +891,55 @@ export class FortePlayback {
             min: Math.max(0, minPitch - 4),
             max: Math.min(127, maxPitch + 4),
           };
+
+          if (this.harana) {
+            const haranaData = this.harana.analyzeGuideKeyTimeline(monoNotes);
+            if (haranaData) {
+              this.state.playback.midiInfo = {
+                ...this.state.playback.midiInfo,
+                baseKey: haranaData.baseKey,
+                key: haranaData.baseKey.key,
+                scale: haranaData.baseKey.scale,
+                root: haranaData.baseKey.root,
+                pitchClass: haranaData.baseKey.pitchClass,
+                modulations: haranaData.modulations,
+                keySegments: haranaData.keySegments,
+              };
+            }
+          }
+        } else if (this.harana && noteChannels) {
+          const fallbackNotes = [];
+          for (let ch = 0; ch < 16; ch++) {
+            if (ch === 9) continue;
+            const chNotes = noteChannels[ch];
+            if (chNotes && chNotes.length > 0) {
+              for (const n of chNotes) {
+                fallbackNotes.push({
+                  pitch: n.midiNote,
+                  startTime: n.start,
+                  duration: n.length,
+                });
+              }
+            }
+          }
+
+          fallbackNotes.sort((a, b) => a.startTime - b.startTime);
+          if (fallbackNotes.length > 0) {
+            const haranaData =
+              this.harana.analyzeGuideKeyTimeline(fallbackNotes);
+            if (haranaData) {
+              this.state.playback.midiInfo = {
+                ...this.state.playback.midiInfo,
+                baseKey: haranaData.baseKey,
+                key: haranaData.baseKey.key,
+                scale: haranaData.baseKey.scale,
+                root: haranaData.baseKey.root,
+                pitchClass: haranaData.baseKey.pitchClass,
+                modulations: haranaData.modulations,
+                keySegments: haranaData.keySegments,
+              };
+            }
+          }
         }
       }
     }
@@ -1179,6 +1232,35 @@ export class FortePlayback {
    */
   async loadTrack(url, chorusUrl = null, midiGuideUrl = null) {
     if (!this.audioCore.context) return false;
+
+    const currentLoadId = ++this.loadId;
+    let resolver;
+    this.loadingPromise = new Promise((resolve) => {
+      resolver = resolve;
+    });
+
+    try {
+      const result = await this._executeLoadTrack(
+        url,
+        chorusUrl,
+        midiGuideUrl,
+        currentLoadId,
+      );
+      return result;
+    } finally {
+      if (this.loadId === currentLoadId) {
+        this.loadingPromise = null;
+      }
+      resolver();
+    }
+  }
+
+  async _executeLoadTrack(
+    url,
+    chorusUrl = null,
+    midiGuideUrl = null,
+    currentLoadId,
+  ) {
     if (this.state.playback.status !== "stopped") this.stopTrack();
 
     this.state.playback.hasMidiGuide = false;
@@ -1388,7 +1470,11 @@ export class FortePlayback {
   /**
    * Executes loaded node timelines beginning progression logic and sound routing.
    */
-  playTrack() {
+  async playTrack() {
+    if (this.loadingPromise) {
+      await this.loadingPromise;
+    }
+
     if (this.audioCore.context.state === "suspended")
       this.audioCore.context.resume();
 
@@ -1432,26 +1518,16 @@ export class FortePlayback {
         details: { accuracy: 0 },
       });
 
-      if (
-        this.state.playback.isMidi &&
-        this.state.playback.midiInfo &&
-        this.state.playback.midiInfo.pitchClass !== null
-      ) {
-        const transposedPc =
-          (this.state.playback.midiInfo.pitchClass +
-            this.state.playback.transpose +
-            24) %
-          12;
-        const isMinor = this.state.playback.midiInfo.scale === "minor";
-        const rootNames = isMinor ? MINOR_ROOT_NAMES : MAJOR_ROOT_NAMES;
-        const steps = isMinor ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
-
-        this.state.scoring.currentKeyName = `${rootNames[transposedPc]} ${
-          isMinor ? "Minor" : "Major"
-        }`;
-        this.state.scoring.allowedPitchClasses = steps
-          .map((s) => (transposedPc + s) % 12)
-          .sort((a, b) => a - b);
+      if (this.harana) {
+        const activeKey = this.harana.getActiveKey(
+          0,
+          this.state.playback.transpose || 0,
+        );
+        if (activeKey) {
+          this.state.scoring.currentKeyName = activeKey.key;
+          this.state.scoring.allowedPitchClasses =
+            activeKey.allowedPitchClasses;
+        }
       }
     }
 
@@ -1838,26 +1914,15 @@ export class FortePlayback {
     if (transposeDelta !== 0) {
       this.state.scoring.rollingChroma.fill(0);
       this.state.scoring.keyHistory = [];
-      if (this.state.scoring.allowedPitchClasses.length > 0) {
-        this.state.scoring.allowedPitchClasses =
-          this.state.scoring.allowedPitchClasses.map(
-            (pc) => (pc + transposeDelta + 24) % 12,
-          );
-      }
 
-      // Keep key string up-to-date in scoring state when transposed
-      if (
-        (this.state.playback.isMidi || this.state.playback.hasMidiGuide) &&
-        this.state.playback.midiInfo &&
-        this.state.playback.midiInfo.pitchClass !== null
-      ) {
-        const transposedPc =
-          (this.state.playback.midiInfo.pitchClass + clamped + 24) % 12;
-        const isMinor = this.state.playback.midiInfo.scale === "minor";
-        const rootNames = isMinor ? MINOR_ROOT_NAMES : MAJOR_ROOT_NAMES;
-        this.state.scoring.currentKeyName = `${rootNames[transposedPc]} ${
-          isMinor ? "Minor" : "Major"
-        }`;
+      if (this.harana) {
+        const currentTime = this.getPlaybackState().currentTime || 0;
+        const activeKey = this.harana.getActiveKey(currentTime, clamped);
+        if (activeKey) {
+          this.state.scoring.currentKeyName = activeKey.key;
+          this.state.scoring.allowedPitchClasses =
+            activeKey.allowedPitchClasses;
+        }
       }
     }
 

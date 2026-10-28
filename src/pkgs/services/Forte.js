@@ -1,5 +1,6 @@
 import { ForteAudioCore } from "./core/AudioCore.js";
 import { logVerbose, logVerboseWarn, state } from "./core/State.js";
+import { ForteHarana } from "./modules/Harana.js";
 import { ForteMicrophone } from "./modules/Microphone.js";
 import { FortePianoRoll } from "./modules/PianoRoll.js";
 import { FortePlayback } from "./modules/Playback.js";
@@ -15,6 +16,7 @@ let pianoRoll;
 let synthesizer;
 let microphone;
 let scoring;
+let harana;
 let playback;
 let sfx;
 
@@ -54,6 +56,8 @@ const pkg = {
     pianoRoll = new FortePianoRoll(state);
     pianoRoll.initialize();
 
+    harana = new ForteHarana(state);
+
     microphone = new ForteMicrophone(state, audioCore);
     scoring = new ForteScoring(state, audioCore, pianoRoll);
 
@@ -70,6 +74,7 @@ const pkg = {
       scoring,
       pianoRoll,
       dispatchPlaybackUpdate,
+      harana,
       pkg.data,
     );
 
