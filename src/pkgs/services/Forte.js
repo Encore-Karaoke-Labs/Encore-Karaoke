@@ -53,10 +53,10 @@ const pkg = {
     audioCore = new ForteAudioCore(state, config);
     await audioCore.initialize();
 
-    pianoRoll = new FortePianoRoll(state);
-    pianoRoll.initialize();
-
     harana = new ForteHarana(state);
+
+    pianoRoll = new FortePianoRoll(state, harana);
+    pianoRoll.initialize();
 
     microphone = new ForteMicrophone(state, audioCore);
     scoring = new ForteScoring(state, audioCore, pianoRoll);

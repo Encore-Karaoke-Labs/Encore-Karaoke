@@ -4,8 +4,9 @@ const PIXELS_PER_SECOND = 150;
 const NOTE_HEIGHT = 16;
 
 export class FortePianoRoll {
-  constructor(state) {
+  constructor(state, harana = null) {
     this.state = state;
+    this.harana = harana;
 
     this.container = null;
     this.canvas = null;
@@ -19,6 +20,7 @@ export class FortePianoRoll {
     this.cachedPageIndex = -1;
     this.cachedNotesLength = -1;
     this.cachedNotes = null;
+    this.cachedTranspose = 0;
     this.lastTime = -1;
 
     this.noteStartIndex = 0;
@@ -241,6 +243,11 @@ export class FortePianoRoll {
       this.noteStartIndex = 0;
     }
 
+    if (this.cachedTranspose !== (this.state.playback.transpose || 0)) {
+      this.cachedTranspose = this.state.playback.transpose || 0;
+      this.cachedPageIndex = -1;
+    }
+
     if (currentTime < this.lastTime) {
       this.noteStartIndex = 0;
       this.cachedPageIndex = -1;
@@ -288,6 +295,14 @@ export class FortePianoRoll {
       }
       this.pageCtx.stroke();
 
+      this.drawModulatedLanes(
+        this.pageCtx,
+        pageRealStartTime,
+        pageRealEndTime,
+        width,
+        height,
+      );
+
       for (let i = 0; i < notes.length; i++) {
         const note = notes[i];
         if (note.startTime + note.duration < pageRealStartTime) continue;
@@ -304,6 +319,8 @@ export class FortePianoRoll {
 
     ctx.clearRect(0, 0, width, height);
     ctx.drawImage(this.pageCanvas, 0, 0);
+
+    this.drawModulationMarkers(ctx, pageRealStartTime, pageRealEndTime, height);
 
     while (
       this.noteStartIndex < notes.length &&
@@ -472,6 +489,243 @@ export class FortePianoRoll {
         ctx.stroke();
       }
     }
+
+    this.drawKeyIndicator(ctx, currentTime, width, height);
+  }
+
+  drawModulatedLanes(
+    ctxToUse,
+    pageRealStartTime,
+    pageRealEndTime,
+    width,
+    height,
+  ) {
+    const isEligible =
+      (this.state.playback.isMidi || this.state.playback.hasMidiGuide) &&
+      this.state.playback.guideNotes &&
+      this.state.playback.guideNotes.length > 0;
+
+    if (!isEligible) return;
+
+    const segments = this.state.playback.midiInfo?.keySegments;
+    if (!segments || segments.length === 0) return;
+
+    for (let s = 0; s < segments.length; s++) {
+      const seg = segments[s];
+      if (!seg.startNoteIndex || seg.startNoteIndex <= 0) continue;
+
+      if (seg.startTime < pageRealEndTime && seg.endTime > pageRealStartTime) {
+        const startX = Math.max(
+          0,
+          ((seg.startTime - pageRealStartTime) * PIXELS_PER_SECOND) | 0,
+        );
+        const endX = Math.min(
+          width,
+          ((seg.endTime - pageRealStartTime) * PIXELS_PER_SECOND) | 0,
+        );
+        const segWidth = endX - startX;
+        if (segWidth <= 0) continue;
+
+        ctxToUse.save();
+
+        const grad = ctxToUse.createLinearGradient(0, 0, 0, height);
+        grad.addColorStop(0, "rgba(147, 51, 234, 0.16)");
+        grad.addColorStop(0.5, "rgba(126, 34, 206, 0.08)");
+        grad.addColorStop(1, "rgba(88, 28, 135, 0.18)");
+        ctxToUse.fillStyle = grad;
+        ctxToUse.fillRect(startX, 0, segWidth, height);
+
+        ctxToUse.fillStyle = "rgba(168, 85, 247, 0.04)";
+        for (let i = 0; i < 8; i += 2) {
+          const laneY = ((height / 8) * i) | 0;
+          const laneH = (((height / 8) * (i + 1)) | 0) - laneY;
+          ctxToUse.fillRect(startX, laneY, segWidth, laneH);
+        }
+
+        ctxToUse.strokeStyle = "rgba(192, 132, 252, 0.22)";
+        ctxToUse.lineWidth = 1;
+        ctxToUse.beginPath();
+        for (let i = 1; i < 8; i++) {
+          const lineY = ((height / 8) * i) | 0;
+          ctxToUse.moveTo(startX, lineY);
+          ctxToUse.lineTo(startX + segWidth, lineY);
+        }
+        ctxToUse.stroke();
+
+        if (
+          seg.startTime >= pageRealStartTime &&
+          seg.startTime <= pageRealEndTime &&
+          startX > 0
+        ) {
+          const glowWidth = Math.min(40, segWidth);
+          const edgeGlow = ctxToUse.createLinearGradient(
+            startX,
+            0,
+            startX + glowWidth,
+            0,
+          );
+          edgeGlow.addColorStop(0, "rgba(192, 132, 252, 0.28)");
+          edgeGlow.addColorStop(1, "transparent");
+          ctxToUse.fillStyle = edgeGlow;
+          ctxToUse.fillRect(startX, 0, glowWidth, height);
+        }
+
+        ctxToUse.restore();
+      }
+    }
+  }
+
+  drawModulationMarkers(ctx, pageRealStartTime, pageRealEndTime, height) {
+    const isEligible =
+      (this.state.playback.isMidi || this.state.playback.hasMidiGuide) &&
+      this.state.playback.guideNotes &&
+      this.state.playback.guideNotes.length > 0;
+
+    if (!isEligible) return;
+
+    const modulations = this.state.playback.midiInfo?.modulations;
+    if (!modulations || modulations.length === 0) return;
+
+    const transpose = this.state.playback.transpose || 0;
+
+    for (let i = 0; i < modulations.length; i++) {
+      const mod = modulations[i];
+      if (mod.time >= pageRealStartTime && mod.time <= pageRealEndTime) {
+        const modX = ((mod.time - pageRealStartTime) * PIXELS_PER_SECOND) | 0;
+
+        ctx.save();
+
+        ctx.strokeStyle = "rgba(168, 85, 247, 0.25)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(modX, 0);
+        ctx.lineTo(modX, height);
+        ctx.stroke();
+
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = "rgba(192, 132, 252, 0.85)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(modX, 0);
+        ctx.lineTo(modX, height);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const targetKeyObj = this.harana
+          ? this.harana.getActiveKey(mod.time + 0.05, transpose)
+          : null;
+        const targetKeyName = targetKeyObj ? targetKeyObj.key : mod.toKey;
+        const flagText = `✦ ${targetKeyName}`;
+
+        ctx.font = "700 11px 'Rajdhani', system-ui, sans-serif";
+        const flagWidth = ctx.measureText(flagText).width + 12;
+        const flagX = Math.min(modX + 2, this.cachedWidth - flagWidth - 4);
+
+        ctx.fillStyle = "rgba(107, 33, 168, 0.9)";
+        ctx.beginPath();
+        if (this.hasRoundRect) {
+          ctx.roundRect(flagX, 4, flagWidth, 18, 4);
+        } else {
+          ctx.rect(flagX, 4, flagWidth, 18);
+        }
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(192, 132, 252, 0.85)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = "#f5f3ff";
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "left";
+        ctx.fillText(flagText, flagX + 6, 13);
+
+        ctx.restore();
+      }
+    }
+  }
+
+  drawKeyIndicator(ctx, currentTime, width, height) {
+    const isEligible =
+      (this.state.playback.isMidi || this.state.playback.hasMidiGuide) &&
+      this.state.playback.guideNotes &&
+      this.state.playback.guideNotes.length > 0;
+
+    if (!isEligible) return;
+
+    const transpose = this.state.playback.transpose || 0;
+    const activeKey = this.harana
+      ? this.harana.getActiveKey(currentTime, transpose)
+      : null;
+
+    if (!activeKey || !activeKey.key) return;
+
+    ctx.save();
+
+    const isModulated = Boolean(activeKey.isModulated);
+    const keyName = activeKey.key;
+
+    ctx.font = "700 11px 'Rajdhani', system-ui, sans-serif";
+    const tagWidth = ctx.measureText("KEY").width;
+
+    ctx.font = "700 14px 'Rajdhani', system-ui, sans-serif";
+    const textWidth = ctx.measureText(keyName).width;
+
+    const paddingX = 10;
+    const badgeHeight = 24;
+    const badgeWidth = tagWidth + textWidth + paddingX * 2 + 8;
+    const badgeX = 14;
+    const badgeY = 12;
+
+    ctx.beginPath();
+    if (this.hasRoundRect) {
+      ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 6);
+    } else {
+      ctx.rect(badgeX, badgeY, badgeWidth, badgeHeight);
+    }
+
+    if (isModulated) {
+      ctx.fillStyle = "rgba(38, 14, 60, 0.88)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(192, 132, 252, 0.85)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "left";
+      ctx.font = "700 11px 'Rajdhani', system-ui, sans-serif";
+      ctx.fillStyle = "#c084fc";
+      ctx.fillText("KEY", badgeX + paddingX, badgeY + badgeHeight / 2);
+
+      ctx.font = "700 14px 'Rajdhani', system-ui, sans-serif";
+      ctx.fillStyle = "#f3e8ff";
+      ctx.fillText(
+        keyName,
+        badgeX + paddingX + tagWidth + 8,
+        badgeY + badgeHeight / 2,
+      );
+    } else {
+      ctx.fillStyle = "rgba(10, 15, 30, 0.82)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(137, 207, 240, 0.3)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "left";
+      ctx.font = "700 11px 'Rajdhani', system-ui, sans-serif";
+      ctx.fillStyle = "rgba(137, 207, 240, 0.85)";
+      ctx.fillText("KEY", badgeX + paddingX, badgeY + badgeHeight / 2);
+
+      ctx.font = "700 14px 'Rajdhani', system-ui, sans-serif";
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(
+        keyName,
+        badgeX + paddingX + tagWidth + 8,
+        badgeY + badgeHeight / 2,
+      );
+    }
+
+    ctx.restore();
   }
 
   /**
