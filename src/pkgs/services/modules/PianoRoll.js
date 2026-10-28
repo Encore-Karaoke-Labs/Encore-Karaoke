@@ -32,6 +32,7 @@ export class FortePianoRoll {
     this.gradHit = null;
     this.gradMiss = null;
     this.gradNeutral = null;
+    this.gradNeutralModulated = null;
     this.gradSweep = null;
 
     this.resizeHandler = this.handleResize.bind(this);
@@ -86,6 +87,7 @@ export class FortePianoRoll {
     this.gradHit = createNoteGrad("#a3e635", "#4d7c0f");
     this.gradMiss = createNoteGrad("#fca5a5", "#991b1b");
     this.gradNeutral = createNoteGrad("#7dd3fc", "#0284c7");
+    this.gradNeutralModulated = createNoteGrad("#c084fc", "#7e22ce");
 
     this.gradSweep = this.ctx.createLinearGradient(-120, 0, 0, 0);
     this.gradSweep.addColorStop(0, "transparent");
@@ -153,10 +155,25 @@ export class FortePianoRoll {
     else if (this.container) this.container.classOff("visible");
   }
 
+  isNoteModulated(note) {
+    if (note.isModulated !== undefined) return note.isModulated;
+    if (note._isModulated !== undefined) return note._isModulated;
+
+    const segments = this.state.playback.midiInfo?.keySegments;
+    if (!segments || segments.length === 0) return false;
+
+    const seg = segments.find(
+      (s) => note.startTime >= s.startTime && note.startTime < s.endTime,
+    );
+    note._isModulated = Boolean(seg && seg.startNoteIndex > 0);
+    return note._isModulated;
+  }
+
   drawNote(ctxToUse, note, startX, y, noteWidth, isActive) {
     ctxToUse.save();
     ctxToUse.translate(startX | 0, y | 0);
     const halfHeight = NOTE_HEIGHT / 2;
+    const isModulated = this.isNoteModulated(note);
 
     if (isActive) {
       if (note.hitStatus === "hit") {
@@ -164,7 +181,9 @@ export class FortePianoRoll {
       } else if (note.hitStatus === "miss") {
         ctxToUse.fillStyle = "rgba(248, 113, 113, 0.4)"; // Red
       } else {
-        ctxToUse.fillStyle = "rgba(56, 189, 248, 0.4)"; // Blue
+        ctxToUse.fillStyle = isModulated
+          ? "rgba(192, 132, 252, 0.45)" // Purple
+          : "rgba(56, 189, 248, 0.4)"; // Blue
       }
 
       ctxToUse.beginPath();
@@ -187,7 +206,9 @@ export class FortePianoRoll {
     } else if (note.hitStatus === "miss") {
       ctxToUse.fillStyle = this.gradMiss;
     } else {
-      ctxToUse.fillStyle = this.gradNeutral;
+      ctxToUse.fillStyle = isModulated
+        ? this.gradNeutralModulated
+        : this.gradNeutral;
     }
 
     ctxToUse.beginPath();
