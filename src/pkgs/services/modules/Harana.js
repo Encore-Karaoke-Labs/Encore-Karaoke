@@ -398,13 +398,25 @@ export class ForteHarana {
       .map((s) => (transposedPc + s) % 12)
       .sort((a, b) => a - b);
 
+    const isModulated = activeSegment
+      ? activeSegment.startNoteIndex > 0
+      : false;
+    const modSegments = midiInfo.keySegments
+      ? midiInfo.keySegments.filter((s) => s.startNoteIndex > 0)
+      : [];
+    const isSubsequentModulated =
+      isModulated && activeSegment
+        ? modSegments.indexOf(activeSegment) > 0
+        : false;
+
     return {
       root: rootName,
       scale: rawScale,
       pitchClass: transposedPc,
       key: keyName,
       allowedPitchClasses,
-      isModulated: activeSegment ? activeSegment.startNoteIndex > 0 : false,
+      isModulated,
+      isSubsequentModulated,
     };
   }
 }

@@ -33,6 +33,7 @@ export class FortePianoRoll {
     this.gradMiss = null;
     this.gradNeutral = null;
     this.gradNeutralModulated = null;
+    this.gradNeutralSubModulated = null;
     this.gradSweep = null;
 
     this.resizeHandler = this.handleResize.bind(this);
@@ -88,6 +89,7 @@ export class FortePianoRoll {
     this.gradMiss = createNoteGrad("#fca5a5", "#991b1b");
     this.gradNeutral = createNoteGrad("#7dd3fc", "#0284c7");
     this.gradNeutralModulated = createNoteGrad("#c084fc", "#7e22ce");
+    this.gradNeutralSubModulated = createNoteGrad("#f472b6", "#9333ea");
 
     this.gradSweep = this.ctx.createLinearGradient(-120, 0, 0, 0);
     this.gradSweep.addColorStop(0, "transparent");
@@ -155,25 +157,45 @@ export class FortePianoRoll {
     else if (this.container) this.container.classOff("visible");
   }
 
-  isNoteModulated(note) {
-    if (note.isModulated !== undefined) return note.isModulated;
-    if (note._isModulated !== undefined) return note._isModulated;
+  getNoteModulationState(note) {
+    if (note._modState !== undefined) return note._modState;
 
     const segments = this.state.playback.midiInfo?.keySegments;
-    if (!segments || segments.length === 0) return false;
+    if (!segments || segments.length === 0) {
+      note._modState = { isModulated: false, isSubsequent: false };
+      return note._modState;
+    }
 
     const seg = segments.find(
       (s) => note.startTime >= s.startTime && note.startTime < s.endTime,
     );
-    note._isModulated = Boolean(seg && seg.startNoteIndex > 0);
-    return note._isModulated;
+
+    if (!seg || !seg.startNoteIndex || seg.startNoteIndex <= 0) {
+      note._modState = { isModulated: false, isSubsequent: false };
+      return note._modState;
+    }
+
+    const modulatedSegments = segments.filter((s) => s.startNoteIndex > 0);
+    const modIndex = modulatedSegments.indexOf(seg);
+
+    note._modState = {
+      isModulated: true,
+      isSubsequent: modIndex > 0,
+    };
+    return note._modState;
+  }
+
+  isNoteModulated(note) {
+    return this.getNoteModulationState(note).isModulated;
   }
 
   drawNote(ctxToUse, note, startX, y, noteWidth, isActive) {
     ctxToUse.save();
     ctxToUse.translate(startX | 0, y | 0);
     const halfHeight = NOTE_HEIGHT / 2;
-    const isModulated = this.isNoteModulated(note);
+    const modState = this.getNoteModulationState(note);
+    const isModulated = modState.isModulated;
+    const isSubsequent = modState.isSubsequent;
 
     if (isActive) {
       if (note.hitStatus === "hit") {
@@ -182,7 +204,9 @@ export class FortePianoRoll {
         ctxToUse.fillStyle = "rgba(248, 113, 113, 0.4)"; // Red
       } else {
         ctxToUse.fillStyle = isModulated
-          ? "rgba(192, 132, 252, 0.45)" // Purple
+          ? isSubsequent
+            ? "rgba(244, 114, 182, 0.45)" // Pink-Purple Halo
+            : "rgba(192, 132, 252, 0.45)" // Purple Halo
           : "rgba(56, 189, 248, 0.4)"; // Blue
       }
 
@@ -207,7 +231,9 @@ export class FortePianoRoll {
       ctxToUse.fillStyle = this.gradMiss;
     } else {
       ctxToUse.fillStyle = isModulated
-        ? this.gradNeutralModulated
+        ? isSubsequent
+          ? this.gradNeutralSubModulated // SUPER FEVER
+          : this.gradNeutralModulated // FEVER
         : this.gradNeutral;
     }
 
@@ -531,6 +557,8 @@ export class FortePianoRoll {
     const segments = this.state.playback.midiInfo?.keySegments;
     if (!segments || segments.length === 0) return;
 
+    const modulatedSegments = segments.filter((s) => s.startNoteIndex > 0);
+
     for (let s = 0; s < segments.length; s++) {
       const seg = segments[s];
       if (!seg.startNoteIndex || seg.startNoteIndex <= 0) continue;
@@ -547,23 +575,37 @@ export class FortePianoRoll {
         const segWidth = endX - startX;
         if (segWidth <= 0) continue;
 
+        const isSubsequent = modulatedSegments.indexOf(seg) > 0;
+
         ctxToUse.save();
 
         const grad = ctxToUse.createLinearGradient(0, 0, 0, height);
-        grad.addColorStop(0, "rgba(147, 51, 234, 0.16)");
-        grad.addColorStop(0.5, "rgba(126, 34, 206, 0.08)");
-        grad.addColorStop(1, "rgba(88, 28, 135, 0.18)");
+        if (isSubsequent) {
+          // SUPER FEVER
+          grad.addColorStop(0, "rgba(236, 72, 153, 0.20)");
+          grad.addColorStop(0.5, "rgba(192, 38, 211, 0.10)");
+          grad.addColorStop(1, "rgba(126, 34, 206, 0.20)");
+        } else {
+          // FEVER
+          grad.addColorStop(0, "rgba(147, 51, 234, 0.16)");
+          grad.addColorStop(0.5, "rgba(126, 34, 206, 0.08)");
+          grad.addColorStop(1, "rgba(88, 28, 135, 0.18)");
+        }
         ctxToUse.fillStyle = grad;
         ctxToUse.fillRect(startX, 0, segWidth, height);
 
-        ctxToUse.fillStyle = "rgba(168, 85, 247, 0.04)";
+        ctxToUse.fillStyle = isSubsequent
+          ? "rgba(244, 114, 182, 0.05)"
+          : "rgba(168, 85, 247, 0.04)";
         for (let i = 0; i < 8; i += 2) {
           const laneY = ((height / 8) * i) | 0;
           const laneH = (((height / 8) * (i + 1)) | 0) - laneY;
           ctxToUse.fillRect(startX, laneY, segWidth, laneH);
         }
 
-        ctxToUse.strokeStyle = "rgba(192, 132, 252, 0.22)";
+        ctxToUse.strokeStyle = isSubsequent
+          ? "rgba(244, 114, 182, 0.25)"
+          : "rgba(192, 132, 252, 0.22)";
         ctxToUse.lineWidth = 1;
         ctxToUse.beginPath();
         for (let i = 1; i < 8; i++) {
@@ -585,7 +627,11 @@ export class FortePianoRoll {
             startX + glowWidth,
             0,
           );
-          edgeGlow.addColorStop(0, "rgba(192, 132, 252, 0.28)");
+          if (isSubsequent) {
+            edgeGlow.addColorStop(0, "rgba(244, 114, 182, 0.35)");
+          } else {
+            edgeGlow.addColorStop(0, "rgba(192, 132, 252, 0.28)");
+          }
           edgeGlow.addColorStop(1, "transparent");
           ctxToUse.fillStyle = edgeGlow;
           ctxToUse.fillRect(startX, 0, glowWidth, height);
@@ -613,10 +659,13 @@ export class FortePianoRoll {
       const mod = modulations[i];
       if (mod.time >= pageRealStartTime && mod.time <= pageRealEndTime) {
         const modX = ((mod.time - pageRealStartTime) * PIXELS_PER_SECOND) | 0;
+        const isSubsequent = i > 0;
 
         ctx.save();
 
-        ctx.strokeStyle = "rgba(168, 85, 247, 0.25)";
+        ctx.strokeStyle = isSubsequent
+          ? "rgba(236, 72, 153, 0.3)"
+          : "rgba(168, 85, 247, 0.25)";
         ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.moveTo(modX, 0);
@@ -624,7 +673,9 @@ export class FortePianoRoll {
         ctx.stroke();
 
         ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = "rgba(192, 132, 252, 0.85)";
+        ctx.strokeStyle = isSubsequent
+          ? "rgba(244, 114, 182, 0.9)"
+          : "rgba(192, 132, 252, 0.85)";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(modX, 0);
@@ -642,7 +693,20 @@ export class FortePianoRoll {
         const flagWidth = ctx.measureText(flagText).width + 12;
         const flagX = Math.min(modX + 2, this.cachedWidth - flagWidth - 4);
 
-        ctx.fillStyle = "rgba(107, 33, 168, 0.9)";
+        if (isSubsequent) {
+          const flagGrad = ctx.createLinearGradient(
+            flagX,
+            4,
+            flagX + flagWidth,
+            22,
+          );
+          flagGrad.addColorStop(0, "rgba(219, 39, 119, 0.95)"); // Pink
+          flagGrad.addColorStop(1, "rgba(126, 34, 206, 0.95)"); // Purple
+          ctx.fillStyle = flagGrad;
+        } else {
+          ctx.fillStyle = "rgba(107, 33, 168, 0.9)";
+        }
+
         ctx.beginPath();
         if (this.hasRoundRect) {
           ctx.roundRect(flagX, 4, flagWidth, 18, 4);
@@ -651,11 +715,13 @@ export class FortePianoRoll {
         }
         ctx.fill();
 
-        ctx.strokeStyle = "rgba(192, 132, 252, 0.85)";
+        ctx.strokeStyle = isSubsequent
+          ? "rgba(249, 168, 212, 0.9)"
+          : "rgba(192, 132, 252, 0.85)";
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        ctx.fillStyle = "#f5f3ff";
+        ctx.fillStyle = isSubsequent ? "#ffffff" : "#f5f3ff";
         ctx.textBaseline = "middle";
         ctx.textAlign = "left";
         ctx.fillText(flagText, flagX + 6, 13);
@@ -705,25 +771,58 @@ export class FortePianoRoll {
     }
 
     if (isModulated) {
-      ctx.fillStyle = "rgba(38, 14, 60, 0.88)";
-      ctx.fill();
-      ctx.strokeStyle = "rgba(192, 132, 252, 0.85)";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+      const isSubsequent = Boolean(activeKey.isSubsequentModulated);
 
-      ctx.textBaseline = "middle";
-      ctx.textAlign = "left";
-      ctx.font = "700 11px 'Rajdhani', system-ui, sans-serif";
-      ctx.fillStyle = "#c084fc";
-      ctx.fillText("KEY", badgeX + paddingX, badgeY + badgeHeight / 2);
+      if (isSubsequent) {
+        const badgeGrad = ctx.createLinearGradient(
+          badgeX,
+          badgeY,
+          badgeX + badgeWidth,
+          badgeY + badgeHeight,
+        );
+        badgeGrad.addColorStop(0, "rgba(88, 20, 60, 0.92)");
+        badgeGrad.addColorStop(1, "rgba(55, 15, 80, 0.92)");
+        ctx.fillStyle = badgeGrad;
+        ctx.fill();
 
-      ctx.font = "700 14px 'Rajdhani', system-ui, sans-serif";
-      ctx.fillStyle = "#f3e8ff";
-      ctx.fillText(
-        keyName,
-        badgeX + paddingX + tagWidth + 8,
-        badgeY + badgeHeight / 2,
-      );
+        ctx.strokeStyle = "rgba(244, 114, 182, 0.85)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "left";
+        ctx.font = "700 11px 'Rajdhani', system-ui, sans-serif";
+        ctx.fillStyle = "#f472b6";
+        ctx.fillText("KEY", badgeX + paddingX, badgeY + badgeHeight / 2);
+
+        ctx.font = "700 14px 'Rajdhani', system-ui, sans-serif";
+        ctx.fillStyle = "#fdf2f8";
+        ctx.fillText(
+          keyName,
+          badgeX + paddingX + tagWidth + 8,
+          badgeY + badgeHeight / 2,
+        );
+      } else {
+        ctx.fillStyle = "rgba(38, 14, 60, 0.88)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(192, 132, 252, 0.85)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "left";
+        ctx.font = "700 11px 'Rajdhani', system-ui, sans-serif";
+        ctx.fillStyle = "#c084fc";
+        ctx.fillText("KEY", badgeX + paddingX, badgeY + badgeHeight / 2);
+
+        ctx.font = "700 14px 'Rajdhani', system-ui, sans-serif";
+        ctx.fillStyle = "#f3e8ff";
+        ctx.fillText(
+          keyName,
+          badgeX + paddingX + tagWidth + 8,
+          badgeY + badgeHeight / 2,
+        );
+      }
     } else {
       ctx.fillStyle = "rgba(10, 15, 30, 0.82)";
       ctx.fill();
