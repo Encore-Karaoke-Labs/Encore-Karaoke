@@ -187,7 +187,7 @@ export class ForteHarana {
     const modulations = [];
     const keySegments = [];
 
-    let segmentStartTime = 0;
+    let segmentStartTime = guideNotes[0].startTime || 0;
     let segmentStartNoteIndex = 0;
 
     let i = 0;
@@ -201,71 +201,133 @@ export class ForteHarana {
         note.isModulation = false;
         note.key = currentKey.key;
         i++;
-      } else {
+        continue;
+      }
+
+      const lookaheadCount = Math.min(6, guideNotes.length - (i + 1));
+      let upcomingOutCount = 0;
+
+      for (let k = 1; k <= lookaheadCount; k++) {
+        if (!this.isNoteInKey(guideNotes[i + k].pitch, currentKey)) {
+          upcomingOutCount++;
+        }
+      }
+
+      if (upcomingOutCount < 2) {
         note.isInKey = false;
         note.isAnomaly = true;
         note.isModulation = false;
         note.key = currentKey.key;
+        i++;
+        continue;
+      }
 
-        const LOOKAHEAD = 4;
-        if (i + LOOKAHEAD < guideNotes.length) {
-          let allNextFourOutOfKey = true;
-          for (let k = 1; k <= LOOKAHEAD; k++) {
-            if (this.isNoteInKey(guideNotes[i + k].pitch, currentKey)) {
-              allNextFourOutOfKey = false;
+      const reanalysisWindow = Math.min(guideNotes.length - i, 24);
+      const candidateKey = this.detectKeyFromNotes(
+        guideNotes,
+        i,
+        reanalysisWindow,
+      );
+
+      let modulated = false;
+
+      if (
+        candidateKey &&
+        (candidateKey.pitchClass !== currentKey.pitchClass ||
+          candidateKey.scale !== currentKey.scale) &&
+        candidateKey.correlation >= 0.35
+      ) {
+        let candidateMatches = 0;
+        let currentMatches = 0;
+
+        for (let k = 0; k < reanalysisWindow; k++) {
+          const p = guideNotes[i + k].pitch;
+          if (this.isNoteInKey(p, candidateKey)) candidateMatches++;
+          if (this.isNoteInKey(p, currentKey)) currentMatches++;
+        }
+
+        const candidateFit = candidateMatches / reanalysisWindow;
+        const currentFit = currentMatches / reanalysisWindow;
+
+        const isConfirmed =
+          candidateFit >= 0.75 &&
+          candidateMatches > currentMatches + 1 &&
+          currentFit <= 0.65;
+
+        if (isConfirmed) {
+          let modStartIndex = i;
+          const maxBacktrack = Math.max(segmentStartNoteIndex, i - 6);
+
+          for (let j = i - 1; j >= maxBacktrack; j--) {
+            const pNote = guideNotes[j];
+            const nNote = guideNotes[j + 1];
+            const onsetGap = nNote.startTime - pNote.startTime;
+
+            if (onsetGap >= 1.5) {
+              if (this.isNoteInKey(nNote.pitch, candidateKey)) {
+                modStartIndex = j + 1;
+              }
               break;
             }
+
+            if (!this.isNoteInKey(pNote.pitch, candidateKey)) {
+              modStartIndex = j + 1;
+              break;
+            }
+
+            modStartIndex = j;
           }
 
-          if (allNextFourOutOfKey) {
-            const reanalysisWindow = Math.min(guideNotes.length - i, 32);
-            const newKey = this.detectKeyFromNotes(
-              guideNotes,
-              i,
-              reanalysisWindow,
-            );
+          if (modStartIndex > segmentStartNoteIndex) {
+            const modNote = guideNotes[modStartIndex];
 
-            if (
-              newKey &&
-              (newKey.pitchClass !== currentKey.pitchClass ||
-                newKey.scale !== currentKey.scale)
-            ) {
-              keySegments.push({
-                startTime: segmentStartTime,
-                endTime: note.startTime,
-                startNoteIndex: segmentStartNoteIndex,
-                endNoteIndex: i - 1,
-                key: currentKey.key,
-                scale: currentKey.scale,
-                root: currentKey.root,
-                pitchClass: currentKey.pitchClass,
-                allowedPitchClasses: currentKey.allowedPitchClasses,
-              });
+            keySegments.push({
+              startTime: segmentStartTime,
+              endTime: modNote.startTime,
+              startNoteIndex: segmentStartNoteIndex,
+              endNoteIndex: modStartIndex - 1,
+              key: currentKey.key,
+              scale: currentKey.scale,
+              root: currentKey.root,
+              pitchClass: currentKey.pitchClass,
+              allowedPitchClasses: currentKey.allowedPitchClasses,
+            });
 
-              note.isModulation = true;
-              note.isAnomaly = false;
-              note.key = newKey.key;
-              note.isInKey = this.isNoteInKey(note.pitch, newKey);
+            modulations.push({
+              noteIndex: modStartIndex,
+              time: modNote.startTime,
+              fromKey: currentKey.key,
+              toKey: candidateKey.key,
+              root: candidateKey.root,
+              scale: candidateKey.scale,
+              pitchClass: candidateKey.pitchClass,
+              allowedPitchClasses: candidateKey.allowedPitchClasses,
+            });
 
-              modulations.push({
-                noteIndex: i,
-                time: note.startTime,
-                fromKey: currentKey.key,
-                toKey: newKey.key,
-                root: newKey.root,
-                scale: newKey.scale,
-                pitchClass: newKey.pitchClass,
-                allowedPitchClasses: newKey.allowedPitchClasses,
-              });
-
-              currentKey = newKey;
-              segmentStartTime = note.startTime;
-              segmentStartNoteIndex = i;
+            for (let k = modStartIndex; k <= i; k++) {
+              const reNote = guideNotes[k];
+              reNote.key = candidateKey.key;
+              reNote.isInKey = this.isNoteInKey(reNote.pitch, candidateKey);
+              reNote.isAnomaly = !reNote.isInKey;
+              reNote.isModulation = k === modStartIndex;
             }
+
+            currentKey = candidateKey;
+            segmentStartTime = modNote.startTime;
+            segmentStartNoteIndex = modStartIndex;
+            modulated = true;
           }
         }
-        i++;
       }
+
+      if (!modulated) {
+        note.isInKey = false;
+        note.isAnomaly = true;
+        note.isModulation = false;
+        note.key = currentKey.key;
+      }
+
+      i++;
     }
 
     if (currentKey) {
