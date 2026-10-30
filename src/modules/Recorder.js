@@ -146,6 +146,8 @@ export class RecorderModule {
     this.cachedInterludeTip = "";
 
     this.scoreScreenOpacity = 0.0;
+    this.scoreAssets = null;
+    this.scorePalette = null;
 
     console.log("[RECORDER] Video Recording feature initialized.");
   }
@@ -885,73 +887,161 @@ export class RecorderModule {
       (targetScoreOpacity - this.scoreScreenOpacity) * 0.2;
 
     if (this.scoreScreenOpacity > 0.01) {
-      ctx.save();
-      ctx.globalAlpha = this.scoreScreenOpacity;
-
-      const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
-      bgGrad.addColorStop(0, "rgba(8, 8, 12, 0.98)");
-      bgGrad.addColorStop(1, "rgba(2, 2, 5, 0.99)");
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, w, h);
-
-      const isLeaderboard =
-        postSongScreen.classList.contains("show-leaderboard");
-      const scoreX = isLeaderboard ? w * 0.28 : w / 2;
-      const scale = isLeaderboard ? 0.75 : 1.0;
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      const titleEl = this.uiRefs?.scoreTitleText?.elm;
-      const titleText = titleEl ? titleEl.textContent : "YOUR SCORE";
-
-      ctx.font = `bold ${Math.floor(h * 0.052 * scale)}px "Rajdhani", sans-serif`;
-      ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-      if ("letterSpacing" in ctx) {
-        ctx.letterSpacing = `${Math.floor(8 * scale)}px`;
-      }
-      ctx.fillText(titleText, scoreX, h * 0.285);
-
-      const scoreEl = this.uiRefs?.finalScoreDisplay?.elm;
-      const scoreText = scoreEl ? scoreEl.textContent : "0";
-
-      ctx.font = `bold ${Math.floor(h * 0.24 * scale)}px "Rajdhani", sans-serif`;
-      if ("letterSpacing" in ctx) {
-        ctx.letterSpacing = "0px";
-      }
-      ctx.fillStyle = "#ffffff";
-      ctx.shadowColor = "rgba(255, 255, 255, 0.25)";
-      ctx.shadowBlur = Math.floor(40 * (h / 1080) * scale);
-      ctx.fillText(scoreText, scoreX, h * 0.445);
-
-      ctx.shadowColor = "transparent";
-      ctx.shadowBlur = 0;
-
-      const rankEl = this.uiRefs?.rankDisplay?.elm;
-      if (rankEl) {
-        const rankText = (rankEl.textContent || "").toUpperCase();
-        const rankOpacity = parseFloat(rankEl.style.opacity || "0");
-        const rankColor = rankEl.style.color || "#ffffff";
-
-        if (rankText && rankOpacity > 0.01) {
-          ctx.globalAlpha = this.scoreScreenOpacity * rankOpacity;
-          ctx.font = `bold ${Math.floor(h * 0.09 * scale)}px "Rajdhani", sans-serif`;
-          if ("letterSpacing" in ctx) {
-            ctx.letterSpacing = `${Math.floor(5 * scale)}px`;
-          }
-          ctx.fillStyle = rankColor;
-          ctx.fillText(rankText, scoreX, h * 0.63);
-        }
-      }
-
-      if ("letterSpacing" in ctx) {
-        ctx.letterSpacing = "0px";
-      }
-      ctx.restore();
+      this._drawPostSongScreen(ctx, w, h);
     }
 
     this.ctx.drawImage(this.offscreenCanvas || this.canvas, 0, 0);
 
     this.animationFrameId = requestAnimationFrame(() => this.drawFrame());
+  }
+
+  _getScoreAssets() {
+    if (this.scoreAssets) return this.scoreAssets;
+
+    const load = (src) => {
+      const image = new Image();
+      image.src = src;
+      return image;
+    };
+
+    this.scoreAssets = {
+      background: load("/assets/img/scoring/background.png"),
+      logo: load("/assets/img/logo.svg"),
+      rightGraphic: load("/assets/img/scoring/right-graphic.png"),
+    };
+    return this.scoreAssets;
+  }
+
+  _getScorePalette() {
+    if (this.scorePalette) return this.scorePalette;
+    const host = this.uiRefs?.postSongScreen?.elm;
+    if (!host) return null;
+
+    const styles = getComputedStyle(host);
+    const read = (name, fallback) =>
+      styles.getPropertyValue(name).trim() || fallback;
+
+    this.scorePalette = {
+      card: read("--score-color-card", "#2f54a6"),
+      ink: read("--score-color-ink", "#1c2955"),
+      accent: read("--score-color-accent", "#ffc862"),
+      text: read("--score-color-on-color", "#ffffff"),
+      wash: read("--score-color-surface-wash", "rgba(75, 110, 228, 0.46)"),
+      shadow: read("--score-color-shadow", "rgba(0, 0, 0, 0.25)"),
+    };
+    return this.scorePalette;
+  }
+
+  _drawPostSongScreen(ctx, w, h) {
+    const colors = this._getScorePalette();
+    if (!colors) return;
+
+    const assets = this._getScoreAssets();
+    const scale = Math.min(w / 1280, h / 720);
+    const unit = (value) => value * scale;
+
+    ctx.save();
+    ctx.globalAlpha = this.scoreScreenOpacity;
+
+    if (assets.background.complete && assets.background.naturalWidth > 0) {
+      ctx.drawImage(assets.background, 0, 0, w, h);
+    } else {
+      ctx.fillStyle = colors.card;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    ctx.fillStyle = colors.wash;
+    ctx.fillRect(0, 0, w, h);
+
+    const phrase =
+      this.uiRefs?.scoreHeadlineText?.elm?.querySelector(
+        ".score-headline-text",
+      )?.textContent || "すごいだよ！";
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = `400 ${Math.floor(unit(120))}px "GenEiKiwamiGo", sans-serif`;
+
+    const headlineX = unit(44);
+    const headlineY = unit(26);
+    ctx.fillStyle = colors.ink;
+    ctx.fillText("「", headlineX, headlineY);
+    let headlineCursor = headlineX + ctx.measureText("「").width;
+    ctx.fillStyle = colors.accent;
+    ctx.fillText(phrase, headlineCursor, headlineY);
+    headlineCursor += ctx.measureText(phrase).width;
+    ctx.fillStyle = colors.ink;
+    ctx.fillText("」", headlineCursor, headlineY);
+
+    const cardX = unit(44);
+    const cardY = unit(178);
+    const cardW = unit(883);
+    const cardH = unit(414);
+    const cardRadius = unit(25);
+
+    ctx.fillStyle = colors.card;
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, cardRadius);
+    ctx.fill();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, cardRadius);
+    ctx.clip();
+
+    const label = this.uiRefs?.scoreTitleText?.elm?.textContent ?? "";
+    if (label) {
+      ctx.fillStyle = colors.ink;
+      ctx.font = `400 ${Math.floor(unit(50))}px "GenEiKiwamiGo", sans-serif`;
+      ctx.fillText(label, cardX + unit(39), cardY + unit(26) + unit(50) * 0.15);
+    }
+
+    const scoreText =
+      this.uiRefs?.finalScoreDisplay?.elm?.textContent ?? "0.00";
+    ctx.fillStyle = colors.accent;
+    ctx.font = `400 ${Math.floor(unit(155))}px "GenEiKiwamiGo", sans-serif`;
+    ctx.fillText(
+      scoreText,
+      cardX + unit(39),
+      cardY + unit(133) + unit(155) * 0.15,
+    );
+
+    const rankEl = this.uiRefs?.rankDisplay?.elm;
+    if (rankEl) {
+      const rankText = (rankEl.textContent || "").toUpperCase();
+      const rankOpacity = parseFloat(rankEl.style.opacity || "0");
+      if (rankText && rankOpacity > 0.01) {
+        ctx.globalAlpha = this.scoreScreenOpacity * rankOpacity;
+        ctx.fillStyle = colors.text;
+        ctx.font = `400 ${Math.floor(unit(30))}px "GenEiKiwamiGo", sans-serif`;
+        ctx.fillText(
+          rankText,
+          cardX + unit(39),
+          cardY + unit(133) + unit(155) * 1.3 + unit(12),
+        );
+        ctx.globalAlpha = this.scoreScreenOpacity;
+      }
+    }
+
+    ctx.restore();
+
+    if (assets.logo.complete && assets.logo.naturalWidth > 0) {
+      ctx.drawImage(
+        assets.logo,
+        unit(44),
+        unit(624),
+        unit(191),
+        unit(191) * (122 / 368),
+      );
+    }
+
+    if (
+      assets.rightGraphic.complete &&
+      assets.rightGraphic.naturalWidth > 0
+    ) {
+      ctx.drawImage(assets.rightGraphic, w - unit(640), 0, unit(640), unit(720));
+    }
+
+    ctx.restore();
   }
 }
