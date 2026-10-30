@@ -1426,6 +1426,7 @@ export default class UIManager {
 
     if (newMode === "setup") {
       dom.setupScreen.classOff("hidden");
+      this.ctx.modules.infoBar.hideBar();
       this.ctx.root.setup.open();
     } else if (newMode === "menu") {
       window.obs?.triggerState?.("idle");
@@ -1446,6 +1447,9 @@ export default class UIManager {
       dom.searchInput.elm.blur();
       this.ctx.modules.infoBar.hideBar();
       this.updateMenuUI();
+      if (state.isTypingNumber && state.numberEntryInInfoBar) {
+        this.ctx.root.input?._updateMenuNumberUI?.(false);
+      }
       setTimeout(() => {
         if (state.scoreSkipped) state.scoreSkipped = false;
       }, 5000);
@@ -1455,6 +1459,7 @@ export default class UIManager {
     } else if (newMode === "yt-search") {
       if (state.currentSongIsMultiplexed)
         this.ctx.services.Forte.togglePianoRollVisibility(false);
+      if (state.numberEntryInInfoBar) this.ctx.modules.infoBar.hideBar();
       dom.searchInput.elm.focus();
       dom.searchInput.elm.select();
     }
@@ -1472,11 +1477,15 @@ export default class UIManager {
       if (state.mode !== "menu") return;
 
       const currentPreventScroll = this._pendingPreventScroll;
+      const isInfoBarNumberEntry =
+        state.isTypingNumber && state.numberEntryInInfoBar;
       const isIdling =
         !state.showSongList && !state.isTypingNumber && state.mode === "menu";
+      const isStandbyVisible =
+        isIdling || (isInfoBarNumberEntry && !state.showSongList);
 
-      if (isIdling) {
-        dom.idleHint.classOff("hidden");
+      if (isStandbyVisible) {
+        dom.idleHint[isIdling ? "classOff" : "classOn"]("hidden");
         if (this.idleState === "newsong") {
           dom.standbyScreen.classOn("hidden");
           dom.newSongScreen.classOff("hidden");
@@ -1492,6 +1501,7 @@ export default class UIManager {
           dom.standbyText.classOff("hidden");
         }
 
+        this.ctx.wrapper.classOff("is-typing");
         dom.mainContent.classOn("hidden");
         dom.songListContainer.classOn("hidden");
         dom.bottomActions.classOn("hidden");
@@ -1510,9 +1520,11 @@ export default class UIManager {
       dom.mainContent.classOff("hidden");
       dom.songListContainer.classOff("hidden");
       dom.bottomActions.classOff("hidden");
-      this.ctx.wrapper[state.isTypingNumber ? "classOn" : "classOff"](
-        "is-typing",
-      );
+      this.ctx.wrapper[
+        state.isTypingNumber && !state.numberEntryInInfoBar
+          ? "classOn"
+          : "classOff"
+      ]("is-typing");
 
       const code = state.songNumber;
 
@@ -1660,9 +1672,16 @@ export default class UIManager {
 
         item.on("click", () => {
           this.menuTransitionSource = "list";
-          if (state.isSessionActive)
+          state.songNumber = "";
+          state.isTypingNumber = false;
+          if (state.isSessionActive) {
             this.ctx.root.sessions.reserveSongInSession(song);
-          else this.ctx.root.playback.startPlayer(song);
+            if (state.numberEntryInInfoBar) {
+              this.ctx.modules.infoBar.showDefault();
+            }
+          } else {
+            this.ctx.root.playback.startPlayer(song);
+          }
         });
         if (i === state.highlightedIndex) item.classOn("highlighted");
 

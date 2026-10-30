@@ -76,6 +76,7 @@ class EncoreController {
 
       isTransitioning: false,
       isTypingNumber: false,
+      numberEntryInInfoBar: config.numberEntryInInfoBar ?? false,
       currentSongIsYouTube: false,
       currentSongIsMultiplexed: false,
       currentSongIsMIDI: false,

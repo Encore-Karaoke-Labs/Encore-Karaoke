@@ -482,13 +482,12 @@ export default class InputManager {
     }
 
     if (state.mode === "menu" && !state.showSongList) {
-      if (
-        (e.key >= "0" && e.key <= "9") ||
+      const isDigit = e.key >= "0" && e.key <= "9";
+      const opensList =
         e.key.startsWith("Arrow") ||
-        e.key.toLowerCase() === "y"
-      ) {
-        state.showSongList = true;
-      }
+        e.key.toLowerCase() === "y" ||
+        (isDigit && !state.numberEntryInInfoBar);
+      if (opensList) state.showSongList = true;
     }
 
     if (e.key.toLowerCase() === "m") {
@@ -769,6 +768,9 @@ export default class InputManager {
       }
       state.isTypingNumber = true;
       ui.updateMenuUI();
+      if (state.mode === "menu" && state.numberEntryInInfoBar) {
+        this._updateMenuNumberUI(false);
+      }
     } else {
       this._updateReservationUI(false);
     }
@@ -797,6 +799,10 @@ export default class InputManager {
       state.songNumber = state.songNumber.slice(0, -1);
       if (!state.songNumber) state.isTypingNumber = false;
       ui.updateMenuUI();
+      if (state.numberEntryInInfoBar) {
+        if (state.songNumber) this._updateMenuNumberUI(false);
+        else infoBar.showDefault();
+      }
     } else if (state.mode === "yt-search" && !dom.searchInput.getValue()) {
       ui.setMode("menu");
     }
@@ -818,16 +824,18 @@ export default class InputManager {
   }
 
   /**
-   * Renders the Infobar state regarding live queued reservations while typing.
+   * Renders the InfoBar for a numeric code currently being entered.
    *
+   * @param {string} number - The song code being entered.
    * @param {boolean} isTemp - Flag indicating fading temporariness of visibility.
+   * @param {string} label - The InfoBar label to display.
    */
-  _updateReservationUI(isTemp) {
+  _updateNumberEntryUI(number, isTemp, label) {
     const state = this.ctx.state;
     const infoBar = this.ctx.modules.infoBar;
 
-    const displayCode = state.reservationNumber.padStart(6, "0");
-    const song = findSongInMap(state.songMap, state.reservationNumber);
+    const displayCode = number.padStart(6, "0");
+    const song = findSongInMap(state.songMap, number);
 
     let fmtBadge = "";
     if (song) {
@@ -837,13 +845,13 @@ export default class InputManager {
 
     let songInfo = song
       ? `${fmtBadge} <span class="info-bar-title">${song.title}</span><span class="info-bar-artist">- ${song.artist}</span>`
-      : state.reservationNumber.length === 6
+      : number.length === 6
         ? `<span style="opacity: 0.5;">No song found.</span>`
         : "";
     const content = `<span class="info-bar-code">${displayCode}</span> ${songInfo}`;
 
     if (isTemp) {
-      infoBar.showTemp("RESERVING", content, 3000);
+      infoBar.showTemp(label, content, 3000);
     } else {
       if (infoBar.isTempVisible) {
         infoBar.isTempVisible = false;
@@ -853,9 +861,31 @@ export default class InputManager {
         }
         infoBar.bar.classOff("temp-visible");
       }
-      infoBar.show("RESERVING", content);
+      infoBar.show(label, content);
       infoBar.showBar();
     }
+  }
+
+  /**
+   * Renders the Infobar state regarding live queued reservations while typing.
+   *
+   * @param {boolean} isTemp - Flag indicating fading temporariness of visibility.
+   */
+  _updateReservationUI(isTemp) {
+    this._updateNumberEntryUI(
+      this.ctx.state.reservationNumber,
+      isTemp,
+      "RESERVING",
+    );
+  }
+
+  /**
+   * Renders the Infobar state for song number entry in the main menu.
+   *
+   * @param {boolean} isTemp - Flag indicating fading temporariness of visibility.
+   */
+  _updateMenuNumberUI(isTemp) {
+    this._updateNumberEntryUI(this.ctx.state.songNumber, isTemp, "RESERVING");
   }
 
   /**
@@ -921,6 +951,9 @@ export default class InputManager {
           state.highlightedIndex = -1;
           state.isTypingNumber = false;
           root.ui.updateMenuUI();
+          if (state.numberEntryInInfoBar) {
+            this.ctx.modules.infoBar.showDefault();
+          }
         }
       } else {
         if (state.reservationQueue.length) {
@@ -934,7 +967,13 @@ export default class InputManager {
               : null;
           if (song) {
             if (state.songNumber && state.songNumber.length > 0) {
-              root.ui.menuTransitionSource = "number";
+              if (state.numberEntryInInfoBar) {
+                root.ui.menuTransitionSource = state.showSongList
+                  ? "list"
+                  : "none";
+              } else {
+                root.ui.menuTransitionSource = "number";
+              }
             } else if (state.showSongList) {
               root.ui.menuTransitionSource = "list";
             } else {
@@ -1048,6 +1087,9 @@ export default class InputManager {
         state.songNumber = "";
         state.isTypingNumber = false;
         ui.updateMenuUI();
+        if (state.numberEntryInInfoBar) {
+          this.ctx.modules.infoBar.showDefault();
+        }
       } else if (state.showSongList) {
         state.showSongList = false;
         state.highlightedIndex = -1;
@@ -1131,6 +1173,9 @@ export default class InputManager {
       }
       state.highlightedIndex = newIdx;
       this.ctx.root.ui.updateMenuUI();
+      if (state.numberEntryInInfoBar) {
+        this.ctx.modules.infoBar.showDefault();
+      }
     } else if (state.mode === "player") {
       if (state.currentSongIsYouTube || state.currentSongIsStandaloneVideo) {
         this.ctx.modules.infoBar.showTemp(
