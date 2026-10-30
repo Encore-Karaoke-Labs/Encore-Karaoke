@@ -70,3 +70,11 @@
   font-weight: 700;
   src: url("./assets/fonts/rajdhani-v17-latin-700.woff2") format("woff2");
 }
+
+/* geneikiwamigo - cjk */
+@font-face {
+  font-display: swap;
+  font-family: "GenEiKiwamiGo";
+  font-style: normal;
+  src: url("./assets/fonts/GenEiKiwamiGo.ttf") format("truetype");
+}
