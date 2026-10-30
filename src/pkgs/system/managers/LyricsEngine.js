@@ -1643,6 +1643,12 @@ export default class LyricsEngine {
 
   drawLyricsFrame() {
     if (this.ctx.state.mode !== "player") return;
+
+    if (this.ctx.state.isTransitioning) {
+      this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
+      return;
+    }
+
     if (this.ctx.state.isInterludeActive) {
       this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
       return;
@@ -1672,11 +1678,6 @@ export default class LyricsEngine {
     if (this.requestCanvasCacheUpdate) {
       this.updateCanvasCache();
       this.requestCanvasCacheUpdate = false;
-    }
-
-    if (this.ctx.state.isTransitioning) {
-      this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
-      return;
     }
 
     ctx.save();

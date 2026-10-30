@@ -475,7 +475,6 @@ export default class PlaybackManager {
       if (dom.introBpmBadge) dom.introBpmBadge.text(`${initialBpm} BPM`);
       if (dom.introKeyBadge) dom.introKeyBadge.text(songKey);
 
-      dom.introCard.classOff("exiting").classOn("visible");
       dom.lyricsCanvas.styleJs({ opacity: "0" });
 
       this.boundTempoUpdate = (e) => {
@@ -494,9 +493,16 @@ export default class PlaybackManager {
         this.boundTimeUpdate,
       );
 
-      if (root.lyrics) {
-        await root.lyrics.setupLyrics(song, pbState);
-        root.lyrics.setupTimeUpdate(this.mvPlayer);
+      try {
+        if (root.lyrics) {
+          await root.lyrics.setupLyrics(song, pbState);
+          root.lyrics.setupTimeUpdate(this.mvPlayer);
+        }
+      } catch (err) {
+        console.error("[PlaybackManager] Failed to prepare lyrics:", err);
+      } finally {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        dom.introCard.classOff("exiting").classOn("visible");
       }
 
       if (song.cdgPath) {
