@@ -184,6 +184,7 @@ export class ForteHarana {
     if (!baseKey) return null;
 
     let currentKey = baseKey;
+    let feverLevel = 0; // 0 = Base Key (Normal), 1 = FEVER, 2 = SUPER FEVER
     const modulations = [];
     const keySegments = [];
 
@@ -200,6 +201,9 @@ export class ForteHarana {
         note.isAnomaly = false;
         note.isModulation = false;
         note.key = currentKey.key;
+        note.isModulated = feverLevel > 0;
+        note.isSubsequentModulated = feverLevel >= 2;
+        note.feverLevel = feverLevel;
         i++;
         continue;
       }
@@ -218,6 +222,9 @@ export class ForteHarana {
         note.isAnomaly = true;
         note.isModulation = false;
         note.key = currentKey.key;
+        note.isModulated = feverLevel > 0;
+        note.isSubsequentModulated = feverLevel >= 2;
+        note.feverLevel = feverLevel;
         i++;
         continue;
       }
@@ -281,6 +288,10 @@ export class ForteHarana {
           if (modStartIndex > segmentStartNoteIndex) {
             const modNote = guideNotes[modStartIndex];
 
+            const wasCurrentBaseKey =
+              currentKey.pitchClass === baseKey.pitchClass &&
+              currentKey.scale === baseKey.scale;
+
             keySegments.push({
               startTime: segmentStartTime,
               endTime: modNote.startTime,
@@ -291,7 +302,23 @@ export class ForteHarana {
               root: currentKey.root,
               pitchClass: currentKey.pitchClass,
               allowedPitchClasses: currentKey.allowedPitchClasses,
+              isOriginalKey: wasCurrentBaseKey,
+              isModulated: !wasCurrentBaseKey,
+              isSubsequentModulated: !wasCurrentBaseKey && feverLevel >= 2,
+              feverLevel: wasCurrentBaseKey ? 0 : feverLevel,
             });
+
+            const isReturnToBase =
+              candidateKey.pitchClass === baseKey.pitchClass &&
+              candidateKey.scale === baseKey.scale;
+
+            if (isReturnToBase) {
+              feverLevel = 0;
+            } else if (feverLevel === 0) {
+              feverLevel = 1;
+            } else {
+              feverLevel = 2;
+            }
 
             modulations.push({
               noteIndex: modStartIndex,
@@ -302,6 +329,10 @@ export class ForteHarana {
               scale: candidateKey.scale,
               pitchClass: candidateKey.pitchClass,
               allowedPitchClasses: candidateKey.allowedPitchClasses,
+              isReturnToBase,
+              isModulated: !isReturnToBase,
+              isSubsequent: feverLevel >= 2,
+              feverLevel,
             });
 
             for (let k = modStartIndex; k <= i; k++) {
@@ -310,6 +341,9 @@ export class ForteHarana {
               reNote.isInKey = this.isNoteInKey(reNote.pitch, candidateKey);
               reNote.isAnomaly = !reNote.isInKey;
               reNote.isModulation = k === modStartIndex;
+              reNote.isModulated = !isReturnToBase;
+              reNote.isSubsequentModulated = feverLevel >= 2;
+              reNote.feverLevel = feverLevel;
             }
 
             currentKey = candidateKey;
@@ -325,6 +359,9 @@ export class ForteHarana {
         note.isAnomaly = true;
         note.isModulation = false;
         note.key = currentKey.key;
+        note.isModulated = feverLevel > 0;
+        note.isSubsequentModulated = feverLevel >= 2;
+        note.feverLevel = feverLevel;
       }
 
       i++;
@@ -332,6 +369,10 @@ export class ForteHarana {
 
     if (currentKey) {
       const lastNote = guideNotes[guideNotes.length - 1];
+      const isFinalBaseKey =
+        currentKey.pitchClass === baseKey.pitchClass &&
+        currentKey.scale === baseKey.scale;
+
       keySegments.push({
         startTime: segmentStartTime,
         endTime: (lastNote.startTime || 0) + (lastNote.duration || 1) + 15,
@@ -342,6 +383,10 @@ export class ForteHarana {
         root: currentKey.root,
         pitchClass: currentKey.pitchClass,
         allowedPitchClasses: currentKey.allowedPitchClasses,
+        isOriginalKey: isFinalBaseKey,
+        isModulated: !isFinalBaseKey,
+        isSubsequentModulated: !isFinalBaseKey && feverLevel >= 2,
+        feverLevel: isFinalBaseKey ? 0 : feverLevel,
       });
     }
 
@@ -398,16 +443,8 @@ export class ForteHarana {
       .map((s) => (transposedPc + s) % 12)
       .sort((a, b) => a - b);
 
-    const isModulated = activeSegment
-      ? activeSegment.startNoteIndex > 0
-      : false;
-    const modSegments = midiInfo.keySegments
-      ? midiInfo.keySegments.filter((s) => s.startNoteIndex > 0)
-      : [];
-    const isSubsequentModulated =
-      isModulated && activeSegment
-        ? modSegments.indexOf(activeSegment) > 0
-        : false;
+    const isModulated = Boolean(activeSegment?.isModulated);
+    const isSubsequentModulated = Boolean(activeSegment?.isSubsequentModulated);
 
     return {
       root: rootName,

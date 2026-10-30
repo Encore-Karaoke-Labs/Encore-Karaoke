@@ -162,7 +162,10 @@ export class FortePianoRoll {
 
     const segments = this.state.playback.midiInfo?.keySegments;
     if (!segments || segments.length === 0) {
-      note._modState = { isModulated: false, isSubsequent: false };
+      note._modState = {
+        isModulated: Boolean(note.isModulated),
+        isSubsequent: Boolean(note.isSubsequentModulated),
+      };
       return note._modState;
     }
 
@@ -170,17 +173,14 @@ export class FortePianoRoll {
       (s) => note.startTime >= s.startTime && note.startTime < s.endTime,
     );
 
-    if (!seg || !seg.startNoteIndex || seg.startNoteIndex <= 0) {
+    if (!seg || !seg.isModulated) {
       note._modState = { isModulated: false, isSubsequent: false };
       return note._modState;
     }
 
-    const modulatedSegments = segments.filter((s) => s.startNoteIndex > 0);
-    const modIndex = modulatedSegments.indexOf(seg);
-
     note._modState = {
       isModulated: true,
-      isSubsequent: modIndex > 0,
+      isSubsequent: Boolean(seg.isSubsequentModulated),
     };
     return note._modState;
   }
@@ -557,11 +557,9 @@ export class FortePianoRoll {
     const segments = this.state.playback.midiInfo?.keySegments;
     if (!segments || segments.length === 0) return;
 
-    const modulatedSegments = segments.filter((s) => s.startNoteIndex > 0);
-
     for (let s = 0; s < segments.length; s++) {
       const seg = segments[s];
-      if (!seg.startNoteIndex || seg.startNoteIndex <= 0) continue;
+      if (!seg.isModulated) continue;
 
       if (seg.startTime < pageRealEndTime && seg.endTime > pageRealStartTime) {
         const startX = Math.max(
@@ -575,7 +573,7 @@ export class FortePianoRoll {
         const segWidth = endX - startX;
         if (segWidth <= 0) continue;
 
-        const isSubsequent = modulatedSegments.indexOf(seg) > 0;
+        const isSubsequent = Boolean(seg.isSubsequentModulated);
 
         ctxToUse.save();
 
@@ -659,29 +657,49 @@ export class FortePianoRoll {
       const mod = modulations[i];
       if (mod.time >= pageRealStartTime && mod.time <= pageRealEndTime) {
         const modX = ((mod.time - pageRealStartTime) * PIXELS_PER_SECOND) | 0;
-        const isSubsequent = i > 0;
+        const isReturnToBase = Boolean(mod.isReturnToBase || !mod.isModulated);
+        const isSubsequent = !isReturnToBase && Boolean(mod.isSubsequent);
 
         ctx.save();
 
-        ctx.strokeStyle = isSubsequent
-          ? "rgba(236, 72, 153, 0.3)"
-          : "rgba(168, 85, 247, 0.25)";
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(modX, 0);
-        ctx.lineTo(modX, height);
-        ctx.stroke();
+        if (isReturnToBase) {
+          ctx.strokeStyle = "rgba(56, 189, 248, 0.25)";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(modX, 0);
+          ctx.lineTo(modX, height);
+          ctx.stroke();
 
-        ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = isSubsequent
-          ? "rgba(244, 114, 182, 0.9)"
-          : "rgba(192, 132, 252, 0.85)";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(modX, 0);
-        ctx.lineTo(modX, height);
-        ctx.stroke();
-        ctx.setLineDash([]);
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = "rgba(137, 207, 240, 0.85)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(modX, 0);
+          ctx.lineTo(modX, height);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        } else {
+          // FEVER / SUPER FEVER
+          ctx.strokeStyle = isSubsequent
+            ? "rgba(236, 72, 153, 0.3)"
+            : "rgba(168, 85, 247, 0.25)";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(modX, 0);
+          ctx.lineTo(modX, height);
+          ctx.stroke();
+
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = isSubsequent
+            ? "rgba(244, 114, 182, 0.9)"
+            : "rgba(192, 132, 252, 0.85)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(modX, 0);
+          ctx.lineTo(modX, height);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
 
         const targetKeyObj = this.harana
           ? this.harana.getActiveKey(mod.time + 0.05, transpose)
@@ -693,7 +711,9 @@ export class FortePianoRoll {
         const flagWidth = ctx.measureText(flagText).width + 12;
         const flagX = Math.min(modX + 2, this.cachedWidth - flagWidth - 4);
 
-        if (isSubsequent) {
+        if (isReturnToBase) {
+          ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+        } else if (isSubsequent) {
           const flagGrad = ctx.createLinearGradient(
             flagX,
             4,
@@ -715,13 +735,21 @@ export class FortePianoRoll {
         }
         ctx.fill();
 
-        ctx.strokeStyle = isSubsequent
-          ? "rgba(249, 168, 212, 0.9)"
-          : "rgba(192, 132, 252, 0.85)";
+        if (isReturnToBase) {
+          ctx.strokeStyle = "rgba(137, 207, 240, 0.8)";
+        } else {
+          ctx.strokeStyle = isSubsequent
+            ? "rgba(249, 168, 212, 0.9)"
+            : "rgba(192, 132, 252, 0.85)";
+        }
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        ctx.fillStyle = isSubsequent ? "#ffffff" : "#f5f3ff";
+        ctx.fillStyle = isReturnToBase
+          ? "#e0f2fe"
+          : isSubsequent
+            ? "#ffffff"
+            : "#f5f3ff";
         ctx.textBaseline = "middle";
         ctx.textAlign = "left";
         ctx.fillText(flagText, flagX + 6, 13);
