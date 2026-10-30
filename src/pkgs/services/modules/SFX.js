@@ -21,6 +21,7 @@ export class ForteSFX {
     this.sfxResolve = null;
     this.sfxMidiOriginalVolume = null;
     this.currentSfxMidi = null;
+    this.sfxGeneration = 0;
   }
 
   /**
@@ -66,23 +67,28 @@ export class ForteSFX {
    * @returns {Promise<boolean>} Resolves to true when completed naturally, false if interrupted.
    */
   async playSfx(url, volume = 1) {
-    await this.stopSfx();
+    this.stopSfx();
+    const generation = this.sfxGeneration;
 
     return new Promise(async (resolve) => {
+      const isStale = () => generation !== this.sfxGeneration;
+      if (isStale()) return resolve(false);
       if (!this.audioCore.context) return resolve(false);
       if (this.audioCore.context.state === "suspended")
         await this.audioCore.context.resume();
+      if (isStale()) return resolve(false);
 
       let cached = this.sfxCache.get(url);
       if (!cached) {
         const success = await this.loadSfx(url);
-        if (!success) return resolve(false);
+        if (isStale() || !success) return resolve(false);
         cached = this.sfxCache.get(url);
       }
 
       const clampedVolume = Math.max(0, Math.min(1, volume));
 
       if (cached) {
+        if (isStale()) return resolve(false);
         this.sfxResolve = resolve;
 
         if (cached.isMidi) {
@@ -234,7 +240,9 @@ export class ForteSFX {
   /**
    * Stops currently playing sound effect and restores volumes if needed.
    */
-  async stopSfx() {
+  stopSfx() {
+    this.sfxGeneration++;
+
     if (this.sfxSourceNode) {
       this.sfxSourceNode.onended = null;
       this.sfxSourceNode.stop();
