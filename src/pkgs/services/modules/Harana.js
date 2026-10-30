@@ -256,7 +256,11 @@ export class ForteHarana {
         const candidateFit = candidateMatches / reanalysisWindow;
         const currentFit = currentMatches / reanalysisWindow;
 
+        const remainingNotes = guideNotes.length - i;
+        const hasMinimumNotes = remainingNotes >= 3;
+
         const isConfirmed =
+          hasMinimumNotes &&
           candidateFit >= 0.75 &&
           candidateMatches > currentMatches + 1 &&
           currentFit <= 0.65;

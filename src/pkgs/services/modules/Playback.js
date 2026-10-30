@@ -338,6 +338,10 @@ export class FortePlayback {
     this.dispatchUpdate = dispatchUpdate;
     this.harana = harana;
 
+    if (this.scoring) {
+      this.scoring.harana = harana;
+    }
+
     this.sourceNode = null;
     this.audioElement = null;
     this.animationFrameId = null;

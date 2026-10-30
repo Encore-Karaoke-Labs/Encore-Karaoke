@@ -87,6 +87,8 @@ export class FortePianoRoll {
 
     this.gradHit = createNoteGrad("#a3e635", "#4d7c0f");
     this.gradMiss = createNoteGrad("#fca5a5", "#991b1b");
+    this.gradInterpreted = createNoteGrad("#fde047", "#ca8a04");
+    this.gradProblematic = createNoteGrad("#fb923c", "#c2410c");
     this.gradNeutral = createNoteGrad("#7dd3fc", "#0284c7");
     this.gradNeutralModulated = createNoteGrad("#c084fc", "#7e22ce");
     this.gradNeutralSubModulated = createNoteGrad("#f472b6", "#9333ea");
@@ -196,18 +198,23 @@ export class FortePianoRoll {
     const modState = this.getNoteModulationState(note);
     const isModulated = modState.isModulated;
     const isSubsequent = modState.isSubsequent;
+    const status = note.hitStatus || "neutral";
 
     if (isActive) {
-      if (note.hitStatus === "hit") {
+      if (status === "hit" || status === "accurate") {
         ctxToUse.fillStyle = "rgba(163, 230, 53, 0.4)"; // Green
-      } else if (note.hitStatus === "miss") {
+      } else if (status === "interpreted") {
+        ctxToUse.fillStyle = "rgba(250, 204, 21, 0.45)"; // Gold
+      } else if (status === "problematic") {
+        ctxToUse.fillStyle = "rgba(251, 146, 60, 0.45)"; // Orange
+      } else if (status === "miss") {
         ctxToUse.fillStyle = "rgba(248, 113, 113, 0.4)"; // Red
       } else {
         ctxToUse.fillStyle = isModulated
           ? isSubsequent
-            ? "rgba(244, 114, 182, 0.45)" // Pink-Purple Halo
-            : "rgba(192, 132, 252, 0.45)" // Purple Halo
-          : "rgba(56, 189, 248, 0.4)"; // Blue
+            ? "rgba(244, 114, 182, 0.45)"
+            : "rgba(192, 132, 252, 0.45)"
+          : "rgba(56, 189, 248, 0.4)";
       }
 
       ctxToUse.beginPath();
@@ -225,15 +232,19 @@ export class FortePianoRoll {
       ctxToUse.fill();
     }
 
-    if (note.hitStatus === "hit") {
+    if (status === "hit" || status === "accurate") {
       ctxToUse.fillStyle = this.gradHit;
-    } else if (note.hitStatus === "miss") {
+    } else if (status === "interpreted") {
+      ctxToUse.fillStyle = this.gradInterpreted;
+    } else if (status === "problematic") {
+      ctxToUse.fillStyle = this.gradProblematic;
+    } else if (status === "miss") {
       ctxToUse.fillStyle = this.gradMiss;
     } else {
       ctxToUse.fillStyle = isModulated
         ? isSubsequent
-          ? this.gradNeutralSubModulated // SUPER FEVER
-          : this.gradNeutralModulated // FEVER
+          ? this.gradNeutralSubModulated
+          : this.gradNeutralModulated
         : this.gradNeutral;
     }
 
@@ -396,7 +407,9 @@ export class FortePianoRoll {
         this.drawNote(ctx, note, startX, y, noteWidth, true);
 
         if (
-          note.hitStatus === "hit" &&
+          (note.hitStatus === "hit" ||
+            note.hitStatus === "accurate" ||
+            note.hitStatus === "interpreted") &&
           this.state.scoring.isSinging &&
           !this.state.scoring.userDisabled
         ) {
@@ -428,11 +441,21 @@ export class FortePianoRoll {
     let dotOuter = "rgba(137, 207, 240, 0.3)";
     let dotInner = "rgba(56, 189, 248, 0.5)";
 
-    if (currentStatus === "hit") {
+    if (currentStatus === "hit" || currentStatus === "accurate") {
       trailOutline = "rgba(163, 230, 53, 0.25)";
       trailCore = "rgba(190, 242, 100, 0.8)";
       dotOuter = "rgba(163, 230, 53, 0.3)";
       dotInner = "rgba(101, 163, 13, 0.5)";
+    } else if (currentStatus === "interpreted") {
+      trailOutline = "rgba(250, 204, 21, 0.25)";
+      trailCore = "rgba(253, 224, 71, 0.85)";
+      dotOuter = "rgba(250, 204, 21, 0.35)";
+      dotInner = "rgba(202, 138, 4, 0.55)";
+    } else if (currentStatus === "problematic") {
+      trailOutline = "rgba(251, 146, 60, 0.25)";
+      trailCore = "rgba(253, 186, 116, 0.8)";
+      dotOuter = "rgba(251, 146, 60, 0.3)";
+      dotInner = "rgba(194, 65, 12, 0.5)";
     } else if (currentStatus === "miss") {
       trailOutline = "rgba(248, 113, 113, 0.25)";
       trailCore = "rgba(252, 165, 165, 0.8)";
