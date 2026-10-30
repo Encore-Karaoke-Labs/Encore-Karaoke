@@ -923,6 +923,7 @@ export class RecorderModule {
 
     this.scorePalette = {
       card: read("--score-color-card", "#2f54a6"),
+      surface: read("--score-color-surface", "#4b6ee4"),
       ink: read("--score-color-ink", "#1c2955"),
       accent: read("--score-color-accent", "#ffc862"),
       text: read("--score-color-on-color", "#ffffff"),
@@ -939,19 +940,25 @@ export class RecorderModule {
     const assets = this._getScoreAssets();
     const scale = Math.min(w / 1280, h / 720);
     const unit = (value) => value * scale;
+    const stageW = unit(1280);
+    const stageH = unit(720);
+    const offsetX = (w - stageW) / 2;
+    const offsetY = (h - stageH) / 2;
 
     ctx.save();
     ctx.globalAlpha = this.scoreScreenOpacity;
 
+    ctx.fillStyle = colors.surface;
+    ctx.fillRect(0, 0, w, h);
+
     if (assets.background.complete && assets.background.naturalWidth > 0) {
-      ctx.drawImage(assets.background, 0, 0, w, h);
-    } else {
-      ctx.fillStyle = colors.card;
-      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(assets.background, offsetX, offsetY, stageW, stageH);
     }
 
     ctx.fillStyle = colors.wash;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(offsetX, offsetY, stageW, stageH);
+
+    ctx.translate(offsetX, offsetY);
 
     const phrase =
       this.uiRefs?.scoreHeadlineText?.elm?.querySelector(
@@ -1039,7 +1046,7 @@ export class RecorderModule {
       assets.rightGraphic.complete &&
       assets.rightGraphic.naturalWidth > 0
     ) {
-      ctx.drawImage(assets.rightGraphic, w - unit(640), 0, unit(640), unit(720));
+      ctx.drawImage(assets.rightGraphic, unit(640), 0, unit(640), unit(720));
     }
 
     ctx.restore();

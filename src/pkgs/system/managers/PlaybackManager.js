@@ -1039,19 +1039,6 @@ export default class PlaybackManager {
         requestAnimationFrame(tick);
       });
 
-      if (
-        typeof window !== "undefined" &&
-        typeof window.confetti === "function" &&
-        !state.scoreSkipped &&
-        s >= 70
-      ) {
-        window.confetti({
-          position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-          count: 67,
-          fade: true,
-        });
-      }
-
       if (state.scoreSkipped) return;
       dom.rankDisplay.text(rank).styleJs({
         transform: "scale(1)",

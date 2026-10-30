@@ -781,8 +781,12 @@ export default class UIManager {
       .classOn("post-song-screen-overlay")
       .appendTo(this.ctx.wrapper);
 
+    dom.scoreStage = new Html("div")
+      .classOn("score-stage")
+      .appendTo(dom.postSongScreen);
+
     new Html("img")
-      .classOn("score-bg-image")
+      .classOn("score-bg-ambient")
       .attr({
         src: "/assets/img/scoring/background.png",
         alt: "",
@@ -790,15 +794,24 @@ export default class UIManager {
       })
       .appendTo(dom.postSongScreen);
 
-    new Html("div").classOn("score-bg-tint").appendTo(dom.postSongScreen);
+    new Html("img")
+      .classOn("score-bg-image")
+      .attr({
+        src: "/assets/img/scoring/background.png",
+        alt: "",
+        draggable: "false",
+      })
+      .appendTo(dom.scoreStage);
+
+    new Html("div").classOn("score-bg-tint").appendTo(dom.scoreStage);
 
     dom.scoreHeadlineText = new Html("div")
       .classOn("score-headline")
-      .appendTo(dom.postSongScreen);
+      .appendTo(dom.scoreStage);
 
     const scoreCard = new Html("div")
       .classOn("score-card")
-      .appendTo(dom.postSongScreen);
+      .appendTo(dom.scoreStage);
 
     dom.scoreTitleText = new Html("div")
       .classOn("score-title-text")
@@ -824,11 +837,11 @@ export default class UIManager {
         alt: "Encore Karaoke",
         draggable: "false",
       })
-      .appendTo(dom.postSongScreen);
+      .appendTo(dom.scoreStage);
 
     dom.scoreSessionLeaderboard = new Html("div")
       .classOn("score-session-leaderboard", "hidden")
-      .appendTo(dom.postSongScreen);
+      .appendTo(dom.scoreStage);
 
     dom.scoreRightGraphic = new Html("img")
       .classOn("score-right-graphic")
@@ -837,7 +850,7 @@ export default class UIManager {
         alt: "",
         draggable: "false",
       })
-      .appendTo(dom.postSongScreen);
+      .appendTo(dom.scoreStage);
   }
 
   setScoreHeadline(phrase) {

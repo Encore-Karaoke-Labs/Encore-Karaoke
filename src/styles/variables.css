@@ -85,7 +85,12 @@
   --negative-dimmest: hsl(0, 82%, 15%);
 
   /* --- Score Screen --- */
-  --score-scale: min(calc(100vw / 1280), calc(100vh / 720));
+  --score-base-width: 1280;
+  --score-base-height: 720;
+  --score-scale: min(
+    calc(100vw / var(--score-base-width)),
+    calc(100vh / var(--score-base-height))
+  );
   --score-color-surface: #4b6ee4;
   --score-color-surface-wash: rgba(75, 110, 228, 0.46);
   --score-color-card: #2f54a6;

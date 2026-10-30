@@ -17,6 +17,7 @@
   display: block;
   font-family: "Radio Canada", sans-serif;
   color: var(--score-color-on-color);
+  background: var(--score-color-surface);
   z-index: 20000001;
   opacity: 0;
   transition: opacity 0.45s ease;
@@ -30,13 +31,38 @@
   pointer-events: all;
 }
 
+.score-bg-ambient {
+  position: absolute;
+  top: calc(var(--score-scale) * -48);
+  left: calc(var(--score-scale) * -48);
+  width: calc(100% + var(--score-scale) * 96);
+  height: calc(100% + var(--score-scale) * 96);
+  object-fit: cover;
+  object-position: center;
+  filter: blur(calc(var(--score-scale) * 28));
+  opacity: 0.7;
+  z-index: 0;
+  pointer-events: none;
+}
+
 /* -- Background -- */
+.score-stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--score-scale) * var(--score-base-width));
+  height: calc(var(--score-scale) * var(--score-base-height));
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+  z-index: 1;
+}
+
 .score-bg-image {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: fill;
   z-index: 0;
   pointer-events: none;
 }
@@ -218,7 +244,7 @@
   position: absolute;
   left: var(--score-page-x);
   top: var(--score-card-y);
-  width: calc(50vw - var(--score-page-x));
+  width: calc(50% - var(--score-page-x));
   height: var(--score-card-h);
   z-index: 6;
   display: flex;
