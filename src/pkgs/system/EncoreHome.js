@@ -823,6 +823,7 @@ class EncoreController {
       scoreDisplay: this.scoreHud.scoreDisplay,
       danmakuCanvas: this.dom.danmakuCanvas,
       postSongScreen: this.dom.postSongScreen,
+      scoreHeadlineText: this.dom.scoreHeadlineText,
       scoreTitleText: this.dom.scoreTitleText,
       finalScoreDisplay: this.dom.finalScoreDisplay,
       rankDisplay: this.dom.rankDisplay,

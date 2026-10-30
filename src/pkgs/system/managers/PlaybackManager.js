@@ -917,9 +917,11 @@ export default class PlaybackManager {
           .classOn("score-lb-rank")
           .text(`#${index + 1}`)
           .appendTo(row);
-        const avatar = new Html("img").classOn("score-lb-avatar").appendTo(row);
+        const avatar = new Html("img")
+          .classOn("score-lb-avatar")
+          .attr({ alt: "" })
+          .appendTo(row);
         if (entry.avatar) avatar.attr({ src: entry.avatar });
-        else avatar.styleJs({ background: "#444" });
 
         const details = new Html("div")
           .classOn("score-lb-details")
@@ -942,40 +944,34 @@ export default class PlaybackManager {
       dom.scoreSessionLeaderboard.classOn("hidden");
     }
 
+    const rawScore = Number.isFinite(scoreData.finalScore)
+      ? Math.max(0, Math.min(100, scoreData.finalScore))
+      : 0;
+    const s = Math.floor(rawScore);
+    const rankTiers = [
+      {
+        min: 100,
+        rank: "HOW DID YOU PULL THAT OFF",
+        phrase: "すごいだよ！",
+      },
+      { min: 98, rank: "WHAT", phrase: "すごいだよ！" },
+      { min: 90, rank: "EXCELLENT", phrase: "すごいだよ！" },
+      { min: 80, rank: "GREAT", phrase: "いいね！" },
+      { min: 60, rank: "GOOD", phrase: "よくできた！" },
+      { min: 50, rank: "DECENT", phrase: "まあまあ！" },
+      { min: 20, rank: "NICE TRY", phrase: "がんばったね" },
+      { min: 0, rank: "YIKES", phrase: "ドンマイ！" },
+    ];
+    const rankTier = rankTiers.find((tier) => s >= tier.min);
+    const rank = rankTier.rank;
+
     dom.rankDisplay
       .text("")
-      .styleJs({ transform: "scale(0.8)", opacity: "0", color: "#fff" });
-    dom.finalScoreDisplay.text("0");
+      .styleJs({ transform: "scale(0.8)", opacity: "0" });
+    dom.finalScoreDisplay.text("0.00");
+    root.ui.setScoreHeadline?.(rankTier.phrase);
+    root.ui.playScoreEntrance?.();
     dom.postSongScreen.styleJs({ opacity: "1", pointerEvents: "all" });
-
-    const s = Math.floor(scoreData.finalScore);
-    let rank = "Good",
-      rankColor = "#aed581";
-    if (s == 100) {
-      rank = "HOW DID YOU PULL THAT OFF";
-      rankColor = "#00e676";
-    } else if (s >= 98) {
-      rank = "WHAT";
-      rankColor = "#00e676";
-    } else if (s >= 90) {
-      rank = "EXCELLENT";
-      rankColor = "#29b6f6";
-    } else if (s >= 80) {
-      rank = "GREAT";
-      rankColor = "#ffee58";
-    } else if (s >= 60) {
-      rank = "GOOD";
-      rankColor = "#ffca28";
-    } else if (s >= 50) {
-      rank = "DECENT";
-      rankColor = "#ffca28";
-    } else if (s >= 20) {
-      rank = "NICE TRY";
-      rankColor = "#ffca28";
-    } else {
-      rank = "yikes";
-      rankColor = "#ef5350";
-    }
 
     const playAudioSequence = async () => {
       await new Promise((r) => setTimeout(r, 1000));
@@ -992,6 +988,7 @@ export default class PlaybackManager {
       } else {
         await new Promise((r) => setTimeout(r, 4000));
       }
+      if (state.scoreSkipped) return;
 
       let playedNarration = false;
       if (state.isScoreNarrationEnabled && !isRemoteAudience) {
@@ -1006,6 +1003,7 @@ export default class PlaybackManager {
             const narrationUrl = await NetworkingUtility.getFileLink(
               joinPath(libraryInfo.path, match.file),
             );
+            if (state.scoreSkipped) return;
             await Forte.playSfx(narrationUrl.href);
             playedNarration = true;
           }
@@ -1016,6 +1014,7 @@ export default class PlaybackManager {
           else if (s >= 70) defaultNarrationUrl = "/assets/audio/scores/70.wav";
           else if (s >= 50) defaultNarrationUrl = "/assets/audio/scores/50.wav";
           else if (s >= 20) defaultNarrationUrl = "/assets/audio/scores/20.wav";
+          if (state.scoreSkipped) return;
           await Forte.playSfx(defaultNarrationUrl);
         }
       } else {
@@ -1027,12 +1026,13 @@ export default class PlaybackManager {
       const dur = 3800;
       const start = performance.now();
       await new Promise((r) => {
-        if (state.scoreSkipped) return;
+        if (state.scoreSkipped) return r();
         const tick = () => {
+          if (state.scoreSkipped) return r();
           const now = performance.now();
           const p = Math.min((now - start) / dur, 1);
           const ease = 1 - Math.pow(1 - p, 3);
-          dom.finalScoreDisplay.text(Math.floor(s * ease));
+          dom.finalScoreDisplay.text((rawScore * ease).toFixed(2));
           if (p < 1) requestAnimationFrame(tick);
           else r();
         };
@@ -1056,7 +1056,6 @@ export default class PlaybackManager {
       dom.rankDisplay.text(rank).styleJs({
         transform: "scale(1)",
         opacity: "1",
-        color: rankColor,
         transition: "all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
       });
 

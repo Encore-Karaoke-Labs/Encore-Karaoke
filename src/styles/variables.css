@@ -84,6 +84,37 @@
   --negative-dimming: hsl(0, 84%, 19%);
   --negative-dimmest: hsl(0, 82%, 15%);
 
+  /* --- Score Screen --- */
+  --score-scale: min(calc(100vw / 1280), calc(100vh / 720));
+  --score-color-surface: #4b6ee4;
+  --score-color-surface-wash: rgba(75, 110, 228, 0.46);
+  --score-color-card: #2f54a6;
+  --score-color-card-veil: rgba(47, 84, 166, 0.96);
+  --score-color-ink: #1c2955;
+  --score-color-accent: #ffc862;
+  --score-color-on-color: #ffffff;
+  --score-color-line: rgba(255, 255, 255, 0.14);
+  --score-color-line-soft: rgba(255, 255, 255, 0.08);
+  --score-color-avatar-ring: rgba(255, 255, 255, 0.28);
+  --score-color-shadow: rgba(0, 0, 0, 0.25);
+  --score-margin-x: 44;
+  --score-margin-top: 8;
+  --score-card-top: 178;
+  --score-card-width: 883;
+  --score-card-height: 414;
+  --score-card-radius: 25;
+  --score-card-inset-x: 39;
+  --score-card-inset-top: 26;
+  --score-card-score-top: 133;
+  --score-logo-top: 624;
+  --score-logo-width: 191;
+  --score-graphic-width: 640;
+  --score-graphic-height: 720;
+  --score-headline-size: 120;
+  --score-label-size: 50;
+  --score-number-size: 155;
+  --score-rank-size: 30;
+
   /* --- Controller & Multi-player Slots --- */
   --controller-color-0: hsl(248, 65%, 74%);
   --controller-color-1: hsl(218, 65%, 74%);

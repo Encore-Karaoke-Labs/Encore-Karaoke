@@ -780,30 +780,92 @@ export default class UIManager {
     dom.postSongScreen = new Html("div")
       .classOn("post-song-screen-overlay")
       .appendTo(this.ctx.wrapper);
+
+    new Html("img")
+      .classOn("score-bg-image")
+      .attr({
+        src: "/assets/img/scoring/background.png",
+        alt: "",
+        draggable: "false",
+      })
+      .appendTo(dom.postSongScreen);
+
+    new Html("div").classOn("score-bg-tint").appendTo(dom.postSongScreen);
+
+    dom.scoreHeadlineText = new Html("div")
+      .classOn("score-headline")
+      .appendTo(dom.postSongScreen);
+
+    const scoreCard = new Html("div")
+      .classOn("score-card")
+      .appendTo(dom.postSongScreen);
+
     dom.scoreTitleText = new Html("div")
       .classOn("score-title-text")
       .text("YOUR SCORE")
-      .appendTo(dom.postSongScreen);
+      .appendTo(scoreCard);
 
     const mainGroup = new Html("div")
       .classOn("score-main-group")
-      .appendTo(dom.postSongScreen);
+      .appendTo(scoreCard);
     dom.finalScoreDisplay = new Html("div")
       .classOn("score-display-number")
-      .text("00")
+      .text("0.00")
       .appendTo(mainGroup);
     dom.rankDisplay = new Html("div")
       .classOn("rank-display-text")
       .text("")
       .appendTo(mainGroup);
 
+    new Html("img")
+      .classOn("score-logo")
+      .attr({
+        src: "/assets/img/logo.svg",
+        alt: "Encore Karaoke",
+        draggable: "false",
+      })
+      .appendTo(dom.postSongScreen);
+
     dom.scoreSessionLeaderboard = new Html("div")
       .classOn("score-session-leaderboard", "hidden")
       .appendTo(dom.postSongScreen);
-    new Html("div")
-      .classOn("score-skip-hint")
-      .text("PRESS ENTER TO CONTINUE")
+
+    dom.scoreRightGraphic = new Html("img")
+      .classOn("score-right-graphic")
+      .attr({
+        src: "/assets/img/scoring/right-graphic.png",
+        alt: "",
+        draggable: "false",
+      })
       .appendTo(dom.postSongScreen);
+  }
+
+  setScoreHeadline(phrase) {
+    const headline = this.ctx.dom.scoreHeadlineText;
+    if (!headline) return;
+
+    headline.clear();
+    new Html("span")
+      .classOn("score-headline-bracket")
+      .text("「")
+      .appendTo(headline);
+    new Html("span")
+      .classOn("score-headline-text")
+      .text(phrase)
+      .appendTo(headline);
+    new Html("span")
+      .classOn("score-headline-bracket")
+      .text("」")
+      .appendTo(headline);
+  }
+
+  playScoreEntrance() {
+    const screen = this.ctx.dom.postSongScreen;
+    if (!screen) return;
+
+    screen.classOff("score-enter");
+    void screen.elm.offsetWidth;
+    screen.classOn("score-enter");
   }
 
   buildRecordingsUI() {
