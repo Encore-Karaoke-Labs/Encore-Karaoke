@@ -980,6 +980,21 @@ export default class SetupManager {
                 },
               },
               {
+                id: "number_entry_info_bar",
+                label: "Song Number Entry Mode",
+                type: "select",
+                options: [
+                  { value: false, label: "Full Screen" },
+                  { value: true, label: "Info Bar" },
+                ],
+                get: () => this.ctx.config.numberEntryInInfoBar ?? false,
+                set: (v) => {
+                  this.ctx.config.numberEntryInInfoBar = v;
+                  this.ctx.state.numberEntryInInfoBar = v;
+                  window.config.setItem("numberEntryInInfoBar", v);
+                },
+              },
+              {
                 id: "display_qr",
                 label: "Show Remote QR Code",
                 type: "select",
