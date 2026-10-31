@@ -778,7 +778,7 @@ export default class UIManager {
   buildPostSongScreen() {
     const dom = this.ctx.dom;
     dom.postSongScreen = new Html("div")
-      .classOn("post-song-screen-overlay")
+      .classOn("post-song-screen-overlay", "hidden")
       .appendTo(this.ctx.wrapper);
 
     dom.scoreStage = new Html("div")
@@ -788,7 +788,7 @@ export default class UIManager {
     new Html("img")
       .classOn("score-bg-ambient")
       .attr({
-        src: "/assets/img/scoring/background.png",
+        src: "/assets/img/scoring/background-blur.png",
         alt: "",
         draggable: "false",
       })
@@ -830,6 +830,10 @@ export default class UIManager {
       .text("")
       .appendTo(mainGroup);
 
+    dom.scoreBreakdown = new Html("div")
+      .classOn("score-breakdown", "hidden")
+      .appendTo(scoreCard);
+
     new Html("img")
       .classOn("score-logo")
       .attr({
@@ -870,6 +874,157 @@ export default class UIManager {
       .classOn("score-headline-bracket")
       .text("」")
       .appendTo(headline);
+  }
+
+  setScoreBreakdown(details) {
+    const dom = this.ctx.dom;
+    const panel = dom.scoreBreakdown;
+    if (!panel) return;
+
+    panel.clear();
+    dom.scoreBreakdownCredit = null;
+
+    const hasBreakdown =
+      details &&
+      Number.isFinite(details.tonality) &&
+      Number.isFinite(details.vibrato) &&
+      Number.isFinite(details.transitions);
+
+    if (!hasBreakdown) {
+      panel.classOn("hidden");
+      return;
+    }
+
+    panel
+      .classOff("hidden")
+      .attr({ role: "region", "aria-labelledby": "score-breakdown-title" });
+
+    const head = new Html("div")
+      .classOn("score-breakdown-head")
+      .appendTo(panel);
+    new Html("h2")
+      .id("score-breakdown-title")
+      .classOn("score-breakdown-title")
+      .text("BREAKDOWN")
+      .appendTo(head);
+
+    if (details.feverLevel > 0) {
+      new Html("div")
+        .classOn("score-breakdown-fever")
+        .text(details.feverLevel >= 2 ? "SUPER FEVER" : "FEVER")
+        .appendTo(head);
+    }
+
+    const weights = details.weights || {};
+    const metrics = [
+      {
+        label: "TONALITY",
+        value: details.tonality,
+        weight: weights.tonality,
+      },
+      {
+        label: "VIBRATO",
+        value: details.vibrato,
+        weight: weights.vibrato,
+      },
+      {
+        label: "TRANSITIONS",
+        value: details.transitions,
+        weight: weights.transitions,
+      },
+    ];
+
+    const statList = new Html("div").classOn("score-stat-list").appendTo(panel);
+
+    metrics.forEach((metric, index) => {
+      const weight = Number.isFinite(metric.weight) ? metric.weight : 0;
+      const value = Number.isFinite(metric.value) ? metric.value : 0;
+      const row = new Html("div")
+        .classOn("score-stat-row")
+        .style({ "--stat-index": String(index) })
+        .appendTo(statList);
+      const top = new Html("div").classOn("score-stat-top").appendTo(row);
+
+      new Html("span")
+        .classOn("score-stat-name")
+        .text(metric.label)
+        .appendTo(top);
+
+      const valueEl = new Html("span")
+        .classOn("score-stat-value")
+        .appendTo(top);
+
+      if (weight > 0) {
+        new Html("span")
+          .classOn("score-stat-number")
+          .text(String(Math.round(value)))
+          .appendTo(valueEl);
+        new Html("span").classOn("score-stat-unit").text("%").appendTo(valueEl);
+      } else {
+        valueEl.text("—").classOn("is-empty");
+      }
+
+      const bar = new Html("div").classOn("score-stat-bar").appendTo(row);
+      const fill = new Html("div").classOn("score-stat-fill").appendTo(bar);
+      const ratio = weight > 0 ? Math.max(0, Math.min(1, value / 100)) : 0;
+      fill.style({ "--stat-fill": String(ratio) });
+    });
+
+    const tiers = details.tiers || {};
+    const tierValues = [
+      { key: "accurate", label: "ACCURATE", tone: "is-accurate" },
+      { key: "interpreted", label: "INTERPRETED", tone: "is-interpreted" },
+      { key: "problematic", label: "PROBLEMATIC", tone: "is-problematic" },
+      { key: "missed", label: "MISSED", tone: "is-missed" },
+    ];
+
+    const tierGrid = new Html("div")
+      .classOn("score-tier-grid")
+      .attr({ role: "list", "aria-label": "Note interpretation" })
+      .appendTo(panel);
+
+    tierValues.forEach((tier, index) => {
+      const tile = new Html("div")
+        .classOn("score-tier", tier.tone)
+        .attr({ role: "listitem" })
+        .style({ "--tier-index": String(index) })
+        .appendTo(tierGrid);
+      new Html("span")
+        .classOn("score-tier-count")
+        .text(String(Number.isFinite(tiers[tier.key]) ? tiers[tier.key] : 0))
+        .appendTo(tile);
+      new Html("span")
+        .classOn("score-tier-label")
+        .text(tier.label)
+        .appendTo(tile);
+    });
+
+    dom.scoreBreakdownCredit = new Html("div")
+      .classOn("score-breakdown-credit", "hidden")
+      .appendTo(panel);
+  }
+
+  setScoreBreakdownMusic(track) {
+    const credit = this.ctx.dom.scoreBreakdownCredit;
+    if (!credit) return;
+
+    credit.clear();
+
+    if (!track) {
+      credit.classOn("hidden");
+      return;
+    }
+
+    new Html("span")
+      .classOn("score-breakdown-credit-label")
+      .text("BGM ·")
+      .appendTo(credit);
+    const artists = track.artists ? ` by ${track.artists}` : "";
+    new Html("span")
+      .classOn("score-breakdown-credit-track")
+      .text(`${track.name}${artists}`)
+      .appendTo(credit);
+    credit.classOff("hidden");
   }
 
   playScoreEntrance() {

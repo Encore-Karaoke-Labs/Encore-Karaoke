@@ -2,6 +2,8 @@ import CDGraphics from "cdgraphics";
 import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
 
+const SCORE_BREAKDOWN_HOLD_MS = 30000;
+
 export default class PlaybackManager {
   /**
    * @param {Object} context - The shared context
@@ -811,6 +813,7 @@ export default class PlaybackManager {
               this.ctx.services.SessionsSvc.submitScore(
                 finalScore.finalScore,
                 songTitle,
+                finalScore.details,
               );
           }
 
@@ -883,7 +886,30 @@ export default class PlaybackManager {
     window.obs?.triggerState?.("score");
     if (root.games)
       root.games.broadcastPlaybackState("score_screen", scoreData);
-    dom.postSongScreen.classOff("show-leaderboard");
+    dom.postSongScreen
+      .classOff("hidden", "show-leaderboard", "show-breakdown")
+      .styleJs({ opacity: "0", pointerEvents: "none" });
+
+    const hasHaranaBreakdown =
+      scoreData.details?.engine === "harana" &&
+      Number.isFinite(scoreData.details.tonality) &&
+      Number.isFinite(scoreData.details.vibrato) &&
+      Number.isFinite(scoreData.details.transitions);
+
+    root.ui.setScoreBreakdown?.(hasHaranaBreakdown ? scoreData.details : null);
+    root.ui.setScoreBreakdownMusic?.(null);
+
+    const revealBreakdown = () => {
+      if (!hasHaranaBreakdown || state.scoreSkipped) return;
+      dom.postSongScreen.classOn("show-breakdown");
+      this.ctx.modules.bgm
+        ?.play()
+        .then((track) => {
+          if (!track || !state.isScoreScreenActive) return;
+          root.ui.setScoreBreakdownMusic?.(track);
+        })
+        .catch(() => {});
+    };
 
     const isRemoteAudience =
       state.isSessionActive &&
@@ -948,6 +974,11 @@ export default class PlaybackManager {
       ? Math.max(0, Math.min(100, scoreData.finalScore))
       : 0;
     const s = Math.floor(rawScore);
+    const finalScoreText = rawScore.toFixed(2);
+    dom.postSongScreen.classOff("is-triple-digit", "is-perfect");
+    if (finalScoreText.length > 5)
+      dom.postSongScreen.classOn("is-triple-digit");
+    if (s === 100) dom.postSongScreen.classOn("is-perfect");
     const rankTiers = [
       {
         min: 100,
@@ -965,13 +996,19 @@ export default class PlaybackManager {
     const rankTier = rankTiers.find((tier) => s >= tier.min);
     const rank = rankTier.rank;
 
-    dom.rankDisplay
-      .text("")
-      .styleJs({ transform: "scale(0.8)", opacity: "0" });
+    dom.rankDisplay.text("").styleJs({ transform: "scale(0.8)", opacity: "0" });
     dom.finalScoreDisplay.text("0.00");
     root.ui.setScoreHeadline?.(rankTier.phrase);
     root.ui.playScoreEntrance?.();
-    dom.postSongScreen.styleJs({ opacity: "1", pointerEvents: "all" });
+    dom.postSongScreen.styleJs({ pointerEvents: "all" });
+    // The overlay starts at display:none, so let it render one frame at
+    // opacity 0 before fading in.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (state.isScoreScreenActive)
+          dom.postSongScreen.styleJs({ opacity: "1" });
+      });
+    });
 
     const playAudioSequence = async () => {
       await new Promise((r) => setTimeout(r, 1000));
@@ -1055,17 +1092,39 @@ export default class PlaybackManager {
       }
     };
 
+    const scoreSequence = async () => {
+      await Promise.all([animate(), playAudioSequence()]);
+      if (state.scoreSkipped || !hasHaranaBreakdown) return;
+
+      await new Promise((r) => setTimeout(r, 400));
+      if (state.scoreSkipped) return;
+
+      revealBreakdown();
+
+      await new Promise((r) => setTimeout(r, SCORE_BREAKDOWN_HOLD_MS));
+    };
+
     await Promise.race([
-      Promise.all([animate(), playAudioSequence()]),
+      scoreSequence(),
       new Promise((resolve) => {
         state.scoreSkipResolver = resolve;
       }),
     ]);
 
     dom.postSongScreen.styleJs({ opacity: "0", pointerEvents: "none" });
+    dom.postSongScreen.classOff("show-breakdown");
+    this.ctx.modules.bgm?.stop();
+    root.ui.setScoreBreakdownMusic?.(null);
     state.isScoreScreenActive = false;
     state.scoreSkipResolver = null;
     if (root.games) root.games.broadcastPlaybackState("score_screen_end", null);
+
+    // Release the score overlay's compositor layers once the fade is done so
+    // the expanded card and breakdown do not linger over the next screen.
+    setTimeout(() => {
+      if (!state.isScoreScreenActive) dom.postSongScreen.classOn("hidden");
+    }, 800);
+
     await new Promise((r) => setTimeout(r, 400));
   }
 }
