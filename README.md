@@ -139,7 +139,7 @@ Pressing **`F2`** in the Main Menu will put you into **Setup Mode**. Setup Mode 
 - Change the SoundFont and MIDI device outputs
 - Adjust Master Volume and Mic Latency overrides.
 - Calibrate Video Sync offsets.
-- Set a full-screen idle greeting for your karaoke business.
+- Set a full-screen idle greeting message for your karaoke business.
 - Change the Security PIN (Recommended).
 
 ---
