@@ -106,6 +106,7 @@
   --score-margin-top: 8;
   --score-card-top: 178;
   --score-card-width: 883;
+  --score-card-expanded-width: 1192;
   --score-card-height: 414;
   --score-card-radius: 25;
   --score-card-inset-x: 39;
@@ -118,7 +119,9 @@
   --score-headline-size: 120;
   --score-label-size: 50;
   --score-number-size: 155;
+  --score-number-size-compact: 132;
   --score-rank-size: 30;
+  --score-rank-size-compact: 26;
 
   /* --- Controller & Multi-player Slots --- */
   --controller-color-0: hsl(248, 65%, 74%);
