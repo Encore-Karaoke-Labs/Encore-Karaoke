@@ -7,7 +7,7 @@ export const DEFAULT_INFO_BAR_ICON = "information-circle";
  */
 export const INFO_BAR_LABEL_ICONS = {
   // Playback & Queue
-  CURRENT: "musical-notes-outline",
+  CURRENT: "musical-notes",
   "UP NEXT": "play-forward",
   PAUSED: "pause",
   PAUSE: "pause",
@@ -31,7 +31,7 @@ export const INFO_BAR_LABEL_ICONS = {
 
   // Sessions, Recordings & Operations
   RECORDING: "radio-button-on",
-  RESERVING: "bookmark",
+  RESERVING: "keypad",
   QUEUE: "list",
   SESSIONS: "people-circle",
   SETUP: "settings",
