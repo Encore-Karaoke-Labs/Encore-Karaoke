@@ -23,6 +23,7 @@
 - **Real-Time Scoring**
   - With our **Forte Audio Engine** powered by the Web Audio API, Encore actively listens to your microphone.
   - Features live pitch tracking, real-time key-modulation detection, and a visual pitch guide overlay so you know exactly when to hit those high notes (only in Multiplex & MIDI tracks).
+  - Scores your performance not just by pitch accuracy, but through expression too.
 - **Pitch & Latency Control**
   - Adjust pitch (transpose) and tempo on the fly.
   - Calibrate your microphone and signal chain's latency quickly.
