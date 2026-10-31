@@ -14,6 +14,7 @@ import SetupManager from "./managers/SetupManager.js";
 import StreamManager from "./managers/StreamManager.js";
 import UIManager from "./managers/UIManager.js";
 
+import { BGMModule } from "../../modules/BGM.js";
 import { BGVModule } from "../../modules/BGVPlayer.js";
 import generateDialog from "../../modules/Dialog.js";
 import { InfoBarModule } from "../../modules/InfoBar.js";
@@ -155,6 +156,11 @@ class EncoreController {
     this.mixer = new MixerModule(this.services.Forte, this.state);
     this.bgv = new BGVModule();
     this.scoreHud = new ScoreHUDModule();
+    this.bgm = new BGMModule(this.services.Forte, {
+      manifestPath: "/assets/audio/scores/breakdown/manifest.json",
+      volume: 0.2,
+      fadeIn: 1.4,
+    });
 
     this.infoBar = new InfoBarModule(
       () => {
@@ -217,6 +223,7 @@ class EncoreController {
         mixer: this.mixer,
         bgv: this.bgv,
         scoreHud: this.scoreHud,
+        bgm: this.bgm,
         infoBar: this.infoBar,
         recorder: this.recorder,
         dialog: generateDialog,
@@ -812,6 +819,7 @@ class EncoreController {
     }
 
     this.ui.buildAll();
+    this.bgm.preload();
 
     this.infoBar.mount(this.dom.topBarContainer);
     this.scoreHud.mount(this.context.wrapper);
