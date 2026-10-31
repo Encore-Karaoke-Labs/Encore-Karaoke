@@ -193,6 +193,35 @@
   padding: 0 1.5rem;
 }
 
+/* -- Idle Greeting -- */
+.idle-greeting-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(2rem, 6vw, 6rem);
+  z-index: 11;
+  pointer-events: none;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.idle-greeting-text {
+  max-width: min(90%, 1600px);
+  font-family: "Radio Canada", sans-serif;
+  font-size: clamp(2.2rem, 5.5vw, 6rem);
+  font-weight: 700;
+  line-height: 1.18;
+  color: #89cff0;
+  text-align: center;
+  text-wrap: balance;
+  text-shadow:
+    0 0 18px rgba(0, 157, 255, 0.35),
+    0 4px 18px rgba(0, 0, 0, 0.9);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
 .idle-hint {
   position: absolute;
   bottom: 2.5rem;

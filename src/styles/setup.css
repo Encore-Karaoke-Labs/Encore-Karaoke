@@ -699,3 +699,175 @@
   background: #ff5555;
   color: white;
 }
+
+/* -- Idle Greeting Editor -- */
+.submenu-edit-icon {
+  font-size: 1.3rem;
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+
+.text-value {
+  display: inline-block;
+  min-width: 0;
+  max-width: min(28rem, 100%);
+  vertical-align: middle;
+}
+
+.info-text.is-empty {
+  opacity: 0.55;
+}
+
+.setup-text-edit-box {
+  width: 85%;
+  max-width: 820px;
+  max-height: 90vh;
+}
+
+.setup-text-edit-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  white-space: normal;
+}
+
+.setup-text-edit-desc {
+  margin: 0 0 1.25rem 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 1.2rem;
+  line-height: 1.5;
+}
+
+.setup-text-edit-label {
+  display: block;
+  margin: 0.5rem 0;
+  color: #89cff0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.setup-text-edit-field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.setup-greeting-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 9rem;
+  margin-bottom: 1rem;
+  padding: 1.5rem;
+  background: radial-gradient(
+    circle at center,
+    rgba(20, 24, 40, 0.9),
+    rgba(5, 5, 10, 0.95)
+  );
+  border: 1px solid rgba(137, 207, 240, 0.25);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.setup-greeting-preview-text {
+  max-width: 100%;
+  font-family: "Radio Canada", sans-serif;
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: #89cff0;
+  text-align: center;
+  text-shadow:
+    0 0 12px rgba(255, 215, 0, 0.3),
+    0 3px 10px rgba(0, 0, 0, 0.8);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.setup-greeting-preview-text.is-empty {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+  text-shadow: none;
+}
+
+.setup-text-edit-box .setup-text-edit-input {
+  width: 100%;
+  min-height: 7.5rem;
+  max-height: 16rem;
+  resize: vertical;
+  padding: 0.9rem 1rem;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(137, 207, 240, 0.4);
+  border-radius: 8px;
+  color: #fff;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.03em;
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+  caret-color: #89cff0;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.setup-text-edit-box .setup-text-edit-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.setup-text-edit-box .setup-text-edit-input::selection {
+  background: rgba(137, 207, 240, 0.35);
+  color: #fff;
+}
+
+.setup-text-edit-box .setup-text-edit-input:focus {
+  border-color: #89cff0;
+  box-shadow: 0 0 0 3px rgba(137, 207, 240, 0.18);
+}
+
+.setup-text-edit-counter {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.setup-text-edit-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-shrink: 0;
+}
+
+.setup-text-edit-footer .setup-dialog-hint {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: left;
+  cursor: default;
+}
+
+.setup-text-edit-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.setup-header-btn.is-primary {
+  border-color: rgba(255, 215, 0, 0.55);
+  background: rgba(255, 215, 0, 0.14);
+  color: #ffd700;
+}
+
+.setup-header-btn.is-primary:hover {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.22);
+  color: #fff;
+}
