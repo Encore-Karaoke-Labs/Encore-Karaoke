@@ -348,7 +348,10 @@ export default class SessionManager {
       SessionsSvc.state.mode === "performance" &&
       SessionsSvc.state.singerId !== SessionsSvc.peer.id
     ) {
-      const mockScoreData = { finalScore: e.detail.entry.score };
+      const mockScoreData = {
+        finalScore: e.detail.entry.score,
+        details: e.detail.entry.details,
+      };
       state.remoteScoreEntry = e.detail.entry;
       state.currentScoreEntryId = e.detail.entry.id;
 

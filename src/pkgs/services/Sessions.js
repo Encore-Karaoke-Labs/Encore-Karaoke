@@ -563,7 +563,7 @@ const pkg = {
       }
     },
 
-    submitScore: function (score, songTitle) {
+    submitScore: function (score, songTitle, details = null) {
       const p = this.state.participants.find(
         (part) => part.id === this.peer.id,
       );
@@ -574,6 +574,7 @@ const pkg = {
         avatar: p ? p.avatar : null,
         songTitle: songTitle || "Unknown Song",
         score: score,
+        details: details,
       };
 
       if (this.isHost) {
