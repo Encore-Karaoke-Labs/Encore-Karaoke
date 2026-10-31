@@ -20,12 +20,14 @@ export interface VideoConfig {
 
 export interface AppConfig {
   setupComplete: boolean;
+  idleGreeting: string;
   audioConfig: AudioConfig;
   videoConfig: VideoConfig;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   setupComplete: false,
+  idleGreeting: "",
   audioConfig: {
     mix: {
       instrumental: { volume: 1, outputDevice: "default" },
