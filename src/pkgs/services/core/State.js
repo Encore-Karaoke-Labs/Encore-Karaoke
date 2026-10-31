@@ -13,6 +13,7 @@ export const state = {
     guideVocalDelayNode: null,
     finalScore: 0,
     details: {
+      engine: null,
       accuracy: 0,
       tonality: 0,
       vibrato: 0,

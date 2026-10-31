@@ -626,6 +626,7 @@ export class ForteScoring {
 
     this.state.scoring.finalScore = clampedScore;
     this.state.scoring.details = {
+      engine: "harana",
       accuracy: clampedScore,
       tonality: Math.round(tonalityScore),
       vibrato: Math.round(vibratoScore),
