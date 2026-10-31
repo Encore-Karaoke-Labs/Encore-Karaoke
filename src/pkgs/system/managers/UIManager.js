@@ -61,6 +61,7 @@ export default class UIManager {
     this._menuUpdateRafId = null;
     this._menuExitTimer = null;
     this._idleTransitionTimeout = null;
+    this._idleCycleToken = 0;
     this._fullscreenListenerAttached = false;
     this._isFullscreenDetected = false;
   }
@@ -1658,6 +1659,9 @@ export default class UIManager {
           dom.newSongScreen.classOn("hidden");
           dom.idleGreetingScreen.classOn("hidden");
           dom.standbyScreen.classOff("hidden");
+          dom.standbyBumper.classOff("hidden");
+          dom.standbyScreen.classOn("has-bumper-image");
+          dom.standbyText.classOn("hidden");
           dom.standbyBumper.styleJs({ opacity: 1 });
         } else if (this.idleState === "greeting") {
           dom.standbyScreen.classOn("hidden");
@@ -1667,7 +1671,7 @@ export default class UIManager {
         } else {
           dom.newSongScreen.classOn("hidden");
           dom.idleGreetingScreen.classOn("hidden");
-          dom.standbyScreen.classOff("hidden");
+          dom.standbyScreen.classOff("hidden", "has-bumper-image");
           dom.standbyBumper.classOn("hidden");
           dom.standbyText.classOff("hidden");
         }
@@ -3027,6 +3031,8 @@ export default class UIManager {
       clearTimeout(this._idleTransitionTimeout);
       this._idleTransitionTimeout = null;
     }
+    // Invalidate any transition still awaiting work from a previous run.
+    this._idleCycleToken++;
 
     const dom = this.ctx.dom;
     this.idlePlaylist = [];
@@ -3077,6 +3083,8 @@ export default class UIManager {
     this.currentIdleIndex = -1;
 
     const cycle = () => {
+      this._idleCycleToken++;
+      const token = this._idleCycleToken;
       this.currentIdleIndex =
         (this.currentIdleIndex + 1) % this.idlePlaylist.length;
       const currentItem = this.idlePlaylist[this.currentIdleIndex];
@@ -3087,9 +3095,11 @@ export default class UIManager {
 
       this._idleTransitionTimeout = setTimeout(async () => {
         this._idleTransitionTimeout = null;
+        // A newer transition (restart or next tick) already superseded this one.
+        if (token !== this._idleCycleToken) return;
         this.idleState = currentItem.type;
         const state = this.ctx.state;
-        const isIdling =
+        const isIdling = () =>
           !state.showSongList && !state.isTypingNumber && state.mode === "menu";
 
         if (currentItem.type === "newsong") {
@@ -3124,30 +3134,35 @@ export default class UIManager {
               .appendTo(row);
           });
 
-          if (isIdling) {
+          if (isIdling()) {
             dom.standbyScreen.classOn("hidden");
             dom.newSongScreen.classOff("hidden");
             dom.newSongScreen.styleJs({ opacity: 1 });
           }
         } else if (currentItem.type === "bumper") {
           dom.idleGreetingScreen.classOn("hidden");
-          const imageUrl = await NetworkingUtility.getFileLink(
-            currentItem.data,
-          );
-          dom.standbyBumper.attr({ src: imageUrl.href });
+          let imageUrl = null;
+          try {
+            imageUrl = await NetworkingUtility.getFileLink(currentItem.data);
+          } catch (err) {
+            console.warn("[UIManager] Could not resolve bumper image:", err);
+          }
+          if (token !== this._idleCycleToken) return;
+          if (imageUrl) dom.standbyBumper.attr({ src: imageUrl.href });
 
-          if (isIdling) {
+          dom.standbyBumper.classOff("hidden");
+          dom.standbyScreen.classOn("has-bumper-image");
+          dom.standbyText.classOn("hidden");
+          dom.standbyBumper.styleJs({ opacity: 1 });
+
+          if (isIdling()) {
             dom.newSongScreen.classOn("hidden");
             dom.standbyScreen.classOff("hidden");
-            dom.standbyBumper.classOff("hidden");
-            dom.standbyScreen.classOn("has-bumper-image");
-            dom.standbyText.classOn("hidden");
-            dom.standbyBumper.styleJs({ opacity: 1 });
           }
         } else if (currentItem.type === "greeting") {
           dom.idleGreetingText.text(currentItem.data);
 
-          if (isIdling) {
+          if (isIdling()) {
             dom.standbyScreen.classOn("hidden");
             dom.newSongScreen.classOn("hidden");
             dom.idleGreetingScreen.classOff("hidden");
