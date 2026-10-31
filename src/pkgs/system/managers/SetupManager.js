@@ -66,11 +66,14 @@ export default class SetupManager {
       showingVersionCard: false,
       showingLicenses: false,
       licensesData: null,
+      textEdit: null,
+      textEditValue: "",
     };
 
     this.previewVideoEl = null;
     this.offsetDisplay = null;
     this.previewSyncFrame = null;
+    this.textEditInput = null;
 
     this.boundBuildProgress = (e) => {
       if (!this.setupState.buildingLibrary) return;
@@ -115,6 +118,9 @@ export default class SetupManager {
     this.setupState.transitionId = (this.setupState.transitionId || 0) + 1;
     const currentId = this.setupState.transitionId;
 
+    this.setupState.textEdit = null;
+    this.setupState.textEditValue = "";
+    this.textEditInput = null;
     this.setupState.isTransitioning = true;
     this.setupState.view = newView;
     Object.assign(this.setupState, stateUpdates);
@@ -147,6 +153,9 @@ export default class SetupManager {
     this.setupState.authInput = "";
     this.setupState.dashboardIndex = 0;
     this.setupState.isDataLoaded = false;
+    this.setupState.textEdit = null;
+    this.setupState.textEditValue = "";
+    this.textEditInput = null;
 
     if (this.ctx.dom.setupContainer) {
       this.ctx.dom.setupContainer.classOn("fadeIn");
@@ -205,6 +214,10 @@ export default class SetupManager {
   exitSetup() {
     if (this.previewSyncFrame) cancelAnimationFrame(this.previewSyncFrame);
     if (this.setupState.manualCalib?.active) this.exitManualCalibration();
+
+    this.setupState.textEdit = null;
+    this.setupState.textEditValue = "";
+    this.textEditInput = null;
 
     this.ctx.root.ui.setMode("menu");
 
@@ -1050,6 +1063,29 @@ export default class SetupManager {
                   }
                 },
               },
+              {
+                id: "idle_greeting",
+                label: "Idle Greeting Message",
+                type: "text",
+                maxLength: 120,
+                title: "IDLE GREETING",
+                description:
+                  "Text greeting shown while idle. Press Enter for a new line. Leave it blank to hide it.",
+                placeholder: "Minahal ang Di Mahal Videoke\n0917 123 4567",
+                footerHint: "CTRL+ENTER: Save | ESC: Cancel",
+                saveToast: "GREETING SAVED",
+                clearToast: "GREETING HIDDEN",
+                get: () => this.ctx.config.idleGreeting || "",
+                set: (v) => {
+                  const value = String(v ?? "")
+                    .replace(/\r\n?/g, "\n")
+                    .trim()
+                    .slice(0, 120);
+                  this.ctx.config.idleGreeting = value;
+                  window.config.setItem("idleGreeting", value);
+                  this.ctx.root.ui?.startBumperCycle?.();
+                },
+              },
             ],
           },
           {
@@ -1282,6 +1318,17 @@ export default class SetupManager {
 
   handleKeyDown(e) {
     if (this.setupState.isTransitioning) return;
+
+    if (this.setupState.textEdit) {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        this.saveTextEditor();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        this.closeTextEditor();
+      }
+      return;
+    }
 
     if (this.setupState.view === "loading") {
       if (e.key === "Escape") this.exitSetup();
@@ -1520,12 +1567,18 @@ export default class SetupManager {
 
         this.renderView();
         return;
-      } else if (
-        e.key === "Enter" &&
-        (currentItem.type === "action" || currentItem.type === "info-action")
-      ) {
-        currentItem.action();
-        return;
+      } else if (e.key === "Enter") {
+        if (currentItem.type === "text") {
+          this.openTextEditor(currentItem);
+          return;
+        }
+        if (
+          currentItem.type === "action" ||
+          currentItem.type === "info-action"
+        ) {
+          currentItem.action();
+          return;
+        }
       }
 
       if (newIndex !== this.setupState.submenuIndex) {
@@ -2526,11 +2579,16 @@ export default class SetupManager {
       hint = "Enter 4-digit PIN using number keys | ESC: Exit Setup";
     if (this.setupState.view === "loading")
       hint = "Loading system settings... | ESC: Exit Setup";
+    if (this.setupState.textEdit)
+      hint =
+        this.setupState.textEdit.footerHint || "CTRL+ENTER: Save | ESC: Cancel";
     new Html("p").text(hint).appendTo(footer);
 
     if (this.setupState.dialog) this.renderDialog(this.ctx.dom.setupContainer);
     if (this.setupState.showingLicenses)
       this.renderLicensesOverlay(this.ctx.dom.setupContainer);
+    if (this.setupState.textEdit)
+      this.renderTextEditOverlay(this.ctx.dom.setupContainer);
   }
 
   renderLoadingScreen(container) {
@@ -2808,6 +2866,167 @@ export default class SetupManager {
         display: "block",
       })
       .appendTo(overlay);
+  }
+
+  openTextEditor(item) {
+    this.setupState.textEdit = item;
+    this.setupState.textEditValue = String(item.get() || "");
+    this.renderView();
+
+    requestAnimationFrame(() => {
+      if (!this.textEditInput?.elm?.isConnected) return;
+      this.textEditInput.elm.focus();
+      const end = this.textEditInput.elm.value.length;
+      this.textEditInput.elm.setSelectionRange(end, end);
+    });
+  }
+
+  closeTextEditor() {
+    this.setupState.textEdit = null;
+    this.setupState.textEditValue = "";
+    this.textEditInput = null;
+    this.renderView();
+  }
+
+  saveTextEditor() {
+    const item = this.setupState.textEdit;
+    if (!item) return;
+
+    const maxLength = item.maxLength || 120;
+    const value = String(this.setupState.textEditValue || "")
+      .replace(/\r\n?/g, "\n")
+      .trim()
+      .slice(0, maxLength);
+
+    item.set(value);
+    this.setupState.textEdit = null;
+    this.setupState.textEditValue = "";
+    this.textEditInput = null;
+    this.showToast(
+      value ? item.saveToast || "SAVED" : item.clearToast || "CLEARED",
+      "success",
+    );
+    this.renderView();
+  }
+
+  renderTextEditOverlay(container) {
+    const item = this.setupState.textEdit;
+    if (!item) return;
+
+    const maxLength = item.maxLength || 120;
+
+    const overlay = new Html("div")
+      .classOn("setup-dialog-overlay")
+      .on("click", (e) => {
+        if (e.target === overlay.elm) this.closeTextEditor();
+      })
+      .appendTo(container);
+
+    const box = new Html("div")
+      .classOn("setup-dialog-box", "setup-text-edit-box")
+      .appendTo(overlay);
+
+    new Html("h2").text(item.title || "EDIT TEXT").appendTo(box);
+
+    const content = new Html("div")
+      .classOn("setup-dialog-content", "setup-text-edit-content")
+      .appendTo(box);
+
+    new Html("p")
+      .classOn("setup-text-edit-desc")
+      .text(item.description || "")
+      .appendTo(content);
+
+    new Html("div")
+      .classOn("setup-text-edit-label")
+      .text("PREVIEW")
+      .appendTo(content);
+
+    const preview = new Html("div")
+      .classOn("setup-greeting-preview")
+      .appendTo(content);
+
+    const previewText = new Html("div")
+      .classOn("setup-greeting-preview-text")
+      .appendTo(preview);
+
+    const fieldHead = new Html("div")
+      .classOn("setup-text-edit-field-head")
+      .appendTo(content);
+
+    new Html("label")
+      .classOn("setup-text-edit-label")
+      .attr({ for: "setup-idle-greeting-input" })
+      .text("MESSAGE")
+      .appendTo(fieldHead);
+
+    const counter = new Html("div")
+      .classOn("setup-text-edit-counter")
+      .appendTo(fieldHead);
+
+    this.textEditInput = new Html("textarea")
+      .id("setup-idle-greeting-input")
+      .classOn("setup-text-edit-input")
+      .attr({
+        maxlength: String(maxLength),
+        rows: "4",
+        placeholder: item.placeholder || "Enter a message...",
+        autocomplete: "off",
+        spellcheck: "false",
+      })
+      .val(this.setupState.textEditValue)
+      .appendTo(content);
+
+    const footer = new Html("div")
+      .classOn("setup-text-edit-footer")
+      .appendTo(box);
+
+    new Html("p")
+      .classOn("setup-dialog-hint")
+      .text(item.footerHint || "CTRL+ENTER: Save | ESC: Cancel")
+      .appendTo(footer);
+
+    const actions = new Html("div")
+      .classOn("setup-text-edit-actions")
+      .appendTo(footer);
+
+    new Html("button")
+      .classOn("setup-header-btn")
+      .text("Cancel (ESC)")
+      .on("click", () => this.closeTextEditor())
+      .appendTo(actions);
+
+    new Html("button")
+      .classOn("setup-header-btn", "is-primary")
+      .text("Save (CTRL+ENTER)")
+      .on("click", () => this.saveTextEditor())
+      .appendTo(actions);
+
+    const updatePreview = () => {
+      const rawValue = String(this.setupState.textEditValue || "");
+      const value = rawValue.trim();
+      previewText.text(value || "Your shop name\nContact number");
+      previewText[value ? "classOff" : "classOn"]("is-empty");
+      counter.text(`${rawValue.length} / ${maxLength}`);
+    };
+
+    updatePreview();
+
+    this.textEditInput.on("input", () => {
+      this.setupState.textEditValue = this.textEditInput.getValue();
+      updatePreview();
+    });
+
+    this.textEditInput.on("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        this.saveTextEditor();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        this.closeTextEditor();
+      }
+    });
   }
 
   renderDialog(container) {
@@ -3138,6 +3357,11 @@ export default class SetupManager {
             this.setupState.submenuIndex = itemIdx;
             item.action();
           });
+        } else if (item.type === "text") {
+          row.on("click", () => {
+            this.setupState.submenuIndex = itemIdx;
+            this.openTextEditor(item);
+          });
         }
 
         new Html("div").classOn("submenu-label").text(item.label).appendTo(row);
@@ -3151,6 +3375,19 @@ export default class SetupManager {
           );
         } else if (item.type === "action") {
           valWrap.text("Click or press Enter to execute");
+        } else if (item.type === "text") {
+          const value = String(item.get() || "")
+            .trim()
+            .replace(/\s*\n+\s*/g, " • ");
+          const valueSpan = new Html("span")
+            .classOn("info-text", "text-value")
+            .text(value || "Not set")
+            .appendTo(valWrap);
+          if (!value) valueSpan.classOn("is-empty");
+          new Html("ion-icon")
+            .classOn("submenu-edit-icon")
+            .attr({ name: "create-outline" })
+            .appendTo(valWrap);
         } else if (item.type === "range") {
           const val = item.get();
           const p = ((val - item.min) / (item.max - item.min)) * 100;

@@ -60,6 +60,7 @@ export default class UIManager {
     this._scrollRafId = null;
     this._menuUpdateRafId = null;
     this._menuExitTimer = null;
+    this._idleTransitionTimeout = null;
     this._fullscreenListenerAttached = false;
     this._isFullscreenDetected = false;
   }
@@ -384,7 +385,6 @@ export default class UIManager {
       .classOn("standby-text")
       .text("SELECT SONG")
       .appendTo(dom.standbyScreen);
-
     // New Song Screen
     dom.newSongScreen = new Html("div")
       .classOn("new-song-screen", "hidden")
@@ -396,6 +396,14 @@ export default class UIManager {
     dom.newSongList = new Html("div")
       .classOn("new-song-list")
       .appendTo(dom.newSongScreen);
+
+    // Idle Greeting Screen
+    dom.idleGreetingScreen = new Html("div")
+      .classOn("idle-greeting-screen", "hidden")
+      .appendTo(dom.overlay);
+    dom.idleGreetingText = new Html("div")
+      .classOn("idle-greeting-text")
+      .appendTo(dom.idleGreetingScreen);
 
     dom.idleHint = new Html("div")
       .classOn("idle-hint")
@@ -1643,14 +1651,22 @@ export default class UIManager {
         dom.idleHint[isIdling ? "classOff" : "classOn"]("hidden");
         if (this.idleState === "newsong") {
           dom.standbyScreen.classOn("hidden");
+          dom.idleGreetingScreen.classOn("hidden");
           dom.newSongScreen.classOff("hidden");
           dom.newSongScreen.styleJs({ opacity: 1 });
         } else if (this.idleState === "bumper") {
           dom.newSongScreen.classOn("hidden");
+          dom.idleGreetingScreen.classOn("hidden");
           dom.standbyScreen.classOff("hidden");
           dom.standbyBumper.styleJs({ opacity: 1 });
+        } else if (this.idleState === "greeting") {
+          dom.standbyScreen.classOn("hidden");
+          dom.newSongScreen.classOn("hidden");
+          dom.idleGreetingScreen.classOff("hidden");
+          dom.idleGreetingScreen.styleJs({ opacity: 1 });
         } else {
           dom.newSongScreen.classOn("hidden");
+          dom.idleGreetingScreen.classOn("hidden");
           dom.standbyScreen.classOff("hidden");
           dom.standbyBumper.classOn("hidden");
           dom.standbyText.classOff("hidden");
@@ -1669,8 +1685,10 @@ export default class UIManager {
       dom.idleHint.classOn("hidden");
       dom.standbyScreen.classOn("hidden");
       dom.newSongScreen.classOn("hidden");
+      dom.idleGreetingScreen.classOn("hidden");
       dom.standbyBumper.styleJs({ opacity: 0 });
       dom.newSongScreen.styleJs({ opacity: 0 });
+      dom.idleGreetingScreen.styleJs({ opacity: 0 });
 
       dom.mainContent.classOff("hidden");
       dom.songListContainer.classOff("hidden");
@@ -3005,7 +3023,17 @@ export default class UIManager {
 
   startBumperCycle() {
     if (this.bumperInterval) clearInterval(this.bumperInterval);
+    if (this._idleTransitionTimeout) {
+      clearTimeout(this._idleTransitionTimeout);
+      this._idleTransitionTimeout = null;
+    }
+
+    const dom = this.ctx.dom;
     this.idlePlaylist = [];
+    this.idleState = "text";
+    dom.idleGreetingScreen.classOn("hidden");
+    dom.idleGreetingScreen.styleJs({ opacity: 0 });
+
     const libraryInfo = this.ctx.root.library.libraryInfo;
 
     const bumperPaths = libraryInfo?.manifest?.additionalContents?.bumperImages;
@@ -3013,6 +3041,13 @@ export default class UIManager {
       const joinPath = (p1, p2) =>
         p1.replace(/\/$/, "") + "/" + p2.replace(/^\//, "");
       this.bumperImages = bumperPaths.map((p) => joinPath(libraryInfo.path, p));
+    }
+
+    const greeting = String(this.ctx.config.idleGreeting || "").trim();
+    if (greeting) {
+      this.idlePlaylist.push({ type: "greeting", data: greeting });
+    } else {
+      dom.idleGreetingText.text("");
     }
 
     if (this.bumperImages.length > 0) {
@@ -3031,15 +3066,14 @@ export default class UIManager {
     }
 
     if (this.idlePlaylist.length === 0) {
-      this.idleState = "text";
-      this.ctx.dom.standbyBumper.classOn("hidden");
-      this.ctx.dom.standbyText.classOff("hidden");
-      this.ctx.dom.standbyScreen.classOff("has-bumper-image");
-      this.ctx.dom.newSongScreen.classOn("hidden");
+      dom.standbyBumper.classOn("hidden");
+      dom.standbyText.classOff("hidden");
+      dom.standbyScreen.classOff("has-bumper-image", "hidden");
+      dom.newSongScreen.classOn("hidden");
       return;
     }
 
-    this.ctx.dom.standbyText.classOn("hidden");
+    dom.standbyText.classOn("hidden");
     this.currentIdleIndex = -1;
 
     const cycle = () => {
@@ -3047,17 +3081,19 @@ export default class UIManager {
         (this.currentIdleIndex + 1) % this.idlePlaylist.length;
       const currentItem = this.idlePlaylist[this.currentIdleIndex];
 
-      this.ctx.dom.standbyBumper.styleJs({ opacity: 0 });
-      this.ctx.dom.newSongScreen.styleJs({ opacity: 0 });
+      dom.standbyBumper.styleJs({ opacity: 0 });
+      dom.newSongScreen.styleJs({ opacity: 0 });
+      dom.idleGreetingScreen.styleJs({ opacity: 0 });
 
-      setTimeout(async () => {
+      this._idleTransitionTimeout = setTimeout(async () => {
+        this._idleTransitionTimeout = null;
         this.idleState = currentItem.type;
         const state = this.ctx.state;
-        const dom = this.ctx.dom;
         const isIdling =
           !state.showSongList && !state.isTypingNumber && state.mode === "menu";
 
         if (currentItem.type === "newsong") {
+          dom.idleGreetingScreen.classOn("hidden");
           dom.newSongList.clear();
           currentItem.data.forEach((song, idx) => {
             const row = new Html("div")
@@ -3094,6 +3130,7 @@ export default class UIManager {
             dom.newSongScreen.styleJs({ opacity: 1 });
           }
         } else if (currentItem.type === "bumper") {
+          dom.idleGreetingScreen.classOn("hidden");
           const imageUrl = await NetworkingUtility.getFileLink(
             currentItem.data,
           );
@@ -3106,6 +3143,15 @@ export default class UIManager {
             dom.standbyScreen.classOn("has-bumper-image");
             dom.standbyText.classOn("hidden");
             dom.standbyBumper.styleJs({ opacity: 1 });
+          }
+        } else if (currentItem.type === "greeting") {
+          dom.idleGreetingText.text(currentItem.data);
+
+          if (isIdling) {
+            dom.standbyScreen.classOn("hidden");
+            dom.newSongScreen.classOn("hidden");
+            dom.idleGreetingScreen.classOff("hidden");
+            dom.idleGreetingScreen.styleJs({ opacity: 1 });
           }
         }
       }, 500);
