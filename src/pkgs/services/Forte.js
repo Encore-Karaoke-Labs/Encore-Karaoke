@@ -99,6 +99,10 @@ const pkg = {
     playSfx: (url, volume) => sfx.playSfx(url, volume),
     stopSfx: () => sfx.stopSfx(),
 
+    loadBgm: (url) => sfx.loadBgm(url),
+    playBgm: (url, volume, fadeIn) => sfx.playBgm(url, volume, fadeIn),
+    stopBgm: (fadeOut) => sfx.stopBgm(fadeOut),
+
     playRemoteStream: (peerId, stream) => sfx.playRemoteStream(peerId, stream),
     stopRemoteStream: (peerId) => sfx.stopRemoteStream(peerId),
     clearRemoteStreams: () => sfx.clearRemoteStreams(),

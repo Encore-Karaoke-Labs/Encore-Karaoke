@@ -22,6 +22,11 @@ export class ForteSFX {
     this.sfxMidiOriginalVolume = null;
     this.currentSfxMidi = null;
     this.sfxGeneration = 0;
+
+    this.bgmCache = new Map();
+    this.bgmSourceNode = null;
+    this.bgmGainNode = null;
+    this.bgmGeneration = 0;
   }
 
   /**
@@ -56,6 +61,117 @@ export class ForteSFX {
       console.error(`[FORTE SVC] Failed to load SFX: ${url}`, e);
       return false;
     }
+  }
+
+  /**
+   * Loads a looping background music track into the BGM cache.
+   *
+   * @param {string} url - Audio endpoint.
+   * @returns {Promise<boolean>} True if loaded.
+   */
+  async loadBgm(url) {
+    if (!this.audioCore.context) return false;
+    if (this.bgmCache.has(url)) return true;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer =
+        await this.audioCore.context.decodeAudioData(arrayBuffer);
+
+      if (this.bgmCache.size >= 3) {
+        const oldest = this.bgmCache.keys().next().value;
+        this.bgmCache.delete(oldest);
+      }
+
+      this.bgmCache.set(url, audioBuffer);
+      return true;
+    } catch (e) {
+      console.error(`[FORTE SVC] Failed to load BGM: ${url}`, e);
+      return false;
+    }
+  }
+
+  /**
+   * Starts a looping background music track at a relative volume.
+   *
+   * @param {string} url - Audio endpoint.
+   * @param {number} [volume=0.2] - Relative BGM volume from 0.0 to 1.0.
+   * @param {number} [fadeIn=1.1] - Fade-in duration in seconds.
+   * @returns {Promise<boolean>} True if playback started.
+   */
+  async playBgm(url, volume = 0.2, fadeIn = 1.1) {
+    this.stopBgm(0.25);
+    const generation = this.bgmGeneration;
+    const context = this.audioCore.context;
+    if (!context) return false;
+
+    if (context.state === "suspended") await context.resume();
+    if (generation !== this.bgmGeneration) return false;
+
+    let buffer = this.bgmCache.get(url);
+    if (!buffer) {
+      const loaded = await this.loadBgm(url);
+      if (!loaded || generation !== this.bgmGeneration) return false;
+      buffer = this.bgmCache.get(url);
+    }
+    if (!buffer || generation !== this.bgmGeneration) return false;
+
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+
+    const gain = context.createGain();
+    const targetVolume = Math.max(0, Math.min(1, volume));
+    const targetFade = Math.max(0, fadeIn);
+    const now = context.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(targetVolume, now + targetFade);
+
+    source.connect(gain);
+    gain.connect(this.audioCore.masterGain);
+    source.start();
+
+    this.bgmSourceNode = source;
+    this.bgmGainNode = gain;
+    return true;
+  }
+
+  /**
+   * Stops the looping background music track.
+   *
+   * @param {number} [fadeOut=0.6] - Fade-out duration in seconds.
+   */
+  stopBgm(fadeOut = 0.6) {
+    this.bgmGeneration++;
+    const source = this.bgmSourceNode;
+    const gain = this.bgmGainNode;
+    this.bgmSourceNode = null;
+    this.bgmGainNode = null;
+    if (!source || !gain || !this.audioCore.context) return;
+
+    const now = this.audioCore.context.currentTime;
+    const duration = Math.max(0, fadeOut);
+    try {
+      if (typeof gain.gain.cancelAndHoldAtTime === "function") {
+        gain.gain.cancelAndHoldAtTime(now);
+      } else {
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(gain.gain.value, now);
+      }
+      gain.gain.linearRampToValueAtTime(0, now + duration);
+    } catch (e) {}
+
+    source.onended = () => {
+      try {
+        source.disconnect();
+        gain.disconnect();
+      } catch (e) {}
+    };
+    try {
+      source.stop(now + duration + 0.05);
+    } catch (e) {}
   }
 
   /**
@@ -393,7 +509,9 @@ export class ForteSFX {
    */
   cleanup() {
     this.stopSfx();
+    this.stopBgm(0);
     this.clearRemoteStreams();
     this.sfxCache.clear();
+    this.bgmCache.clear();
   }
 }
