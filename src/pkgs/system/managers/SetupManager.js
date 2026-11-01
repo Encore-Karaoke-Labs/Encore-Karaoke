@@ -2402,7 +2402,7 @@ export default class SetupManager {
     }
     const mtvSong = this.ctx.state.songList.find((s) => s.videoPath);
     if (!mtvSong) {
-      this.showToast("NO MTV SONGS FOUND IN LIBRARY", "error");
+      this.showToast("NO MV SONGS FOUND IN LIBRARY", "error");
       return;
     }
 
