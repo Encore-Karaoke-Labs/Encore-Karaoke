@@ -44,6 +44,23 @@ contextBridge.exposeInMainWorld("karaoke", {
     ipcRenderer.invoke("karaoke:toggle-chorus", enabled),
   setGuideMelody: (level = "cycle") =>
     ipcRenderer.invoke("karaoke:guide-melody", level),
+  adjustVolume: (direction = "up") =>
+    ipcRenderer.invoke("karaoke:adjust-volume", direction),
+  adjustMicVolume: (direction = "up") =>
+    ipcRenderer.invoke("karaoke:adjust-mic-volume", direction),
+  cycleRhythm: (direction = "right") =>
+    ipcRenderer.invoke("karaoke:cycle-rhythm", direction),
+  cycleBgv: (direction = 1) =>
+    ipcRenderer.invoke("karaoke:cycle-bgv", direction),
+  toggleRecording: () => ipcRenderer.invoke("karaoke:toggle-recording"),
+  getQueue: () => ipcRenderer.invoke("karaoke:get-queue"),
+  getAlbumArt: (song) => ipcRenderer.invoke("album-art:get", song),
+  isAppReady: () => ipcRenderer.invoke("karaoke:app-ready"),
+  onAppState: (callback) => {
+    const listener = (_event, ready) => callback(Boolean(ready));
+    ipcRenderer.on("karaoke:app-state", listener);
+    return () => ipcRenderer.removeListener("karaoke:app-state", listener);
+  },
 });
 
 contextBridge.exposeInMainWorld("config", {
