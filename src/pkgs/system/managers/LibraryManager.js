@@ -86,7 +86,7 @@ export default class LibraryManager {
     }
 
     if (song.type === "video" || song.videoPath) {
-      return { label: "MTV", color: colors.MTV };
+      return { label: "MV", color: colors.MTV };
     }
 
     return { label: "RS", color: colors.RealSound };

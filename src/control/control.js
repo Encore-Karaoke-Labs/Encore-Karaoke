@@ -69,7 +69,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ) {
       return { label: "YT", color: "#D12F2F" };
     }
-    if (song.videoPath) return { label: "MTV", color: "#2F6CD1" };
+    if (song.videoPath) return { label: "MV", color: "#2F6CD1" };
     if (
       song.type === "multiplexed" ||
       (song.path && song.path.toLowerCase().includes("multiplex"))
