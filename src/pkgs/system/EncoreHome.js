@@ -251,6 +251,36 @@ class EncoreController {
     this.boundKeydown = (e) => this.input.handleKeyDown(e);
   }
 
+  describeSong(song) {
+    if (!song) return null;
+
+    let enriched = song;
+    if (song.code && this.state.songMap) {
+      const localMatch =
+        this.state.songMap.get(Number(song.code)) ||
+        this.state.songMap.get(String(song.code));
+      if (localMatch) {
+        enriched = { ...localMatch, ...song };
+      }
+    }
+
+    const fmt = this.library ? this.library.getFormatInfo(enriched) : null;
+    return {
+      code: enriched.code
+        ? String(enriched.code).padStart(6, "0")
+        : enriched.path?.startsWith("yt://")
+          ? "YT"
+          : "",
+      title: enriched.title || "Unknown Title",
+      artist: enriched.artist || "Unknown Artist",
+      singer: enriched.requesterNickname || enriched.singer || null,
+      formatLabel: fmt?.label || "RS",
+      formatColor: fmt?.color || "#B02FD1",
+      isYouTube: Boolean(enriched.path?.startsWith("yt://")),
+      isMV: Boolean(enriched.videoPath),
+    };
+  }
+
   syncSetlistOverlay() {
     if (!window.setlistOverlay?.sendUpdate) return;
 
@@ -275,40 +305,10 @@ class EncoreController {
       }
     }
 
-    const formatSong = (s) => {
-      if (!s) return null;
-
-      let enriched = s;
-      if (s.code && this.state.songMap) {
-        const localMatch =
-          this.state.songMap.get(Number(s.code)) ||
-          this.state.songMap.get(String(s.code));
-        if (localMatch) {
-          enriched = { ...localMatch, ...s };
-        }
-      }
-
-      const fmt = this.library ? this.library.getFormatInfo(enriched) : null;
-      return {
-        code: enriched.code
-          ? String(enriched.code).padStart(6, "0")
-          : enriched.path?.startsWith("yt://")
-            ? "YT"
-            : "",
-        title: enriched.title || "Unknown Title",
-        artist: enriched.artist || "Unknown Artist",
-        singer: enriched.requesterNickname || enriched.singer || null,
-        formatLabel: fmt?.label || "RS",
-        formatColor: fmt?.color || "#B02FD1",
-        isYouTube: Boolean(enriched.path?.startsWith("yt://")),
-        isMV: Boolean(enriched.videoPath),
-      };
-    };
-
     window.setlistOverlay.sendUpdate({
-      nowPlaying: formatSong(currentSong),
+      nowPlaying: this.describeSong(currentSong),
       queue: queueList.map((item, idx) => ({
-        ...formatSong(item),
+        ...this.describeSong(item),
         order: idx + 1,
       })),
       total: queueList.length,
@@ -437,6 +437,23 @@ class EncoreController {
           ? this.library.getFormatInfo(currentSong)
           : null;
 
+        const guideLevels = this.input?.guideMelodyLevels || [];
+        const guideIndex = this.input?.currentGuideMelodyIndex ?? 2;
+        const guideLevel = guideLevels[guideIndex];
+
+        let rhythmName = "AUTO";
+        let rhythmIndex = this.input?.currentDrumPresetIndex ?? -1;
+        const drumPresets = this.input?.drums || [];
+        if (rhythmIndex >= 0 && drumPresets[rhythmIndex]?.name) {
+          rhythmName = drumPresets[rhythmIndex].name;
+        } else {
+          const currentPreset = this.services.Forte.getCurrentDrumPreset?.(9);
+          if (currentPreset?.name) rhythmName = currentPreset.name;
+        }
+
+        const vocalState = this.services.Forte.getVocalChainState?.() || {};
+        const recorder = this.recorder;
+
         return {
           mode: this.state.mode,
           status:
@@ -457,12 +474,47 @@ class EncoreController {
                 isMIDI: Boolean(this.state.currentSongIsMIDI),
               }
             : null,
-          volume: this.state.volume,
+          volume: pb?.volume ?? this.state.volume,
+          micVolume: vocalState.micMonitorVolume ?? 1,
           transpose: pb?.transpose ?? 0,
           multiplexPan: pb?.multiplexPan ?? 0,
           score: pb?.score?.finalScore ?? 0,
           isDuet: Boolean(this.state.isDuet),
           queueLength: this.state.reservationQueue.length,
+          isMIDI: Boolean(this.state.currentSongIsMIDI),
+          hasChorus: Boolean(pb?.hasChorus),
+          chorusEnabled: Boolean(pb?.isChorusEnabled),
+          hasGuideNotes: Boolean(pb?.hasGuideNotes),
+          guideMelody: guideLevel?.label || "NORMAL",
+          guideMelodyIndex: guideIndex,
+          rhythmName,
+          rhythmIndex,
+          rhythmCount: drumPresets.length,
+          bgvCategory: this.bgv?.selectedCategory || "Auto",
+          isRecording: Boolean(recorder?.isRecording),
+          recordingTime:
+            recorder?.isRecording && recorder.getRecordingTimeString
+              ? recorder.getRecordingTimeString()
+              : null,
+        };
+      }
+
+      case "get-queue": {
+        const isSession = Boolean(
+          this.state.isSessionActive && this.services.SessionsSvc,
+        );
+        const queueList = isSession
+          ? this.services.SessionsSvc.state?.queue || []
+          : this.state.reservationQueue || [];
+
+        return {
+          success: true,
+          isSession,
+          total: queueList.length,
+          songs: queueList.map((item, index) => ({
+            ...this.describeSong(item),
+            order: index + 1,
+          })),
         };
       }
 
@@ -512,38 +564,6 @@ class EncoreController {
           return {
             ...s,
             code: String(s.code).padStart(6, "0"),
-            format: fmt.label,
-            formatColor: fmt.color,
-          };
-        });
-
-        return {
-          query,
-          count: sliced.length,
-          results: sliced,
-        };
-      }
-
-      case "search-songs": {
-        const query =
-          typeof payload === "object" && payload !== null
-            ? payload.query
-            : String(payload || "");
-        const limit = Number(payload?.limit) || 50;
-
-        if (!query.trim()) {
-          return { query: "", results: [] };
-        }
-
-        const rawResults = await this.library.getLocalSearchResults(query);
-        const sliced = rawResults.slice(0, limit).map((s) => {
-          const fmt = this.library.getFormatInfo(s);
-          return {
-            code: String(s.code).padStart(6, "0"),
-            title: s.title,
-            artist: s.artist,
-            displayRomaTitle: s.displayRomaTitle || null,
-            displayRomaArtist: s.displayRomaArtist || null,
             format: fmt.label,
             formatColor: fmt.color,
           };
@@ -707,6 +727,118 @@ class EncoreController {
           success: true,
           label: selectedLevel.label,
           volume: selectedLevel.value,
+        };
+      }
+
+      case "adjust-volume": {
+        const direction = payload === "down" ? "down" : "up";
+        this.input.handleVolume(direction);
+        const liveState = this.services.Forte.getPlaybackState();
+        return {
+          success: true,
+          direction,
+          volume: liveState?.volume ?? this.state.volume,
+        };
+      }
+
+      case "adjust-mic-volume": {
+        const direction = payload === "down" ? "down" : "up";
+        this.input.handleMicVolume(direction);
+        const vocalState = this.services.Forte.getVocalChainState?.() || {};
+        return {
+          success: true,
+          direction,
+          micVolume: vocalState.micMonitorVolume ?? 1,
+        };
+      }
+
+      case "cycle-rhythm": {
+        if (!this.state.mode.startsWith("player")) {
+          return { success: false, reason: "Not in player mode." };
+        }
+        if (!this.state.currentSongIsMIDI) {
+          return {
+            success: false,
+            reason: "Rhythm is only available for MIDI songs.",
+          };
+        }
+
+        const direction = payload === "left" ? "left" : "right";
+        this.input.cycleDrumPreset(direction);
+
+        const rhythmIndex = this.input.currentDrumPresetIndex;
+        const preset = this.input.drums?.[rhythmIndex];
+        if (rhythmIndex < 0 || !preset) {
+          return { success: false, reason: "Could not switch rhythm." };
+        }
+
+        return {
+          success: true,
+          direction,
+          rhythmIndex,
+          rhythmName: preset.name || "AUTO",
+        };
+      }
+
+      case "cycle-bgv": {
+        if (this.state.currentSongIsMV) {
+          return {
+            success: false,
+            reason: "Use video sync for MV songs.",
+          };
+        }
+
+        const direction = Number(payload) < 0 ? -1 : 1;
+        this.bgv.cycleCategory(direction);
+        try {
+          window.config.setItem(
+            "videoConfig.defaultBgvCategory",
+            this.bgv.selectedCategory,
+          );
+        } catch {
+          // The category still changes for this session.
+        }
+
+        return {
+          success: true,
+          direction,
+          category: this.bgv.selectedCategory,
+        };
+      }
+
+      case "toggle-recording": {
+        if (!this.recorder) {
+          return { success: false, reason: "Recorder unavailable." };
+        }
+        if (
+          !this.state.mode.startsWith("player") &&
+          !this.recorder.isRecording
+        ) {
+          return {
+            success: false,
+            reason: "Start a song before recording.",
+          };
+        }
+
+        const wasRecording = Boolean(this.recorder.isRecording);
+        this.recorder.toggle();
+        const isRecording = Boolean(this.recorder.isRecording);
+
+        if (isRecording === wasRecording) {
+          return {
+            success: false,
+            reason: wasRecording
+              ? "Could not stop recording."
+              : "Recording is not available right now.",
+          };
+        }
+
+        return {
+          success: true,
+          isRecording,
+          recordingTime: isRecording
+            ? this.recorder.getRecordingTimeString()
+            : null,
         };
       }
 

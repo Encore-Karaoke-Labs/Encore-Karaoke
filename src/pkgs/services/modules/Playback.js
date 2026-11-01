@@ -2061,6 +2061,8 @@ export class FortePlayback {
       isMidi: this.state.playback.isMidi,
       isMultiplexed: this.state.playback.isMultiplexed,
       hasChorus: this.state.playback.hasChorus,
+      isChorusEnabled: Boolean(this.state.playback.isChorusEnabled),
+      volume: this.state.playback.volume,
       hasGuideNotes:
         this.state.playback.guideNotes &&
         this.state.playback.guideNotes.length > 0,
