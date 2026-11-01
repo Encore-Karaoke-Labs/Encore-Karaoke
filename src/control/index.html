@@ -10,177 +10,323 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Radio+Canada:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div class="app-container">
-      <div class="view-container">
-        <!-- Left: Control Remote -->
-        <div id="remote-view" class="view">
-          <div id="remote-view-content">
-            <div class="remote-title-desktop">ENCORE</div>
+    <div class="app-shell">
+      <header class="console-topbar">
+        <div class="quick-controls">
+          <button
+            type="button"
+            class="quick-btn"
+            id="btn-melody"
+            data-action="melody-cycle"
+            disabled
+          >
+            <span class="svg-icon icon-melody quick-icon" aria-hidden="true"></span>
+            <span class="quick-label">Guide melody</span>
+            <span class="quick-value" id="melody-value">—</span>
+          </button>
 
-            <div class="remote-grid">
-              <!-- Song Number Input Display -->
-              <div class="input-display span-4">
-                <span class="input-display-label">SONG</span>
-                <span class="input-display-digits" id="input-buffer"
-                  >------</span
-                >
-              </div>
+          <button
+            type="button"
+            class="quick-btn"
+            id="btn-rhythm"
+            data-action="rhythm-cycle"
+            disabled
+          >
+            <span class="svg-icon icon-rhythm quick-icon" aria-hidden="true"></span>
+            <span class="quick-label">Rhythm</span>
+            <span class="quick-value" id="rhythm-value">—</span>
+          </button>
 
-              <!-- Primary Action Row -->
-              <button data-type="stop" data-value="Escape" class="btn-danger">
-                STOP
-              </button>
-              <button
-                data-type="play_pause"
-                id="btn-play-pause"
-                class="btn-secondary"
-              >
-                PAUSE
-              </button>
-              <button
-                data-type="reserve"
-                data-value="Enter"
-                class="btn-primary span-2"
-              >
-                RESERVE
-              </button>
+          <button
+            type="button"
+            class="quick-btn"
+            id="btn-bgv"
+            data-action="bgv-cycle"
+            disabled
+          >
+            <span class="svg-icon icon-bgv quick-icon" aria-hidden="true"></span>
+            <span class="quick-label">Background video</span>
+            <span class="quick-value" id="bgv-value">—</span>
+          </button>
 
-              <!-- Numpad Grid -->
-              <div class="numpad-grid span-4">
-                <button class="numpad-btn" data-type="digit" data-value="1">
-                  1
-                </button>
-                <button class="numpad-btn" data-type="digit" data-value="2">
-                  2
-                </button>
-                <button class="numpad-btn" data-type="digit" data-value="3">
-                  3
-                </button>
-                <button class="numpad-btn" data-type="digit" data-value="4">
-                  4
-                </button>
-                <button class="numpad-btn" data-type="digit" data-value="5">
-                  5
-                </button>
-                <button class="numpad-btn" data-type="digit" data-value="6">
-                  6
-                </button>
-                <button class="numpad-btn" data-type="digit" data-value="7">
-                  7
-                </button>
-                <button class="numpad-btn" data-type="digit" data-value="8">
-                  8
-                </button>
-                <button class="numpad-btn" data-type="digit" data-value="9">
-                  9
-                </button>
-                <button
-                  class="numpad-btn"
-                  data-type="backspace"
-                  data-value="Backspace"
-                >
-                  &larr;
-                </button>
-                <button class="numpad-btn" data-type="digit" data-value="0">
-                  0
-                </button>
-                <button
-                  class="numpad-btn"
-                  data-type="toggle_recording"
-                  style="
-                    color: #ff5555;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                  "
-                >
-                  <span class="svg-icon icon-record"></span>
-                </button>
-              </div>
-
-              <!-- Controls: Key & Volume -->
-              <div class="controls-wrapper span-4">
-                <div class="control-column">
-                  <button data-type="key_up" data-value="ArrowUp">
-                    KEY &uarr;
-                  </button>
-                  <button data-type="key_down" data-value="ArrowDown">
-                    KEY &darr;
-                  </button>
-                </div>
-                <div class="control-column">
-                  <button data-type="vol_up" data-value="=">VOL &uarr;</button>
-                  <button data-type="vol_down" data-value="-">
-                    VOL &darr;
-                  </button>
-                </div>
-              </div>
-
-              <!-- Playback Features Grid -->
-              <div class="playback-features-grid span-4">
-                <button class="feature-btn" data-type="toggle_melody">
-                  <span class="svg-icon icon-melody"></span>
-                  <span>MELODY</span>
-                </button>
-                <button class="feature-btn" data-type="cycle_rhythm">
-                  <span class="svg-icon icon-rhythm"></span>
-                  <span>RHYTHM</span>
-                </button>
-                <button class="feature-btn" data-type="toggle_chorus">
-                  <span class="svg-icon icon-chorus"></span>
-                  <span>CHORUS</span>
-                </button>
-                <button class="feature-btn" data-type="toggle_bgv">
-                  <span class="svg-icon icon-bgv"></span>
-                  <span>BGV</span>
-                </button>
-              </div>
-            </div>
-          </div>
+          <button
+            type="button"
+            class="quick-btn"
+            id="btn-chorus"
+            data-action="chorus"
+            aria-pressed="false"
+            disabled
+          >
+            <span class="svg-icon icon-chorus quick-icon" aria-hidden="true"></span>
+            <span class="quick-label">Chorus</span>
+            <span class="quick-value" id="chorus-value">—</span>
+          </button>
         </div>
 
-        <!-- Right: Songbook & Search View -->
-        <div id="songlist-view" class="view">
-          <div class="library-header">
-            <div class="library-tabs">
-              <div class="library-tab active" id="tab-local">SONGBOOK</div>
+        <button
+          type="button"
+          class="record-btn"
+          id="btn-record"
+          data-action="record"
+          aria-pressed="false"
+          aria-label="Toggle recording"
+        >
+          <span class="svg-icon icon-record" aria-hidden="true"></span>
+          <span class="record-copy">
+            <span class="record-label">Rec</span>
+            <span class="record-time" id="record-time" hidden></span>
+          </span>
+        </button>
+      </header>
+
+      <main class="console-main">
+        <section class="panel songbook-panel" aria-label="Songbook and queue">
+          <header class="panel-header panel-header-switch">
+            <div class="panel-switch" role="tablist" aria-label="Songbook views">
+              <button
+                type="button"
+                class="panel-switch-btn is-active"
+                id="tab-songs"
+                data-action="view-songs"
+                role="tab"
+                aria-selected="true"
+                aria-controls="songs-view"
+              >
+                Songbook
+              </button>
+              <button
+                type="button"
+                class="panel-switch-btn"
+                id="tab-queue"
+                data-action="view-queue"
+                role="tab"
+                aria-selected="false"
+                aria-controls="queue-view"
+              >
+                Queue
+                <span class="queue-count" id="queue-count">0</span>
+              </button>
             </div>
+          </header>
+
+          <div
+            class="songs-view"
+            id="songs-view"
+            role="tabpanel"
+            aria-labelledby="tab-songs"
+          >
             <div class="search-row">
+              <span class="svg-icon icon-search search-icon" aria-hidden="true"></span>
               <input
                 type="text"
                 id="library-search"
                 class="search-bar"
-                placeholder="Search songs or artists..."
+                placeholder="Search title or artist"
                 autocomplete="off"
+                spellcheck="false"
+                aria-label="Search the songbook"
               />
-            </div>
-          </div>
-
-          <div class="library-content">
-            <div
-              id="song-view-container"
-              style="display: flex; flex-direction: column; height: 100%"
-            >
-              <div
-                id="song-scroller-container"
-                class="virtual-scroller"
-                style="flex: 1"
+              <button
+                type="button"
+                class="search-clear"
+                id="search-clear"
+                data-action="clear-search"
+                aria-label="Clear search"
+                hidden
               >
-                <div class="virtual-scroller-content" id="songs-list"></div>
+                <span class="svg-icon icon-close" aria-hidden="true"></span>
+              </button>
+            </div>
+
+            <div class="virtual-scroller" id="song-scroller-container" tabindex="-1">
+              <div class="virtual-scroller-content" id="songs-list"></div>
+              <div class="list-state" id="list-state" hidden>
+                <span class="svg-icon icon-musical-notes" aria-hidden="true"></span>
+                <p class="list-state-title" id="list-state-title">Loading songbook</p>
+                <p class="list-state-copy" id="list-state-copy">Waiting for Encore…</p>
+                <button
+                  type="button"
+                  class="text-btn"
+                  id="list-retry"
+                  data-action="retry-songs"
+                  hidden
+                >
+                  Try again
+                </button>
               </div>
             </div>
           </div>
+
+          <div
+            class="queue-view"
+            id="queue-view"
+            role="tabpanel"
+            aria-labelledby="tab-queue"
+            hidden
+          >
+            <div class="queue-list" id="queue-list"></div>
+            <div class="list-state" id="queue-state">
+              <span class="svg-icon icon-musical-notes" aria-hidden="true"></span>
+              <p class="list-state-title" id="queue-state-title">Queue is empty</p>
+              <p class="list-state-copy" id="queue-state-copy">
+                Songs you reserve will appear here.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel now-playing-panel" aria-labelledby="now-playing-title">
+          <header class="panel-header">
+            <div class="panel-title" id="now-playing-title">
+              <span class="svg-icon icon-disc" aria-hidden="true"></span>
+              <span>Now playing</span>
+            </div>
+          </header>
+
+          <div class="now-playing-body">
+            <div class="now-stage">
+              <div class="artwork-frame" id="artwork-frame" hidden></div>
+
+              <div class="song-details">
+                <span class="song-code-badge" id="now-code"></span>
+                <h1 class="song-title" id="now-title">Nothing playing</h1>
+                <p class="song-artist" id="now-artist"></p>
+
+                <div class="progress-block">
+                  <div
+                    class="progress-track"
+                    role="progressbar"
+                    aria-label="Song progress"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="0"
+                    id="progress-track"
+                  >
+                    <div class="progress-fill" id="progress-fill"></div>
+                  </div>
+                  <div class="time-row">
+                    <span id="time-current">0:00</span>
+                    <span id="time-total">0:00</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel keypad-panel" aria-labelledby="keypad-title">
+          <header class="panel-header">
+            <div class="panel-title" id="keypad-title">
+              <span class="svg-icon icon-keypad" aria-hidden="true"></span>
+              <span>Keypad</span>
+            </div>
+          </header>
+
+          <div class="numpad-grid" role="group" aria-label="Song number keypad">
+            <button type="button" class="numpad-btn" data-action="digit" data-digit="1">1</button>
+            <button type="button" class="numpad-btn" data-action="digit" data-digit="2">2</button>
+            <button type="button" class="numpad-btn" data-action="digit" data-digit="3">3</button>
+            <button type="button" class="numpad-btn" data-action="digit" data-digit="4">4</button>
+            <button type="button" class="numpad-btn" data-action="digit" data-digit="5">5</button>
+            <button type="button" class="numpad-btn" data-action="digit" data-digit="6">6</button>
+            <button type="button" class="numpad-btn" data-action="digit" data-digit="7">7</button>
+            <button type="button" class="numpad-btn" data-action="digit" data-digit="8">8</button>
+            <button type="button" class="numpad-btn" data-action="digit" data-digit="9">9</button>
+            <button
+              type="button"
+              class="numpad-btn numpad-util"
+              data-action="backspace"
+              aria-label="Delete last digit"
+              title="Delete last digit"
+            >
+              <span class="svg-icon icon-backspace" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="numpad-btn" data-action="digit" data-digit="0">0</button>
+            <button
+              type="button"
+              class="numpad-btn numpad-enter"
+              data-action="enter"
+              aria-label="Enter song number"
+              title="Enter song number"
+            >
+              <span class="svg-icon icon-enter" aria-hidden="true"></span>
+            </button>
+          </div>
+        </section>
+      </main>
+
+      <footer class="transport-bar">
+        <div class="transport-group">
+          <div class="transport-label">
+            <span class="svg-icon icon-volume" aria-hidden="true"></span>
+            <span>Master</span>
+          </div>
+          <div class="transport-stepper">
+            <button type="button" class="transport-step" data-action="vol-down" aria-label="Master volume down">−</button>
+            <div class="transport-readout">
+              <span class="transport-value" id="vol-value">100</span>
+              <span class="transport-unit">%</span>
+            </div>
+            <button type="button" class="transport-step" data-action="vol-up" aria-label="Master volume up">+</button>
+          </div>
         </div>
-      </div>
+
+        <span class="transport-divider" aria-hidden="true"></span>
+
+        <div class="transport-group">
+          <div class="transport-label">
+            <span class="svg-icon icon-mic" aria-hidden="true"></span>
+            <span>Mic</span>
+          </div>
+          <div class="transport-stepper">
+            <button type="button" class="transport-step" data-action="mic-down" aria-label="Microphone volume down">−</button>
+            <div class="transport-readout">
+              <span class="transport-value" id="mic-value">100</span>
+              <span class="transport-unit">%</span>
+            </div>
+            <button type="button" class="transport-step" data-action="mic-up" aria-label="Microphone volume up">+</button>
+          </div>
+        </div>
+
+        <span class="transport-divider" aria-hidden="true"></span>
+
+        <div class="transport-group">
+          <div class="transport-label">
+            <span class="svg-icon icon-note" aria-hidden="true"></span>
+            <span>Key</span>
+          </div>
+          <div class="transport-stepper">
+            <button type="button" class="transport-step" data-action="key-down" aria-label="Lower key">−</button>
+            <div class="transport-readout">
+              <span class="transport-value" id="key-value">0</span>
+              <span class="transport-unit">st</span>
+            </div>
+            <button type="button" class="transport-step" data-action="key-up" aria-label="Raise key">+</button>
+          </div>
+        </div>
+
+        <div class="transport-spacer"></div>
+
+        <div class="transport-actions">
+          <button type="button" class="transport-btn stop-btn" data-action="stop">
+            <span class="svg-icon icon-stop" aria-hidden="true"></span>
+            <span>Stop</span>
+          </button>
+          <button type="button" class="transport-btn play-btn" id="btn-play-pause" data-action="play-pause">
+            <span class="svg-icon icon-play" id="play-pause-icon" aria-hidden="true"></span>
+            <span id="play-pause-label">Play</span>
+          </button>
+        </div>
+      </footer>
     </div>
 
-    <div class="toast" id="toast">Notice</div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="control.js"></script>
   </body>
