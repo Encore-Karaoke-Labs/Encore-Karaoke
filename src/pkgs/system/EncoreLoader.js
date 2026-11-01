@@ -5,7 +5,59 @@ import NetworkingUtility from "../../libs/networkingUtility.js";
 let wrapper, Ui, Pid, Sfx;
 let root;
 let statusP;
+let progressFill;
+let progressSheen;
+let progressAnim;
+let progressIndeterminate = false;
 let actualPort = 9864;
+
+const BOOT_BG_URL = "/assets/img/boot/bg.png";
+
+/**
+ * Stops the indeterminate sweep and hides its highlight.
+ */
+function stopIndeterminate() {
+  progressIndeterminate = false;
+
+  if (progressAnim) {
+    progressAnim.pause();
+    progressAnim = null;
+  }
+
+  if (progressSheen) progressSheen.elm.style.opacity = "0";
+}
+
+/**
+ * Paints the boot progress bar to a specific percentage.
+ *
+ * @param {number} percent - Progress value between 0 and 100.
+ */
+function setProgress(percent) {
+  if (!progressFill) return;
+
+  const value = Math.max(0, Math.min(100, Number(percent) || 0));
+
+  stopIndeterminate();
+
+  progressFill.elm.style.transition =
+    "width 0.45s cubic-bezier(0.22, 1, 0.36, 1)";
+  progressFill.elm.style.width = `${value}%`;
+}
+
+function setIndeterminate() {
+  if (!progressFill || !progressSheen || progressIndeterminate) return;
+
+  progressIndeterminate = true;
+  progressSheen.elm.style.opacity = "1";
+
+  progressAnim = anime({
+    targets: progressSheen.elm,
+    left: ["-30%", "100%"],
+    duration: 1400,
+    easing: "easeInOutSine",
+    loop: true,
+  });
+}
 
 /**
  * Joins path parts with a given separator, normalizing leading and trailing slashes.
@@ -245,7 +297,7 @@ const pkg = {
   async waitForLibrary() {
     const fsSvc = root.Processes.getService("FsSvc").data;
     statusP.text(
-      "No library detected.\nOpen the Library Manager to import a Library by clicking the LIB button.",
+      "No library detected. Open Library Manager to import a Library (LIB).",
     );
 
     return new Promise((resolve) => {
@@ -270,10 +322,12 @@ const pkg = {
     let fsSvc = root.Processes.getService("FsSvc").data;
     let forteSvc = root.Processes.getService("ForteSvc").data;
 
-    statusP.text("Loading Library...");
+    statusP.text("Loading library...");
+    setIndeterminate();
 
     const progressHandler = (e) => {
       if (this.aborted) return;
+      setProgress(30 + e.detail.percentage * 0.7);
       statusP.text(
         `Loading library...\n${e.detail.current}/${e.detail.total} (${e.detail.percentage}%)`,
       );
@@ -296,6 +350,8 @@ const pkg = {
     if (!success) {
       return false;
     }
+
+    setProgress(100);
 
     const libInfo = fsSvc.getLibraryInfo();
     const config = await window.config.getAll();
@@ -374,6 +430,7 @@ const pkg = {
     let fsSvc = root.Processes.getService("FsSvc").data;
 
     statusP.text("Loading components");
+    setIndeterminate();
 
     defineCustomElements(window, {
       resourcesUrl: "/assets/img/icons/",
@@ -393,6 +450,7 @@ const pkg = {
             await window.config.merge({ libraryPath: null });
             currentLibraryPath = null;
             statusP.text("Library missing. Re-evaluating...");
+            setIndeterminate();
           } else {
             return;
           }
@@ -458,12 +516,21 @@ const pkg = {
     Pid = Root.Pid;
     Ui = Root.Processes.getService("UiLib").data;
 
-    wrapper = new Html("div").class("full-ui").appendTo("body").styleJs({
-      color: "black",
-      opacity: 1,
-    });
+    wrapper = new Html("div")
+      .class("full-ui")
+      .id("encore-loader")
+      .appendTo("body")
+      .styleJs({
+        color: "#ffffff",
+        opacity: 1,
+        backgroundColor: "#1c2955",
+        zIndex: "1000",
+        overflow: "hidden",
+      });
 
-    let imgContainer = new Html("div")
+    // Full-bleed boot artwork. The image is cover-cropped slightly toward the
+    // top so the character sits exactly where it does in the design.
+    const bgLayer = new Html("div")
       .styleJs({
         position: "absolute",
         top: "0",
@@ -471,143 +538,194 @@ const pkg = {
         width: "100%",
         height: "100%",
         overflow: "hidden",
+        zIndex: "0",
       })
       .appendTo(wrapper);
 
-    let mascotImg = new Html("img")
-      .attr({ src: "assets/img/oobe/hoshi_hi.png" })
+    new Html("img")
+      .attr({ src: BOOT_BG_URL, alt: "", draggable: "false" })
       .styleJs({
         position: "absolute",
         top: "0",
-        left: "-250px",
+        left: "0",
         width: "100%",
         height: "100%",
         objectFit: "cover",
-        opacity: 0,
+        objectPosition: "50% 14%",
+        pointerEvents: "none",
       })
-      .appendTo(imgContainer);
+      .appendTo(bgLayer);
 
-    let elementContainer = new Html("div")
+    new Html("div")
       .styleJs({
         position: "absolute",
         top: "0",
         left: "0",
         width: "100%",
         height: "100%",
-        overflow: "hidden",
-        display: "flex",
-        padding: "80px",
+        zIndex: "1",
+        pointerEvents: "none",
+        background:
+          "linear-gradient(to bottom, rgba(102, 102, 102, 0) 0%, rgba(0, 0, 0, 0.59) 100%)",
       })
       .appendTo(wrapper);
 
-    new Html("div")
-      .styleJs({ height: "100%", width: "50%" })
-      .appendTo(elementContainer);
-
-    let right = new Html("div")
+    const content = new Html("div")
       .styleJs({
+        position: "absolute",
+        top: "0",
+        left: "0",
+        width: "100%",
         height: "100%",
-        width: "50%",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "right",
+        zIndex: "2",
       })
-      .appendTo(elementContainer);
+      .appendTo(wrapper);
 
-    let telebiText = new Html("p")
+    const logoClip = new Html("div")
       .styleJs({
-        fontSize: "2rem",
-        textAlign: "right",
-        margin: "0",
-        padding: "0",
-        fontWeight: "500",
-      })
-      .text("テレビ")
-      .appendTo(right);
-
-    let encoreH1 = new Html("h1")
-      .styleJs({
-        fontFamily: "Rajdhani",
-        fontSize: "10rem",
-        lineHeight: "9rem",
-        fontWeight: "bold",
-        textAlign: "right",
-        margin: "0",
-        padding: "0",
+        position: "absolute",
+        left: "6.25%",
+        top: "11.111%",
+        width: "38.333%",
         overflow: "hidden",
       })
-      .appendTo(right);
+      .appendTo(content);
 
-    encoreH1.html(
-      "ENCORE"
-        .split("")
-        .map(
-          (letter) =>
-            `<span class="encore-letter" style="display: inline-block;">${letter}</span>`,
-        )
-        .join(""),
-    );
-
-    let karaokeH2 = new Html("h2")
+    const logoImg = new Html("img")
+      .attr({ src: "/assets/img/logo.svg", alt: "Encore Karaoke" })
       .styleJs({
-        margin: "0",
-        padding: "0",
-        fontFamily: "Rajdhani",
-        fontSize: "3.5rem",
-        lineHeight: "2rem",
-        fontWeight: "bold",
-        textAlign: "right",
+        display: "block",
+        width: "100%",
+        height: "auto",
+        opacity: "0",
       })
-      .text("KARAOKE")
-      .appendTo(right);
+      .appendTo(logoClip);
 
-    new Html("br").appendTo(right);
-    new Html("br").appendTo(right);
+    // "Booting..." display type.
+    const bootingClip = new Html("div")
+      .styleJs({
+        position: "absolute",
+        left: "6.25%",
+        top: "67.083%",
+        width: "35.298%",
+        overflow: "hidden",
+      })
+      .appendTo(content);
 
-    statusP = new Html("p").text("Booting up...").appendTo(right).styleJs({
-      textAlign: "right",
-      fontSize: "2rem",
-      whiteSpace: "pre-wrap",
-    });
+    const bootingImg = new Html("img")
+      .attr({ src: "/assets/img/boot/booting.svg", alt: "Booting..." })
+      .styleJs({
+        display: "block",
+        width: "100%",
+        height: "auto",
+        opacity: "0",
+      })
+      .appendTo(bootingClip);
 
-    const tl = anime.timeline({
-      easing: "easeInOutExpo",
-    });
+    const progressWrap = new Html("div")
+      .styleJs({
+        position: "absolute",
+        left: "6.25%",
+        top: "82.7176%",
+        width: "35.2865%",
+      })
+      .appendTo(content);
+
+    const progressTrack = new Html("div")
+      .styleJs({
+        position: "relative",
+        width: "100%",
+        height: "4.6296vh",
+        backgroundColor: "#1c2955",
+        borderRadius: "0.6944vh",
+        overflow: "hidden",
+        opacity: "0",
+      })
+      .appendTo(progressWrap);
+
+    progressFill = new Html("div")
+      .styleJs({
+        position: "absolute",
+        top: "0",
+        left: "0",
+        height: "100%",
+        width: "0%",
+        backgroundColor: "#89cff0",
+        borderRadius: "0.6944vh",
+        transition: "width 0.45s cubic-bezier(0.22, 1, 0.36, 1)",
+        willChange: "width",
+      })
+      .appendTo(progressTrack);
+
+    progressSheen = new Html("div")
+      .styleJs({
+        position: "absolute",
+        top: "0",
+        left: "-30%",
+        width: "30%",
+        height: "100%",
+        pointerEvents: "none",
+        opacity: "0",
+        willChange: "left",
+        background:
+          "linear-gradient(90deg, rgba(137, 207, 240, 0) 0%, rgba(137, 207, 240, 0.9) 50%, rgba(137, 207, 240, 0) 100%)",
+      })
+      .appendTo(progressTrack);
+
+    statusP = new Html("p")
+      .text("Booting up...")
+      .appendTo(progressWrap)
+      .styleJs({
+        margin: "2.037vh 0 0 0",
+        padding: "0",
+        fontFamily: '"Radio Canada", sans-serif',
+        fontSize: "1.8229vw",
+        fontWeight: "400",
+        lineHeight: "1.2",
+        color: "#ffffff",
+        whiteSpace: "pre-wrap",
+        opacity: "0",
+      });
+
+    const tl = anime.timeline({ easing: "easeOutExpo" });
 
     tl
       .add(
         {
-          targets: mascotImg.elm,
-          translateX: ["-50%", 0],
-          opacity: [0, 1],
-          duration: 1200,
-        },
-        0,
-      )
-      .add(
-        {
-          targets: ".encore-letter",
+          targets: logoImg.elm,
           translateY: ["100%", 0],
           opacity: [0, 1],
-          delay: anime.stagger(70),
+          duration: 1100,
         },
-        "-=1000",
+        150,
       )
       .add(
         {
-          targets: [telebiText.elm, karaokeH2.elm],
-          translateY: [-20, 0],
+          targets: bootingImg.elm,
+          translateY: ["100%", 0],
           opacity: [0, 1],
-          duration: 800,
+          duration: 1000,
         },
-        "-=600",
+        "-=850",
       )
       .add(
-        { targets: statusP.elm, opacity: [0, 1], duration: 1000 },
+        {
+          targets: progressTrack.elm,
+          opacity: [0, 1],
+          scaleX: [0.97, 1],
+          duration: 700,
+        },
+        "-=750",
+      )
+      .add(
+        {
+          targets: statusP.elm,
+          opacity: [0, 1],
+          translateY: [10, 0],
+          duration: 700,
+        },
         "-=500",
       ).complete = () => {
-      statusP.classOn("pulse-status");
       this.startLoadingSequence();
     };
 
@@ -615,6 +733,8 @@ const pkg = {
   },
 
   end: async function () {
+    stopIndeterminate();
+    document.body.style.backgroundColor = "";
     Ui.cleanup(Pid);
     await Ui.transition("fadeOut", wrapper, 500);
     wrapper.cleanup();

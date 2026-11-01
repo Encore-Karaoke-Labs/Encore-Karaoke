@@ -35,6 +35,45 @@ const pkg = {
       })
       .appendTo("body");
 
+    const bootBackdrop = new Html("div")
+      .styleJs({
+        position: "absolute",
+        top: "0",
+        left: "0",
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+        zIndex: 0,
+      })
+      .appendTo(wrapper);
+
+    new Html("img")
+      .attr({ src: "/assets/img/boot/bg.png", alt: "", draggable: "false" })
+      .styleJs({
+        position: "absolute",
+        top: "0",
+        left: "0",
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        objectPosition: "50% 14%",
+        pointerEvents: "none",
+      })
+      .appendTo(bootBackdrop);
+
+    new Html("div")
+      .styleJs({
+        position: "absolute",
+        top: "0",
+        left: "0",
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        background:
+          "linear-gradient(to bottom, rgba(102, 102, 102, 0) 0%, rgba(0, 0, 0, 0.59) 100%)",
+      })
+      .appendTo(bootBackdrop);
+
     const tilesCanvas = new Html("canvas")
       .styleJs({
         position: "absolute",
@@ -43,7 +82,7 @@ const pkg = {
         width: "100%",
         height: "100%",
         pointerEvents: "none",
-        zIndex: 0,
+        zIndex: 1,
       })
       .appendTo(wrapper);
 
@@ -194,8 +233,9 @@ const pkg = {
       const tl = anime.timeline({
         easing: "easeInOutExpo",
         complete: () => {
+          ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+          cancelAnimationFrame(renderLoopId);
           setTimeout(() => {
-            wrapper.cleanup();
             checkServicesLoaded();
           }, 1000);
         },
@@ -232,8 +272,7 @@ const pkg = {
         duration: 100,
         ease: "outExpo",
         begin: () => {
-          wrapper.styleJs({ backgroundColor: "white" });
-          document.body.style.backgroundColor = "white";
+          document.body.style.backgroundColor = "#1c2955";
         },
       });
     }
@@ -269,6 +308,20 @@ const pkg = {
       Root.Security.setSecureVariable("TV_NAME", tvName);
 
       await Root.Core.pkg.run("system:EncoreLoader", [], true);
+      const loaderWait = setInterval(() => {
+        if (!document.getElementById("encore-loader")) return;
+        clearInterval(loaderWait);
+        wrapper?.cleanup();
+        wrapper = null;
+      }, 50);
+
+      setTimeout(() => {
+        clearInterval(loaderWait);
+        if (wrapper) {
+          wrapper.cleanup();
+          wrapper = null;
+        }
+      }, 15000);
 
       let mvT;
       window.addEventListener("mousemove", (e) => {
