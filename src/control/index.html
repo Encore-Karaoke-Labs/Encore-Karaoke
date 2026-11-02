@@ -26,7 +26,10 @@
             data-action="melody-cycle"
             disabled
           >
-            <span class="svg-icon icon-melody quick-icon" aria-hidden="true"></span>
+            <span
+              class="svg-icon icon-melody quick-icon"
+              aria-hidden="true"
+            ></span>
             <span class="quick-label">Guide melody</span>
             <span class="quick-value" id="melody-value">—</span>
           </button>
@@ -38,7 +41,10 @@
             data-action="rhythm-cycle"
             disabled
           >
-            <span class="svg-icon icon-rhythm quick-icon" aria-hidden="true"></span>
+            <span
+              class="svg-icon icon-rhythm quick-icon"
+              aria-hidden="true"
+            ></span>
             <span class="quick-label">Rhythm</span>
             <span class="quick-value" id="rhythm-value">—</span>
           </button>
@@ -50,7 +56,10 @@
             data-action="bgv-cycle"
             disabled
           >
-            <span class="svg-icon icon-bgv quick-icon" aria-hidden="true"></span>
+            <span
+              class="svg-icon icon-bgv quick-icon"
+              aria-hidden="true"
+            ></span>
             <span class="quick-label">Background video</span>
             <span class="quick-value" id="bgv-value">—</span>
           </button>
@@ -63,7 +72,10 @@
             aria-pressed="false"
             disabled
           >
-            <span class="svg-icon icon-chorus quick-icon" aria-hidden="true"></span>
+            <span
+              class="svg-icon icon-chorus quick-icon"
+              aria-hidden="true"
+            ></span>
             <span class="quick-label">Chorus</span>
             <span class="quick-value" id="chorus-value">—</span>
           </button>
@@ -88,7 +100,11 @@
       <main class="console-main">
         <section class="panel songbook-panel" aria-label="Songbook and queue">
           <header class="panel-header panel-header-switch">
-            <div class="panel-switch" role="tablist" aria-label="Songbook views">
+            <div
+              class="panel-switch"
+              role="tablist"
+              aria-label="Songbook views"
+            >
               <button
                 type="button"
                 class="panel-switch-btn is-active"
@@ -122,7 +138,10 @@
             aria-labelledby="tab-songs"
           >
             <div class="search-row">
-              <span class="svg-icon icon-search search-icon" aria-hidden="true"></span>
+              <span
+                class="svg-icon icon-search search-icon"
+                aria-hidden="true"
+              ></span>
               <input
                 type="text"
                 id="library-search"
@@ -144,12 +163,23 @@
               </button>
             </div>
 
-            <div class="virtual-scroller" id="song-scroller-container" tabindex="-1">
+            <div
+              class="virtual-scroller"
+              id="song-scroller-container"
+              tabindex="-1"
+            >
               <div class="virtual-scroller-content" id="songs-list"></div>
               <div class="list-state" id="list-state" hidden>
-                <span class="svg-icon icon-musical-notes" aria-hidden="true"></span>
-                <p class="list-state-title" id="list-state-title">Loading songbook</p>
-                <p class="list-state-copy" id="list-state-copy">Waiting for Encore…</p>
+                <span
+                  class="svg-icon icon-musical-notes"
+                  aria-hidden="true"
+                ></span>
+                <p class="list-state-title" id="list-state-title">
+                  Loading songbook
+                </p>
+                <p class="list-state-copy" id="list-state-copy">
+                  Waiting for Encore…
+                </p>
                 <button
                   type="button"
                   class="text-btn"
@@ -172,8 +202,13 @@
           >
             <div class="queue-list" id="queue-list"></div>
             <div class="list-state" id="queue-state">
-              <span class="svg-icon icon-musical-notes" aria-hidden="true"></span>
-              <p class="list-state-title" id="queue-state-title">Queue is empty</p>
+              <span
+                class="svg-icon icon-musical-notes"
+                aria-hidden="true"
+              ></span>
+              <p class="list-state-title" id="queue-state-title">
+                Queue is empty
+              </p>
               <p class="list-state-copy" id="queue-state-copy">
                 Songs you reserve will appear here.
               </p>
@@ -181,7 +216,10 @@
           </div>
         </section>
 
-        <section class="panel now-playing-panel" aria-labelledby="now-playing-title">
+        <section
+          class="panel now-playing-panel"
+          aria-labelledby="now-playing-title"
+        >
           <header class="panel-header">
             <div class="panel-title" id="now-playing-title">
               <span class="svg-icon icon-disc" aria-hidden="true"></span>
@@ -229,15 +267,78 @@
           </header>
 
           <div class="numpad-grid" role="group" aria-label="Song number keypad">
-            <button type="button" class="numpad-btn" data-action="digit" data-digit="1">1</button>
-            <button type="button" class="numpad-btn" data-action="digit" data-digit="2">2</button>
-            <button type="button" class="numpad-btn" data-action="digit" data-digit="3">3</button>
-            <button type="button" class="numpad-btn" data-action="digit" data-digit="4">4</button>
-            <button type="button" class="numpad-btn" data-action="digit" data-digit="5">5</button>
-            <button type="button" class="numpad-btn" data-action="digit" data-digit="6">6</button>
-            <button type="button" class="numpad-btn" data-action="digit" data-digit="7">7</button>
-            <button type="button" class="numpad-btn" data-action="digit" data-digit="8">8</button>
-            <button type="button" class="numpad-btn" data-action="digit" data-digit="9">9</button>
+            <button
+              type="button"
+              class="numpad-btn"
+              data-action="digit"
+              data-digit="1"
+            >
+              1
+            </button>
+            <button
+              type="button"
+              class="numpad-btn"
+              data-action="digit"
+              data-digit="2"
+            >
+              2
+            </button>
+            <button
+              type="button"
+              class="numpad-btn"
+              data-action="digit"
+              data-digit="3"
+            >
+              3
+            </button>
+            <button
+              type="button"
+              class="numpad-btn"
+              data-action="digit"
+              data-digit="4"
+            >
+              4
+            </button>
+            <button
+              type="button"
+              class="numpad-btn"
+              data-action="digit"
+              data-digit="5"
+            >
+              5
+            </button>
+            <button
+              type="button"
+              class="numpad-btn"
+              data-action="digit"
+              data-digit="6"
+            >
+              6
+            </button>
+            <button
+              type="button"
+              class="numpad-btn"
+              data-action="digit"
+              data-digit="7"
+            >
+              7
+            </button>
+            <button
+              type="button"
+              class="numpad-btn"
+              data-action="digit"
+              data-digit="8"
+            >
+              8
+            </button>
+            <button
+              type="button"
+              class="numpad-btn"
+              data-action="digit"
+              data-digit="9"
+            >
+              9
+            </button>
             <button
               type="button"
               class="numpad-btn numpad-util"
@@ -247,7 +348,14 @@
             >
               <span class="svg-icon icon-backspace" aria-hidden="true"></span>
             </button>
-            <button type="button" class="numpad-btn" data-action="digit" data-digit="0">0</button>
+            <button
+              type="button"
+              class="numpad-btn"
+              data-action="digit"
+              data-digit="0"
+            >
+              0
+            </button>
             <button
               type="button"
               class="numpad-btn numpad-enter"
@@ -268,12 +376,26 @@
             <span>Master</span>
           </div>
           <div class="transport-stepper">
-            <button type="button" class="transport-step" data-action="vol-down" aria-label="Master volume down">−</button>
+            <button
+              type="button"
+              class="transport-step"
+              data-action="vol-down"
+              aria-label="Master volume down"
+            >
+              −
+            </button>
             <div class="transport-readout">
               <span class="transport-value" id="vol-value">100</span>
               <span class="transport-unit">%</span>
             </div>
-            <button type="button" class="transport-step" data-action="vol-up" aria-label="Master volume up">+</button>
+            <button
+              type="button"
+              class="transport-step"
+              data-action="vol-up"
+              aria-label="Master volume up"
+            >
+              +
+            </button>
           </div>
         </div>
 
@@ -285,12 +407,26 @@
             <span>Mic</span>
           </div>
           <div class="transport-stepper">
-            <button type="button" class="transport-step" data-action="mic-down" aria-label="Microphone volume down">−</button>
+            <button
+              type="button"
+              class="transport-step"
+              data-action="mic-down"
+              aria-label="Microphone volume down"
+            >
+              −
+            </button>
             <div class="transport-readout">
               <span class="transport-value" id="mic-value">100</span>
               <span class="transport-unit">%</span>
             </div>
-            <button type="button" class="transport-step" data-action="mic-up" aria-label="Microphone volume up">+</button>
+            <button
+              type="button"
+              class="transport-step"
+              data-action="mic-up"
+              aria-label="Microphone volume up"
+            >
+              +
+            </button>
           </div>
         </div>
 
@@ -302,24 +438,51 @@
             <span>Key</span>
           </div>
           <div class="transport-stepper">
-            <button type="button" class="transport-step" data-action="key-down" aria-label="Lower key">−</button>
+            <button
+              type="button"
+              class="transport-step"
+              data-action="key-down"
+              aria-label="Lower key"
+            >
+              −
+            </button>
             <div class="transport-readout">
               <span class="transport-value" id="key-value">0</span>
               <span class="transport-unit">st</span>
             </div>
-            <button type="button" class="transport-step" data-action="key-up" aria-label="Raise key">+</button>
+            <button
+              type="button"
+              class="transport-step"
+              data-action="key-up"
+              aria-label="Raise key"
+            >
+              +
+            </button>
           </div>
         </div>
 
         <div class="transport-spacer"></div>
 
         <div class="transport-actions">
-          <button type="button" class="transport-btn stop-btn" data-action="stop">
+          <button
+            type="button"
+            class="transport-btn stop-btn"
+            data-action="stop"
+          >
             <span class="svg-icon icon-stop" aria-hidden="true"></span>
             <span>Stop</span>
           </button>
-          <button type="button" class="transport-btn play-btn" id="btn-play-pause" data-action="play-pause">
-            <span class="svg-icon icon-play" id="play-pause-icon" aria-hidden="true"></span>
+          <button
+            type="button"
+            class="transport-btn play-btn"
+            id="btn-play-pause"
+            data-action="play-pause"
+          >
+            <span
+              class="svg-icon icon-play"
+              id="play-pause-icon"
+              aria-hidden="true"
+            ></span>
             <span id="play-pause-label">Play</span>
           </button>
         </div>
