@@ -33,6 +33,9 @@ export default class InputManager {
     this.drums = [];
     this.currentDrumPresetIndex = -1;
 
+    this.rhythms = [];
+    this.currentRhythmIndex = -1;
+
     this.guideMelodyLevels = [
       { label: "OFF", value: 0 },
       { label: "SOFT", value: 45 },
@@ -553,8 +556,10 @@ export default class InputManager {
     else if (e.key === "+" || (e.key === "=" && e.shiftKey))
       this.handleMicVolume("up");
     else if (e.key === "[" || e.key === "]") this.handleBracket(e.key);
-    else if (e.key === ";") this.cycleDrumPreset("left");
-    else if (e.key === "'") this.cycleDrumPreset("right");
+    else if (e.key === ";" || e.key === ":" || e.code === "Semicolon")
+      this.handleRhythmShortcut(e, "left");
+    else if (e.key === "'" || e.key === '"' || e.code === "Quote")
+      this.handleRhythmShortcut(e, "right");
     else if (e.key.toLowerCase() === "c") this.handleChorusToggle();
     else if (e.key.toLowerCase() === "g") this.cycleGuideMelody();
     else if (e.key.toLowerCase() === "y") this.handleYKey();
@@ -652,6 +657,95 @@ export default class InputManager {
     modules.infoBar.showTemp("MELODY", html, 3000);
   }
 
+  handleRhythmShortcut(event, direction) {
+    if (event.shiftKey) {
+      this.cycleDrumPreset(direction);
+      return;
+    }
+
+    void this.cycleRhythm(direction);
+  }
+
+  /**
+   * Cycles the live rhythm pattern while preserving the song's original drums.
+   *
+   * @param {"left"|"right"} direction
+   */
+  async cycleRhythm(direction) {
+    const state = this.ctx.state;
+    const Forte = this.ctx.services.Forte;
+    const modules = this.ctx.modules;
+
+    if (state.mode !== "player" || !state.currentSongIsMIDI) {
+      modules.infoBar.showTemp(
+        "RHYTHM",
+        "Not available for this format.",
+        3000,
+      );
+      if (typeof modules.dialog === "function") {
+        modules.dialog(
+          new Html("div").classOn("temp-dialog-text").text("NOT AVAILABLE"),
+          2000,
+        );
+      }
+      return {
+        success: false,
+        reason: "Rhythm is only available for MIDI songs.",
+      };
+    }
+
+    const result = await Forte.cycleRhythm(direction);
+
+    if (!result?.success) {
+      modules.infoBar.showTemp(
+        "RHYTHM",
+        result?.reason || "FAILED TO SWITCH",
+        3000,
+      );
+      return result || { success: false, reason: "Could not switch rhythm." };
+    }
+
+    this.rhythms = Forte.getRhythmList();
+    this.currentRhythmIndex = result.rhythmIndex + 1;
+
+    const html = `
+      <div class="rhythm-carousel" style="opacity: 0; transition: opacity 0.2s ease-out;">
+        ${this.rhythms
+          .map((rhythm, idx) => {
+            const isSelected = idx === this.currentRhythmIndex;
+            const rhythmNumber = (idx + 1).toString().padStart(2, "0");
+            const label = rhythm.original
+              ? "ORIGINAL"
+              : `RHYTHM ${rhythmNumber}`;
+            return `
+            <div class="rhythm-item ${isSelected ? "selected" : ""}">
+              <span>${label}</span>
+              <span>${rhythm.name}</span>
+            </div>
+          `;
+          })
+          .join("")}
+      </div>
+    `;
+
+    modules.infoBar.showTemp("RHYTHM", html, 3000);
+
+    setTimeout(() => {
+      const carousel = document.querySelector(".rhythm-carousel");
+      const activeRhythm = carousel?.querySelector(".rhythm-item.selected");
+      if (carousel && activeRhythm) {
+        activeRhythm.scrollIntoView({
+          behavior: "auto",
+          block: "nearest",
+          inline: "center",
+        });
+        carousel.style.opacity = "1";
+      }
+    }, 50);
+
+    return result;
+  }
+
   /**
    * Cycles the active drum preset on the standard MIDI percussion channel.
    * Remembers the user's selection throughout the song.
@@ -666,11 +760,7 @@ export default class InputManager {
     let numDir = direction === "left" ? -1 : 1;
 
     if (state.mode !== "player" || !state.currentSongIsMIDI) {
-      modules.infoBar.showTemp(
-        "RHYTHM",
-        "Not available for this format.",
-        3000,
-      );
+      modules.infoBar.showTemp("KIT", "Not available for this format.", 3000);
       modules.dialog(
         new Html("div").classOn("temp-dialog-text").text("NOT AVAILABLE"),
         2000,
@@ -680,7 +770,7 @@ export default class InputManager {
 
     this.drums = Forte.getAvailableDrumPresets();
     if (!this.drums || this.drums.length === 0) {
-      modules.infoBar.showTemp("RHYTHM", "No rhythm patches available", 3000);
+      modules.infoBar.showTemp("KIT", "No drum kits available", 3000);
       return;
     }
 
@@ -714,10 +804,10 @@ export default class InputManager {
           ${this.drums
             .map((preset, idx) => {
               const isSelected = idx === this.currentDrumPresetIndex;
-              const rhythmNumber = (idx + 1).toString().padStart(2, "0");
+              const kitNumber = (idx + 1).toString().padStart(2, "0");
               return `
               <div class="rhythm-item ${isSelected ? "selected" : ""}">
-                <span>RHYTHM ${rhythmNumber}</span>
+                <span>KIT ${kitNumber}</span>
                 <span>${preset.name.substring(0, 12)}</span>
               </div>
             `;
@@ -726,7 +816,7 @@ export default class InputManager {
         </div>
       `;
 
-      modules.infoBar.showTemp("RHYTHM", html, 3000);
+      modules.infoBar.showTemp("KIT", html, 3000);
 
       setTimeout(() => {
         const carousel = document.querySelector(".rhythm-carousel");
@@ -741,7 +831,7 @@ export default class InputManager {
         }
       }, 50);
     } else {
-      modules.infoBar.showTemp("RHYTHM", "FAILED TO SWITCH", 3000);
+      modules.infoBar.showTemp("KIT", "FAILED TO SWITCH", 3000);
     }
   }
 
