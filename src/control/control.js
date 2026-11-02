@@ -882,7 +882,7 @@ async function init() {
     setDisabled(
       "btn-rhythm",
       !rhythmAvailable,
-      "Rhythm patches are only available for MIDI songs.",
+      "Rhythm patterns are only available for MIDI songs.",
     );
     setDisabled(
       "btn-bgv",
@@ -908,7 +908,7 @@ async function init() {
     setText(
       dom["rhythm-value"],
       availability.rhythmAvailable
-        ? displayCase(info?.rhythmName || "Auto")
+        ? displayCase(info?.rhythmName || "Original Drums")
         : "—",
     );
     setText(
@@ -1098,9 +1098,11 @@ async function init() {
       if (response?.success) {
         setText(
           dom["rhythm-value"],
-          displayCase(response.rhythmName || "Auto"),
+          displayCase(response.rhythmName || "Original Drums"),
         );
-        showToast(`Rhythm: ${displayCase(response.rhythmName || "Auto")}`);
+        showToast(
+          `Rhythm: ${displayCase(response.rhythmName || "Original Drums")}`,
+        );
       } else {
         showToast(response?.reason || "Rhythm unavailable.", true);
       }
