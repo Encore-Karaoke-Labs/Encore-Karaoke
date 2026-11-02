@@ -329,6 +329,7 @@ export class FortePlayback {
     pianoRoll,
     dispatchUpdate,
     harana,
+    rhythm,
   ) {
     this.state = state;
     this.audioCore = audioCore;
@@ -337,6 +338,7 @@ export class FortePlayback {
     this.pianoRoll = pianoRoll;
     this.dispatchUpdate = dispatchUpdate;
     this.harana = harana;
+    this.rhythm = rhythm || null;
 
     if (this.scoring) {
       this.scoring.harana = harana;
@@ -981,6 +983,8 @@ export class FortePlayback {
       this.state.playback.smoothedTime += drift * 0.15;
     }
 
+    this.rhythm?.tick(engineTime);
+
     const currentTime = Math.max(
       0,
       Math.min(this.state.playback.smoothedTime, duration),
@@ -1266,6 +1270,7 @@ export class FortePlayback {
     currentLoadId,
   ) {
     if (this.state.playback.status !== "stopped") this.stopTrack();
+    this.rhythm?.stop();
 
     this.state.playback.hasMidiGuide = false;
     if (this.audioElement) {
@@ -1721,6 +1726,7 @@ export class FortePlayback {
       }
     }
 
+    this.rhythm?.resume();
     this.dispatchUpdate();
     this.state.playback.lastFrameTime = performance.now();
     this.state.playback.smoothedTime = this.getPlaybackState().currentTime;
@@ -1758,6 +1764,8 @@ export class FortePlayback {
       } catch (e) {}
     }
 
+    this.rhythm?.pause();
+
     if (this.state.playback.isMidi) {
       if (this.state.playback.hasChorus && this.chorusElement)
         this.chorusElement.pause();
@@ -1787,6 +1795,7 @@ export class FortePlayback {
    */
   stopTrack() {
     this.pianoRoll.toggleVisibility(false);
+    this.rhythm?.stop();
 
     if (this.state.playback.status === "stopped") return;
     this.state.playback.status = "stopped";
@@ -2070,6 +2079,7 @@ export class FortePlayback {
       midiInfo: this.state.playback.midiInfo,
       transpose: this.state.playback.transpose,
       multiplexPan: this.state.playback.multiplexPan,
+      ...(this.rhythm ? this.rhythm.getState() : {}),
       score: this.scoring.getScoringState(),
     };
   }
