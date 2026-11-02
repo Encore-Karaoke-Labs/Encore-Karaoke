@@ -329,7 +329,7 @@ const pkg = {
       if (this.aborted) return;
       setProgress(30 + e.detail.percentage * 0.7);
       statusP.text(
-        `Loading library...\n${e.detail.current}/${e.detail.total} (${e.detail.percentage}%)`,
+        `Loading library... ${e.detail.current}/${e.detail.total} (${e.detail.percentage}%)`,
       );
     };
 
