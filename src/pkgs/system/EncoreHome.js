@@ -441,15 +441,13 @@ class EncoreController {
         const guideIndex = this.input?.currentGuideMelodyIndex ?? 2;
         const guideLevel = guideLevels[guideIndex];
 
-        let rhythmName = "AUTO";
-        let rhythmIndex = this.input?.currentDrumPresetIndex ?? -1;
-        const drumPresets = this.input?.drums || [];
-        if (rhythmIndex >= 0 && drumPresets[rhythmIndex]?.name) {
-          rhythmName = drumPresets[rhythmIndex].name;
-        } else {
-          const currentPreset = this.services.Forte.getCurrentDrumPreset?.(9);
-          if (currentPreset?.name) rhythmName = currentPreset.name;
-        }
+        const rhythmState =
+          this.services.Forte.getRhythmState?.() ||
+          this.services.Forte.getPlaybackState?.() ||
+          {};
+        const rhythmName = rhythmState.rhythmName || "Original Drums";
+        const rhythmIndex = rhythmState.rhythmIndex ?? -1;
+        const rhythmCount = rhythmState.rhythmCount ?? 0;
 
         const vocalState = this.services.Forte.getVocalChainState?.() || {};
         const recorder = this.recorder;
@@ -489,7 +487,7 @@ class EncoreController {
           guideMelodyIndex: guideIndex,
           rhythmName,
           rhythmIndex,
-          rhythmCount: drumPresets.length,
+          rhythmCount,
           bgvCategory: this.bgv?.selectedCategory || "Auto",
           isRecording: Boolean(recorder?.isRecording),
           recordingTime:
@@ -764,20 +762,15 @@ class EncoreController {
         }
 
         const direction = payload === "left" ? "left" : "right";
-        this.input.cycleDrumPreset(direction);
+        const result = await this.input.cycleRhythm(direction);
 
-        const rhythmIndex = this.input.currentDrumPresetIndex;
-        const preset = this.input.drums?.[rhythmIndex];
-        if (rhythmIndex < 0 || !preset) {
-          return { success: false, reason: "Could not switch rhythm." };
+        if (!result?.success) {
+          return (
+            result || { success: false, reason: "Could not switch rhythm." }
+          );
         }
 
-        return {
-          success: true,
-          direction,
-          rhythmIndex,
-          rhythmName: preset.name || "AUTO",
-        };
+        return { ...result, direction };
       }
 
       case "cycle-bgv": {
