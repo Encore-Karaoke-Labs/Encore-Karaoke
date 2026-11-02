@@ -4,6 +4,7 @@ import { ForteHarana } from "./modules/Harana.js";
 import { ForteMicrophone } from "./modules/Microphone.js";
 import { FortePianoRoll } from "./modules/PianoRoll.js";
 import { FortePlayback } from "./modules/Playback.js";
+import { ForteRhythm } from "./modules/Rhythm.js";
 import { ForteScoring } from "./modules/Scoring.js";
 import { ForteSFX } from "./modules/SFX.js";
 import { ForteSynthesizer } from "./modules/Synthesizer.js";
@@ -18,6 +19,7 @@ let microphone;
 let scoring;
 let harana;
 let playback;
+let rhythm;
 let sfx;
 
 /**
@@ -67,6 +69,16 @@ const pkg = {
       dispatchPlaybackUpdate,
     );
 
+    rhythm = new ForteRhythm(
+      state,
+      audioCore,
+      synthesizer,
+      dispatchPlaybackUpdate,
+    );
+
+    synthesizer.onDrumKitChanged = (channelNumber, preset) =>
+      rhythm.handleKitChange(channelNumber, preset);
+
     playback = new FortePlayback(
       state,
       audioCore,
@@ -75,7 +87,7 @@ const pkg = {
       pianoRoll,
       dispatchPlaybackUpdate,
       harana,
-      pkg.data,
+      rhythm,
     );
 
     sfx = new ForteSFX(state, audioCore, synthesizer);
@@ -85,6 +97,12 @@ const pkg = {
       synthesizer.getMidiOutputDevices();
     } catch (e) {
       logVerboseWarn("Could not query MIDI output devices:", e);
+    }
+
+    try {
+      await rhythm.initialize();
+    } catch (e) {
+      logVerboseWarn("Could not initialize the rhythm engine:", e);
     }
 
     await pkg.data.initializeScoringEngine();
@@ -159,6 +177,11 @@ const pkg = {
       synthesizer.stopNote(channelNumber, midiNote);
     },
 
+    getRhythmState: () => rhythm.getState(),
+    getRhythmList: () => rhythm.getRhythmList(),
+    cycleRhythm: (direction = "right") => rhythm.cycleRhythm(direction),
+    setRhythm: (index) => rhythm.setRhythm(index),
+
     getScoringState: () => scoring.getScoringState(),
     getPlaybackState: () => playback.getPlaybackState(),
     setScoringEnabled: (enabled) => {
@@ -205,6 +228,7 @@ const pkg = {
     if (microphone) microphone.cleanup();
     if (audioCore) audioCore.cleanup();
     if (sfx) sfx.cleanup();
+    if (rhythm) rhythm.cleanup();
     if (playback) playback.cleanup();
     if (synthesizer) synthesizer.cleanup();
   },
