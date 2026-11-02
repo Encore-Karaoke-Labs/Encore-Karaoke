@@ -134,6 +134,11 @@ export class ForteSynthesizer {
     this.currentLoadController = null;
     this.midiDeviceHandler = null;
 
+    this.sequencerOutputRoutes = new WeakMap();
+    this.externalDrumReplacement = false;
+    this.externalDrumChannel = 9;
+    this.onDrumKitChanged = null;
+
     if (!this.state.playback.currentMidiDeviceIds) {
       this.state.playback.currentMidiDeviceIds = [
         this.state.playback.currentMidiDeviceId || "internal",
@@ -237,6 +242,162 @@ export class ForteSynthesizer {
   }
 
   /**
+   * Returns the external MIDI routes belonging to a sequencer.
+   *
+   * @param {Object} sequencer
+   * @returns {Map<number, Object>}
+   */
+  getSequencerOutputRoutes(sequencer) {
+    let routes = this.sequencerOutputRoutes.get(sequencer);
+    if (!routes) {
+      routes = new Map();
+      this.sequencerOutputRoutes.set(sequencer, routes);
+    }
+    return routes;
+  }
+
+  /**
+   * Routes a sequencer to one external MIDI port through a proxy,
+   *
+   * @param {Object} sequencer - SpessaSynth Sequencer instance.
+   * @param {Object} output - LibMIDIOutput wrapper from the device handler.
+   * @param {number} portIndex - Port index (0-3).
+   * @returns {boolean} True when the route was established.
+   */
+  connectSequencerOutput(sequencer, output, portIndex) {
+    if (!sequencer || !output?.port?.send) return false;
+
+    const routes = this.getSequencerOutputRoutes(sequencer);
+    if (routes.has(portIndex)) return true;
+
+    const proxy = {
+      send: (data) => {
+        if (this.shouldFilterExternalDrumMessage(data, portIndex)) return;
+        try {
+          output.port.send(data);
+        } catch (e) {
+          logVerboseWarn(
+            `[FORTE SVC] Failed to send MIDI to Port ${portIndex + 1}:`,
+            e,
+          );
+        }
+      },
+    };
+
+    try {
+      sequencer.connectMIDIOutput(proxy, portIndex * 16);
+      routes.set(portIndex, proxy);
+      logVerbose(
+        `Connected sequencer to external MIDI Port ${portIndex + 1} (offset ${portIndex * 16}): ${output.name || output.id}`,
+      );
+      return true;
+    } catch (e) {
+      console.error(
+        `[FORTE SVC] Failed to connect sequencer to Port ${portIndex + 1}:`,
+        e,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Removes a single external MIDI route from a sequencer.
+   *
+   * @param {Object} sequencer
+   * @param {number} portIndex
+   */
+  disconnectSequencerOutput(sequencer, portIndex) {
+    const routes = this.sequencerOutputRoutes.get(sequencer);
+    if (!routes) return;
+
+    const proxy = routes.get(portIndex);
+    if (!proxy) return;
+
+    try {
+      sequencer.disconnectMIDIOutput(proxy);
+    } catch (e) {
+      logVerboseWarn(
+        `[FORTE SVC] Failed to disconnect MIDI Port ${portIndex + 1}:`,
+        e,
+      );
+    }
+
+    routes.delete(portIndex);
+  }
+
+  /**
+   * Removes all external MIDI routes from a sequencer.
+   *
+   * @param {Object} sequencer
+   */
+  disconnectAllSequencerOutputs(sequencer) {
+    const routes = this.sequencerOutputRoutes.get(sequencer);
+    if (!routes) return;
+
+    for (const portIndex of [...routes.keys()]) {
+      this.disconnectSequencerOutput(sequencer, portIndex);
+    }
+
+    this.sequencerOutputRoutes.delete(sequencer);
+  }
+
+  /**
+   * Enables or disables replacement of the song's external drum channel.
+   *
+   * @param {boolean} active
+   * @param {number} [channel=9] - MIDI channel used by the replacement rhythm.
+   */
+  setExternalDrumReplacement(active, channel = 9) {
+    this.externalDrumReplacement = Boolean(active);
+    if (Number.isFinite(channel)) {
+      this.externalDrumChannel = Math.max(0, Math.min(15, Math.floor(channel)));
+    }
+  }
+
+  /**
+   * Returns true when a message from the song sequencer must be suppressed
+   * because a rhythm is playing on the drum channel.
+   *
+   * @param {ArrayLike<number>|null} data - Raw MIDI bytes.
+   * @param {number} [portIndex=0]
+   * @returns {boolean}
+   */
+  shouldFilterExternalDrumMessage(data, portIndex = 0) {
+    if (!this.externalDrumReplacement) return false;
+    if (portIndex !== 0) return false;
+    if (!data || data.length < 1) return false;
+
+    const status = data[0] & 0xf0;
+    const channel = data[0] & 0x0f;
+    if (channel !== this.externalDrumChannel) return false;
+
+    if (status === 0x80 || status === 0x90 || status === 0xa0) return true;
+
+    if (status === 0xb0 && data.length >= 2) {
+      const controller = data[1];
+      return controller === 120 || controller === 121 || controller === 123;
+    }
+
+    return false;
+  }
+
+  /**
+   * Notifies listeners (the rhythm engine) that the song's drum kit changed.
+   *
+   * @param {number} channelNumber
+   * @param {Object|null} preset
+   */
+  notifyDrumKitChanged(channelNumber, preset) {
+    if (typeof this.onDrumKitChanged !== "function") return;
+
+    try {
+      this.onDrumKitChanged(channelNumber, preset);
+    } catch (e) {
+      logVerboseWarn("Drum kit change listener failed:", e);
+    }
+  }
+
+  /**
    * Connects an active sequencer to all configured external MIDI output ports.
    * @param {Object} sequencer - Active SpessaSynth Sequencer instance.
    */
@@ -260,17 +421,7 @@ export class ForteSynthesizer {
 
       const output = this.midiDeviceHandler.outputs.get(deviceId);
       if (output) {
-        try {
-          output.connect(sequencer, port * 16);
-          logVerbose(
-            `Connected sequencer to external MIDI Port ${port + 1} (offset ${port * 16}): ${output.name || deviceId}`,
-          );
-        } catch (e) {
-          console.error(
-            `[FORTE SVC] Failed to connect sequencer to Port ${port + 1}:`,
-            e,
-          );
-        }
+        this.connectSequencerOutput(sequencer, output, port);
       }
     }
   }
@@ -280,32 +431,9 @@ export class ForteSynthesizer {
    * @param {Object} sequencer - Active SpessaSynth Sequencer instance.
    */
   disconnectSequencerFromMidiOutput(sequencer) {
-    if (!sequencer || !this.midiDeviceHandler) return;
+    if (!sequencer) return;
 
-    const deviceIds = this.state.playback.currentMidiDeviceIds || [
-      this.state.playback.currentMidiDeviceId,
-    ];
-
-    for (let port = 0; port < 4; port++) {
-      const deviceId = deviceIds[port];
-      if (!deviceId || deviceId === "internal" || deviceId === "none") continue;
-
-      const output = this.midiDeviceHandler.outputs.get(deviceId);
-      if (output) {
-        try {
-          output.disconnect(sequencer);
-          logVerbose(
-            `Disconnected sequencer from external MIDI Port ${port + 1}: ${output.name || deviceId}`,
-          );
-        } catch (e) {
-          console.warn(
-            `[FORTE SVC] Failed to disconnect sequencer from Port ${port + 1}:`,
-            e,
-          );
-        }
-      }
-    }
-
+    this.disconnectAllSequencerOutputs(sequencer);
     sequencer.externalMIDIPlayback = false;
   }
 
@@ -425,9 +553,7 @@ export class ForteSynthesizer {
       ) {
         const prevOutput = this.midiDeviceHandler.outputs.get(prevDeviceId);
         if (prevOutput) {
-          try {
-            prevOutput.disconnect(currentSequencer);
-          } catch (e) {}
+          this.disconnectSequencerOutput(currentSequencer, 0);
         }
       }
 
@@ -454,14 +580,7 @@ export class ForteSynthesizer {
     ) {
       const prevOutput = this.midiDeviceHandler.outputs.get(prevDeviceId);
       if (prevOutput) {
-        try {
-          prevOutput.disconnect(currentSequencer);
-        } catch (e) {
-          console.warn(
-            `[FORTE SVC] Error disconnecting Port ${portIndex + 1}:`,
-            e,
-          );
-        }
+        this.disconnectSequencerOutput(currentSequencer, portIndex);
       }
     }
 
@@ -477,19 +596,12 @@ export class ForteSynthesizer {
     ) {
       const newOutput = this.midiDeviceHandler.outputs.get(deviceId);
       if (newOutput) {
-        try {
-          newOutput.connect(currentSequencer, portIndex * 16);
-          logVerbose(
-            `Connected Port ${portIndex + 1} (offset ${portIndex * 16}) to: ${newOutput.name || deviceId}`,
-          );
-          this.initExternalDevicePort(deviceId, portIndex);
-        } catch (e) {
-          console.error(
-            `[FORTE SVC] Failed to connect Port ${portIndex + 1}:`,
-            e,
-          );
+        if (
+          !this.connectSequencerOutput(currentSequencer, newOutput, portIndex)
+        ) {
           return false;
         }
+        this.initExternalDevicePort(deviceId, portIndex);
       }
     }
 
@@ -928,6 +1040,7 @@ export class ForteSynthesizer {
           ].setSystemParameter("presetLock", false);
         } catch (e) {}
       }
+      this.notifyDrumKitChanged(channelNumber, null);
       this.dispatchUpdate();
       return true;
     }
@@ -1001,6 +1114,7 @@ export class ForteSynthesizer {
       logVerbose(
         `Drum preset switched successfully on channel ${channelNumber + 1}`,
       );
+      this.notifyDrumKitChanged(channelNumber, drumPreset);
       this.dispatchUpdate();
       return true;
     } catch (e) {
@@ -1048,20 +1162,18 @@ export class ForteSynthesizer {
     if (!this.state.playback.synthesizer) return null;
 
     try {
-      const channel =
-        this.state.playback.synthesizer.channelProperties?.[channelNumber];
-      if (!channel) return null;
+      const midiChannel =
+        this.state.playback.synthesizer.midiChannels?.[channelNumber];
+      const patch = midiChannel?.patch;
+      if (!patch) return null;
 
       return {
-        program: channel.program || 0,
-        bankMSB: channel.bankMSB || 0,
-        bankLSB: channel.bankLSB || 0,
-        name: channel.presetName || "Unknown",
-        isGMGSDrum:
-          channel.isGMGSDrum ??
-          (channel.isDrum === true && channel.bankMSB !== undefined
-            ? channel.bankMSB === 0
-            : false),
+        program: patch.program || 0,
+        bankMSB: patch.bankMSB || 0,
+        bankLSB: patch.bankLSB || 0,
+        name: patch.name || "Unknown",
+        isGMGSDrum: patch.isGMGSDrum ?? false,
+        isAnyDrums: patch.isAnyDrums ?? patch.isDrum ?? false,
       };
     } catch (e) {
       console.error(
