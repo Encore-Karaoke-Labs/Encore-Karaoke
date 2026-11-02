@@ -411,7 +411,7 @@ export default class NetworkManager {
           input.cycleGuideMelody();
           break;
         case "cycle_rhythm":
-          input.cycleDrumPreset("right");
+          void input.cycleRhythm("right");
           break;
         case "toggle_chorus":
           input.handleChorusToggle();
