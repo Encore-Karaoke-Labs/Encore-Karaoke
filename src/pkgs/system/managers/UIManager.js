@@ -206,7 +206,11 @@ export default class UIManager {
         items: [
           { key: "C", desc: "Toggle Chorus backing vocals" },
           { key: "G", desc: "Adjust guide melody" },
-          { key: "; / '", desc: "Cycle live MIDI drum kits" },
+          { key: "; / '", desc: "Cycle rhythm patterns" },
+          {
+            key: "SHIFT + ; / '",
+            desc: "Cycle live MIDI drum kits",
+          },
           { key: "L", desc: "Customize lyrics" },
         ],
       },
