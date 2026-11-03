@@ -65,6 +65,7 @@ export const state = {
     devices: [],
     currentDeviceId: "default",
     transpose: 0,
+    tempo: 1,
     multiplexPan: -1,
     leftPannerGain: null,
     rightPannerGain: null,

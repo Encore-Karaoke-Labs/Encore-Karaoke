@@ -545,8 +545,8 @@ export default class InputManager {
     else if (e.key === "Backspace") this.handleBackspace();
     else if (e.key === "Enter") this.handleEnter();
     else if (e.key === "Escape") this.handleEscape();
-    else if (e.key === "ArrowUp") this.handleNav("up");
-    else if (e.key === "ArrowDown") this.handleNav("down");
+    else if (e.key === "ArrowUp") this.handleNav("up", e);
+    else if (e.key === "ArrowDown") this.handleNav("down", e);
     else if (e.key === "ArrowLeft") this.handlePan("left");
     else if (e.key === "ArrowRight") this.handlePan("right");
     else if (e.key === "-" && !e.shiftKey) this.handleVolume("down");
@@ -1204,8 +1204,9 @@ export default class InputManager {
    * Action traversing lists vertically.
    *
    * @param {string} dir - Literal string "up" or "down".
+   * @param {KeyboardEvent} e - Original keyboard event (for shift detection).
    */
-  handleNav(dir) {
+  handleNav(dir, e) {
     const state = this.ctx.state;
     const dom = this.ctx.dom;
 
@@ -1265,9 +1266,11 @@ export default class InputManager {
         this.ctx.modules.infoBar.showDefault();
       }
     } else if (state.mode === "player") {
+      const isTempoChange = Boolean(e && e.shiftKey);
+
       if (state.currentSongIsYouTube || state.currentSongIsStandaloneVideo) {
         this.ctx.modules.infoBar.showTemp(
-          "TRANSPOSE",
+          isTempoChange ? "TEMPO" : "TRANSPOSE",
           "Not available for this format.",
           3000,
         );
@@ -1279,21 +1282,37 @@ export default class InputManager {
         }
         return;
       }
-      const change = dir === "up" ? 1 : -1;
-      const cur = this.ctx.services.Forte.getPlaybackState().transpose || 0;
-      const next = Math.max(-24, Math.min(24, cur + change));
-      this.ctx.services.Forte.setTranspose(next);
 
-      let left = 50;
-      let width = 0;
-      if (next > 0) width = (next / 24) * 50;
-      else if (next < 0) {
-        width = (Math.abs(next) / 24) * 50;
-        left = 50 - width;
+      if (isTempoChange) {
+        const change = dir === "up" ? 0.1 : -0.1;
+        const cur = this.ctx.services.Forte.getPlaybackState().tempo || 1;
+        const next = Math.max(
+          0.5,
+          Math.min(2, Number((cur + change).toFixed(1))),
+        );
+        this.ctx.services.Forte.setTempo(next);
+        this.ctx.modules.infoBar.showTemp(
+          "TEMPO",
+          `${(next * 100).toFixed(0)}%`,
+          3000,
+        );
+      } else {
+        const change = dir === "up" ? 1 : -1;
+        const cur = this.ctx.services.Forte.getPlaybackState().transpose || 0;
+        const next = Math.max(-24, Math.min(24, cur + change));
+        this.ctx.services.Forte.setTranspose(next);
+
+        let left = 50;
+        let width = 0;
+        if (next > 0) width = (next / 24) * 50;
+        else if (next < 0) {
+          width = (Math.abs(next) / 24) * 50;
+          left = 50 - width;
+        }
+
+        const html = `<div class="transpose-display"><div class="transpose-min">-24</div><div class="transpose-slider-container"><div class="transpose-slider-center-line"></div><div class="transpose-slider-fill" style="left: ${left}%; width: ${width}%;"></div></div><div class="transpose-max">+24</div><span class="transpose-value">${(next > 0 ? "+" : "") + next} st</span></div>`;
+        this.ctx.modules.infoBar.showTemp("TRANSPOSE", html, 3000);
       }
-
-      const html = `<div class="transpose-display"><div class="transpose-min">-24</div><div class="transpose-slider-container"><div class="transpose-slider-center-line"></div><div class="transpose-slider-fill" style="left: ${left}%; width: ${width}%;"></div></div><div class="transpose-max">+24</div><span class="transpose-value">${(next > 0 ? "+" : "") + next} st</span></div>`;
-      this.ctx.modules.infoBar.showTemp("TRANSPOSE", html, 3000);
     }
   }
 
