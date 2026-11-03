@@ -774,10 +774,8 @@ export default class InputManager {
       return;
     }
 
-    const channelNumber = 9;
-
     if (this.currentDrumPresetIndex === -1) {
-      const current = Forte.getCurrentDrumPreset(channelNumber);
+      const current = Forte.getActiveDrumPreset();
       if (current) {
         const matchedIndex = this.drums.findIndex(
           (p) =>
@@ -796,7 +794,7 @@ export default class InputManager {
       this.drums.length;
     const nextPreset = this.drums[nextIndex];
 
-    if (Forte.switchDrumPreset(channelNumber, nextPreset)) {
+    if (Forte.switchActiveDrumPreset(nextPreset)) {
       this.currentDrumPresetIndex = nextIndex;
 
       const html = `
