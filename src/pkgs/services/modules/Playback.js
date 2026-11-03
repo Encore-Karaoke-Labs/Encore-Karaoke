@@ -979,8 +979,10 @@ export class FortePlayback {
     const duration = engineState.duration;
 
     let rate = 1.0;
-    if (!this.state.playback.isMidi && this.audioElement) {
-      rate = this.audioElement.playbackRate;
+    if (this.state.playback.isMidi && this.state.playback.sequencer) {
+      rate = this.state.playback.sequencer.playbackRate || 1;
+    } else if (this.audioElement) {
+      rate = this.audioElement.playbackRate || 1;
     }
 
     this.state.playback.smoothedTime += delta * rate;
@@ -1339,6 +1341,7 @@ export class FortePlayback {
     this.state.playback.lyricsEncoding = "utf-8";
     this.state.playback.artifactRegex = null;
     this.state.playback.transpose = 0;
+    this.state.playback.tempo = 1;
     this.state.playback.isMultiplexed = false;
     this.state.playback.isPlatinum = false;
     this.state.playback.multiplexPan = -1;
@@ -1394,7 +1397,7 @@ export class FortePlayback {
         if (chorusUrl) {
           this.chorusElement = new Audio(chorusUrl);
           this.chorusElement.crossOrigin = "anonymous";
-          this.chorusElement.preservesPitch = false;
+          this.chorusElement.preservesPitch = true;
 
           await new Promise((resolve) => {
             this.chorusElement.addEventListener("canplay", resolve, {
@@ -1425,7 +1428,7 @@ export class FortePlayback {
           this.audioElement = new Audio(url);
           this.audioElementIsExternal = false;
           this.audioElement.crossOrigin = "anonymous";
-          this.audioElement.preservesPitch = false;
+          this.audioElement.preservesPitch = true;
 
           await new Promise((resolve, reject) => {
             this.audioElement.addEventListener("canplay", resolve, {
@@ -1474,6 +1477,7 @@ export class FortePlayback {
 
       this.state.playback.status = "stopped";
       this.state.playback.pauseTime = 0;
+      this.setTempo(1);
       logVerbose(`Track loaded: ${urlString}`);
       this.dispatchUpdate();
       return true;
@@ -1571,6 +1575,7 @@ export class FortePlayback {
       this.state.playback.sequencer.play();
 
       if (this.state.playback.hasChorus && this.chorusElement) {
+        this.chorusElement.playbackRate = this.state.playback.tempo || 1;
         if (this.state.playback.status !== "paused") {
           this.chorusElement.currentTime = 0;
         }
@@ -1606,7 +1611,7 @@ export class FortePlayback {
         this.sourceNode.disconnect();
       } catch (e) {}
 
-      this.audioElement.playbackRate = 1.0;
+      this.audioElement.playbackRate = this.state.playback.tempo || 1;
       this.audioElement.preservesPitch = true;
 
       if (this.state.playback.isMultiplexed) {
@@ -1694,7 +1699,8 @@ export class FortePlayback {
       this.audioElement.currentTime = resumeTime;
 
       if (this.state.playback.hasMidiGuide && this.state.playback.sequencer) {
-        this.state.playback.sequencer.playbackRate = 1.0;
+        this.state.playback.sequencer.playbackRate =
+          this.state.playback.tempo || 1;
         if (this.state.playback.status !== "paused") {
           this.state.playback.sequencer.currentTime = resumeTime;
         }
@@ -1844,6 +1850,7 @@ export class FortePlayback {
     }
 
     this.setTranspose(0);
+    this.setTempo(1);
 
     if (this.state.playback.isMidi) {
       if (this.state.playback.hasChorus && this.chorusElement) {
@@ -1983,6 +1990,72 @@ export class FortePlayback {
   }
 
   /**
+   * Returns the skip-to-first-note offset in seconds for the current MIDI.
+   *
+   * @returns {number} Skip offset in seconds (0 when no MIDI or no padded start).
+   */
+  getMidiSkipOffset() {
+    const midi = this.state.playback.currentMidi;
+    if (!midi || typeof midi.midiTicksToSeconds !== "function") return 0;
+    const firstNoteOn = midi.firstNoteOn;
+    if (!firstNoteOn) return 0;
+    try {
+      return midi.midiTicksToSeconds(firstNoteOn);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /**
+   * Alters playback tempo scaling the MIDI sequencer, chorus audio and RS
+   * audio streams.
+   *
+   * @param {number} rate - Playback rate multiplier (1.0 = original tempo).
+   */
+  setTempo(rate) {
+    const clamped = Math.max(0.5, Math.min(2, Number(rate) || 1));
+    this.state.playback.tempo = clamped;
+
+    if (this.state.playback.sequencer) {
+      this.state.playback.sequencer.playbackRate = clamped;
+    }
+    if (this.state.playback.hasChorus && this.chorusElement) {
+      this.chorusElement.playbackRate = clamped;
+    }
+    if (!this.state.playback.isMidi && this.audioElement) {
+      this.audioElement.playbackRate = clamped;
+    }
+
+    if (this.state.playback.status === "playing") {
+      const syncTime = Math.max(0, this.getPlaybackState().currentTime || 0);
+
+      if (this.state.playback.isMidi) {
+        if (this.state.playback.hasChorus && this.chorusElement) {
+          let chorusSyncTime = syncTime;
+          if (this.state.playback.skipToFirstNoteOn) {
+            chorusSyncTime = Math.max(0, syncTime - this.getMidiSkipOffset());
+          }
+          if (
+            Math.abs(this.chorusElement.currentTime - chorusSyncTime) > 0.05
+          ) {
+            this.chorusElement.currentTime = chorusSyncTime;
+          }
+        }
+      } else if (
+        this.state.playback.hasMidiGuide &&
+        this.state.playback.sequencer
+      ) {
+        const seqTime = this.state.playback.sequencer.currentTime || 0;
+        if (Math.abs(seqTime - syncTime) > 0.05) {
+          this.state.playback.sequencer.currentTime = syncTime;
+        }
+      }
+    }
+
+    this.dispatchUpdate();
+  }
+
+  /**
    * Modifies the individual track volume of the MIDI channels containing the guide melody.
    *
    * @param {number} volume - Volume mapping value (0-127).
@@ -2086,6 +2159,7 @@ export class FortePlayback {
       decodedLyrics: this.state.playback.decodedLyrics,
       midiInfo: this.state.playback.midiInfo,
       transpose: this.state.playback.transpose,
+      tempo: this.state.playback.tempo,
       multiplexPan: this.state.playback.multiplexPan,
       ...(this.rhythm ? this.rhythm.getState() : {}),
       score: this.scoring.getScoringState(),
