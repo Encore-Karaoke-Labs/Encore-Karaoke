@@ -626,6 +626,49 @@ class EncoreController {
         return { success: true, transpose: next };
       }
 
+      case "tempo-change": {
+        if (this.state.mode !== "player") {
+          return { success: false, reason: "Not in player mode." };
+        }
+
+        if (
+          this.state.currentSongIsYouTube ||
+          this.state.currentSongIsStandaloneVideo
+        ) {
+          this.infoBar.showTemp(
+            "TEMPO",
+            "Not available for this format.",
+            3000,
+          );
+          return { success: false, reason: "Not available for this format." };
+        }
+
+        const Forte = this.services.Forte;
+        const cur = Forte.getPlaybackState().tempo || 1;
+        let next = cur;
+
+        if (typeof payload === "number") {
+          next = Number(payload);
+        } else if (payload === "up") {
+          next = cur + 0.1;
+        } else if (payload === "down") {
+          next = cur - 0.1;
+        } else if (typeof payload === "object" && payload !== null) {
+          if (payload.value !== undefined) next = Number(payload.value);
+          else if (payload.step !== undefined)
+            next = cur + Number(payload.step);
+        } else {
+          next = cur + 0.1;
+        }
+
+        next = Math.max(0.5, Math.min(2, Number(next.toFixed(1))));
+        Forte.setTempo(next);
+
+        this.infoBar.showTemp("TEMPO", `${(next * 100).toFixed(0)}%`, 3000);
+
+        return { success: true, tempo: next };
+      }
+
       case "toggle-chorus": {
         if (this.state.mode !== "player") {
           return { success: false, reason: "Not in player mode." };

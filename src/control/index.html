@@ -413,7 +413,7 @@
               data-action="mic-down"
               aria-label="Microphone volume down"
             >
-              −
+              -
             </button>
             <div class="transport-readout">
               <span class="transport-value" id="mic-value">100</span>
@@ -432,36 +432,64 @@
 
         <span class="transport-divider" aria-hidden="true"></span>
 
-        <div class="transport-group">
-          <div class="transport-label">
-            <span class="svg-icon icon-note" aria-hidden="true"></span>
-            <span>Key</span>
-          </div>
-          <div class="transport-stepper">
-            <button
-              type="button"
-              class="transport-step"
-              data-action="key-down"
-              aria-label="Lower key"
-            >
-              −
-            </button>
-            <div class="transport-readout">
-              <span class="transport-value" id="key-value">0</span>
-              <span class="transport-unit">st</span>
+          <div class="transport-group">
+            <div class="transport-label">
+              <span class="svg-icon icon-note" aria-hidden="true"></span>
+              <span>Key</span>
             </div>
-            <button
-              type="button"
-              class="transport-step"
-              data-action="key-up"
-              aria-label="Raise key"
-            >
-              +
-            </button>
+            <div class="transport-stepper">
+              <button
+                type="button"
+                class="transport-step"
+                data-action="key-down"
+                aria-label="Lower key"
+              >
+                −
+              </button>
+              <div class="transport-readout">
+                <span class="transport-value" id="key-value">0</span>
+                <span class="transport-unit">st</span>
+              </div>
+              <button
+                type="button"
+                class="transport-step"
+                data-action="key-up"
+                aria-label="Raise key"
+              >
+                +
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div class="transport-spacer"></div>
+          <div class="transport-group">
+            <div class="transport-label">
+              <span>Tempo</span>
+            </div>
+            <div class="transport-stepper">
+              <button
+                type="button"
+                class="transport-step"
+                data-action="tempo-down"
+                aria-label="Lower tempo"
+              >
+                −
+              </button>
+              <div class="transport-readout">
+                <span class="transport-value" id="tempo-value">100</span>
+                <span class="transport-unit">%</span>
+              </div>
+              <button
+                type="button"
+                class="transport-step"
+                data-action="tempo-up"
+                aria-label="Raise tempo"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div class="transport-spacer"></div>
 
         <div class="transport-actions">
           <button

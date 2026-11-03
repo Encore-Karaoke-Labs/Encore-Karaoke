@@ -373,6 +373,7 @@ async function init() {
     "vol-value",
     "mic-value",
     "key-value",
+    "tempo-value",
     "btn-play-pause",
     "play-pause-icon",
     "play-pause-label",
@@ -975,6 +976,13 @@ async function init() {
 
     setText(dom["key-value"], formatSigned(info.transpose));
 
+    if (Number.isFinite(Number(info.tempo))) {
+      setText(
+        dom["tempo-value"],
+        `${Math.round(Number(info.tempo) * 100)}`,
+      );
+    }
+
     const queueLength = Number(info.queueLength) || 0;
     setText(dom["queue-count"], formatCount(queueLength));
     if (queueLength !== lastQueueLength) {
@@ -1088,6 +1096,24 @@ async function init() {
       }
     } catch {
       showToast("Key change unavailable.", true);
+    }
+  }
+
+  async function changeTempo(direction) {
+    if (!window.karaoke?.changeTempo) return;
+    try {
+      const response = await window.karaoke.changeTempo(direction);
+      if (response?.success) {
+        setText(
+          dom["tempo-value"],
+          `${Math.round(response.tempo * 100)}`,
+        );
+        showToast(`Tempo: ${Math.round(response.tempo * 100)}%`);
+      } else {
+        showToast(response?.reason || "Tempo change unavailable.", true);
+      }
+    } catch {
+      showToast("Tempo change unavailable.", true);
     }
   }
 
@@ -1233,6 +1259,12 @@ async function init() {
       case "key-down":
         void changeKey("down");
         break;
+      case "tempo-up":
+        void changeTempo("up");
+        break;
+      case "tempo-down":
+        void changeTempo("down");
+        break;
       case "rhythm-cycle":
         void cycleRhythm();
         break;
@@ -1347,6 +1379,7 @@ async function init() {
   setText(dom["rhythm-value"], "—");
   setText(dom["bgv-value"], "—");
   setText(dom["chorus-value"], "—");
+  setText(dom["tempo-value"], "100");
   setPlaybackStatus("stopped");
   updateRecording(null);
   updateFeatureState(null);
