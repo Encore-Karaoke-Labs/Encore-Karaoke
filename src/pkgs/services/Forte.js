@@ -160,6 +160,7 @@ const pkg = {
     setMultiplexPan: (panValue) => playback.setMultiplexPan(panValue),
     setSkipToFirstNoteOn: (enable) => playback.setSkipToFirstNoteOn(enable),
     setTranspose: (semitones) => playback.setTranspose(semitones),
+    setTempo: (rate) => playback.setTempo(rate),
     setGuideTrackVolume: (volume) => playback.setGuideTrackVolume(volume),
 
     setChannelVolume: (channelNumber, volume) =>
