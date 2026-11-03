@@ -135,9 +135,18 @@ export class ForteSynthesizer {
     this.midiDeviceHandler = null;
 
     this.sequencerOutputRoutes = new WeakMap();
+    this.sequencerExtraRoutes = new WeakMap();
     this.externalDrumReplacement = false;
     this.externalDrumChannel = 9;
+    this.songDrumState = {
+      program: 0,
+      bankMSB: 0,
+      bankLSB: 0,
+      volume: 100,
+      expression: 127,
+    };
     this.onDrumKitChanged = null;
+    this.onMidiOutputChanged = null;
 
     if (!this.state.playback.currentMidiDeviceIds) {
       this.state.playback.currentMidiDeviceIds = [
@@ -257,7 +266,7 @@ export class ForteSynthesizer {
   }
 
   /**
-   * Routes a sequencer to one external MIDI port through a proxy,
+   * Routes a sequencer to one external MIDI port through a proxy.
    *
    * @param {Object} sequencer - SpessaSynth Sequencer instance.
    * @param {Object} output - LibMIDIOutput wrapper from the device handler.
@@ -265,19 +274,45 @@ export class ForteSynthesizer {
    * @returns {boolean} True when the route was established.
    */
   connectSequencerOutput(sequencer, output, portIndex) {
+    return this.connectSequencerOutputAtOffset(
+      sequencer,
+      output,
+      portIndex * 16,
+      null,
+    );
+  }
+
+  /**
+   * Routes a sequencer channel offset to an external output.
+   *
+   * @param {Object} sequencer
+   * @param {Object} output
+   * @param {number} channelOffset
+   * @param {Function|null} transform
+   * @returns {boolean}
+   */
+  connectSequencerOutputAtOffset(sequencer, output, channelOffset, transform) {
     if (!sequencer || !output?.port?.send) return false;
 
     const routes = this.getSequencerOutputRoutes(sequencer);
-    if (routes.has(portIndex)) return true;
+    if (routes.has(channelOffset)) return true;
 
     const proxy = {
       send: (data) => {
-        if (this.shouldFilterExternalDrumMessage(data, portIndex)) return;
+        if (channelOffset === 0) this.recordSongDrumMessage(data);
+
+        const message = transform ? transform(data) : data;
+        if (!message) return;
+
+        if (this.shouldFilterExternalDrumMessage(message, channelOffset)) {
+          return;
+        }
+
         try {
-          output.port.send(data);
+          output.port.send(message);
         } catch (e) {
           logVerboseWarn(
-            `[FORTE SVC] Failed to send MIDI to Port ${portIndex + 1}:`,
+            `[FORTE SVC] Failed to send MIDI on offset ${channelOffset}:`,
             e,
           );
         }
@@ -285,15 +320,19 @@ export class ForteSynthesizer {
     };
 
     try {
-      sequencer.connectMIDIOutput(proxy, portIndex * 16);
-      routes.set(portIndex, proxy);
+      if (sequencer.midiOutputs && sequencer.midiOutputs.size > 0) {
+        sequencer.midiOutputs.set(channelOffset, proxy);
+      } else {
+        sequencer.connectMIDIOutput(proxy, channelOffset);
+      }
+      routes.set(channelOffset, proxy);
       logVerbose(
-        `Connected sequencer to external MIDI Port ${portIndex + 1} (offset ${portIndex * 16}): ${output.name || output.id}`,
+        `Connected sequencer output offset ${channelOffset}: ${output.name || output.id}`,
       );
       return true;
     } catch (e) {
       console.error(
-        `[FORTE SVC] Failed to connect sequencer to Port ${portIndex + 1}:`,
+        `[FORTE SVC] Failed to connect sequencer output offset ${channelOffset}:`,
         e,
       );
       return false;
@@ -307,22 +346,32 @@ export class ForteSynthesizer {
    * @param {number} portIndex
    */
   disconnectSequencerOutput(sequencer, portIndex) {
+    this.disconnectSequencerOutputAtOffset(sequencer, portIndex * 16);
+  }
+
+  /**
+   * Removes one external MIDI route by channel offset.
+   *
+   * @param {Object} sequencer
+   * @param {number} channelOffset
+   */
+  disconnectSequencerOutputAtOffset(sequencer, channelOffset) {
     const routes = this.sequencerOutputRoutes.get(sequencer);
     if (!routes) return;
 
-    const proxy = routes.get(portIndex);
+    const proxy = routes.get(channelOffset);
     if (!proxy) return;
 
     try {
       sequencer.disconnectMIDIOutput(proxy);
     } catch (e) {
       logVerboseWarn(
-        `[FORTE SVC] Failed to disconnect MIDI Port ${portIndex + 1}:`,
+        `[FORTE SVC] Failed to disconnect MIDI offset ${channelOffset}:`,
         e,
       );
     }
 
-    routes.delete(portIndex);
+    routes.delete(channelOffset);
   }
 
   /**
@@ -334,11 +383,97 @@ export class ForteSynthesizer {
     const routes = this.sequencerOutputRoutes.get(sequencer);
     if (!routes) return;
 
-    for (const portIndex of [...routes.keys()]) {
-      this.disconnectSequencerOutput(sequencer, portIndex);
+    for (const offset of [...routes.keys()]) {
+      this.disconnectSequencerOutputAtOffset(sequencer, offset);
     }
 
     this.sequencerOutputRoutes.delete(sequencer);
+  }
+
+  /**
+   * Registers an extra sequencer output offset.
+   *
+   * @param {Object} sequencer
+   * @param {number} channelOffset
+   * @param {Function} transform
+   */
+  registerSequencerExtraRoute(sequencer, channelOffset, transform) {
+    if (!sequencer || !Number.isFinite(channelOffset)) return;
+
+    let specs = this.sequencerExtraRoutes.get(sequencer);
+    if (!specs) {
+      specs = new Map();
+      this.sequencerExtraRoutes.set(sequencer, specs);
+    }
+
+    specs.set(channelOffset, transform);
+    this.connectExtraSequencerRoutes(sequencer, true);
+  }
+
+  /**
+   * Connects all registered extra offsets to the main external output.
+   *
+   * @param {Object} sequencer
+   * @param {boolean} [force=false] - Reconnect existing routes.
+   */
+  connectExtraSequencerRoutes(sequencer, force = false) {
+    const specs = this.sequencerExtraRoutes.get(sequencer);
+    if (!specs || specs.size === 0) return;
+    if (!this.hasExternalMidiDevice() || !this.midiDeviceHandler) return;
+
+    const mainId = this.state.playback.currentMidiDeviceIds?.[0];
+    const output = this.midiDeviceHandler.outputs.get(mainId);
+    if (!output) return;
+
+    for (const [offset, transform] of specs) {
+      if (force) this.disconnectSequencerOutputAtOffset(sequencer, offset);
+      this.connectSequencerOutputAtOffset(sequencer, output, offset, transform);
+    }
+  }
+
+  /**
+   * Records the song's drum program and volume as it streams to an external
+   * device.
+   *
+   * @param {ArrayLike<number>} data
+   */
+  recordSongDrumMessage(data) {
+    if (!data || data.length < 1) return;
+
+    const status = data[0] & 0xf0;
+    const channel = data[0] & 0x0f;
+    if (channel !== this.externalDrumChannel) return;
+
+    if (status === 0xc0 && data.length >= 2) {
+      this.songDrumState.program = data[1];
+      return;
+    }
+
+    if (status !== 0xb0 || data.length < 3) return;
+
+    switch (data[1]) {
+      case 0:
+        this.songDrumState.bankMSB = data[2];
+        break;
+      case 32:
+        this.songDrumState.bankLSB = data[2];
+        break;
+      case 7:
+        this.songDrumState.volume = data[2];
+        break;
+      case 11:
+        this.songDrumState.expression = data[2];
+        break;
+    }
+  }
+
+  /**
+   * Returns a copy of the last known song drum state.
+   *
+   * @returns {Object}
+   */
+  getSongDrumState() {
+    return { ...this.songDrumState };
   }
 
   /**
@@ -359,12 +494,12 @@ export class ForteSynthesizer {
    * because a rhythm is playing on the drum channel.
    *
    * @param {ArrayLike<number>|null} data - Raw MIDI bytes.
-   * @param {number} [portIndex=0]
+   * @param {number} [channelOffset=0]
    * @returns {boolean}
    */
-  shouldFilterExternalDrumMessage(data, portIndex = 0) {
+  shouldFilterExternalDrumMessage(data, channelOffset = 0) {
     if (!this.externalDrumReplacement) return false;
-    if (portIndex !== 0) return false;
+    if (channelOffset !== 0) return false;
     if (!data || data.length < 1) return false;
 
     const status = data[0] & 0xf0;
@@ -372,10 +507,19 @@ export class ForteSynthesizer {
     if (channel !== this.externalDrumChannel) return false;
 
     if (status === 0x80 || status === 0x90 || status === 0xa0) return true;
+    if (status === 0xc0) return true;
 
     if (status === 0xb0 && data.length >= 2) {
       const controller = data[1];
-      return controller === 120 || controller === 121 || controller === 123;
+      return (
+        controller === midiControllers.bankSelect ||
+        controller === midiControllers.bankSelectLSB ||
+        controller === midiControllers.mainVolume ||
+        controller === midiControllers.expression ||
+        controller === 120 ||
+        controller === 121 ||
+        controller === 123
+      );
     }
 
     return false;
@@ -424,6 +568,8 @@ export class ForteSynthesizer {
         this.connectSequencerOutput(sequencer, output, port);
       }
     }
+
+    this.connectExtraSequencerRoutes(sequencer, true);
   }
 
   /**
@@ -540,6 +686,7 @@ export class ForteSynthesizer {
         logVerbose(
           "Switched Main MIDI Output to Internal Synthesizer (disabling external MIDI).",
         );
+        this.onMidiOutputChanged?.();
         this.dispatchUpdate();
         return true;
       }
@@ -565,6 +712,7 @@ export class ForteSynthesizer {
       }
 
       this.initExternalDevicePort(deviceId, 0);
+      this.onMidiOutputChanged?.();
       this.dispatchUpdate();
       return true;
     }
@@ -1110,6 +1258,15 @@ export class ForteSynthesizer {
         port,
       );
       this.sendExternalMidiMessage([0xc0 | portChannel, program], port);
+
+      if (channelNumber === this.externalDrumChannel) {
+        this.songDrumState = {
+          ...this.songDrumState,
+          program,
+          bankMSB,
+          bankLSB,
+        };
+      }
 
       logVerbose(
         `Drum preset switched successfully on channel ${channelNumber + 1}`,
