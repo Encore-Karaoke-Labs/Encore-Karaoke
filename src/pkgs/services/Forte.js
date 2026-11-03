@@ -78,6 +78,7 @@ const pkg = {
 
     synthesizer.onDrumKitChanged = (channelNumber, preset) =>
       rhythm.handleKitChange(channelNumber, preset);
+    synthesizer.onMidiOutputChanged = () => rhythm.handleMidiOutputChanged();
 
     playback = new FortePlayback(
       state,
@@ -181,6 +182,15 @@ const pkg = {
     getRhythmList: () => rhythm.getRhythmList(),
     cycleRhythm: (direction = "right") => rhythm.cycleRhythm(direction),
     setRhythm: (index) => rhythm.setRhythm(index),
+    getActiveDrumChannel: () => rhythm.getActiveDrumChannel(),
+    getActiveDrumPreset: () => rhythm.getActiveDrumPreset(),
+    switchActiveDrumPreset: (drumPreset) => {
+      if (rhythm.getState().rhythmActive) {
+        return rhythm.setActiveDrumPreset(drumPreset);
+      }
+
+      return synthesizer.switchDrumPreset(9, drumPreset);
+    },
 
     getScoringState: () => scoring.getScoringState(),
     getPlaybackState: () => playback.getPlaybackState(),
