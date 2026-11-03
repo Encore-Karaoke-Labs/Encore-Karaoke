@@ -2171,6 +2171,13 @@ void app.whenReady().then(() => {
   );
 
   ipcMain.handle(
+    "karaoke:tempo-change",
+    async (_event: IpcMainInvokeEvent, direction?: "up" | "down") => {
+      return await requestAppView("tempo-change", direction);
+    },
+  );
+
+  ipcMain.handle(
     "karaoke:toggle-chorus",
     async (_event: IpcMainInvokeEvent, enabled?: boolean) => {
       return await requestAppView("toggle-chorus", enabled);

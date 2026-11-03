@@ -40,6 +40,8 @@ contextBridge.exposeInMainWorld("karaoke", {
     ipcRenderer.invoke("karaoke:search-songs", { query, limit }),
   keyChange: (payload = "up") =>
     ipcRenderer.invoke("karaoke:key-change", payload),
+  changeTempo: (direction = "up") =>
+    ipcRenderer.invoke("karaoke:tempo-change", direction),
   toggleChorus: (enabled) =>
     ipcRenderer.invoke("karaoke:toggle-chorus", enabled),
   setGuideMelody: (level = "cycle") =>
