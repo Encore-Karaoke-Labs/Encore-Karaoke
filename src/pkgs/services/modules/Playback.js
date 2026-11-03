@@ -443,6 +443,15 @@ export class FortePlayback {
       this.state.playback.sequencer,
     );
 
+    const playbackMidi =
+      !isCompanion && this.rhythm
+        ? this.rhythm.prepareSong(parsedMidi)
+        : parsedMidi;
+
+    if (!isCompanion && this.rhythm) {
+      this.rhythm.attachSequencer(this.state.playback.sequencer);
+    }
+
     bindSpessaEvent(
       this.state.playback.sequencer.eventHandler,
       "songEnded",
@@ -490,7 +499,7 @@ export class FortePlayback {
       },
     );
 
-    this.state.playback.sequencer.loadNewSongList([parsedMidi]);
+    this.state.playback.sequencer.loadNewSongList([playbackMidi]);
 
     let rawTrackEvents =
       highestLyricScore > 0 ? primaryLyricTrackEvents : parsedMidi.lyrics || [];
@@ -982,8 +991,6 @@ export class FortePlayback {
     } else {
       this.state.playback.smoothedTime += drift * 0.15;
     }
-
-    this.rhythm?.tick(engineTime);
 
     const currentTime = Math.max(
       0,
@@ -1560,6 +1567,7 @@ export class FortePlayback {
       if (this.state.playback.status !== "paused") {
         this.state.playback.sequencer.currentTime = 0;
       }
+      this.rhythm?.beforePlay();
       this.state.playback.sequencer.play();
 
       if (this.state.playback.hasChorus && this.chorusElement) {
