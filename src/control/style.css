@@ -196,6 +196,10 @@ input:focus-visible,
   -webkit-mask-image: url("/assets/img/icons/svg/disc.svg");
   mask-image: url("/assets/img/icons/svg/disc.svg");
 }
+.icon-tempo {
+  -webkit-mask-image: url("/assets/img/icons/svg/speedometer.svg");
+  mask-image: url("/assets/img/icons/svg/speedometer.svg");
+}
 
 .app-shell {
   height: 100%;
