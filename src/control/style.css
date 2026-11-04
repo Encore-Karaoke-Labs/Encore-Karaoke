@@ -1071,43 +1071,6 @@ input:focus-visible,
   background: var(--accent-strong);
 }
 
-/* ==========================================================================
-   Toast
-   ========================================================================== */
-
-.toast {
-  position: fixed;
-  left: 50%;
-  bottom: 18px;
-  z-index: 9999;
-  max-width: min(520px, calc(100vw - 40px));
-  padding: 10px 20px;
-  border: 1px solid var(--accent-line);
-  border-radius: 9px;
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 0.84rem;
-  font-weight: 600;
-  text-align: center;
-  opacity: 0;
-  transform: translate(-50%, 12px);
-  pointer-events: none;
-  transition:
-    opacity 180ms var(--ease-out),
-    transform 180ms var(--ease-out);
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.38);
-}
-
-.toast.show {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
-.toast.error {
-  border-color: var(--danger-line);
-  color: #ffd7d7;
-}
-
 @media (max-width: 1180px) {
   .app-shell {
     gap: 8px;

@@ -377,13 +377,11 @@ async function init() {
     "btn-play-pause",
     "play-pause-icon",
     "play-pause-label",
-    "toast",
   ];
   for (const id of ids) dom[id] = el(id);
 
   let playPauseInFlight = false;
   let recordInFlight = false;
-  let toastTimer = 0;
   let searchTimer = 0;
   let artToken = 0;
   let currentSongKey = "\u0000";
@@ -419,27 +417,11 @@ async function init() {
     total: 0,
   };
 
-  function showToast(message, isError = false) {
-    const toast = dom.toast;
-    if (!toast) return;
-    toast.textContent = message;
-    toast.classList.toggle("error", Boolean(isError));
-    toast.classList.add("show");
-    window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => {
-      toast.classList.remove("show");
-    }, 3000);
-  }
-
   function sendKey(key) {
-    if (!appReady) {
-      showToast("Encore is still loading.", true);
-      return;
-    }
+    if (!appReady) return;
     try {
       window.desktopIntegration?.ipc?.send?.("simulate-key", key);
     } catch {
-      showToast("Key input unavailable.", true);
     }
   }
 
@@ -656,7 +638,6 @@ async function init() {
         );
       } else {
         list.failed = true;
-        showToast("Could not load more songs.", true);
       }
     } finally {
       if (requestId === list.requestId) list.loading = false;
@@ -716,10 +697,7 @@ async function init() {
    * Song reservation.
    */
   async function reserveSong(song) {
-    if (!appReady || !window.karaoke?.playOrReserveSong) {
-      showToast("Song reservation is unavailable.", true);
-      return false;
-    }
+    if (!appReady || !window.karaoke?.playOrReserveSong) return false;
 
     const label =
       typeof song === "string" ? song : song?.title || song?.code || "song";
@@ -727,20 +705,13 @@ async function init() {
     try {
       const response = await window.karaoke.playOrReserveSong(song);
       if (response?.success) {
-        showToast(
-          response.action === "queued"
-            ? `Queued: ${label}`
-            : `Playing: ${label}`,
-        );
         window.setTimeout(() => {
           void refreshPlayback();
           void refreshQueue();
         }, 250);
         return true;
       }
-      showToast(response?.reason || "Could not reserve that song.", true);
     } catch {
-      showToast("Reservation failed.", true);
     }
     return false;
   }
@@ -1012,7 +983,6 @@ async function init() {
       consecutiveFailures++;
       if (consecutiveFailures >= 3 && !offlineNotified) {
         offlineNotified = true;
-        showToast("Waiting for the Encore app…", true);
       }
     } finally {
       pollInFlight = false;
@@ -1054,12 +1024,9 @@ async function init() {
       const response = await window.karaoke.setGuideMelody("cycle");
       if (response?.success) {
         setText(dom["melody-value"], displayCase(response.label || "—"));
-        showToast(`Guide melody: ${displayCase(response.label || "—")}`);
       } else {
-        showToast(response?.reason || "Guide melody unavailable.", true);
       }
     } catch {
-      showToast("Guide melody unavailable.", true);
     }
   }
 
@@ -1068,9 +1035,7 @@ async function init() {
     try {
       const response = await window.karaoke.adjustVolume(direction);
       if (response?.success) setVolumeUI(response.volume);
-      else showToast(response?.reason || "Volume unavailable.", true);
     } catch {
-      showToast("Volume unavailable.", true);
     }
   }
 
@@ -1079,9 +1044,7 @@ async function init() {
     try {
       const response = await window.karaoke.adjustMicVolume(direction);
       if (response?.success) setMicUI(response.micVolume);
-      else showToast(response?.reason || "Mic volume unavailable.", true);
     } catch {
-      showToast("Mic volume unavailable.", true);
     }
   }
 
@@ -1091,11 +1054,8 @@ async function init() {
       const response = await window.karaoke.keyChange(direction);
       if (response?.success) {
         setText(dom["key-value"], formatSigned(response.transpose));
-      } else {
-        showToast(response?.reason || "Key change unavailable.", true);
       }
     } catch {
-      showToast("Key change unavailable.", true);
     }
   }
 
@@ -1108,12 +1068,8 @@ async function init() {
           dom["tempo-value"],
           `${Math.round(response.tempo * 100)}`,
         );
-        showToast(`Tempo: ${Math.round(response.tempo * 100)}%`);
-      } else {
-        showToast(response?.reason || "Tempo change unavailable.", true);
       }
     } catch {
-      showToast("Tempo change unavailable.", true);
     }
   }
 
@@ -1126,14 +1082,8 @@ async function init() {
           dom["rhythm-value"],
           displayCase(response.rhythmName || "Original Drums"),
         );
-        showToast(
-          `Rhythm: ${displayCase(response.rhythmName || "Original Drums")}`,
-        );
-      } else {
-        showToast(response?.reason || "Rhythm unavailable.", true);
       }
     } catch {
-      showToast("Rhythm unavailable.", true);
     }
   }
 
@@ -1143,14 +1093,8 @@ async function init() {
       const response = await window.karaoke.cycleBgv(1);
       if (response?.success) {
         setText(dom["bgv-value"], displayCase(response.category || "Auto"));
-        showToast(
-          `Background video: ${displayCase(response.category || "Auto")}`,
-        );
-      } else {
-        showToast(response?.reason || "Background video unavailable.", true);
       }
     } catch {
-      showToast("Background video unavailable.", true);
     }
   }
 
@@ -1165,12 +1109,8 @@ async function init() {
           enabled ? "true" : "false",
         );
         setText(dom["chorus-value"], enabled ? "On" : "Off");
-        showToast(`Chorus ${enabled ? "on" : "off"}`);
-      } else {
-        showToast(response?.reason || "Chorus unavailable.", true);
       }
     } catch {
-      showToast("Chorus unavailable.", true);
     }
   }
 
@@ -1181,14 +1121,8 @@ async function init() {
       const response = await window.karaoke.toggleRecording();
       if (response?.success) {
         updateRecording(response);
-        showToast(
-          response.isRecording ? "Recording started." : "Recording stopped.",
-        );
-      } else {
-        showToast(response?.reason || "Recording unavailable.", true);
       }
     } catch {
-      showToast("Recording unavailable.", true);
     } finally {
       recordInFlight = false;
     }
@@ -1203,7 +1137,7 @@ async function init() {
         if (response?.status) setPlaybackStatus(response.status);
         window.setTimeout(() => void refreshPlayback(), 200);
       })
-      .catch(() => showToast("Playback control unavailable.", true))
+      .catch(() => {})
       .finally(() => {
         playPauseInFlight = false;
       });
@@ -1211,7 +1145,6 @@ async function init() {
 
   function stopPlayback() {
     sendKey("Escape");
-    showToast("Playback stopped.");
     window.setTimeout(() => void refreshPlayback(), 350);
   }
 
