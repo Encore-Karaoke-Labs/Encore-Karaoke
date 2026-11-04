@@ -710,6 +710,10 @@ async function init() {
     if (!frame) return;
     frame.replaceChildren();
     frame.hidden = true;
+    const stage = frame.parentElement;
+    if (!stage) return;
+    const backdrop = stage.querySelector(".art-backdrop");
+    if (backdrop) backdrop.remove();
   }
 
   function cacheArtwork(key, value) {
@@ -724,6 +728,19 @@ async function init() {
     const frame = dom["artwork-frame"];
     if (!frame || token !== artToken) return;
 
+    const stage = frame.parentElement;
+    if (!stage) return;
+
+    const existingBackdrop = stage.querySelector(".art-backdrop");
+    if (existingBackdrop) existingBackdrop.remove();
+
+    const backdrop = document.createElement("img");
+    backdrop.className = "art-backdrop";
+    backdrop.alt = "";
+    backdrop.setAttribute("aria-hidden", "true");
+    backdrop.src = imageUrl;
+    stage.insertBefore(backdrop, stage.firstChild);
+
     const image = document.createElement("img");
     image.className = "art-image";
     image.alt = `${song?.title || "Song"} cover`;
@@ -732,6 +749,7 @@ async function init() {
       () => {
         if (token !== artToken) return;
         frame.hidden = false;
+        image.classList.add("art-entering");
       },
       { once: true },
     );
