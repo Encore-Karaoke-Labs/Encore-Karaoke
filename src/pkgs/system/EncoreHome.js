@@ -475,6 +475,7 @@ class EncoreController {
           volume: pb?.volume ?? this.state.volume,
           micVolume: vocalState.micMonitorVolume ?? 1,
           transpose: pb?.transpose ?? 0,
+          tempo: pb?.tempo ?? 1,
           multiplexPan: pb?.multiplexPan ?? 0,
           score: pb?.score?.finalScore ?? 0,
           isDuet: Boolean(this.state.isDuet),
