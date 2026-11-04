@@ -936,10 +936,7 @@ async function init() {
     setText(dom["key-value"], formatSigned(info.transpose));
 
     if (Number.isFinite(Number(info.tempo))) {
-      setText(
-        dom["tempo-value"],
-        `${Math.round(Number(info.tempo) * 100)}`,
-      );
+      setText(dom["tempo-value"], Number(info.tempo).toFixed(1));
     }
 
     const queueLength = Number(info.queueLength) || 0;
@@ -1054,7 +1051,7 @@ async function init() {
       if (response?.success) {
         setText(
           dom["tempo-value"],
-          `${Math.round(response.tempo * 100)}`,
+          response.tempo.toFixed(1),
         );
       }
     } catch {
@@ -1300,7 +1297,7 @@ async function init() {
   setText(dom["rhythm-value"], "—");
   setText(dom["bgv-value"], "—");
   setText(dom["chorus-value"], "—");
-  setText(dom["tempo-value"], "100");
+  setText(dom["tempo-value"], "1.0");
   setPlaybackStatus("stopped");
   updateRecording(null);
   updateFeatureState(null);
