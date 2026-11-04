@@ -1291,11 +1291,12 @@ export default class InputManager {
           Math.min(2, Number((cur + change).toFixed(1))),
         );
         this.ctx.services.Forte.setTempo(next);
-        this.ctx.modules.infoBar.showTemp(
-          "TEMPO",
-          `${(next * 100).toFixed(0)}%`,
-          3000,
-        );
+
+        const pct = Math.round(next * 100);
+        const proportion = (next - 0.5) / 1.5;
+        const width = proportion * 100;
+        const html = `<div class="tempo-display"><div class="tempo-min">50%</div><div class="tempo-slider-container"><div class="tempo-slider-fill" style="width: ${width}%"></div></div><div class="tempo-max">200%</div><span class="tempo-value">${pct}%</span></div>`;
+        this.ctx.modules.infoBar.showTemp("TEMPO", html, 3000);
       } else {
         const change = dir === "up" ? 1 : -1;
         const cur = this.ctx.services.Forte.getPlaybackState().transpose || 0;

@@ -1130,6 +1130,50 @@
   color: #f7b733;
 }
 
+.tempo-display {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 1rem;
+}
+
+.tempo-min,
+.tempo-max {
+  font-size: 1.2rem;
+  font-weight: 700;
+  opacity: 0.6;
+  width: 40px;
+  text-align: center;
+}
+
+.tempo-slider-container {
+  flex-grow: 1;
+  height: 12px;
+  background-color: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.tempo-slider-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background-color: #f7b733;
+  border-radius: 6px;
+  transition: width 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.tempo-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  width: 60px;
+  text-align: right;
+  color: #f7b733;
+}
+
 .info-bar-content .volume-display {
   display: flex;
   align-items: center;
