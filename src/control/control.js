@@ -101,18 +101,6 @@ function applyFormatColor(badge, song) {
   badge.style.backgroundColor = getFormatColor(song);
 }
 
-function displayCase(value) {
-  if (value == null) return "";
-  const text = String(value).trim();
-  if (!text || text === "—" || text !== text.toUpperCase()) return text;
-  return text
-    .toLowerCase()
-    .replaceAll(
-      /(^|[\s/-])([a-z])/g,
-      (_match, prefix, letter) => `${prefix}${letter.toUpperCase()}`,
-    );
-}
-
 function songCacheKey(song) {
   return `${song?.code || ""}|${song?.title || ""}|${song?.artist || ""}`;
 }
@@ -875,19 +863,19 @@ async function init() {
 
     setText(
       dom["melody-value"],
-      availability.guideAvailable ? displayCase(info?.guideMelody || "—") : "—",
+      availability.guideAvailable ? info?.guideMelody || "—" : "—",
     );
     setText(
       dom["rhythm-value"],
-      availability.rhythmAvailable
-        ? displayCase(info?.rhythmName || "Original Drums")
-        : "—",
+        availability.rhythmAvailable
+          ? info?.rhythmName || "Original Drums"
+          : "—",
     );
     setText(
       dom["bgv-value"],
-      availability.bgvAvailable
-        ? displayCase(info?.bgvCategory || "Auto")
-        : "—",
+        availability.bgvAvailable
+          ? info?.bgvCategory || "Auto"
+          : "—",
     );
 
     const chorusEnabled =
@@ -1023,7 +1011,7 @@ async function init() {
     try {
       const response = await window.karaoke.setGuideMelody("cycle");
       if (response?.success) {
-        setText(dom["melody-value"], displayCase(response.label || "—"));
+        setText(dom["melody-value"], response.label || "—");
       } else {
       }
     } catch {
@@ -1080,7 +1068,7 @@ async function init() {
       if (response?.success) {
         setText(
           dom["rhythm-value"],
-          displayCase(response.rhythmName || "Original Drums"),
+          response.rhythmName || "Original Drums",
         );
       }
     } catch {
@@ -1092,7 +1080,7 @@ async function init() {
     try {
       const response = await window.karaoke.cycleBgv(1);
       if (response?.success) {
-        setText(dom["bgv-value"], displayCase(response.category || "Auto"));
+        setText(dom["bgv-value"], response.category || "Auto");
       }
     } catch {
     }
