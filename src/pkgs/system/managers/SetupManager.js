@@ -435,7 +435,7 @@ export default class SetupManager {
                 label: "Refresh Server List",
                 type: "action",
                 action: async () => {
-                  this.showToast("REFRESHING...", "info");
+                  this.showToast("Refreshing...", "info");
                   this.updateServers =
                     await window.desktopIntegration.ipc.invoke(
                       "get-update-servers",
@@ -536,14 +536,14 @@ export default class SetupManager {
                 label: "Rescan MIDI Ports",
                 type: "action",
                 action: async () => {
-                  this.showToast("SCANNING FOR MIDI DEVICES...", "info");
+                  this.showToast("Scanning for MIDI devices...", "info");
                   if (this.ctx.services.Forte.getMidiOutputDevices) {
                     this.midiOutputDevices =
                       await this.ctx.services.Forte.getMidiOutputDevices();
                   }
                   this.buildSettingsMap();
                   this.renderView();
-                  this.showToast("DEVICE LIST UPDATED", "success");
+                  this.showToast("Device list updated", "success");
                 },
               },
               {
@@ -598,7 +598,7 @@ export default class SetupManager {
                   this.ctx.services.Forte.playSfx(
                     "/assets/audio/Uta wa I Love You (I Sing I Love You) [Encore Karaoke Jingle].mid",
                   );
-                  this.showToast("PLAYING TEST SOUND...", "info");
+                  this.showToast("Playing test sound...", "info");
                 },
               },
             ],
@@ -652,24 +652,24 @@ export default class SetupManager {
                       );
                       soundFontUrl = url.href;
                     } else {
-                      this.showToast("PLEASE SET A CUSTOM PATH BELOW", "info");
+                      this.showToast("Please set a custom path below", "info");
                       shouldLoad = false;
                     }
                   }
 
                   if (shouldLoad) {
-                    this.showToast("LOADING SOUNDFONT...", "info");
+                    this.showToast("Loading soundfont...", "info");
                     try {
                       const result =
                         await this.ctx.services.Forte.loadSoundFont(
                           soundFontUrl,
                         );
                       if (result != false) {
-                        this.showToast("LOADED SUCCESSFULLY", "success");
+                        this.showToast("Loaded successfully", "success");
                       }
                     } catch (err) {
                       console.error("Soundfont change failed", err);
-                      this.showToast("FAILED TO LOAD SOUNDFONT", "error");
+                      this.showToast("Failed to load soundfont", "error");
                     }
                   }
                   this.renderView();
@@ -705,17 +705,17 @@ export default class SetupManager {
                     );
                     window.config.setItem("audioConfig.useLibraryFont", false);
 
-                    this.showToast("LOADING CUSTOM SOUNDFONT...", "info");
+                     this.showToast("Loading custom soundfont...", "info");
 
                     const url = await NetworkingUtility.getFileLink(filePath);
 
                     try {
                       await this.ctx.services.Forte.loadSoundFont(url.href);
-                      this.showToast("LOADED SUCCESSFULLY", "success");
+                      this.showToast("Loaded successfully", "success");
                       this.renderView();
                     } catch (err) {
                       console.error("Failed to load custom soundfont:", err);
-                      this.showToast("FAILED TO LOAD SOUNDFONT", "error");
+                      this.showToast("Failed to load soundfont", "error");
                     }
                   }
                 },
@@ -1073,8 +1073,8 @@ export default class SetupManager {
                   "Text greeting shown while idle. Press Enter for a new line. Leave it blank to hide it.",
                 placeholder: "Minahal ang Di Mahal Videoke\n0917 123 4567",
                 footerHint: "CTRL+ENTER: Save | ESC: Cancel",
-                saveToast: "GREETING SAVED",
-                clearToast: "GREETING HIDDEN",
+                saveToast: "Greeting saved",
+                clearToast: "Greeting hidden",
                 get: () => this.ctx.config.idleGreeting || "",
                 set: (v) => {
                   const value = String(v ?? "")
@@ -1221,7 +1221,7 @@ export default class SetupManager {
                         }),
                       );
                     } catch (e) {
-                      this.showToast("FAILED TO LOAD LICENSES", "error");
+                      this.showToast("Failed to load licenses", "error");
                       return;
                     }
                   }
@@ -1353,7 +1353,7 @@ export default class SetupManager {
         if (song) {
           this.launchLyricPreview(song);
         } else {
-          this.showToast("SONG NOT FOUND", "error");
+          this.showToast("Song not found", "error");
         }
       } else if (e.key === "Escape") {
         this.setupState.lyricPickerInput = "";
@@ -1632,7 +1632,7 @@ export default class SetupManager {
     if (showOverlay) {
       this.setupState.buildingLibrary = false;
       this.renderView();
-      if (!success) this.showToast("FAILED TO BUILD SONG LIST", "error");
+      if (!success) this.showToast("Failed to build song list", "error");
     }
   }
 
@@ -1674,11 +1674,11 @@ export default class SetupManager {
       !this.updateServers ||
       this.updateServers.length === 0
     ) {
-      this.showToast("NO VALID SERVERS FOUND", "error");
+      this.showToast("No valid servers found", "error");
       return;
     }
     if (!this.ctx.config.libraryPath) {
-      this.showToast("PLEASE SET LIBRARY PATH FIRST", "error");
+      this.showToast("Please set library path first", "error");
       return;
     }
 
@@ -1754,15 +1754,15 @@ export default class SetupManager {
       });
       this.setupState.syncing = false;
       if (res.success) {
-        this.showToast("NETWORK SYNC COMPLETE", "success");
+        this.showToast("Network sync complete", "success");
         await this.triggerLibraryBuild(true);
       } else {
-        this.showToast("SYNC FAILED: " + res.error, "error");
+        this.showToast("Sync failed: " + res.error, "error");
         this.renderView();
       }
     } catch (error) {
       this.setupState.syncing = false;
-      this.showToast("SYNC CRASHED: " + error.message, "error");
+      this.showToast("Sync crashed: " + error.message, "error");
     } finally {
       if (ipc.off) ipc.off("sync-progress", this.boundSyncProgress);
       else if (ipc.removeListener)
@@ -2134,7 +2134,7 @@ export default class SetupManager {
         this.startCalibrationPlayback();
       })
       .catch((e) => {
-        this.showToast("FAILED TO PROCESS RECORDING", "error");
+        this.showToast("Failed to process recording", "error");
         this.exitManualCalibration();
       });
   }
@@ -2302,7 +2302,7 @@ export default class SetupManager {
     this.ctx.config.audioConfig.micLatency = val;
     window.config.setItem("audioConfig.micLatency", val);
     this.ctx.services.Forte.setLatency(val);
-    this.showToast("CALIBRATION SAVED", "success");
+    this.showToast("Calibration saved", "success");
     this.setupState.manualCalib.active = false;
     this.exitManualCalibration();
   }
@@ -2318,7 +2318,7 @@ export default class SetupManager {
           this.showToast("Please change your default PIN in User Security.");
         }
       } else {
-        this.showToast("INCORRECT PIN", "error");
+        this.showToast("Incorrect PIN", "error");
         this.setupState.authInput = "";
         this.renderView();
       }
@@ -2328,7 +2328,7 @@ export default class SetupManager {
         if (isValid) this.setupState.pinChangeStep = 1;
         else {
           this.setupState.pinChangeStep = 0;
-          this.showToast("AUTHORIZATION FAILED", "error");
+          this.showToast("Authorization failed", "error");
           this.transitionTo("dashboard");
           this.setupState.authInput = "";
           this.setupState.isVerifying = false;
@@ -2350,9 +2350,9 @@ export default class SetupManager {
             this.ctx.config.security ??= {};
             this.ctx.config.security.pinData = newPinData;
             window.config.setItem("security.pinData", newPinData);
-            this.showToast("PIN UPDATED", "success");
-          } else this.showToast("HASHING FAILED", "error");
-        } else this.showToast("PIN MISMATCH", "error");
+            this.showToast("PIN updated", "success");
+          } else this.showToast("Hashing failed", "error");
+        } else this.showToast("PIN mismatch", "error");
 
         this.transitionTo("dashboard", { authInput: "" });
       }
@@ -2380,29 +2380,29 @@ export default class SetupManager {
   }
 
   async handleLibraryScan() {
-    this.showToast("SCANNING DRIVES...", "info");
+    this.showToast("Scanning drives...", "info");
     const foundLibs = await this.ctx.services.FsSvc.findEncoreLibraries();
     if (foundLibs.length === 0) {
-      this.showToast("NO LIBRARIES FOUND", "error");
+      this.showToast("No libraries found", "error");
       return;
     }
     const newLib = foundLibs[0];
     this.ctx.config.libraryPath = newLib.path;
     this.currentManifest = newLib.manifest;
     window.config.setItem("libraryPath", newLib.path);
-    this.showToast(`LIBRARY SET TO: ${newLib.manifest.title}`, "success");
+    this.showToast(`Library set to: ${newLib.manifest.title}`, "success");
     this.buildSettingsMap();
     await this.triggerLibraryBuild(true);
   }
 
   async startVideoPreview() {
     if (!this.ctx.state.songList || this.ctx.state.songList.length === 0) {
-      this.showToast("LIBRARY IS STILL LOADING... PLEASE WAIT", "error");
+      this.showToast("Library is still loading... please wait", "error");
       return;
     }
     const mtvSong = this.ctx.state.songList.find((s) => s.videoPath);
     if (!mtvSong) {
-      this.showToast("NO MV SONGS FOUND IN LIBRARY", "error");
+      this.showToast("No MV songs found in library", "error");
       return;
     }
 
@@ -2410,7 +2410,7 @@ export default class SetupManager {
     this.renderView();
 
     const audioUrl = await NetworkingUtility.getFileLink(mtvSong.path);
-    this.showToast("LOADING TRACK...", "info");
+    this.showToast("Loading track...", "info");
     await this.ctx.services.Forte.loadTrack(audioUrl.href);
 
     const videoUrl = await NetworkingUtility.getFileLink(mtvSong.videoPath);
@@ -2903,7 +2903,7 @@ export default class SetupManager {
     this.setupState.textEditValue = "";
     this.textEditInput = null;
     this.showToast(
-      value ? item.saveToast || "SAVED" : item.clearToast || "CLEARED",
+      value ? item.saveToast || "Saved" : item.clearToast || "Cleared",
       "success",
     );
     this.renderView();
