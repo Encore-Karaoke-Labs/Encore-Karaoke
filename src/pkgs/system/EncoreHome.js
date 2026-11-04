@@ -665,10 +665,9 @@ class EncoreController {
         next = Math.max(0.5, Math.min(2, Number(next.toFixed(1))));
         Forte.setTempo(next);
 
-        const pct = Math.round(next * 100);
         const proportion = (next - 0.5) / 1.5;
         const width = proportion * 100;
-        const html = `<div class="tempo-display"><div class="tempo-min">50%</div><div class="tempo-slider-container"><div class="tempo-slider-fill" style="width: ${width}%"></div></div><div class="tempo-max">200%</div><span class="tempo-value">${pct}%</span></div>`;
+        const html = `<div class="tempo-display"><div class="tempo-min">0.5x</div><div class="tempo-slider-container"><div class="tempo-slider-fill" style="width: ${width}%"></div></div><div class="tempo-max">2.0x</div><span class="tempo-value">${next.toFixed(1)}x</span></div>`;
         this.infoBar.showTemp("TEMPO", html, 3000);
 
         return { success: true, tempo: next };
