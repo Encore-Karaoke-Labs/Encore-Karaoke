@@ -976,6 +976,9 @@ class EncoreController {
     const savedChain = this.config.audioConfig?.vocalChain || [];
     await this.services.Forte.loadVocalChain(savedChain);
 
+    const savedMusicChain = this.config.audioConfig?.musicChain || [];
+    await this.services.Forte.loadMusicChain?.(savedMusicChain);
+
     this.state.systemFonts = ["Radio Canada"];
     try {
       if ("queryLocalFonts" in window) {
