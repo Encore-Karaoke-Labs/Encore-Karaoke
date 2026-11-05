@@ -57,11 +57,11 @@ export class ForteAudioCore {
         this.context.currentTime,
       );
 
-      this.masterGain.connect(this.state.effects.musicChainInput);
       this.state.effects.musicChainInput.connect(
         this.state.effects.musicChainOutput,
       );
-      this.state.effects.musicChainOutput.connect(this.masterCompressor);
+      this.state.effects.musicChainOutput.connect(this.masterGain);
+      this.masterGain.connect(this.masterCompressor);
       this.masterCompressor.connect(this.context.destination);
 
       this.sfxGain.connect(this.context.destination);
@@ -103,7 +103,9 @@ export class ForteAudioCore {
       this.state.effects.chorusPitchNode.connect(
         this.state.playback.chorusGain,
       );
-      this.state.playback.chorusGain.connect(this.masterGain);
+      this.state.playback.chorusGain.connect(
+        this.state.effects.musicChainInput,
+      );
 
       this.state.effects.micMonitorNode.parameters.get("volume").value =
         this.config.audioConfig?.micMonitorVolume ?? 1.0;
@@ -122,7 +124,7 @@ export class ForteAudioCore {
       );
 
       this.state.playback.midiGain = this.context.createGain();
-      this.state.playback.midiGain.connect(this.masterGain);
+      this.state.playback.midiGain.connect(this.state.effects.musicChainInput);
 
       this.state.scoring.musicAnalyser = this.context.createAnalyser();
       this.state.scoring.musicAnalyser.fftSize = 2048;
