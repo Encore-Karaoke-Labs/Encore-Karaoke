@@ -8,6 +8,7 @@ import {
   globalShortcut,
   ipcMain,
   powerSaveBlocker,
+  screen,
   session,
   shell,
   WebContentsView,
@@ -39,6 +40,7 @@ import { io as ioClient, type Socket as ClientSocket } from "socket.io-client";
 import si from "systeminformation";
 import youtubesearchapi from "youtube-search-api";
 import Config from "./config-manager";
+import { parsePlatformHints } from "./platform-hints";
 
 // Types & Interfaces
 export interface VersionInformation {
@@ -268,6 +270,8 @@ const PROTOCOL_PREFIX = "encore";
 const DISCORD_CLIENT_ID = "1408795513397973052";
 const DISCORD_PROTOCOL_PREFIX = `discord-${DISCORD_CLIENT_ID}`;
 
+const platformHints = parsePlatformHints(process.argv);
+
 function registerProtocols(): void {
   const protocols = [PROTOCOL_PREFIX, DISCORD_PROTOCOL_PREFIX];
 
@@ -284,7 +288,9 @@ function registerProtocols(): void {
   });
 }
 
-registerProtocols();
+if (!platformHints.has("no-protocols")) {
+  registerProtocols();
+}
 
 const krRegex = /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/; // Hangul (Korean)
 const kanaRegex = /[\u3040-\u30ff\u31f0-\u31ff]/; // Hiragana & Katakana (Japanese)
@@ -642,6 +648,7 @@ function extractDeepLink(argv: readonly string[]): string | null {
 }
 
 function handleDeepLink(url: string | null | undefined): void {
+  if (platformHints.has("no-deep-links")) return;
   if (!url || !url.startsWith("encore://")) return;
   logger.info("DEEPLINK", `Received deep link: ${url}`);
 
@@ -705,12 +712,12 @@ if (initialDeepLink) {
 // Initialization
 const versionInformation: VersionInformation = {
   number: "1.16.0",
-  channel: "BETA",
+  channel: platformHints.embedded ? "EMBEDDED" : "BETA",
   codename: "Pisces",
 };
 
-const kioskEnabled = process.argv.includes("--kiosk");
-const isLowLatency = process.argv.includes("--low-latency");
+const kioskEnabled = platformHints.kiosk;
+const isLowLatency = platformHints.lowLatency;
 const isDev = process.argv.includes("--dev");
 
 let PORT = 0;
@@ -1490,6 +1497,7 @@ const reduceZoom = (): number => {
 };
 
 function popOutAppView(): void {
+  if (kioskEnabled || platformHints.has("no-popout")) return;
   if (isPoppedOut || !mainWindow || !appView) return;
 
   const targetAppView = appView;
@@ -1683,10 +1691,17 @@ const createWindow = (): void => {
     Config.getItem("fullscreenEnabled"),
   );
 
+  const initialBounds = platformHints.embedded
+    ? screen.getPrimaryDisplay().bounds
+    : { width: 1280, height: 774 };
+
   const win = new BrowserWindow({
     title: `Encore Karaoke ${versionInformation.channel} ${versionInformation.number} (${versionInformation.codename})`,
-    width: 1280,
-    height: 774,
+    ...initialBounds,
+    frame: !platformHints.embedded,
+    resizable: !platformHints.embedded,
+    movable: !platformHints.embedded,
+    enableLargerThanScreen: platformHints.embedded,
     ...(process.platform === "win32"
       ? { icon: path.join(__dirname, "resources/icon.ico") }
       : process.platform === "linux"
@@ -1949,10 +1964,14 @@ void app.whenReady().then(() => {
     logger.debug("GPU", app.getGPUFeatureStatus());
   }, 2000);
 
-  setupDiscordRPC();
-  discordClient
-    .login()
-    .catch(() => logger.error("DISCORD", "Initial login failed"));
+  if (platformHints.has("no-discord")) {
+    logger.info("DISCORD", "Rich Presence disabled by platform hints.");
+  } else {
+    setupDiscordRPC();
+    discordClient
+      .login()
+      .catch(() => logger.error("DISCORD", "Initial login failed"));
+  }
 
   const CLOUD_URL = "https://olive.nxw.pw:8443";
   const RELAY_URL = "https://enmoku.encorekaraoke.org/1.11.0/";
@@ -2325,6 +2344,7 @@ void app.whenReady().then(() => {
   });
 
   ipcMain.handle("get-version", () => versionInformation);
+  ipcMain.handle("get-platform-hints", () => platformHints.toJSON());
   ipcMain.handle("get-kiosk-enabled", () => kioskEnabled);
   ipcMain.handle("deep-link-get-initial", () => {
     const url = pendingDeepLinkUrl ?? pendingDeepLinks.shift() ?? null;
@@ -2767,6 +2787,10 @@ void app.whenReady().then(() => {
   ipcMain.handle(
     "libmgr-export-songbook",
     async (event: IpcMainInvokeEvent, payload: SongbookExportPayload) => {
+      if (platformHints.has("no-library-manager")) {
+        return { success: false, reason: "Disabled by platform hints." };
+      }
+
       const win = BrowserWindow.fromWebContents(event.sender);
       if (!win) return { success: false, reason: "Window not found." };
       const { folderPath, libraryTitle } = payload;
@@ -3366,6 +3390,11 @@ void app.whenReady().then(() => {
   );
 
   ipcMain.on("open-library-manager", () => {
+    if (platformHints.has("no-library-manager")) {
+      logger.info("SYSTEM", "Library Manager disabled by platform hints.");
+      return;
+    }
+
     if (libraryManagerWin) {
       libraryManagerWin.focus();
       return;
