@@ -55,7 +55,7 @@
   - Supports high-quality MVs (Music Videos) (`.mp4`, `.mkv`, `.webm`, `.avi`).
   - Full support for **Multiplex tracks** (pan left/right to toggle the guide vocal).
 - **Native YouTube Integration**
-  - Don't have a song in your local library? Search YouTube directly from the player or your phone and queue it up instantly.
+  - Don't have a song in your library? Search YouTube directly from the player or your phone and queue it up instantly.
 
 ### Recording, Streaming & Creator Tools
 
