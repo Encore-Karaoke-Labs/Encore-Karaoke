@@ -717,6 +717,7 @@ const versionInformation: VersionInformation = {
 };
 
 const kioskEnabled = platformHints.kiosk;
+const kioskMode = platformHints.kioskMode;
 const isLowLatency = platformHints.lowLatency;
 const isDev = process.argv.includes("--dev");
 
@@ -1702,6 +1703,7 @@ const createWindow = (): void => {
     resizable: !platformHints.embedded,
     movable: !platformHints.embedded,
     enableLargerThanScreen: platformHints.embedded,
+    kiosk: kioskEnabled,
     ...(process.platform === "win32"
       ? { icon: path.join(__dirname, "resources/icon.ico") }
       : process.platform === "linux"
@@ -1757,21 +1759,21 @@ const createWindow = (): void => {
 
   updateMainWindowBounds = (): void => {
     if (!win || win.isDestroyed()) return;
-    const bounds = win.getContentBounds();
-    if (bounds.width === 0 || bounds.height === 0) return;
-
     const isFullScreen = win.isFullScreen() || win.isKiosk();
     const currentActiveView = isPoppedOut ? controlView : localAppView;
     if (!currentActiveView) return;
 
     if (isFullScreen) {
+      const displayBounds = screen.getDisplayMatching(win.getBounds()).bounds;
       currentActiveView.setBounds({
         x: 0,
         y: 0,
-        width: bounds.width,
-        height: bounds.height,
+        width: displayBounds.width,
+        height: displayBounds.height,
       });
     } else {
+      const bounds = win.getContentBounds();
+      if (bounds.width === 0 || bounds.height === 0) return;
       currentActiveView.setBounds({
         x: 0,
         y: titleBarHeight,
@@ -1854,7 +1856,11 @@ const createWindow = (): void => {
   if (kioskEnabled) {
     win.setKiosk(true);
     win.setAlwaysOnTop(true);
-    if (process.platform === "win32") {
+
+    updateMainWindowBounds();
+    setTimeout(updateMainWindowBounds, 50);
+
+    if (kioskMode && process.platform === "win32") {
       exec("taskkill /f /im explorer.exe", (error) => {
         if (error) {
           logger.error(
@@ -4008,7 +4014,7 @@ void app.whenReady().then(() => {
 app.on("before-quit", () => {
   isAppQuitting = true;
   clearInterval(overlayHeartbeat);
-  if (kioskEnabled && process.platform === "win32") {
+  if (kioskMode && process.platform === "win32") {
     exec("explorer.exe", (error) => {
       if (error) {
         logger.error(
