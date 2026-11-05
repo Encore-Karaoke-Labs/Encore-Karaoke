@@ -130,7 +130,7 @@ export class ForteSFX {
     gain.gain.linearRampToValueAtTime(targetVolume, now + targetFade);
 
     source.connect(gain);
-    gain.connect(this.audioCore.masterGain);
+    gain.connect(this.state.effects.musicChainInput);
     source.start();
 
     this.bgmSourceNode = source;
@@ -452,7 +452,7 @@ export class ForteSFX {
     this.state.playback.remoteAudioElements.set(peerId, audioEl);
 
     const source = this.audioCore.context.createMediaStreamSource(stream);
-    source.connect(this.audioCore.masterGain);
+    source.connect(this.state.effects.musicChainInput);
 
     this.state.playback.remoteSources.set(peerId, source);
     logVerbose(`Started playing remote stream for ${peerId}`);
