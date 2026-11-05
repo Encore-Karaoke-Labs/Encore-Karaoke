@@ -123,6 +123,14 @@ contextBridge.exposeInMainWorld("version", {
   getVersionInformation: async () => ipcRenderer.invoke("get-version"),
 });
 
+contextBridge.exposeInMainWorld("platformHints", {
+  get: async () => ipcRenderer.invoke("get-platform-hints"),
+  has: async (hint) => {
+    const state = await ipcRenderer.invoke("get-platform-hints");
+    return Array.isArray(state?.hints) && state.hints.includes(hint);
+  },
+});
+
 contextBridge.exposeInMainWorld("kiosk", {
   isEnabled: async () => ipcRenderer.invoke("get-kiosk-enabled"),
 });
