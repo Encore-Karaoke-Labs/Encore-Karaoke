@@ -37,6 +37,9 @@ export class ForteAudioCore {
       this.masterGain = this.context.createGain();
       this.sfxGain = this.context.createGain();
 
+      // Instrumental effects bus
+      this.state.effects.musicChainOutput = this.context.createGain();
+
       this.masterCompressor = this.context.createDynamicsCompressor();
       this.masterCompressor.threshold.setValueAtTime(
         -24,
@@ -53,7 +56,11 @@ export class ForteAudioCore {
         this.context.currentTime,
       );
 
-      this.masterGain.connect(this.masterCompressor);
+      this.masterGain.connect(this.state.effects.musicChainInput);
+      this.state.effects.musicChainInput.connect(
+        this.state.effects.musicChainOutput,
+      );
+      this.state.effects.musicChainOutput.connect(this.masterCompressor);
       this.masterCompressor.connect(this.context.destination);
 
       this.sfxGain.connect(this.context.destination);
@@ -228,6 +235,10 @@ export class ForteAudioCore {
         this.state.effects.micChainOutput.disconnect();
       if (this.state.effects.micMonitorNode)
         this.state.effects.micMonitorNode.disconnect();
+      if (this.state.effects.musicChainInput)
+        this.state.effects.musicChainInput.disconnect();
+      if (this.state.effects.musicChainOutput)
+        this.state.effects.musicChainOutput.disconnect();
       if (this.masterCompressor) this.masterCompressor.disconnect();
       if (this.masterGain) this.masterGain.disconnect();
       if (this.sfxGain) this.sfxGain.disconnect();
