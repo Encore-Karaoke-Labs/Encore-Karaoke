@@ -12,12 +12,14 @@ export interface PlatformHintState {
   readonly hints: ReadonlySet<string>;
   readonly embedded: boolean;
   readonly kiosk: boolean;
+  readonly kioskMode: boolean;
   readonly lowLatency: boolean;
   has(hint: string): boolean;
   toJSON(): {
     hints: string[];
     embedded: boolean;
     kiosk: boolean;
+    kioskMode: boolean;
     lowLatency: boolean;
   };
 }
@@ -75,6 +77,7 @@ export function parsePlatformHints(argv: readonly string[]): PlatformHintState {
     if (arg === "--low-latency") hints.add("low-latency");
   }
 
+  const kioskMode = hints.has("kiosk");
   const embedded = hints.has("embedded");
   if (embedded) {
     for (const hint of EMBEDDED_PROFILE) hints.add(hint);
@@ -84,12 +87,14 @@ export function parsePlatformHints(argv: readonly string[]): PlatformHintState {
     hints,
     embedded,
     kiosk: hints.has("kiosk"),
+    kioskMode,
     lowLatency: hints.has("low-latency"),
     has: (hint: string) => hints.has(hint),
     toJSON: () => ({
       hints: [...hints].sort(),
       embedded,
       kiosk: hints.has("kiosk"),
+      kioskMode,
       lowLatency: hints.has("low-latency"),
     }),
   };
