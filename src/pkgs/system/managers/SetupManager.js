@@ -705,7 +705,7 @@ export default class SetupManager {
                     );
                     window.config.setItem("audioConfig.useLibraryFont", false);
 
-                     this.showToast("Loading custom soundfont...", "info");
+                    this.showToast("Loading custom soundfont...", "info");
 
                     const url = await NetworkingUtility.getFileLink(filePath);
 
@@ -2402,7 +2402,7 @@ export default class SetupManager {
     }
     const mtvSong = this.ctx.state.songList.find((s) => s.videoPath);
     if (!mtvSong) {
-      this.showToast("No MV songs found in library", "error");
+      this.showToast("No music videos found in library", "error");
       return;
     }
 
