@@ -14,6 +14,7 @@ export interface PlatformHintState {
   readonly kiosk: boolean;
   readonly kioskMode: boolean;
   readonly lowLatency: boolean;
+  readonly shizuku: boolean;
   has(hint: string): boolean;
   toJSON(): {
     hints: string[];
@@ -21,6 +22,7 @@ export interface PlatformHintState {
     kiosk: boolean;
     kioskMode: boolean;
     lowLatency: boolean;
+    shizuku: boolean;
   };
 }
 
@@ -89,6 +91,7 @@ export function parsePlatformHints(argv: readonly string[]): PlatformHintState {
     kiosk: hints.has("kiosk"),
     kioskMode,
     lowLatency: hints.has("low-latency"),
+    shizuku: hints.has("shizuku"),
     has: (hint: string) => hints.has(hint),
     toJSON: () => ({
       hints: [...hints].sort(),
@@ -96,6 +99,7 @@ export function parsePlatformHints(argv: readonly string[]): PlatformHintState {
       kiosk: hints.has("kiosk"),
       kioskMode,
       lowLatency: hints.has("low-latency"),
+      shizuku: hints.has("shizuku"),
     }),
   };
 }

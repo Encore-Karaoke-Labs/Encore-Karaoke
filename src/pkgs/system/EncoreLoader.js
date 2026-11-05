@@ -11,7 +11,11 @@ let progressAnim;
 let progressIndeterminate = false;
 let actualPort = 9864;
 
-const BOOT_BG_URL = "/assets/img/boot/bg.png";
+let BOOT_BG_URL = "/assets/img/boot/bg.png";
+
+if (await window.platformHints.has("shizuku")) {
+  BOOT_BG_URL = "/assets/img/boot/shizuku.png";
+}
 
 /**
  * Stops the indeterminate sweep and hides its highlight.

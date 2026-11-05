@@ -19,6 +19,12 @@ const pkg = {
     const config = await window.config.getAll();
     console.log("[BootManager] config", config);
 
+    let BOOT_BG_URL = "/assets/img/boot/bg.png";
+
+    if (await window.platformHints.has("shizuku")) {
+      BOOT_BG_URL = "/assets/img/boot/shizuku.png";
+    }
+
     wrapper = new Html("div")
       .class("flex")
       .styleJs({
@@ -48,7 +54,7 @@ const pkg = {
       .appendTo(wrapper);
 
     new Html("img")
-      .attr({ src: "/assets/img/boot/bg.png", alt: "", draggable: "false" })
+      .attr({ src: BOOT_BG_URL, alt: "", draggable: "false" })
       .styleJs({
         position: "absolute",
         top: "0",
