@@ -31,6 +31,9 @@ export class MixerModule {
     this.selectedParamIndex = 0;
     this.isExpanded = false;
 
+    this.activeChannel = "mic";
+    this.musicState = { chain: [], rawConfig: [] };
+
     this.chainItems = [];
 
     this.isDraggingFader = false;
@@ -54,7 +57,7 @@ export class MixerModule {
 
     new Html("p")
       .text(
-        "Navigate: Arrows | Switch Panels: Tab | Select/Expand: Enter | Reorder: Shift+Up/Down | Remove: Backspace | Close: ESC",
+        "Navigate: Arrows | Switch Panels: Tab | Switch Channel: Shift+Tab | Select/Expand: Enter | Reorder: Shift+Up/Down | Remove: Backspace | Close: ESC",
       )
       .styleJs({ color: "#89cff0", fontWeight: "600", fontSize: "1rem" })
       .appendTo(header);
@@ -73,8 +76,13 @@ export class MixerModule {
       .classOn("mixer-plugin-section")
       .appendTo(main);
 
+    let startedOnBackdrop = false;
+    this.modal.on("mousedown", (e) => {
+      startedOnBackdrop = e.target === this.modal.elm;
+    });
     this.modal.on("click", (e) => {
-      if (e.target === this.modal.elm) this.toggle();
+      if (startedOnBackdrop && e.target === this.modal.elm) this.toggle();
+      startedOnBackdrop = false;
     });
 
     this._setupGlobalMouseEvents();
@@ -90,6 +98,7 @@ export class MixerModule {
       this.faderIndex = 0;
       this.chainIndex = 0;
       this.isExpanded = false;
+      this.activeChannel = "mic";
       this.contentWrapper.classOff("expanded");
 
       this.build();
@@ -106,6 +115,10 @@ export class MixerModule {
    */
   build() {
     this.state = this.Forte.getVocalChainState();
+    this.musicState = this.Forte.getMusicChainState?.() || {
+      chain: [],
+      rawConfig: [],
+    };
     this._renderFaders();
     this._renderChain();
     if (this.isExpanded) this._renderPluginControls();
@@ -113,13 +126,51 @@ export class MixerModule {
   }
 
   /**
-   * Applies and saves a new vocal chain configuration.
+   * Returns the chain state for the channel currently being edited.
+   * @returns {Object} Active chain state
+   */
+  _getActiveChainState() {
+    return this.activeChannel === "music" ? this.musicState : this.state;
+  }
+
+  /**
+   * Switches the effects chain being edited in the mixer.
+   * @param {"mic"|"music"} channel - Target channel
+   * @param {Object} [options] - Options
+   * @param {boolean} [options.preserveFaderFocus] - Keep the currently focused fader
+   */
+  _setActiveChannel(channel, { preserveFaderFocus = false } = {}) {
+    const changed = this.activeChannel !== channel;
+    this.activeChannel = channel;
+
+    if (!preserveFaderFocus) this.faderIndex = channel === "music" ? 1 : 0;
+    if (!changed) return;
+
+    this.chainIndex = 0;
+    this._renderChain();
+    if (this.isExpanded) this._renderPluginControls();
+    this._updateHighlights();
+  }
+
+  /**
+   * Applies and saves a new chain configuration for the active channel.
    * @param {Array} newConfig - The new chain configuration to apply and save
    * @returns {Promise<void>}
    */
   async _applyAndSaveChain(newConfig) {
-    window.config.setItem("audioConfig.vocalChain", newConfig);
-    await this.Forte.loadVocalChain(newConfig);
+    const isMusic = this.activeChannel === "music";
+    const configKey = isMusic
+      ? "audioConfig.musicChain"
+      : "audioConfig.vocalChain";
+
+    window.config.setItem(configKey, newConfig);
+
+    if (isMusic) {
+      await this.Forte.loadMusicChain(newConfig);
+    } else {
+      await this.Forte.loadVocalChain(newConfig);
+    }
+
     this.build();
   }
 
@@ -182,10 +233,16 @@ export class MixerModule {
       hitArea.on("mousedown", (e) => {
         this.isDraggingFader = true;
         this.dragFaderType = isMic ? "mic" : "music";
-        this.focusedPane = "faders";
-        this.faderIndex = isMic ? 0 : 1;
-        this._updateHighlights();
         this._handleFaderMouse(e, track.elm, isMic, maxVal);
+      });
+
+      strip.on("mousedown", () => {
+        this.faderIndex = isMic ? 0 : 1;
+        this._setActiveChannel(isMic ? "mic" : "music", {
+          preserveFaderFocus: true,
+        });
+        this.focusedPane = "faders";
+        this._updateHighlights();
       });
 
       return { strip, track, thumb, valDisplay, vuFill };
@@ -252,11 +309,20 @@ export class MixerModule {
   _renderChain() {
     this.chainSection.clear();
     this.chainItems = [];
+
+    const isMusic = this.activeChannel === "music";
+    const activeState = this._getActiveChainState() || {
+      chain: [],
+      rawConfig: [],
+    };
+    const activeChain = activeState.chain || [];
+
     new Html("h3")
       .classOn("chain-header")
-      .text("MICROPHONE EFFECTS")
+      .text(isMusic ? "INSTRUMENTAL EFFECTS" : "MICROPHONE EFFECTS")
       .appendTo(this.chainSection);
-    this.state.chain.forEach((plugin, i) => {
+
+    activeChain.forEach((plugin, i) => {
       const item = new Html("div")
         .classOn("chain-item")
         .text(`${i + 1}. ${plugin.name}`)
@@ -264,7 +330,7 @@ export class MixerModule {
       this.chainItems.push({ type: "plugin", el: item, index: i });
     });
 
-    if (this.state.chain.length === 0) {
+    if (activeChain.length === 0) {
       new Html("div")
         .styleJs({ opacity: 0.5, fontStyle: "italic", marginBottom: "1rem" })
         .text("No plugins loaded.")
@@ -318,7 +384,7 @@ export class MixerModule {
         if (item.type === "plugin") this._openPluginEditor();
         else if (item.type === "add")
           this._applyAndSaveChain([
-            ...(this.state.rawConfig || []),
+            ...(activeState.rawConfig || []),
             item.config,
           ]);
         else if (item.type === "custom") item.input.elm.focus();
@@ -329,7 +395,7 @@ export class MixerModule {
     customInput.on("keydown", (e) => {
       if (e.key === "Enter" && customInput.getValue().trim())
         this._applyAndSaveChain([
-          ...(this.state.rawConfig || []),
+          ...(activeState.rawConfig || []),
           { path: customInput.getValue().trim(), params: {} },
         ]);
     });
@@ -364,12 +430,16 @@ export class MixerModule {
     this.pluginSection.clear();
     const currentChainItem = this.chainItems[this.chainIndex];
     if (!currentChainItem || currentChainItem.type !== "plugin") {
-      this._closePluginEditor();
+      new Html("div")
+        .classOn("plugin-editor-empty")
+        .text("Select a plugin from the chain to edit its controls.")
+        .appendTo(this.pluginSection);
       return;
     }
 
+    const activeState = this._getActiveChainState() || { chain: [] };
     const pluginIndex = currentChainItem.index;
-    const pluginState = this.state.chain[pluginIndex];
+    const pluginState = (activeState.chain || [])[pluginIndex];
     const plugin = pluginState?.instance;
 
     new Html("h2")
@@ -397,7 +467,15 @@ export class MixerModule {
             paramName.replace(/_/g, " "),
             paramDef,
             (value) => {
-              this.Forte.setPluginParameter(pluginIndex, paramName, value);
+              if (this.activeChannel === "music") {
+                this.Forte.setMusicPluginParameter(
+                  pluginIndex,
+                  paramName,
+                  value,
+                );
+              } else {
+                this.Forte.setPluginParameter(pluginIndex, paramName, value);
+              }
             },
             pIndex,
           );
@@ -599,8 +677,11 @@ export class MixerModule {
    */
   _updateHighlights() {
     if (this.micFader && this.musicFader) {
-      this.micFader.strip.classOff("focused");
-      this.musicFader.strip.classOff("focused");
+      this.micFader.strip.classOff("focused", "active-channel");
+      this.musicFader.strip.classOff("focused", "active-channel");
+      if (this.activeChannel === "mic")
+        this.micFader.strip.classOn("active-channel");
+      else this.musicFader.strip.classOn("active-channel");
       if (this.focusedPane === "faders") {
         if (this.faderIndex === 0) this.micFader.strip.classOn("focused");
         else this.musicFader.strip.classOn("focused");
@@ -651,13 +732,19 @@ export class MixerModule {
       return;
     }
 
+    const activeState = this._getActiveChainState() || {
+      chain: [],
+      rawConfig: [],
+    };
+    const activeChain = activeState.chain || [];
+
     const currentChainItem = this.chainItems[this.chainIndex];
     const isPluginNode = currentChainItem && currentChainItem.type === "plugin";
 
     let isCustomGUI = false;
     let pluginInstance = null;
     if (isPluginNode) {
-      pluginInstance = this.state.chain[currentChainItem.index]?.instance;
+      pluginInstance = activeChain[currentChainItem.index]?.instance;
       if (pluginInstance && typeof pluginInstance.renderGUI === "function")
         isCustomGUI = true;
     }
@@ -669,7 +756,7 @@ export class MixerModule {
       const idx = currentChainItem.index;
       if (e.key === "Backspace" || e.key === "Delete") {
         e.preventDefault();
-        const newConfig = [...(this.state.rawConfig || [])];
+        const newConfig = [...(activeState.rawConfig || [])];
         newConfig.splice(idx, 1);
         if (this.isExpanded) this._closePluginEditor();
         this.chainIndex = Math.max(0, this.chainIndex - 1);
@@ -679,7 +766,7 @@ export class MixerModule {
 
       if (this.focusedPane === "chain") {
         if (e.shiftKey && e.key === "ArrowUp" && idx > 0) {
-          const newConfig = [...(this.state.rawConfig || [])];
+          const newConfig = [...(activeState.rawConfig || [])];
           [newConfig[idx - 1], newConfig[idx]] = [
             newConfig[idx],
             newConfig[idx - 1],
@@ -691,9 +778,9 @@ export class MixerModule {
         if (
           e.shiftKey &&
           e.key === "ArrowDown" &&
-          idx < this.state.chain.length - 1
+          idx < activeChain.length - 1
         ) {
-          const newConfig = [...(this.state.rawConfig || [])];
+          const newConfig = [...(activeState.rawConfig || [])];
           [newConfig[idx + 1], newConfig[idx]] = [
             newConfig[idx],
             newConfig[idx + 1],
@@ -744,8 +831,10 @@ export class MixerModule {
         break;
       case "ArrowRight":
         if (this.focusedPane === "faders") {
-          if (this.faderIndex === 0) this.faderIndex = 1;
-          else this.focusedPane = "chain";
+          if (this.faderIndex === 0) {
+            this.faderIndex = 1;
+            this._setActiveChannel("music", { preserveFaderFocus: true });
+          } else this.focusedPane = "chain";
         } else if (this.focusedPane === "chain") {
           if (isPluginNode) this._openPluginEditor();
         } else if (this.focusedPane === "plugin" && !isCustomGUI) {
@@ -780,6 +869,7 @@ export class MixerModule {
           }
         } else if (this.focusedPane === "faders" && this.faderIndex === 1) {
           this.faderIndex = 0;
+          this._setActiveChannel("mic", { preserveFaderFocus: true });
         }
         break;
       case "Enter":
@@ -787,7 +877,7 @@ export class MixerModule {
           if (currentChainItem.type === "plugin") this._openPluginEditor();
           else if (currentChainItem.type === "add")
             this._applyAndSaveChain([
-              ...(this.state.rawConfig || []),
+              ...(activeState.rawConfig || []),
               currentChainItem.config,
             ]);
           else if (currentChainItem.type === "custom")
@@ -795,6 +885,12 @@ export class MixerModule {
         }
         break;
       case "Tab":
+        if (e.shiftKey) {
+          this._setActiveChannel(
+            this.activeChannel === "music" ? "mic" : "music",
+          );
+          break;
+        }
         if (this.focusedPane === "faders") this.focusedPane = "chain";
         else if (this.focusedPane === "chain")
           this.focusedPane = this.isExpanded ? "plugin" : "faders";
