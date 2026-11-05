@@ -2,6 +2,7 @@ import { ForteAudioCore } from "./core/AudioCore.js";
 import { logVerbose, logVerboseWarn, state } from "./core/State.js";
 import { ForteHarana } from "./modules/Harana.js";
 import { ForteMicrophone } from "./modules/Microphone.js";
+import { ForteMusicChain } from "./modules/MusicChain.js";
 import { FortePianoRoll } from "./modules/PianoRoll.js";
 import { FortePlayback } from "./modules/Playback.js";
 import { ForteRhythm } from "./modules/Rhythm.js";
@@ -16,6 +17,7 @@ let audioCore;
 let pianoRoll;
 let synthesizer;
 let microphone;
+let musicChain;
 let scoring;
 let harana;
 let playback;
@@ -61,6 +63,7 @@ const pkg = {
     pianoRoll.initialize();
 
     microphone = new ForteMicrophone(state, audioCore);
+    musicChain = new ForteMusicChain(state, audioCore);
     scoring = new ForteScoring(state, audioCore, pianoRoll);
 
     synthesizer = new ForteSynthesizer(
@@ -231,12 +234,19 @@ const pkg = {
     setMusicRecordingVolume: (level) =>
       microphone.setMusicRecordingVolume(level),
     getVocalChainState: () => microphone.getVocalChainState(),
+
+    loadMusicChain: (chainConfig) => musicChain.loadMusicChain(chainConfig),
+    rebuildMusicChain: () => musicChain.rebuildMusicChain(),
+    setMusicPluginParameter: (pluginIndex, paramName, value) =>
+      musicChain.setPluginParameter(pluginIndex, paramName, value),
+    getMusicChainState: () => musicChain.getMusicChainState(),
   },
 
   end: async function () {
     logVerbose("Shutting down.");
     if (pianoRoll) pianoRoll.cleanup();
     if (microphone) microphone.cleanup();
+    if (musicChain) musicChain.cleanup();
     if (audioCore) audioCore.cleanup();
     if (sfx) sfx.cleanup();
     if (rhythm) rhythm.cleanup();
