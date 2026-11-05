@@ -49,10 +49,10 @@
 
 ### Media Support & Playback
 
-- **Versatile Media Support (MTVs & Multiplex)**
+- **Versatile Media Support (MVs & Multiplex)**
   - Supports MIDI karaoke (`.mid`, `.kar`) with SoundFont (`.sf2`, `.sf3` & `.dls`) playback.
   - Supports audio tracks (`.mp3`, `.wav`, `.m4a`, `.ogg`) paired with `.lrc` lyrics or CDG.
-  - Supports high-quality MTVs (Music Videos) (`.mp4`, `.mkv`, `.webm`, `.avi`).
+  - Supports high-quality MVs (Music Videos) (`.mp4`, `.mkv`, `.webm`, `.avi`).
   - Full support for **Multiplex tracks** (pan left/right to toggle the guide vocal).
 - **Native YouTube Integration**
   - Don't have a song in your local library? Search YouTube directly from the player or your phone and queue it up instantly.
