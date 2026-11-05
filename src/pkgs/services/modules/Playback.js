@@ -1498,6 +1498,18 @@ export class FortePlayback {
     if (this.audioCore.context.state === "suspended")
       this.audioCore.context.resume();
 
+    if (this.state.recording.trackDelayNode) {
+      if (this.state.effects.musicChainOutput) {
+        try {
+          this.state.effects.musicChainOutput.disconnect(
+            this.state.recording.trackDelayNode,
+          );
+        } catch (e) {}
+      }
+      this.state.recording.trackDelayNode.disconnect();
+      this.state.recording.trackDelayNode = null;
+    }
+
     if (this.state.recording.destinationNode) {
       this.state.recording.trackDelayNode =
         this.audioCore.context.createDelay();
@@ -1511,6 +1523,12 @@ export class FortePlayback {
       this.state.recording.trackDelayNode.connect(recordingGain);
       recordingGain.connect(this.state.recording.destinationNode);
       recordingGain.connect(this.state.recording.musicDestinationNode);
+
+      if (this.state.effects.musicChainOutput) {
+        this.state.effects.musicChainOutput.connect(
+          this.state.recording.trackDelayNode,
+        );
+      }
     }
 
     this.state.scoring.enabled = true;
@@ -1557,16 +1575,6 @@ export class FortePlayback {
         this.state.playback.status === "playing"
       )
         return;
-
-      if (this.state.recording.trackDelayNode && this.state.playback.midiGain) {
-        this.state.playback.midiGain.connect(
-          this.state.recording.trackDelayNode,
-        );
-        if (this.state.playback.chorusGain)
-          this.state.playback.chorusGain.connect(
-            this.state.recording.trackDelayNode,
-          );
-      }
 
       if (this.state.playback.status !== "paused") {
         this.state.playback.sequencer.currentTime = 0;
@@ -1645,7 +1653,7 @@ export class FortePlayback {
             this.audioCore.context,
             "pitch-shifter-processor",
           );
-          this.audioPitchNode.connect(this.audioCore.masterGain);
+          this.audioPitchNode.connect(this.state.effects.musicChainInput);
         }
 
         const currentTranspose = this.state.playback.transpose || 0;
@@ -1659,10 +1667,6 @@ export class FortePlayback {
 
         monoMixer.connect(this.audioPitchNode);
 
-        if (this.state.recording.trackDelayNode) {
-          this.audioPitchNode.connect(this.state.recording.trackDelayNode);
-        }
-
         this.setMultiplexPan(this.state.playback.multiplexPan);
       } else {
         if (!this.audioPitchNode) {
@@ -1670,7 +1674,7 @@ export class FortePlayback {
             this.audioCore.context,
             "pitch-shifter-processor",
           );
-          this.audioPitchNode.connect(this.audioCore.masterGain);
+          this.audioPitchNode.connect(this.state.effects.musicChainInput);
         }
 
         const currentTranspose = this.state.playback.transpose || 0;
@@ -1684,10 +1688,6 @@ export class FortePlayback {
 
         this.sourceNode.connect(this.audioPitchNode);
         this.sourceNode.connect(this.state.scoring.musicAnalyser);
-
-        if (this.state.recording.trackDelayNode) {
-          this.audioPitchNode.connect(this.state.recording.trackDelayNode);
-        }
       }
 
       const resumeTime =
@@ -1761,14 +1761,14 @@ export class FortePlayback {
       this.state.scoring.meydaAnalyzer.stop();
 
     if (this.state.recording.trackDelayNode) {
-      this.state.recording.trackDelayNode.disconnect();
-      if (this.state.playback.isMidi && this.state.playback.midiGain) {
+      if (this.state.effects.musicChainOutput) {
         try {
-          this.state.playback.midiGain.disconnect(
+          this.state.effects.musicChainOutput.disconnect(
             this.state.recording.trackDelayNode,
           );
         } catch (e) {}
       }
+      this.state.recording.trackDelayNode.disconnect();
       this.state.recording.trackDelayNode = null;
     }
 
@@ -1819,14 +1819,14 @@ export class FortePlayback {
       this.state.scoring.meydaAnalyzer.stop();
 
     if (this.state.recording.trackDelayNode) {
-      this.state.recording.trackDelayNode.disconnect();
-      if (this.state.playback.isMidi && this.state.playback.midiGain) {
+      if (this.state.effects.musicChainOutput) {
         try {
-          this.state.playback.midiGain.disconnect(
+          this.state.effects.musicChainOutput.disconnect(
             this.state.recording.trackDelayNode,
           );
         } catch (e) {}
       }
+      this.state.recording.trackDelayNode.disconnect();
       this.state.recording.trackDelayNode = null;
     }
 
