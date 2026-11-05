@@ -38,6 +38,7 @@ export class ForteAudioCore {
       this.sfxGain = this.context.createGain();
 
       // Instrumental effects bus
+      this.state.effects.musicChainInput = this.context.createGain();
       this.state.effects.musicChainOutput = this.context.createGain();
 
       this.masterCompressor = this.context.createDynamicsCompressor();
