@@ -7,11 +7,22 @@ export interface AudioMixDeviceConfig {
   inputDevice?: string;
 }
 
+export interface AudioChainEntry {
+  path: string;
+  params?: Record<string, number>;
+}
+
 export interface AudioConfig {
   mix: {
     instrumental: AudioMixDeviceConfig;
     scoring: AudioMixDeviceConfig;
   };
+  vocalChain?: AudioChainEntry[];
+  musicChain?: AudioChainEntry[];
+  micMonitorVolume?: number;
+  micRecordingVolume?: number;
+  musicRecordingVolume?: number;
+  enableMicMonitor?: boolean;
 }
 
 export interface VideoConfig {
