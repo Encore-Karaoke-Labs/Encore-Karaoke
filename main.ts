@@ -3032,7 +3032,7 @@ void app.whenReady().then(() => {
             let formatColor = "#B02FD1";
 
             if (song.videoPath) {
-              formatText = "[MTV]";
+              formatText = "[MV]";
               formatColor = "#2F6CD1";
             } else if (song.chorusPath) {
               formatText = "[CHR]";
