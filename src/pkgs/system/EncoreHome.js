@@ -1076,7 +1076,7 @@ class EncoreController {
 
       if (enableMtvCategory && mtvPaths.length) {
         this.bgv.addDynamicCategory({
-          BGV_CATEGORY: "MTV",
+          BGV_CATEGORY: "MV",
           BGV_LIST: mtvPaths,
           isAbsolute: true,
         });
