@@ -148,3 +148,22 @@ contextBridge.exposeInMainWorld("zoom", {
   in: async () => ipcRenderer.invoke("zoom-in"),
   out: async () => ipcRenderer.invoke("zoom-out"),
 });
+
+contextBridge.exposeInMainWorld("systemAPI", {
+  execCommand: (payload) => ipcRenderer.invoke("exec-command", payload),
+  spawnCommand: (payload) => ipcRenderer.invoke("spawn-command", payload),
+  killProcess: (taskId, signal) =>
+    ipcRenderer.send("kill-process", { taskId, signal }),
+  onSpawnStdout: (callback) =>
+    ipcRenderer.on("spawn-stdout", (event, data) => callback(data)),
+  onSpawnStderr: (callback) =>
+    ipcRenderer.on("spawn-stderr", (event, data) => callback(data)),
+  onSpawnExit: (callback) =>
+    ipcRenderer.on("spawn-exit", (event, data) => callback(data)),
+  onSpawnError: (callback) =>
+    ipcRenderer.on("spawn-error", (event, data) => callback(data)),
+  writeProcessStdin: (taskId, data) =>
+    ipcRenderer.send("write-process-stdin", { taskId, data }),
+  spawnInteractiveShell: (payload) =>
+    ipcRenderer.invoke("spawn-interactive-shell", payload),
+});
