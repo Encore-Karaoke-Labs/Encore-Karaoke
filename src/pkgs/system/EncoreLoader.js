@@ -227,7 +227,11 @@ const pkg = {
       const modal = new Html("div")
         .class("modal-container")
         .appendTo(wrapper)
-        .styleJs({ color: "white" });
+        .styleJs({
+          position: "relative",
+          zIndex: "3",
+          color: "white",
+        });
 
       const content = new Html("div").class("modal-content").appendTo(modal);
       new Html("h2").text("Multiple Libraries Found").appendTo(content);
