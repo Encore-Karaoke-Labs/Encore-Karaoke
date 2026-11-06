@@ -432,6 +432,9 @@ const pkg = {
       );
     }
 
+    if (await window.platformHints.has("embedded")) {
+      await Root.Core.pkg.run("services:Terminal", [], true);
+    }
     await Root.Core.pkg.run("services:UiLib", [], true);
     await Root.Core.pkg.run("services:Forte", [], true);
     await Root.Core.pkg.run("services:FsSvc", [], true);
