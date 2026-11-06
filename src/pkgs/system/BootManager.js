@@ -67,6 +67,7 @@ const pkg = {
         transform: "scale(1.04)",
         transformOrigin: "50% 35%",
         willChange: "transform",
+        filter: "brightness(1.4)",
       })
       .appendTo(bootBackdrop);
 
@@ -409,7 +410,10 @@ const pkg = {
         begin: () => {
           document.body.style.backgroundColor = "#1c2955";
         },
-        update: () => renderRipple(rippleState.progress),
+        update: () => {
+          renderRipple(rippleState.progress);
+          bootBg.elm.style.filter = `brightness(${1 + 0.4 * (1 - rippleState.progress)})`;
+        },
         complete: () => {
           ctx.clearRect(0, 0, viewW, viewH);
           ctx.globalAlpha = 1;
