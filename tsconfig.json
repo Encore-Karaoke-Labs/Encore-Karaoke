@@ -26,5 +26,5 @@
     "verbatimModuleSyntax": true,
     "noEmit": true
   },
-  "include": ["src/**/*", "*.ts", "*.js"]
+  "include": ["main/**/*", "src/**/*", "*.ts", "*.js"]
 }
