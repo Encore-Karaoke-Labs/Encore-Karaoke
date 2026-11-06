@@ -321,7 +321,7 @@ const pkg = {
 
     new Html("p")
       .html(
-        "This application contains rapid color changes, flashing lights, and visual patterns<br>that may trigger seizures for people with photosensitive epilepsy.<br><br>Viewer discretion is advised.",
+        "Encore Karaoke may contain rapid color changes, flashing lights, and visual patterns<br>that may trigger seizures for people with photosensitive epilepsy.<br><br>Viewer discretion is advised.",
       )
       .styleJs({
         margin: "0",
