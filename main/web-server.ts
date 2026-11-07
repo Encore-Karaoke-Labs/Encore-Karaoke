@@ -103,6 +103,19 @@ export class WebServer {
     this.server.use(cors());
   }
 
+  private verifyFileToken(req: Request, res: Response): boolean {
+    const fToken = req.query.token;
+    if (!fToken) {
+      res.status(403).json({ error: "Provide an access token to continue." });
+      return false;
+    }
+    if (fToken !== appState.fileToken) {
+      res.status(403).json({ error: "Invalid access token" });
+      return false;
+    }
+    return true;
+  }
+
   private registerRoutes(): void {
     this.server.get("/local_ip", (_req: Request, res: Response) => {
       res.send(this.localIp);
@@ -126,15 +139,7 @@ export class WebServer {
     });
 
     this.server.get("/drives", async (req: Request, res: Response) => {
-      const fToken = req.query.token;
-      if (!fToken) {
-        res.status(403).json({ error: "Provide an access token to continue." });
-        return;
-      }
-      if (fToken !== appState.fileToken) {
-        res.status(403).json({ error: "Invalid access token" });
-        return;
-      }
+      if (!this.verifyFileToken(req, res)) return;
       logger.debug("FILE", "Requesting drives");
       try {
         const disks = await si.fsSize();
@@ -181,15 +186,7 @@ export class WebServer {
 
     this.server.post("/list", (req: Request, res: Response) => {
       const dir = req.body.dir as string;
-      const fToken = req.query.token;
-      if (!fToken) {
-        res.status(403).json({ error: "Provide an access token to continue." });
-        return;
-      }
-      if (fToken !== appState.fileToken) {
-        res.status(403).json({ error: "Invalid access token" });
-        return;
-      }
+      if (!this.verifyFileToken(req, res)) return;
       if (!dir) {
         res
           .status(400)
@@ -238,15 +235,7 @@ export class WebServer {
 
     this.server.get("/getFile", (req: Request, res: Response) => {
       const fPath = req.query.path as string;
-      const fToken = req.query.token;
-      if (!fToken) {
-        res.status(403).json({ error: "Provide an access token to continue." });
-        return;
-      }
-      if (fToken !== appState.fileToken) {
-        res.status(403).json({ error: "Invalid access token" });
-        return;
-      }
+      if (!this.verifyFileToken(req, res)) return;
       if (!fPath) {
         res.status(400).json({ error: "No path" });
         return;
