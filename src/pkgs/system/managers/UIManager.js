@@ -1,5 +1,6 @@
 import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
+import { findSongByCode } from "../../../libs/songLookup.js";
 import { COLOR_PALETTES } from "./LyricsEngine.js";
 
 const LYRIC_ROLES = [
@@ -17,29 +18,6 @@ const COLOR_SWATCHES = Object.keys(COLOR_PALETTES).map((key) => ({
   hex: COLOR_PALETTES[key].main,
   stroke: COLOR_PALETTES[key].stroke,
 }));
-
-/**
- * Resolves a song from songMap regardless of leading zeros or number/string typing.
- */
-function findSongInMap(songMap, code) {
-  if (!songMap || !code) return null;
-  const str = String(code).trim();
-  if (!str) return null;
-
-  const unpadded = str.replace(/^0+/, "");
-  const num = parseInt(str, 10);
-
-  return (
-    songMap.get(str) ??
-    (unpadded ? songMap.get(unpadded) : null) ??
-    (!isNaN(num) ? songMap.get(num) : null) ??
-    (unpadded ? songMap.get(unpadded.padStart(5, "0")) : null) ??
-    (unpadded ? songMap.get(unpadded.padStart(6, "0")) : null) ??
-    songMap.get(str.padStart(5, "0")) ??
-    songMap.get(str.padStart(6, "0")) ??
-    null
-  );
-}
 
 export default class UIManager {
   /**
@@ -1711,7 +1689,7 @@ export default class UIManager {
 
       let activeSong =
         state.songNumber.length > 0
-          ? findSongInMap(state.songMap, code)
+          ? findSongByCode(state.songMap, code)
           : state.highlightedIndex >= 0
             ? state.songList[state.highlightedIndex]
             : null;
