@@ -1,27 +1,5 @@
 import Html from "../../../libs/html.js";
-
-/**
- * Resolves a song from songMap regardless of leading zeros or number/string typing.
- */
-function findSongInMap(songMap, code) {
-  if (!songMap || !code) return null;
-  const str = String(code).trim();
-  if (!str) return null;
-
-  const unpadded = str.replace(/^0+/, "");
-  const num = parseInt(str, 10);
-
-  return (
-    songMap.get(str) ??
-    (unpadded ? songMap.get(unpadded) : null) ??
-    (!isNaN(num) ? songMap.get(num) : null) ??
-    (unpadded ? songMap.get(unpadded.padStart(5, "0")) : null) ??
-    (unpadded ? songMap.get(unpadded.padStart(6, "0")) : null) ??
-    songMap.get(str.padStart(5, "0")) ??
-    songMap.get(str.padStart(6, "0")) ??
-    null
-  );
-}
+import { findSongByCode } from "../../../libs/songLookup.js";
 
 /**
  * @param {Object} context - The shared context
@@ -923,7 +901,7 @@ export default class InputManager {
     const infoBar = this.ctx.modules.infoBar;
 
     const displayCode = number.padStart(6, "0");
-    const song = findSongInMap(state.songMap, number);
+    const song = findSongByCode(state.songMap, number);
 
     let fmtBadge = "";
     if (song) {
@@ -1026,9 +1004,7 @@ export default class InputManager {
 
       if (state.isSessionActive) {
         let song = state.songNumber
-          ? (state.songMap.get(state.songNumber) ??
-            state.songMap.get(state.songNumber.padStart(5, "0")) ??
-            state.songMap.get(state.songNumber.padStart(6, "0")))
+          ? findSongByCode(state.songMap, state.songNumber)
           : state.highlightedIndex >= 0
             ? state.songList[state.highlightedIndex]
             : null;
@@ -1049,7 +1025,7 @@ export default class InputManager {
           root.playback.startPlayer(state.reservationQueue.shift());
         } else {
           let song = state.songNumber
-            ? findSongInMap(state.songMap, state.songNumber)
+            ? findSongByCode(state.songMap, state.songNumber)
             : state.highlightedIndex >= 0
               ? state.songList[state.highlightedIndex]
               : null;
@@ -1104,7 +1080,7 @@ export default class InputManager {
         }
         return;
       } else if (state.reservationNumber) {
-        const song = findSongInMap(state.songMap, state.reservationNumber);
+        const song = findSongByCode(state.songMap, state.reservationNumber);
         if (song) {
           if (state.isSessionActive) root.sessions.reserveSongInSession(song);
           else {
