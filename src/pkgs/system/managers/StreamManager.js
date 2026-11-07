@@ -1043,6 +1043,7 @@ export default class StreamManager {
   }
 
   handleKeyDown(e) {
+    const state = this.ctx.state;
     const dom = this.ctx.dom;
 
     if (e.key === "Escape") {
@@ -1058,6 +1059,8 @@ export default class StreamManager {
 
     const modalEl = dom.streamContentArea?.elm;
     if (!modalEl) return;
+
+    const isPlaying = state.lastPlaybackStatus === "playing";
 
     const focusables = Array.from(
       modalEl.querySelectorAll(
@@ -1103,7 +1106,7 @@ export default class StreamManager {
     }
     if (["ArrowDown", "ArrowRight", "Tab"].includes(e.key)) {
       e.preventDefault();
-      this.playNavSfx("nav");
+      if (!isPlaying) this.playNavSfx("nav");
       let nextIndex = currentIndex + 1;
       if (nextIndex >= focusables.length || currentIndex === -1) nextIndex = 0;
       focusables[nextIndex].focus();
@@ -1112,7 +1115,7 @@ export default class StreamManager {
       (e.key === "Tab" && e.shiftKey)
     ) {
       e.preventDefault();
-      this.playNavSfx("nav");
+      if (!isPlaying) this.playNavSfx("nav");
       let nextIndex = currentIndex - 1;
       if (nextIndex < 0) nextIndex = focusables.length - 1;
       focusables[nextIndex].focus();
