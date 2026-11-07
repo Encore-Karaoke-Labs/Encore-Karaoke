@@ -1238,9 +1238,12 @@ export default class SetupManager {
               },
             ],
           },
-          {
-            title: "Software Updates",
-            items: [
+          ...(isEmbedded
+            ? []
+            : [
+                {
+                  title: "Software Updates",
+                  items: [
               {
                 id: "check_on_startup",
                 label: "Notify Updates on Startup",
@@ -1318,6 +1321,7 @@ export default class SetupManager {
               },
             ],
           },
+          ]),
         ],
       },
     };

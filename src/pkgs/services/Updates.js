@@ -10,7 +10,8 @@ const pkg = {
   start: async function (Root) {
     this.root = Root;
     config = await window.config.getAll();
-    if ((config.checkUpdatesOnStartup ?? true) == true) {
+    const isEmbedded = await window.platformHints.has("embedded");
+    if (!isEmbedded && (config.checkUpdatesOnStartup ?? true) == true) {
       fetch(versioningEndpoint)
         .then((res) => res.json())
         .then((data) => {
