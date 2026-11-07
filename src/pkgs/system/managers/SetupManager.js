@@ -1,5 +1,6 @@
 import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
+import { findSongByCode as lookupSongByCode } from "../../../libs/songLookup.js";
 
 /**
  * Joins path parts with a given separator, normalizing leading and trailing slashes.
@@ -1859,23 +1860,7 @@ export default class SetupManager {
   }
 
   findSongByCode(rawCode) {
-    if (!rawCode) return null;
-    const code6 = rawCode.padStart(6, "0");
-    const code5 = rawCode.padStart(5, "0");
-    const state = this.ctx.state;
-
-    return (
-      state.songMap?.get(code6) ||
-      state.songMap?.get(code5) ||
-      state.songMap?.get(rawCode) ||
-      state.songList?.find(
-        (s) =>
-          String(s.code).padStart(6, "0") === code6 ||
-          String(s.code).padStart(5, "0") === code5 ||
-          String(s.code) === rawCode,
-      ) ||
-      null
-    );
+    return lookupSongByCode(this.ctx.state.songMap, rawCode, this.ctx.state.songList);
   }
 
   async launchLyricPreview(song) {
