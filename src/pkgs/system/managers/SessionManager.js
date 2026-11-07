@@ -1,4 +1,5 @@
 import Html from "../../../libs/html.js";
+import playNavSfx from "../../../libs/sfx.js";
 
 export default class SessionManager {
   /**
@@ -30,7 +31,6 @@ export default class SessionManager {
     this.handleChatHistorySync = this.handleChatHistorySync.bind(this);
     this.handleChat = this.handleChat.bind(this);
     this.handleCheer = this.handleCheer.bind(this);
-    this.lastNavSfxTime = 0;
   }
 
   /**
@@ -129,13 +129,7 @@ export default class SessionManager {
    * @param {string} sfxName - The name of the wav file (without extension)
    */
   playNavSfx(sfxName) {
-    if (this.ctx.state.isNavSfxEnabled === false) return;
-
-    const now = Date.now();
-    if (now - this.lastNavSfxTime < 80) return;
-
-    this.lastNavSfxTime = now;
-    this.ctx.services.Forte.playSfx(`/assets/audio/${sfxName}.wav`);
+    return playNavSfx(this.ctx, sfxName);
   }
 
   /**
