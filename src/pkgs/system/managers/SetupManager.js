@@ -196,7 +196,7 @@ export default class SetupManager {
         ? activeLib.manifest
         : { title: "Unknown", description: "No metadata available." };
 
-      this.buildSettingsMap();
+      await this.buildSettingsMap();
     } catch (error) {
       console.error("Setup background load error:", error);
     } finally {
@@ -307,10 +307,13 @@ export default class SetupManager {
     this.renderView();
   }
 
-  buildSettingsMap() {
+  async buildSettingsMap() {
+    const isEmbedded = await window.platformHints.has("embedded");
     this.DASHBOARD_TILES = [
       { id: "library", label: "Library & Storage", icon: "folder" },
-      { id: "sync", label: "Network Sync", icon: "cloud-download" },
+      ...(isEmbedded
+        ? []
+        : [{ id: "sync", label: "Network Sync", icon: "cloud-download" }]),
       { id: "audio", label: "Sound Settings", icon: "volume-high" },
       { id: "mic", label: "Mic & Scoring Settings", icon: "mic" },
       { id: "video", label: "Video Settings", icon: "tv" },
@@ -416,49 +419,53 @@ export default class SetupManager {
           },
         ],
       },
-      sync: {
-        title: "Network Sync",
-        groups: [
-          {
-            title: "Server Configuration",
-            items: [
-              {
-                id: "server_select",
-                label: "Target Update Server",
-                type: "select",
-                options: serverOptions,
-                get: () => this.setupState.selectedServerId,
-                set: (v) => (this.setupState.selectedServerId = v),
-              },
-              {
-                id: "refresh_servers",
-                label: "Refresh Server List",
-                type: "action",
-                action: async () => {
-                  this.showToast("Refreshing...", "info");
-                  this.updateServers =
-                    await window.desktopIntegration.ipc.invoke(
-                      "get-update-servers",
-                    );
-                  this.buildSettingsMap();
-                  this.renderView();
+      ...(isEmbedded
+        ? {}
+        : {
+            sync: {
+              title: "Network Sync",
+              groups: [
+                {
+                  title: "Server Configuration",
+                  items: [
+                    {
+                      id: "server_select",
+                      label: "Target Update Server",
+                      type: "select",
+                      options: serverOptions,
+                      get: () => this.setupState.selectedServerId,
+                      set: (v) => (this.setupState.selectedServerId = v),
+                    },
+                    {
+                      id: "refresh_servers",
+                      label: "Refresh Server List",
+                      type: "action",
+                      action: async () => {
+                        this.showToast("Refreshing...", "info");
+                        this.updateServers =
+                          await window.desktopIntegration.ipc.invoke(
+                            "get-update-servers",
+                          );
+                        await this.buildSettingsMap();
+                        this.renderView();
+                      },
+                    },
+                  ],
                 },
-              },
-            ],
-          },
-          {
-            title: "Sync Actions",
-            items: [
-              {
-                id: "start_sync",
-                label: "Start Network Download",
-                type: "action",
-                action: () => this.startNetworkSync(),
-              },
-            ],
-          },
-        ],
-      },
+                {
+                  title: "Sync Actions",
+                  items: [
+                    {
+                      id: "start_sync",
+                      label: "Start Network Download",
+                      type: "action",
+                      action: () => this.startNetworkSync(),
+                    },
+                  ],
+                },
+              ],
+            },
+          }),
       audio: {
         title: "Sound Settings",
         groups: [
@@ -491,9 +498,9 @@ export default class SetupManager {
                 type: "select",
                 options: mainMidiOptions,
                 get: () => this.getMidiPortConfig(0),
-                set: (v) => {
+                set: async (v) => {
                   this.updateMidiPortConfig(0, v);
-                  this.buildSettingsMap();
+                  await this.buildSettingsMap();
                   if (
                     this.setupState.submenuIndex >=
                     this.getSubmenuItems(this.setupState.activeMenuId).length
@@ -541,7 +548,7 @@ export default class SetupManager {
                     this.midiOutputDevices =
                       await this.ctx.services.Forte.getMidiOutputDevices();
                   }
-                  this.buildSettingsMap();
+                  await this.buildSettingsMap();
                   this.renderView();
                   this.showToast("Device list updated", "success");
                 },
@@ -2369,7 +2376,7 @@ export default class SetupManager {
       if (id === "sync") {
         this.updateServers =
           await window.desktopIntegration.ipc.invoke("get-update-servers");
-        this.buildSettingsMap();
+        await this.buildSettingsMap();
       }
       this.transitionTo("submenu", {
         activeMenuId: id,
@@ -2391,7 +2398,7 @@ export default class SetupManager {
     this.currentManifest = newLib.manifest;
     window.config.setItem("libraryPath", newLib.path);
     this.showToast(`Library set to: ${newLib.manifest.title}`, "success");
-    this.buildSettingsMap();
+    await this.buildSettingsMap();
     await this.triggerLibraryBuild(true);
   }
 
