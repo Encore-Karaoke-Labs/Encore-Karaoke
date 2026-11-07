@@ -1,5 +1,6 @@
 import { Peer } from "peerjs";
 import Html from "../../../libs/html.js";
+import { findSongByCode } from "../../../libs/songLookup.js";
 
 export default class NetworkManager {
   /**
@@ -531,10 +532,7 @@ export default class NetworkManager {
           break;
 
         case "reserve_code":
-          const s =
-            state.songMap.get(d.value) ??
-            state.songMap.get(d.value.padStart(5, "0")) ??
-            state.songMap.get(d.value.padStart(6, "0"));
+          const s = findSongByCode(state.songMap, d.value);
           if (s) {
             state.mode === "menu"
               ? root.playback.startPlayer(s)
