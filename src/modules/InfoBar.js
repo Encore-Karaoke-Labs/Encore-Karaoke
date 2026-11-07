@@ -1,4 +1,5 @@
 import Html from "../libs/html.js";
+import { findSongByCode } from "../libs/songLookup.js";
 
 export const DEFAULT_INFO_BAR_ICON = "information-circle";
 
@@ -395,10 +396,7 @@ export class InfoBarModule {
   showReservation(reservationNumber) {
     const displayCode = reservationNumber.padStart(6, "0");
     const { songMap } = this.getState() || {};
-    const song =
-      songMap?.get(reservationNumber) ??
-      songMap?.get(reservationNumber.padStart(5, "0")) ??
-      songMap?.get(displayCode);
+    const song = findSongByCode(songMap, reservationNumber);
 
     let songInfo = song
       ? `<span class="info-bar-title">${song.title}</span><span class="info-bar-artist">- ${song.artist}</span>`
