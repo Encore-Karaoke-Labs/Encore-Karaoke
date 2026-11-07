@@ -478,6 +478,18 @@ export default class InputManager {
 
     if (e.key.toLowerCase() === "r") {
       if (state.isTypingNumber && state.mode === "menu") {
+        if (state.isSessionActive) {
+          modules.infoBar.showTemp(
+            "RECORDING",
+            "Disabled during an active Session.",
+            4000,
+          );
+          modules.dialog(
+            new Html("div").classOn("temp-dialog-text").text("NOT AVAILABLE"),
+            2000,
+          );
+          return;
+        }
         const song = findSongByCode(state.songMap, state.songNumber);
         if (song) {
           state.songNumber = "";
