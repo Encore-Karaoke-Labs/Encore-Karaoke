@@ -1,5 +1,6 @@
 import Html from "../../libs/html.js";
 import NetworkingUtility from "../../libs/networkingUtility.js";
+import { findSongByCode } from "../../libs/songLookup.js";
 
 import DriveRecoveryManager from "./managers/DriveRecoveryManager.js";
 import GamesManager from "./managers/GamesManager.js";
@@ -182,9 +183,7 @@ class EncoreController {
         }
 
         if (currentSong && currentSong.code && this.state.songMap) {
-          const localMatch =
-            this.state.songMap.get(Number(currentSong.code)) ||
-            this.state.songMap.get(String(currentSong.code));
+          const localMatch = findSongByCode(this.state.songMap, currentSong.code);
           if (localMatch) {
             currentSong = { ...localMatch, ...currentSong };
           }
@@ -256,9 +255,7 @@ class EncoreController {
 
     let enriched = song;
     if (song.code && this.state.songMap) {
-      const localMatch =
-        this.state.songMap.get(Number(song.code)) ||
-        this.state.songMap.get(String(song.code));
+      const localMatch = findSongByCode(this.state.songMap, song.code);
       if (localMatch) {
         enriched = { ...localMatch, ...song };
       }
@@ -384,11 +381,7 @@ class EncoreController {
 
         if (typeof payload === "string" || typeof payload === "number") {
           const str = String(payload).trim();
-          song =
-            this.state.songMap.get(str) ||
-            this.state.songMap.get(Number(str)) ||
-            this.state.songMap.get(str.padStart(6, "0")) ||
-            null;
+          song = findSongByCode(this.state.songMap, str);
         }
 
         if (!song) {
@@ -427,9 +420,7 @@ class EncoreController {
         let currentSong = this.state.currentSong || null;
 
         if (currentSong && currentSong.code && this.state.songMap) {
-          const match =
-            this.state.songMap.get(Number(currentSong.code)) ||
-            this.state.songMap.get(String(currentSong.code));
+          const match = findSongByCode(this.state.songMap, currentSong.code);
           if (match) currentSong = { ...match, ...currentSong };
         }
 
