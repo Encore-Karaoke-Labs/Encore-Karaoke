@@ -1483,6 +1483,7 @@ window.updateBgvCategoryName = updateBgvCategoryName;
 window.confirmRemoveBgvCategory = confirmRemoveBgvCategory;
 window.addVideoToCategory = addVideoToCategory;
 window.removeVideoFromCategory = removeVideoFromCategory;
+window.setActive = setActive;
 window.addBumperImages = addBumperImages;
 window.removeBumperImage = removeBumperImage;
 
