@@ -1,4 +1,5 @@
 import Html from "../../../libs/html.js";
+import playNavSfx from "../../../libs/sfx.js";
 
 export default class StreamManager {
   /**
@@ -46,7 +47,6 @@ export default class StreamManager {
     this.totalBytesSent = 0;
     this.currentBitrateKbps = 0;
     this.lastChunkTime = null;
-    this.lastNavSfxTime = 0;
 
     // Direct RTMP Telemetry Listeners
     window.desktopIntegration?.ipc?.on?.("stream-stats", (_e, stats) => {
@@ -94,13 +94,7 @@ export default class StreamManager {
    * @param {string} sfxName - The name of the wav file (without extension)
    */
   playNavSfx(sfxName) {
-    if (this.ctx.state.isNavSfxEnabled === false) return;
-
-    const now = Date.now();
-    if (now - this.lastNavSfxTime < 80) return;
-
-    this.lastNavSfxTime = now;
-    this.ctx.services.Forte?.playSfx(`/assets/audio/${sfxName}.wav`);
+    return playNavSfx(this.ctx, sfxName);
   }
 
   /**
