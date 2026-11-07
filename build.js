@@ -86,8 +86,8 @@ const buildOS = esbuild.build({
 const windowEntryPoints = [];
 if (fs.existsSync("src/windows/titlebar.js"))
   windowEntryPoints.push("src/windows/titlebar.js");
-if (fs.existsSync("src/windows/library-manager.js"))
-  windowEntryPoints.push("src/windows/library-manager.js");
+if (fs.existsSync("src/windows/library-manager/library-manager.js"))
+  windowEntryPoints.push("src/windows/library-manager/library-manager.js");
 
 let buildWindows = Promise.resolve();
 if (windowEntryPoints.length > 0) {
@@ -149,6 +149,18 @@ Promise.all([buildMain, buildPreload, buildOS, buildWindows, buildCSS])
         if (file.endsWith(".html") || file.endsWith(".css")) {
           fs.copyFileSync(
             path.join(windowsDir, file),
+            path.join("dist/resources", file),
+          );
+        }
+      });
+    }
+
+    const lmDir = path.join(windowsDir, "library-manager");
+    if (fs.existsSync(lmDir)) {
+      fs.readdirSync(lmDir).forEach((file) => {
+        if (file.endsWith(".html") || file.endsWith(".css")) {
+          fs.copyFileSync(
+            path.join(lmDir, file),
             path.join("dist/resources", file),
           );
         }
