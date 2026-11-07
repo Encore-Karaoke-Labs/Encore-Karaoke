@@ -1,5 +1,6 @@
 import Html from "../../../libs/html.js";
 import { findSongByCode } from "../../../libs/songLookup.js";
+import playNavSfx from "../../../libs/sfx.js";
 
 /**
  * @param {Object} context - The shared context
@@ -21,7 +22,6 @@ export default class InputManager {
       { label: "STRONG", value: 127 },
     ];
     this.currentGuideMelodyIndex = 2;
-    this.lastNavSfxTime = 0;
   }
 
   /**
@@ -29,13 +29,7 @@ export default class InputManager {
    * @param {string} sfxName - The name of the wav file (without extension)
    */
   playNavSfx(sfxName) {
-    if (this.ctx.state.isNavSfxEnabled === false) return;
-
-    const now = Date.now();
-    if (now - this.lastNavSfxTime < 80) return;
-
-    this.lastNavSfxTime = now;
-    this.ctx.services.Forte.playSfx(`/assets/audio/${sfxName}.wav`);
+    return playNavSfx(this.ctx, sfxName);
   }
 
   /**
