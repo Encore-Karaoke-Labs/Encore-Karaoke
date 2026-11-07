@@ -1,3 +1,5 @@
+import { findSongByCode } from "../../libs/songLookup.js";
+
 const V_WIDTH = 1920;
 const V_HEIGHT = 1080;
 
@@ -415,10 +417,7 @@ export default class RouletteGame {
       (!this.rollTargetSong.path || !this.rollTargetSong.artist) &&
       this.ctx.state.songMap
     ) {
-      const match =
-        this.ctx.state.songMap.get(this.rollTargetSong.code) ||
-        this.ctx.state.songMap.get(Number(this.rollTargetSong.code)) ||
-        this.ctx.state.songMap.get(String(this.rollTargetSong.code));
+      const match = findSongByCode(this.ctx.state.songMap, this.rollTargetSong.code);
       if (match) {
         this.rollTargetSong = { ...match, ...this.rollTargetSong };
       }
