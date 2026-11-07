@@ -477,6 +477,17 @@ export default class InputManager {
     }
 
     if (e.key.toLowerCase() === "r") {
+      if (state.isTypingNumber && state.mode === "menu") {
+        const song = findSongByCode(state.songMap, state.songNumber);
+        if (song) {
+          state.songNumber = "";
+          state.isTypingNumber = false;
+          playback.startPlayer(song).then(() => {
+            modules.recorder.start();
+          });
+        }
+        return;
+      }
       if (state.mode === "player" && !state.currentSongIsYouTube) {
         if (state.isSessionActive) {
           modules.infoBar.showTemp(
