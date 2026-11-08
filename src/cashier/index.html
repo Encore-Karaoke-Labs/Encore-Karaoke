@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Encore Cashier</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="titlebar">
+      <div class="titlebar-title">ENCORE CASHIER</div>
+      <div class="window-controls" id="window-controls">
+        <button tabindex="-1" onclick="ipcSend('window-minimize')">
+          <svg width="12" height="12" viewBox="0 0 16 16">
+            <path
+              d="M2,8 h12"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              fill="none"
+            />
+          </svg>
+        </button>
+        <button tabindex="-1" onclick="ipcSend('window-maximize')">
+          <svg width="12" height="12" viewBox="0 0 16 16">
+            <rect
+              x="2"
+              y="2"
+              width="12"
+              height="12"
+              rx="2"
+              stroke="currentColor"
+              stroke-width="3"
+              fill="none"
+            />
+          </svg>
+        </button>
+        <button
+          tabindex="-1"
+          class="close-btn"
+          onclick="ipcSend('window-close')"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16">
+            <path
+              d="M3,3 l10,10 M13,3 l-10,10"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              fill="none"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="app-body">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h1>CASHIER PORTAL</h1>
+          <div class="sidebar-subtitle">Select target user</div>
+        </div>
+        <div class="user-list" id="user-list"></div>
+        <div class="sidebar-footer">
+          <button class="btn btn-warning" id="reset-all" onclick="resetAllUsers()">
+            RESET ALL USERS TO 0
+          </button>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <div class="status-indicator" id="conn-status">CONNECTING...</div>
+
+        <div class="retail-banner hidden" id="retail-banner">
+          RETAIL MODE IS DISABLED
+        </div>
+
+        <div class="target-block">
+          <div class="target-label">SELECTED TARGET</div>
+          <h2 class="target-name" id="selected-user-name">HOST KIOSK</h2>
+        </div>
+
+        <div class="credits-box" id="credits-box">
+          <div class="credits-label">CURRENT CREDITS</div>
+          <div class="credits-val" id="credits-display">--</div>
+          <div class="credits-sub" id="credits-sub">Waiting for host...</div>
+        </div>
+
+        <div class="grid">
+          <button class="btn btn-primary" onclick="addCredits(1)">
+            +1 CREDIT
+          </button>
+          <button class="btn btn-primary" onclick="addCredits(5)">
+            +5 CREDITS
+          </button>
+          <button class="btn btn-primary" onclick="addCredits(10)">
+            +10 CREDITS
+          </button>
+          <button class="btn btn-danger" id="freeplay-btn" onclick="toggleFreePlay()">
+            TOGGLE FREE PLAY
+          </button>
+          <button class="btn btn-danger" onclick="resetTargetCredits()">
+            RESET TO ZERO
+          </button>
+        </div>
+
+        <div class="unit-note" id="unit-note"></div>
+      </main>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
