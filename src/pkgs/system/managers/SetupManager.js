@@ -318,6 +318,7 @@ export default class SetupManager {
       { id: "audio", label: "Sound Settings", icon: "volume-high" },
       { id: "mic", label: "Mic & Scoring Settings", icon: "mic" },
       { id: "video", label: "Video Settings", icon: "tv" },
+      { id: "retail", label: "Retail Settings", icon: "card" },
       { id: "security", label: "User Security", icon: "lock-closed" },
       {
         id: "firmware",
@@ -415,6 +416,76 @@ export default class SetupManager {
                 label: "Rescan & Change Library",
                 type: "action",
                 action: async () => await this.handleLibraryScan(),
+              },
+            ],
+          },
+        ],
+      },
+      retail: {
+        title: "Retail Settings",
+        groups: [
+          {
+            title: "Retail Mode",
+            items: [
+              {
+                id: "retail_enabled",
+                label: "Enable Retail Mode",
+                type: "select",
+                options: [
+                  { value: false, label: "Disabled" },
+                  { value: true, label: "Enabled" },
+                ],
+                get: () => this.ctx.root.retail?.enabled ?? false,
+                set: (v) => {
+                  this.ctx.root.retail?.setEnabled(v);
+                  this.ctx.config.retailConfig ??= {};
+                  this.ctx.config.retailConfig.enabled = v;
+                  this.renderView();
+                },
+              },
+              {
+                id: "retail_unit",
+                label: "Credit Represents",
+                type: "select",
+                options: [
+                  { value: "songs", label: "Song Count" },
+                  { value: "time", label: "Session Time" },
+                ],
+                get: () => this.ctx.root.retail?.creditUnit ?? "songs",
+                set: (v) => {
+                  this.ctx.root.retail?.setCreditUnit(v);
+                  this.ctx.config.retailConfig ??= {};
+                  this.ctx.config.retailConfig.creditUnit = v;
+                  this.renderView();
+                },
+              },
+              {
+                id: "retail_value",
+                label: "Credit Value (songs or minutes)",
+                type: "range",
+                min: 1,
+                max: 60,
+                step: 1,
+                get: () => this.ctx.root.retail?.creditValue ?? 1,
+                set: (v) => {
+                  this.ctx.root.retail?.setCreditValue(v);
+                  this.ctx.config.retailConfig ??= {};
+                  this.ctx.config.retailConfig.creditValue = v;
+                },
+              },
+            ],
+          },
+          {
+            title: "Balance Management",
+            items: [
+              {
+                id: "retail_open_cashier",
+                label: "Open Cashier Portal",
+                type: "action",
+                action: () => {
+                  window.desktopIntegration.ipc.send("open-cashier");
+                  this.showToast("Opening Cashier...", "info");
+                },
               },
             ],
           },
@@ -1245,84 +1316,86 @@ export default class SetupManager {
                 {
                   title: "Software Updates",
                   items: [
-              {
-                id: "check_on_startup",
-                label: "Notify Updates on Startup",
-                type: "select",
-                options: [
-                  { value: false, label: "No" },
-                  { value: true, label: "Yes" },
-                ],
-                get: () => this.ctx.config.checkUpdatesOnStartup ?? true,
-                set: (v) => {
-                  this.ctx.config.checkUpdatesOnStartup = v;
-                  window.config.setItem("checkUpdatesOnStartup", v);
-                },
-              },
-              {
-                id: "release_channel",
-                label: "Release Channel",
-                type: "select",
-                options: [
-                  { value: "RELEASE", label: "Stable" },
-                  { value: "BETA", label: "Beta" },
-                ],
-                get: () =>
-                  this.ctx.config.releaseChannel ??
-                  this.versionInformation.channel,
-                set: (v) => {
-                  this.ctx.config.releaseChannel = v;
-                  window.config.setItem("releaseChannel", v);
-                },
-              },
-              {
-                id: "about_release_channels",
-                label: "About Release Channels",
-                type: "info-action",
-                get: () => "Press Enter to learn more",
-                action: () => {
-                  this.setupState.dialog = {
-                    title: "About Release Channels",
-                    content:
-                      "Encore has two release channels: The Beta (Pre-Release) channel, and the Stable channel. You get the latest features in Beta, while the Stable version gives you the most stability.",
-                  };
-                  this.renderView();
-                },
-              },
-              {
-                id: "check_for_updates",
-                label: "Check for Updates",
-                type: "info-action",
-                get: () => "Press Enter to check",
-                action: async () => {
-                  let infoBarTimeout = setTimeout(() => {
-                    this.showToast("Checking for updates...");
-                  }, 1000);
-                  await this.ctx.services.Updates.refreshUpdateInformation();
-                  let updateInfo =
-                    await this.ctx.services.Updates.getUpdateInformation();
+                    {
+                      id: "check_on_startup",
+                      label: "Notify Updates on Startup",
+                      type: "select",
+                      options: [
+                        { value: false, label: "No" },
+                        { value: true, label: "Yes" },
+                      ],
+                      get: () => this.ctx.config.checkUpdatesOnStartup ?? true,
+                      set: (v) => {
+                        this.ctx.config.checkUpdatesOnStartup = v;
+                        window.config.setItem("checkUpdatesOnStartup", v);
+                      },
+                    },
+                    {
+                      id: "release_channel",
+                      label: "Release Channel",
+                      type: "select",
+                      options: [
+                        { value: "RELEASE", label: "Stable" },
+                        { value: "BETA", label: "Beta" },
+                      ],
+                      get: () =>
+                        this.ctx.config.releaseChannel ??
+                        this.versionInformation.channel,
+                      set: (v) => {
+                        this.ctx.config.releaseChannel = v;
+                        window.config.setItem("releaseChannel", v);
+                      },
+                    },
+                    {
+                      id: "about_release_channels",
+                      label: "About Release Channels",
+                      type: "info-action",
+                      get: () => "Press Enter to learn more",
+                      action: () => {
+                        this.setupState.dialog = {
+                          title: "About Release Channels",
+                          content:
+                            "Encore has two release channels: The Beta (Pre-Release) channel, and the Stable channel. You get the latest features in Beta, while the Stable version gives you the most stability.",
+                        };
+                        this.renderView();
+                      },
+                    },
+                    {
+                      id: "check_for_updates",
+                      label: "Check for Updates",
+                      type: "info-action",
+                      get: () => "Press Enter to check",
+                      action: async () => {
+                        let infoBarTimeout = setTimeout(() => {
+                          this.showToast("Checking for updates...");
+                        }, 1000);
+                        await this.ctx.services.Updates.refreshUpdateInformation();
+                        let updateInfo =
+                          await this.ctx.services.Updates.getUpdateInformation();
 
-                  clearTimeout(infoBarTimeout);
+                        clearTimeout(infoBarTimeout);
 
-                  this.setupState.dialog = {
-                    title: "Check for Updates",
-                    content: "You are up to date.",
-                  };
+                        this.setupState.dialog = {
+                          title: "Check for Updates",
+                          content: "You are up to date.",
+                        };
 
-                  if (updateInfo.number != this.versionInformation.number) {
-                    if (
-                      this.ctx.config.releaseChannel == "BETA" ||
-                      updateInfo.channel == "RELEASE"
-                    ) {
-                      this.setupState.dialog.content = `You have a new update: v${updateInfo.number} ${updateInfo.channel} (${updateInfo.codename})`;
-                    }
-                  }
-                  this.renderView();
+                        if (
+                          updateInfo.number != this.versionInformation.number
+                        ) {
+                          if (
+                            this.ctx.config.releaseChannel == "BETA" ||
+                            updateInfo.channel == "RELEASE"
+                          ) {
+                            this.setupState.dialog.content = `You have a new update: v${updateInfo.number} ${updateInfo.channel} (${updateInfo.codename})`;
+                          }
+                        }
+                        this.renderView();
+                      },
+                    },
+                  ],
                 },
-              },
-            ],
-          },
-          ]),
+              ]),
         ],
       },
     };
@@ -1860,7 +1933,11 @@ export default class SetupManager {
   }
 
   findSongByCode(rawCode) {
-    return lookupSongByCode(this.ctx.state.songMap, rawCode, this.ctx.state.songList);
+    return lookupSongByCode(
+      this.ctx.state.songMap,
+      rawCode,
+      this.ctx.state.songList,
+    );
   }
 
   async launchLyricPreview(song) {
