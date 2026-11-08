@@ -199,6 +199,16 @@
         background: rgba(57, 255, 20, 0.3);
       }
 
+      .cashier-btn {
+        color: #ffd700;
+        border-color: rgba(255, 215, 0, 0.3);
+      }
+      .cashier-btn:hover {
+        background: rgba(255, 215, 0, 0.15);
+        border-color: #ffd700;
+        color: #ffd700;
+      }
+
       .popout-btn {
         color: #ffd700;
         border-color: rgba(255, 215, 0, 0.3);
@@ -223,7 +233,7 @@
         gap: 6px;
       }
 
-      .window-controls button:not(.popout-btn) {
+      .window-controls button:not(.popout-btn):not(.cashier-btn) {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -238,7 +248,7 @@
         outline: none;
       }
 
-      .window-controls button:not(.popout-btn):hover {
+      .window-controls button:not(.popout-btn):not(.cashier-btn):hover {
         background: rgba(137, 207, 240, 0.15);
         border-color: var(--accent);
         color: var(--accent);
@@ -309,6 +319,15 @@
       </div>
 
       <div class="section window-controls" id="window-controls">
+        <button
+          onclick="openCashier()"
+          id="cashier-btn"
+          class="cashier-btn"
+          title="Open the cashier portal"
+          style="display: none"
+        >
+          CASHIER
+        </button>
         <button
           onclick="togglePopout()"
           id="popout-btn"
@@ -386,6 +405,25 @@
       function openLibraryManager() {
         window.desktopIntegration.ipc.send("open-library-manager");
       }
+
+      const cashierBtn = document.getElementById("cashier-btn");
+
+      function openCashier() {
+        window.desktopIntegration.ipc.send("open-cashier");
+      }
+
+      function setCashierVisibility(enabled) {
+        if (cashierBtn) cashierBtn.style.display = enabled ? "" : "none";
+      }
+
+      window.desktopIntegration.ipc
+        .invoke("retail-get-enabled")
+        .then(setCashierVisibility);
+
+      window.desktopIntegration.ipc.on(
+        "retail-state-changed",
+        (_event, enabled) => setCashierVisibility(Boolean(enabled)),
+      );
 
       const npTitle = document.getElementById("np-title");
       const npArtist = document.getElementById("np-artist");
