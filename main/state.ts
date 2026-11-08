@@ -20,6 +20,7 @@ export interface AppState {
   controlView: WebContentsView | null;
   popoutWindow: BrowserWindow | null;
   libraryManagerWin: BrowserWindow | null;
+  cashierWin: BrowserWindow | null;
   isAppQuitting: boolean;
   isRendererReady: boolean;
   isSongbookBuildActive: boolean;
@@ -40,6 +41,7 @@ export const appState: AppState = {
   controlView: null,
   popoutWindow: null,
   libraryManagerWin: null,
+  cashierWin: null,
   isAppQuitting: false,
   isRendererReady: false,
   isSongbookBuildActive: false,
