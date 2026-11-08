@@ -129,11 +129,21 @@ export default class NetworkManager {
       })
       .filter(Boolean);
 
+    const retailState = this.ctx.root.retail?.getPublicState();
+
     this.socket.emit("broadcastData", {
       type: "social_update",
       typing: typingNicks,
       usersCount: activeUsersCount,
-      users: state.deviceRegistry,
+      users: retailState?.users ?? state.deviceRegistry,
+      freePlay: retailState?.freePlay ?? false,
+      retail: retailState
+        ? {
+            enabled: retailState.enabled,
+            creditUnit: retailState.creditUnit,
+            creditValue: retailState.creditValue,
+          }
+        : null,
     });
   }
 
@@ -295,6 +305,10 @@ export default class NetworkManager {
     this.socket.on("execute-command", async (cmd) => {
       const d = cmd.data;
 
+      if (this.ctx.root.retail?.handleCommand(d.type, d.value)) {
+        return;
+      }
+
       if (d.type === "set_nickname") {
         const deviceId = d.deviceId || cmd.identity;
         const existingNames = Object.entries(state.deviceRegistry)
@@ -306,7 +320,13 @@ export default class NetworkManager {
           existingNames,
         );
 
-        state.deviceRegistry[deviceId] = { nickname: uniqueName };
+        if (this.ctx.root.retail) {
+          this.ctx.root.retail.setDeviceNickname(deviceId, uniqueName);
+        } else if (state.deviceRegistry[deviceId]) {
+          state.deviceRegistry[deviceId].nickname = uniqueName;
+        } else {
+          state.deviceRegistry[deviceId] = { nickname: uniqueName };
+        }
         state.activeSockets[cmd.identity] = deviceId;
 
         this.socket.emit("sendData", {
@@ -534,6 +554,18 @@ export default class NetworkManager {
         case "reserve_code":
           const s = findSongByCode(state.songMap, d.value);
           if (s) {
+            if (!this.ctx.root.retail?.authorizeRemote(cmd.identity)) {
+              this.socket.emit("sendData", {
+                identity: cmd.identity,
+                data: {
+                  type: "reserve_response",
+                  success: false,
+                  reason: "No credits",
+                },
+              });
+              break;
+            }
+
             state.mode === "menu"
               ? root.playback.startPlayer(s)
               : (state.reservationQueue.push(s),
@@ -595,7 +627,19 @@ export default class NetworkManager {
           })();
           break;
 
-        case "reserve_yt":
+        case "reserve_yt": {
+          if (!this.ctx.root.retail?.authorizeRemote(cmd.identity)) {
+            this.socket.emit("sendData", {
+              identity: cmd.identity,
+              data: {
+                type: "reserve_response",
+                success: false,
+                reason: "No credits",
+              },
+            });
+            break;
+          }
+
           const ytSong = {
             title: d.value.title,
             artist: d.value.artist || d.value.channelTitle,
@@ -613,6 +657,8 @@ export default class NetworkManager {
             identity: cmd.identity,
             data: { type: "reserve_response", success: true, song: ytSong },
           });
+          break;
+        }
 
         case "request_camera_peer":
           const cameraSvc = this.ctx.services.CameraSvc;
