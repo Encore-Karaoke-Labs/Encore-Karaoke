@@ -434,6 +434,24 @@ export class WebServer {
         return;
       }
 
+      if (clientType === "cashier") {
+        logger.info("LINK", `Cashier portal connected: ${socket.id}`);
+        socket.on("remote-command", (data: unknown) => {
+          logger.debug(
+            "LINK",
+            `Cashier Command from ${socket.id}: ${JSON.stringify(data)}`,
+          );
+          this.io.to("karaoke-app").emit("execute-command", {
+            identity: socket.id,
+            data,
+          });
+        });
+        socket.on("disconnect", () => {
+          logger.info("LINK", `Cashier portal disconnected: ${socket.id}`);
+        });
+        return;
+      }
+
       if (clientType === "remote") {
         logger.info("LINK", `Local Remote connected: ${socket.id}`);
         this.io.to("karaoke-app").emit("join", {
