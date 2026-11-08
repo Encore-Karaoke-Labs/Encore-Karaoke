@@ -841,6 +841,31 @@
   font-size: 1.6rem;
 }
 
+.credits-display {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  transition:
+    color 0.3s ease,
+    opacity 0.3s ease;
+}
+
+.credits-display.hidden {
+  display: none !important;
+}
+
+.credits-display.has-credits {
+  color: #89cff0;
+}
+
+.credits-display.free-play {
+  color: #ffd700;
+}
+
 .info-bar {
   position: relative;
   height: 100%;
