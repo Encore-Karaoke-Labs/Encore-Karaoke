@@ -34,6 +34,8 @@
     "kuroshiro-analyzer-kuromoji": "^1.1.0",
     "loudness": "^0.4.2",
     "pdfkit": "^0.19.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "systeminformation": "^5.33.1"
   },
   "devDependencies": {
@@ -74,8 +76,6 @@
     "peerjs": "^1.5.5",
     "pitchy": "^4.1.0",
     "qrcode": "^1.5.4",
-    "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3",
     "spessasynth_core": "^4.4.1",
     "spessasynth_lib": "^4.4.0",
     "typescript": "^6.0.3",
