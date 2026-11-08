@@ -486,6 +486,10 @@ export default class InputManager {
         }
         const song = findSongByCode(state.songMap, state.songNumber);
         if (song) {
+          if (!this.ctx.root.retail?.authorizeAndConsume("HOST")) {
+            this.ctx.root.retail?.showInsufficient("play song");
+            return;
+          }
           state.songNumber = "";
           state.isTypingNumber = false;
           playback.startPlayer(song).then(() => {
@@ -1014,7 +1018,11 @@ export default class InputManager {
           if (state.mode === "yt-search") root.ui.setMode("menu");
 
           if (state.isSessionActive) root.sessions.reserveSongInSession(song);
-          else root.playback.startPlayer(song);
+          else if (root.retail?.authorizeAndConsume("HOST")) {
+            root.playback.startPlayer(song);
+          } else {
+            root.retail?.showInsufficient("play song");
+          }
         }
         return;
       }
@@ -1061,6 +1069,11 @@ export default class InputManager {
               root.ui.menuTransitionSource = "none";
             }
 
+            if (!root.retail?.authorizeAndConsume("HOST")) {
+              root.retail?.showInsufficient("play song");
+              return;
+            }
+
             state.songNumber = "";
             state.highlightedIndex = -1;
             state.isTypingNumber = false;
@@ -1084,9 +1097,12 @@ export default class InputManager {
                 };
 
           if (state.isSessionActive) root.sessions.reserveSongInSession(song);
-          else {
+          else if (root.retail?.authorizeAndConsume("HOST")) {
             state.reservationQueue.push(song);
             root.sessions.showReservationNotification(song);
+          } else {
+            root.retail?.showInsufficient("reserve song");
+            return;
           }
 
           state.highlightedSearchIndex = -1;
@@ -1100,8 +1116,11 @@ export default class InputManager {
         const song = findSongByCode(state.songMap, state.reservationNumber);
         if (song) {
           if (state.isSessionActive) root.sessions.reserveSongInSession(song);
-          else {
+          else if (root.retail?.authorizeAndConsume("HOST")) {
             state.reservationQueue.push(song);
+            this._restoreInfoBar();
+          } else {
+            root.retail?.showInsufficient("reserve song");
             this._restoreInfoBar();
           }
         }
@@ -1129,7 +1148,11 @@ export default class InputManager {
       root.ui.renderSearchResults();
 
       if (state.isSessionActive) root.sessions.reserveSongInSession(song);
-      else root.playback.startPlayer(song);
+      else if (root.retail?.authorizeAndConsume("HOST")) {
+        root.playback.startPlayer(song);
+      } else {
+        root.retail?.showInsufficient("play song");
+      }
     }
   }
 
