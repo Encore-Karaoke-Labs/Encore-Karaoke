@@ -10,6 +10,7 @@ import LyricsEngine from "./managers/LyricsEngine.js";
 import NetworkManager from "./managers/NetworkManager.js";
 import PlaybackManager from "./managers/PlaybackManager.js";
 import RecordingsManager from "./managers/RecordingsManager.js";
+import RetailManager from "./managers/RetailManager.js";
 import SessionManager from "./managers/SessionManager.js";
 import SetupManager from "./managers/SetupManager.js";
 import StreamManager from "./managers/StreamManager.js";
@@ -237,6 +238,8 @@ class EncoreController {
     this.lyrics = new LyricsEngine(this.context);
     this.playback = new PlaybackManager(this.context);
     this.network = new NetworkManager(this.context);
+    this.retail = new RetailManager(this.context);
+    this.context.modules.retail = this.retail;
     this.sessions = new SessionManager(this.context);
     this.recordings = new RecordingsManager(this.context);
     this.input = new InputManager(this.context);
@@ -389,6 +392,10 @@ class EncoreController {
         }
 
         if (this.state.mode === "menu") {
+          if (!this.retail.authorizeAndConsume("HOST")) {
+            return { success: false, reason: "Insufficient credits." };
+          }
+
           this.ui.menuTransitionSource = "list";
           this.state.songNumber = "";
           this.state.isTypingNumber = false;
@@ -397,6 +404,10 @@ class EncoreController {
         }
 
         if (this.state.mode.startsWith("player")) {
+          if (!this.retail.authorizeAndConsume("HOST")) {
+            return { success: false, reason: "Insufficient credits." };
+          }
+
           if (this.state.isSessionActive) {
             this.sessions.reserveSongInSession(song);
           } else {
@@ -1006,6 +1017,7 @@ class EncoreController {
 
     await this.library.init();
     await this.network.init();
+    this.retail.init();
     this.sessions.init();
     this.recordings.init();
     this.lyrics.init();
@@ -1163,6 +1175,7 @@ class EncoreController {
     if (this.stream) this.stream.destroy();
     this.playback.cleanupPlayerEvents();
     this.network.destroy();
+    this.retail.destroy();
     this.sessions.destroy();
     this.setup.destroy();
     this.games.destroy();
