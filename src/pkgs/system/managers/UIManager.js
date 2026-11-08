@@ -689,6 +689,16 @@ export default class UIManager {
       .attr({ name: "wifi" })
       .appendTo(dom.systemIndicators);
 
+    dom.creditsDisplay = new Html("div")
+      .classOn("credits-display", "hidden")
+      .appendTo(dom.systemIndicators);
+    dom.creditsIcon = new Html("ion-icon")
+      .attr({ name: "ticket" })
+      .appendTo(dom.creditsDisplay);
+    dom.creditsText = new Html("span")
+      .classOn("credits-text")
+      .appendTo(dom.creditsDisplay);
+
     dom.batteryDisplay = new Html("div")
       .classOn("battery-display")
       .appendTo(dom.systemIndicators);
@@ -1838,8 +1848,10 @@ export default class UIManager {
             if (state.numberEntryInInfoBar) {
               this.ctx.modules.infoBar.showDefault();
             }
-          } else {
+          } else if (this.ctx.root.retail?.authorizeAndConsume("HOST")) {
             this.ctx.root.playback.startPlayer(song);
+          } else {
+            this.ctx.root.retail?.showInsufficient("play song");
           }
         });
         if (i === state.highlightedIndex) item.classOn("highlighted");
