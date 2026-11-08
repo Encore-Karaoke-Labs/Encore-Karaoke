@@ -26,6 +26,7 @@ import { registerStreamingIpc } from "./main/ipc/streaming";
 import { registerSyncIpc } from "./main/ipc/sync";
 import { registerSongbookIpc } from "./main/songbook";
 import { registerLibraryManagerIpc } from "./main/library-manager";
+import { registerCashierIpc } from "./main/cashier";
 import {
   killAllProcesses,
   registerEmbeddedTerminalIpc,
@@ -155,6 +156,7 @@ void app.whenReady().then(async () => {
   registerSyncIpc();
   registerSongbookIpc();
   registerLibraryManagerIpc();
+  registerCashierIpc();
   registerWindowIpc();
   deepLinks.registerIpc();
   discordRpc.registerIpc();
