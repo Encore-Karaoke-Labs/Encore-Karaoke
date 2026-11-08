@@ -45,6 +45,7 @@ import { dirname as __dirnameFunc } from 'node:path';
 import { createRequire as __createRequire } from 'node:module';
 
 const require = __createRequire(import.meta.url);
+const __dirname = __dirnameFunc(require.resolve("socket.io"));
     `,
   },
   external: [
@@ -120,6 +121,7 @@ Promise.all([buildMain, buildPreload, buildOS, buildWindows, buildCSS])
     copyRecursiveSync("src/remote", "dist/resources/static/remote");
     copyRecursiveSync("src/control", "dist/resources/static/control");
     copyRecursiveSync("src/games", "dist/resources/static/games");
+    copyRecursiveSync("src/cashier", "dist/resources/static/cashier");
 
     const binDir = path.join("dist", "resources", "bin");
     if (!fs.existsSync(binDir)) {
