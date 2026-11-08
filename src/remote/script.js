@@ -287,7 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (payload.type === "reserve_response") {
       if (payload.success) showToast(`Queued: ${payload.song.title}`);
-      else showToast("Song not found.", true);
+      else showToast(payload.reason || "Song not found.", true);
     }
 
     if (payload.type === "yt_search_results") {
