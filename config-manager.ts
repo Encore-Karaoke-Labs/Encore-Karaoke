@@ -29,11 +29,27 @@ export interface VideoConfig {
   syncOffset: number;
 }
 
+export interface RetailDeviceEntry {
+  nickname: string;
+  credits: number;
+  songsRemaining: number;
+  timeRemainingMs: number;
+}
+
+export interface RetailConfig {
+  enabled: boolean;
+  freePlay: boolean;
+  creditUnit: "songs" | "time";
+  creditValue: number;
+  deviceRegistry: Record<string, RetailDeviceEntry>;
+}
+
 export interface AppConfig {
   setupComplete: boolean;
   idleGreeting: string;
   audioConfig: AudioConfig;
   videoConfig: VideoConfig;
+  retailConfig: RetailConfig;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -47,6 +63,20 @@ const DEFAULT_CONFIG: AppConfig = {
   },
   videoConfig: {
     syncOffset: 0,
+  },
+  retailConfig: {
+    enabled: false,
+    freePlay: false,
+    creditUnit: "songs",
+    creditValue: 1,
+    deviceRegistry: {
+      HOST: {
+        nickname: "Main Player",
+        credits: 0,
+        songsRemaining: 0,
+        timeRemainingMs: 0,
+      },
+    },
   },
 };
 
