@@ -21,7 +21,12 @@ const defaultHost = {
 
 let usersData = { HOST: { ...defaultHost } };
 let freePlay = false;
-let retail = { enabled: false, creditUnit: "songs", creditValue: 1 };
+let retail = {
+  enabled: false,
+  creditUnit: "songs",
+  creditValue: 1,
+  timerPaused: false,
+};
 let selectedUserId = "HOST";
 
 const deadlines = {};
@@ -70,6 +75,10 @@ function getRemainingMs(id) {
   if (!entry) return 0;
 
   if (retail.creditUnit === "time") {
+    if (retail.timerPaused) {
+      return Math.max(0, Number(entry.timeRemainingMs) || 0);
+    }
+
     const deadline = deadlines[id];
     if (deadline !== undefined) {
       return Math.max(0, deadline - Date.now());
@@ -210,6 +219,7 @@ function applySocialUpdate(payload) {
       enabled: Boolean(payload.retail.enabled),
       creditUnit: payload.retail.creditUnit === "time" ? "time" : "songs",
       creditValue: Math.max(1, Number(payload.retail.creditValue) || 1),
+      timerPaused: Boolean(payload.retail.timerPaused),
     };
   }
 
