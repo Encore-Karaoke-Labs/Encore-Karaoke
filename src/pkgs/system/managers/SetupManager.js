@@ -44,6 +44,7 @@ export default class SetupManager {
     this.micDevices = [];
     this.playbackDevices = [];
     this.midiOutputDevices = [];
+    this.cameraDevices = [];
     this.updateServers = [];
 
     this.setupState = {
@@ -60,6 +61,7 @@ export default class SetupManager {
       isDataLoaded: false,
       dialog: null,
       previewingVideo: false,
+      previewingCamera: false,
       manualCalib: null,
       syncing: false,
       syncProgress: { current: 0, total: 0, filename: "" },
@@ -157,6 +159,7 @@ export default class SetupManager {
     this.setupState.isDataLoaded = false;
     this.setupState.textEdit = null;
     this.setupState.textEditValue = "";
+    this.setupState.previewingCamera = false;
     this.textEditInput = null;
 
     if (this.ctx.dom.setupContainer) {
@@ -184,6 +187,16 @@ export default class SetupManager {
       if (this.ctx.services.Forte.getMidiOutputDevices) {
         this.midiOutputDevices =
           await this.ctx.services.Forte.getMidiOutputDevices();
+      }
+
+      if (this.ctx.services.CameraSvc?.getVideoDevices) {
+        try {
+          this.cameraDevices =
+            await this.ctx.services.CameraSvc.getVideoDevices();
+        } catch (error) {
+          console.warn("Could not enumerate cameras:", error);
+          this.cameraDevices = [];
+        }
       }
 
       this.updateServers =
@@ -219,6 +232,7 @@ export default class SetupManager {
 
     this.setupState.textEdit = null;
     this.setupState.textEditValue = "";
+    this.setupState.previewingCamera = false;
     this.textEditInput = null;
 
     this.ctx.root.ui.setMode("menu");
@@ -339,6 +353,27 @@ export default class SetupManager {
       label: d.label || "Default",
       value: d.deviceId,
     }));
+
+    const cameraSource = this.ctx.config.videoConfig?.cameraSource || "remote";
+    const savedCameraDeviceId =
+      this.ctx.config.videoConfig?.cameraDeviceId || "";
+    const cameraOptions = [
+      { label: "System Default Camera", value: "" },
+      ...(this.cameraDevices || []).map((d, index) => ({
+        label: d.label?.trim() || `Camera ${index + 1}`,
+        value: d.deviceId,
+      })),
+    ];
+
+    if (
+      savedCameraDeviceId &&
+      !cameraOptions.some((option) => option.value === savedCameraDeviceId)
+    ) {
+      cameraOptions.push({
+        label: "Saved Camera (unavailable)",
+        value: savedCameraDeviceId,
+      });
+    }
 
     // Hardware devices only (excludes "internal")
     const hardwareMidiDevices =
@@ -788,18 +823,21 @@ export default class SetupManager {
                       label: "SoundFont Path (Click to Browse)",
                       type: "info-action",
                       get: () => {
-                        const p = this.ctx.config.audioConfig?.customSoundfontPath;
+                        const p =
+                          this.ctx.config.audioConfig?.customSoundfontPath;
                         if (!p) return "Not Set";
                         return p.length > 35 ? "..." + p.slice(-32) : p;
                       },
                       action: async () => {
-                        const filePath = await window.desktopIntegration.ipc.invoke(
-                          "select-soundfont-file",
-                        );
+                        const filePath =
+                          await window.desktopIntegration.ipc.invoke(
+                            "select-soundfont-file",
+                          );
 
                         if (filePath) {
                           this.ctx.config.audioConfig ??= {};
-                          this.ctx.config.audioConfig.customSoundfontPath = filePath;
+                          this.ctx.config.audioConfig.customSoundfontPath =
+                            filePath;
                           this.ctx.config.audioConfig.soundfontMode = "custom";
                           this.ctx.config.audioConfig.useLibraryFont = false;
 
@@ -811,18 +849,27 @@ export default class SetupManager {
                             "audioConfig.soundfontMode",
                             "custom",
                           );
-                          window.config.setItem("audioConfig.useLibraryFont", false);
+                          window.config.setItem(
+                            "audioConfig.useLibraryFont",
+                            false,
+                          );
 
                           this.showToast("Loading custom soundfont...", "info");
 
-                          const url = await NetworkingUtility.getFileLink(filePath);
+                          const url =
+                            await NetworkingUtility.getFileLink(filePath);
 
                           try {
-                            await this.ctx.services.Forte.loadSoundFont(url.href);
+                            await this.ctx.services.Forte.loadSoundFont(
+                              url.href,
+                            );
                             this.showToast("Loaded successfully", "success");
                             this.renderView();
                           } catch (err) {
-                            console.error("Failed to load custom soundfont:", err);
+                            console.error(
+                              "Failed to load custom soundfont:",
+                              err,
+                            );
                             this.showToast("Failed to load soundfont", "error");
                           }
                         }
@@ -1060,6 +1107,43 @@ export default class SetupManager {
       video: {
         title: "Video Settings",
         groups: [
+          {
+            title: "Camera",
+            items: [
+              {
+                id: "camera_source",
+                label: "Camera Source",
+                type: "select",
+                options: [
+                  { value: "remote", label: "Remote Device (Phone)" },
+                  { value: "local", label: "Physical Camera" },
+                  { value: "off", label: "Disabled" },
+                ],
+                get: () => cameraSource,
+                set: (v) => this.setCameraSource(v),
+              },
+              {
+                id: "camera_device",
+                label: "Physical Camera Device",
+                type: "select",
+                options: cameraOptions,
+                get: () => this.ctx.config.videoConfig?.cameraDeviceId || "",
+                set: (v) => this.setCameraDevice(v),
+              },
+              {
+                id: "camera_refresh",
+                label: "Refresh Camera List",
+                type: "action",
+                action: () => this.refreshCameraDevices(),
+              },
+              {
+                id: "camera_preview",
+                label: "Preview Active Camera",
+                type: "action",
+                action: () => this.previewCamera(),
+              },
+            ],
+          },
           {
             title: "Display & Window",
             items: [
@@ -1552,6 +1636,13 @@ export default class SetupManager {
             this.renderView();
           }, 450);
         }
+      }
+      return;
+    }
+
+    if (this.setupState.previewingCamera) {
+      if (e.key === "Enter" || e.key === "Escape") {
+        this.closeCameraPreview();
       }
       return;
     }
@@ -2568,6 +2659,126 @@ export default class SetupManager {
     this.renderView();
   }
 
+  async setCameraSource(value) {
+    this.ctx.config.videoConfig ??= {};
+    this.ctx.config.videoConfig.cameraSource = value;
+    window.config.setItem("videoConfig.cameraSource", value);
+
+    const camera = this.ctx.services.CameraSvc;
+    const deviceId = this.ctx.config.videoConfig.cameraDeviceId || "";
+
+    try {
+      if (value === "local") {
+        this.showToast("Starting physical camera...", "info");
+      }
+
+      if (camera?.applySource) {
+        await camera.applySource(value, deviceId);
+      }
+
+      if (value === "local") {
+        if (camera?.getActiveStream?.()) {
+          this.cameraDevices = (await camera.getVideoDevices?.()) || [];
+          this.showToast("Physical camera started", "success");
+        } else {
+          this.showToast("No physical camera feed available", "error");
+        }
+      } else if (value === "off") {
+        this.showToast("Camera disabled", "info");
+      } else {
+        this.showToast("Remote camera enabled", "info");
+      }
+    } catch (error) {
+      console.error("Failed to change camera source:", error);
+      this.showToast("Could not start the physical camera", "error");
+    }
+
+    await this.buildSettingsMap();
+    this.renderView();
+  }
+
+  async setCameraDevice(deviceId) {
+    this.ctx.config.videoConfig ??= {};
+    this.ctx.config.videoConfig.cameraDeviceId = deviceId;
+    this.ctx.config.videoConfig.cameraSource = "local";
+    window.config.setItem("videoConfig.cameraDeviceId", deviceId);
+    window.config.setItem("videoConfig.cameraSource", "local");
+
+    const camera = this.ctx.services.CameraSvc;
+
+    try {
+      this.showToast("Starting physical camera...", "info");
+      if (camera?.applySource) {
+        await camera.applySource("local", deviceId);
+      }
+      this.cameraDevices = (await camera?.getVideoDevices?.()) || [];
+      this.showToast(
+        camera?.getActiveStream?.()
+          ? "Physical camera started"
+          : "No physical camera feed available",
+        camera?.getActiveStream?.() ? "success" : "error",
+      );
+    } catch (error) {
+      console.error("Failed to start the selected camera:", error);
+      this.showToast("Could not start the selected camera", "error");
+    }
+
+    await this.buildSettingsMap();
+    this.renderView();
+  }
+
+  async refreshCameraDevices() {
+    const camera = this.ctx.services.CameraSvc;
+    if (!camera?.getVideoDevices) {
+      this.showToast("Camera enumeration is unavailable", "error");
+      return;
+    }
+
+    this.showToast("Scanning for cameras...", "info");
+    this.cameraDevices = await camera.getVideoDevices(true);
+    await this.buildSettingsMap();
+    this.renderView();
+    this.showToast(
+      this.cameraDevices.length > 0
+        ? "Camera list updated"
+        : "No cameras found",
+      this.cameraDevices.length > 0 ? "success" : "error",
+    );
+  }
+
+  async previewCamera() {
+    const camera = this.ctx.services.CameraSvc;
+    let stream = camera?.getActiveStream?.();
+
+    if (!stream && this.ctx.config.videoConfig?.cameraSource === "local") {
+      try {
+        await camera?.applySource?.(
+          "local",
+          this.ctx.config.videoConfig?.cameraDeviceId || "",
+        );
+        stream = camera?.getActiveStream?.();
+      } catch (error) {
+        console.error("Failed to start camera for preview:", error);
+      }
+    }
+
+    if (!stream) {
+      this.showToast(
+        "No camera feed is active. Select a physical camera or connect a phone.",
+        "info",
+      );
+      return;
+    }
+
+    this.setupState.previewingCamera = true;
+    this.renderView();
+  }
+
+  closeCameraPreview() {
+    this.setupState.previewingCamera = false;
+    this.renderView();
+  }
+
   showToast(msg, type) {
     this.ctx.modules.infoBar.showTemp("SETUP", msg, 3000);
   }
@@ -2604,6 +2815,10 @@ export default class SetupManager {
     }
     if (this.setupState.manualCalib?.active) {
       this.renderManualCalibrationOverlay(this.ctx.dom.setupContainer);
+      return;
+    }
+    if (this.setupState.previewingCamera) {
+      this.renderCameraPreviewOverlay(this.ctx.dom.setupContainer);
       return;
     }
     if (this.setupState.showingVersionCard) {
@@ -2936,6 +3151,44 @@ export default class SetupManager {
       .styleJs({ margin: "1rem auto 0 auto" })
       .text("Save & Exit (ENTER)")
       .on("click", () => this.stopVideoPreview())
+      .appendTo(hud);
+  }
+
+  renderCameraPreviewOverlay(container) {
+    const overlay = new Html("div")
+      .classOn("setup-video-preview-overlay")
+      .appendTo(container);
+
+    const stream = this.ctx.services.CameraSvc?.getActiveStream?.();
+
+    if (stream) {
+      const video = new Html("video")
+        .classOn("setup-preview-video")
+        .attr({ autoplay: true, muted: true, playsInline: true })
+        .appendTo(overlay);
+
+      video.elm.muted = true;
+      video.elm.srcObject = stream;
+      video.elm
+        .play()
+        .catch((error) =>
+          console.warn("[SETUP] Camera preview could not start:", error),
+        );
+    }
+
+    const hud = new Html("div").classOn("setup-preview-hud").appendTo(overlay);
+    new Html("h2").text("CAMERA PREVIEW").appendTo(hud);
+
+    if (!stream) {
+      new Html("p").text("No camera feed is active.").appendTo(hud);
+    }
+
+    new Html("p").text("Press ENTER or ESC to close").appendTo(hud);
+    new Html("button")
+      .classOn("box", "positive")
+      .styleJs({ margin: "1rem auto 0 auto" })
+      .text("Close (ESC)")
+      .on("click", () => this.closeCameraPreview())
       .appendTo(hud);
   }
 
