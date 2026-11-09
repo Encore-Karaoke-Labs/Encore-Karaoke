@@ -142,6 +142,7 @@ export default class NetworkManager {
             enabled: retailState.enabled,
             creditUnit: retailState.creditUnit,
             creditValue: retailState.creditValue,
+            timerPaused: retailState.timerPaused === true,
           }
         : null,
     });
