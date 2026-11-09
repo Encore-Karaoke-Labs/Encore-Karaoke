@@ -41,6 +41,7 @@ export interface RetailConfig {
   freePlay: boolean;
   creditUnit: "songs" | "time";
   creditValue: number;
+  playBootVideoOnCredits: boolean;
   deviceRegistry: Record<string, RetailDeviceEntry>;
 }
 
@@ -69,6 +70,7 @@ const DEFAULT_CONFIG: AppConfig = {
     freePlay: false,
     creditUnit: "songs",
     creditValue: 1,
+    playBootVideoOnCredits: false,
     deviceRegistry: {
       HOST: {
         nickname: "Main Player",
