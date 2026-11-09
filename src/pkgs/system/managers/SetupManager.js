@@ -1,5 +1,6 @@
 import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
+import { hasPlatformHint } from "../../../libs/platformHints.js";
 import { findSongByCode as lookupSongByCode } from "../../../libs/songLookup.js";
 
 /**
@@ -309,7 +310,7 @@ export default class SetupManager {
   }
 
   async buildSettingsMap() {
-    const isEmbedded = await window.platformHints.has("embedded");
+    const isEmbedded = await hasPlatformHint("embedded");
     this.DASHBOARD_TILES = [
       { id: "library", label: "Library & Storage", icon: "folder" },
       ...(isEmbedded
