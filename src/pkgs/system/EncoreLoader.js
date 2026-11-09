@@ -1,6 +1,7 @@
 import { defineCustomElements } from "ionicons/loader";
 import Html from "../../libs/html.js";
 import NetworkingUtility from "../../libs/networkingUtility.js";
+import { hasPlatformHint } from "../../libs/platformHints.js";
 
 let wrapper, Ui, Pid, Sfx;
 let root;
@@ -13,7 +14,7 @@ let actualPort = 9864;
 
 let BOOT_BG_URL = "/assets/img/boot/bg.png";
 
-if (await window.platformHints.has("shizuku")) {
+if (await hasPlatformHint("shizuku")) {
   BOOT_BG_URL = "/assets/img/boot/shizuku.png";
 }
 
