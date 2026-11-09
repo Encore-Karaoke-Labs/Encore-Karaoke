@@ -41,7 +41,7 @@
 - **EnMoku! (Mobile Remote Control)**
   - No more passing a bulky songbook around! Just scan the QR code on the screen to connect your smartphone.
   - No additional app installs needed! EnMoku works straight in your web browser. (Chromium-based browsers (e.g., Chrome, Edge) and Firefox)
-  - Queue tracks, send "Cheers", chat with the room, and turn your phone into a camera in one tap!
+  - Queue tracks, send "Cheers", chat with the room, and turn your phone into a camera in a few taps!
   - Use your phone as a virtual shaker!
   - Works seamlessly on your local network, with a Cloud tunnel fallback for devices not on the same network.
 - **Discord Rich Presence**
