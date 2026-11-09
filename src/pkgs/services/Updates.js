@@ -1,3 +1,5 @@
+import { hasPlatformHint } from "../../libs/platformHints.js";
+
 let versioningEndpoint = "https://versioning.encorekaraoke.org/versionInfo";
 let updateInformation = null;
 let config = null;
@@ -10,7 +12,7 @@ const pkg = {
   start: async function (Root) {
     this.root = Root;
     config = await window.config.getAll();
-    const isEmbedded = await window.platformHints.has("embedded");
+    const isEmbedded = await hasPlatformHint("embedded");
     if (!isEmbedded && (config.checkUpdatesOnStartup ?? true) == true) {
       fetch(versioningEndpoint)
         .then((res) => res.json())
