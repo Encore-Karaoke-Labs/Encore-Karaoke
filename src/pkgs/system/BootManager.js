@@ -1,4 +1,5 @@
 import Html from "../../libs/html.js";
+import { hasPlatformHint, isEmbedded } from "../../libs/platformHints.js";
 
 let wrapper;
 let bootTimeline;
@@ -21,7 +22,7 @@ const pkg = {
 
     let BOOT_BG_URL = "/assets/img/boot/bg.png";
 
-    if (await window.platformHints.has("shizuku")) {
+    if (await hasPlatformHint("shizuku")) {
       BOOT_BG_URL = "/assets/img/boot/shizuku.png";
     }
 
@@ -432,7 +433,7 @@ const pkg = {
       );
     }
 
-    if (await window.platformHints.has("embedded")) {
+    if (await isEmbedded()) {
       await Root.Core.pkg.run("services:Terminal", [], true);
     }
     await Root.Core.pkg.run("services:UiLib", [], true);
