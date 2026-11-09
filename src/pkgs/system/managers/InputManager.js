@@ -520,6 +520,7 @@ export default class InputManager {
 
     if (
       e.key.toLowerCase() === "b" &&
+      !ui.embedded &&
       !isSearchInputFocused &&
       !state.isSearchOverlayVisible
     ) {
