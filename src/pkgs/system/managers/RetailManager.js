@@ -33,17 +33,29 @@ export default class RetailManager {
     this.lastTickAt = Date.now();
     this.lastPersistAt = 0;
     this.lastBroadcastAt = 0;
+    this.embedded = false;
 
     this.boundTick = () => this.tick();
   }
 
-  init() {
+  async init() {
     this.ctx.state.deviceRegistry = this.registry;
     this.lastTickAt = Date.now();
     this.updateIndicator();
 
     if (!this.tickTimer) {
       this.tickTimer = window.setInterval(this.boundTick, 1000);
+    }
+
+    this.embedded = await window.platformHints.has("embedded");
+
+    if (this.embedded) {
+      if (this.enabled) {
+        this.enabled = false;
+        this._persistConfig();
+        this.updateIndicator();
+      }
+      return;
     }
 
     if (this.enabled) {
@@ -62,6 +74,7 @@ export default class RetailManager {
   // --- Configuration -------------------------------------------------------
 
   setEnabled(enabled) {
+    if (this.embedded) return;
     const next = Boolean(enabled);
     if (next === this.enabled) return;
 
