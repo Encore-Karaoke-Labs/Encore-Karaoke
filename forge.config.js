@@ -67,7 +67,7 @@ export default {
       Microphone:
         "Encore Karaoke uses your microphone to score your singing and record your performances.",
       Camera:
-        "Encore Karaoke shows a camera feed from paired phones during a session.",
+        "Encore Karaoke can show a feed from a connected USB or built-in camera, or from paired phones, during a session.",
       AudioCapture:
         "Encore Karaoke captures audio so it can mix and record your performance.",
       BluetoothAlways:
