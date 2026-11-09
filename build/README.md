@@ -15,6 +15,7 @@ Hardened-runtime entitlements applied by `osxSign` (see `forge.config.js`).
 | Entitlement | Why |
 |---|---|
 | `com.apple.security.device.audio-input` | Vocal capture for scoring and recording. |
+| `com.apple.security.device.camera` | Capturing a USB or built-in camera for the BGV feed. |
 | `com.apple.security.cs.allow-jit` | V8 requires JIT under the hardened runtime. |
 | `com.apple.security.cs.allow-unsigned-executable-memory` | Chromium requires writable-executable pages. |
 | `com.apple.security.cs.allow-dyld-environment-variables` | Electron's helper processes rely on `DYLD_*`. |
@@ -29,6 +30,3 @@ Hardened-runtime entitlements applied by `osxSign` (see `forge.config.js`).
   this back only if a native `.node` enters the bundle.
 - **`com.apple.security.network.server` / `.client`** — App Sandbox keys. This
   app is not sandboxed, so they do nothing here.
-- **`com.apple.security.device.camera`** — the Electron process never opens a
-  camera; the paired phone captures and streams over PeerJS. Add if the desktop
-  ever captures directly.
