@@ -27,6 +27,8 @@ export interface AudioConfig {
 
 export interface VideoConfig {
   syncOffset: number;
+  cameraSource?: "remote" | "local" | "off";
+  cameraDeviceId?: string;
 }
 
 export interface RetailDeviceEntry {
@@ -64,6 +66,8 @@ const DEFAULT_CONFIG: AppConfig = {
   },
   videoConfig: {
     syncOffset: 0,
+    cameraSource: "remote",
+    cameraDeviceId: "",
   },
   retailConfig: {
     enabled: false,
