@@ -699,7 +699,9 @@ export default class SetupManager {
                 options: [
                   { value: "default", label: "Internal Default" },
                   { value: "library", label: "Library Provided" },
-                  { value: "custom", label: "Custom Path" },
+                  ...(isEmbedded
+                    ? []
+                    : [{ value: "custom", label: "Custom Path" }]),
                 ],
                 get: () => {
                   const ac = this.ctx.config.audioConfig;
@@ -761,51 +763,55 @@ export default class SetupManager {
                   this.renderView();
                 },
               },
-              {
-                id: "custom_soundfont_path",
-                label: "SoundFont Path (Click to Browse)",
-                type: "info-action",
-                get: () => {
-                  const p = this.ctx.config.audioConfig?.customSoundfontPath;
-                  if (!p) return "Not Set";
-                  return p.length > 35 ? "..." + p.slice(-32) : p;
-                },
-                action: async () => {
-                  const filePath = await window.desktopIntegration.ipc.invoke(
-                    "select-soundfont-file",
-                  );
+              ...(isEmbedded
+                ? []
+                : [
+                    {
+                      id: "custom_soundfont_path",
+                      label: "SoundFont Path (Click to Browse)",
+                      type: "info-action",
+                      get: () => {
+                        const p = this.ctx.config.audioConfig?.customSoundfontPath;
+                        if (!p) return "Not Set";
+                        return p.length > 35 ? "..." + p.slice(-32) : p;
+                      },
+                      action: async () => {
+                        const filePath = await window.desktopIntegration.ipc.invoke(
+                          "select-soundfont-file",
+                        );
 
-                  if (filePath) {
-                    this.ctx.config.audioConfig ??= {};
-                    this.ctx.config.audioConfig.customSoundfontPath = filePath;
-                    this.ctx.config.audioConfig.soundfontMode = "custom";
-                    this.ctx.config.audioConfig.useLibraryFont = false;
+                        if (filePath) {
+                          this.ctx.config.audioConfig ??= {};
+                          this.ctx.config.audioConfig.customSoundfontPath = filePath;
+                          this.ctx.config.audioConfig.soundfontMode = "custom";
+                          this.ctx.config.audioConfig.useLibraryFont = false;
 
-                    window.config.setItem(
-                      "audioConfig.customSoundfontPath",
-                      filePath,
-                    );
-                    window.config.setItem(
-                      "audioConfig.soundfontMode",
-                      "custom",
-                    );
-                    window.config.setItem("audioConfig.useLibraryFont", false);
+                          window.config.setItem(
+                            "audioConfig.customSoundfontPath",
+                            filePath,
+                          );
+                          window.config.setItem(
+                            "audioConfig.soundfontMode",
+                            "custom",
+                          );
+                          window.config.setItem("audioConfig.useLibraryFont", false);
 
-                    this.showToast("Loading custom soundfont...", "info");
+                          this.showToast("Loading custom soundfont...", "info");
 
-                    const url = await NetworkingUtility.getFileLink(filePath);
+                          const url = await NetworkingUtility.getFileLink(filePath);
 
-                    try {
-                      await this.ctx.services.Forte.loadSoundFont(url.href);
-                      this.showToast("Loaded successfully", "success");
-                      this.renderView();
-                    } catch (err) {
-                      console.error("Failed to load custom soundfont:", err);
-                      this.showToast("Failed to load soundfont", "error");
-                    }
-                  }
-                },
-              },
+                          try {
+                            await this.ctx.services.Forte.loadSoundFont(url.href);
+                            this.showToast("Loaded successfully", "success");
+                            this.renderView();
+                          } catch (err) {
+                            console.error("Failed to load custom soundfont:", err);
+                            this.showToast("Failed to load soundfont", "error");
+                          }
+                        }
+                      },
+                    },
+                  ]),
             ],
           },
           {
