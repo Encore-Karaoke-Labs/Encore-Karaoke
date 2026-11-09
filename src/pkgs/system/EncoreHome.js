@@ -184,7 +184,10 @@ class EncoreController {
         }
 
         if (currentSong && currentSong.code && this.state.songMap) {
-          const localMatch = findSongByCode(this.state.songMap, currentSong.code);
+          const localMatch = findSongByCode(
+            this.state.songMap,
+            currentSong.code,
+          );
           if (localMatch) {
             currentSong = { ...localMatch, ...currentSong };
           }
@@ -1124,6 +1127,15 @@ class EncoreController {
       this.bgv.setFillMode(savedFillMode);
     } catch (e) {
       this.bgv.setFillMode("fill");
+    }
+
+    try {
+      const activeCamera = this.services.CameraSvc?.getActiveCamera?.();
+      if (activeCamera?.stream) {
+        this.bgv.setLiveStream(activeCamera.stream, activeCamera.source, false);
+      }
+    } catch (e) {
+      console.warn("Could not attach the active camera stream:", e);
     }
 
     this.ui.startBumperCycle();
