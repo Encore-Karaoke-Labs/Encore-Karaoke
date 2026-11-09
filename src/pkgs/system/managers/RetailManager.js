@@ -1,3 +1,4 @@
+import playBootVideo from "../../../libs/bootVideo.js";
 import { isEmbedded } from "../../../libs/platformHints.js";
 
 const HOST_ID = "HOST";
@@ -23,6 +24,7 @@ export default class RetailManager {
     this.freePlay = stored.freePlay === true;
     this.creditUnit = stored.creditUnit === "time" ? "time" : "songs";
     this.creditValue = this._sanitizeCreditValue(stored.creditValue);
+    this.playBootVideoOnCredits = stored.playBootVideoOnCredits === true;
 
     this.registry = this._normalizeRegistry(stored.deviceRegistry);
 
@@ -35,6 +37,7 @@ export default class RetailManager {
     this.lastTickAt = Date.now();
     this.lastPersistAt = 0;
     this.lastBroadcastAt = 0;
+    this.bootVideoPlaying = false;
     this.embedded = false;
 
     this.boundTick = () => this.tick();
@@ -121,11 +124,25 @@ export default class RetailManager {
     this.broadcastState();
   }
 
+  setPlayBootVideoOnCredits(enabled) {
+    const next = Boolean(enabled);
+    if (next === this.playBootVideoOnCredits) return;
+
+    this.playBootVideoOnCredits = next;
+    this._persistConfig();
+  }
+
   // --- Balances ------------------------------------------------------------
 
   addCredits(target, amount) {
     const add = Number(amount);
     if (!Number.isFinite(add) || add === 0) return;
+
+    const isMainPlayer = !target || target === HOST_ID;
+    const wasEmpty =
+      add > 0 &&
+      isMainPlayer &&
+      this._entryHasNoCredits(this.registry[HOST_ID]);
 
     const apply = (entry) => {
       if (!entry) return;
@@ -152,6 +169,19 @@ export default class RetailManager {
     }
 
     this._afterBalanceChange();
+
+    if (wasEmpty) {
+      void this._playBootVideoForCredits();
+    }
+  }
+
+  _entryHasNoCredits(entry) {
+    if (!entry) return false;
+    return (
+      (Number(entry.credits) || 0) <= 0 &&
+      (Number(entry.songsRemaining) || 0) <= 0 &&
+      (Number(entry.timeRemainingMs) || 0) <= 0
+    );
   }
 
   resetCredits(target) {
@@ -261,6 +291,7 @@ export default class RetailManager {
       freePlay: this.freePlay,
       creditUnit: this.creditUnit,
       creditValue: this.creditValue,
+      timerPaused: this.bootVideoPlaying,
       users: this.registry,
       totalSongs: this.getTotalRemainingSongs(),
       hostTimeMs: Math.max(
@@ -358,6 +389,9 @@ export default class RetailManager {
         if (value.creditValue !== undefined) {
           this.setCreditValue(value.creditValue);
         }
+        if (value.playBootVideoOnCredits !== undefined) {
+          this.setPlayBootVideoOnCredits(value.playBootVideoOnCredits);
+        }
         this.updateIndicator();
         this.broadcastState();
         return true;
@@ -375,6 +409,16 @@ export default class RetailManager {
 
   tick() {
     const now = Date.now();
+
+    if (this.bootVideoPlaying) {
+      this.lastTickAt = now;
+
+      if (now - this.lastBroadcastAt >= BROADCAST_INTERVAL_MS) {
+        this.broadcastState();
+      }
+      return;
+    }
+
     const elapsed = Math.max(0, now - this.lastTickAt);
     this.lastTickAt = now;
 
@@ -415,6 +459,10 @@ export default class RetailManager {
     window.config.setItem("retailConfig.freePlay", this.freePlay);
     window.config.setItem("retailConfig.creditUnit", this.creditUnit);
     window.config.setItem("retailConfig.creditValue", this.creditValue);
+    window.config.setItem(
+      "retailConfig.playBootVideoOnCredits",
+      this.playBootVideoOnCredits,
+    );
   }
 
   formatTime(ms) {
@@ -431,6 +479,47 @@ export default class RetailManager {
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
       2,
       "0",
+    )}`;
+  }
+
+  async _playBootVideoForCredits() {
+    if (
+      !this.enabled ||
+      !this.playBootVideoOnCredits ||
+      this.bootVideoPlaying
+    ) {
+      return;
+    }
+
+    const libraryInfo = this.ctx.root.library?.libraryInfo;
+    const bootVideoRel = libraryInfo?.manifest?.additionalContents?.bootVideo;
+    if (!libraryInfo?.path || !bootVideoRel) return;
+
+    this.bootVideoPlaying = true;
+    this.lastTickAt = Date.now();
+    this.broadcastState();
+
+    try {
+      await playBootVideo(this._joinPath(libraryInfo.path, bootVideoRel), {
+        skippable: true,
+        playVolume: this.ctx.config.audioConfig?.mix?.instrumental?.volume ?? 1,
+        fillMode: this.ctx.config.videoConfig?.bgvFillMode || "cover",
+        freezeFrame: false,
+        blockInput: true,
+      });
+    } catch (err) {
+      console.warn("[Retail] Could not play boot video:", err);
+    } finally {
+      this.bootVideoPlaying = false;
+      this.lastTickAt = Date.now();
+      this.broadcastState();
+    }
+  }
+
+  _joinPath(base, relative) {
+    return `${String(base).replace(/[\\/]+$/, "")}/${String(relative).replace(
+      /^[\\/]+/,
+      "",
     )}`;
   }
 
