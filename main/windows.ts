@@ -519,6 +519,7 @@ export function registerWindowIpc(): void {
   ipcMain.handle(
     "fullscreen-set",
     (event: IpcMainInvokeEvent, fullscreen: boolean) => {
+      if (platformHints.embedded) return false;
       const win = BrowserWindow.fromWebContents(event.sender);
       if (!win) return false;
       win.setFullScreen(Boolean(fullscreen));
@@ -526,6 +527,7 @@ export function registerWindowIpc(): void {
     },
   );
   ipcMain.handle("fullscreen-toggle", (event: IpcMainInvokeEvent) => {
+    if (platformHints.embedded) return false;
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return false;
     const nextState = !win.isFullScreen();
