@@ -1,7 +1,7 @@
 import { defineCustomElements } from "ionicons/loader";
 import Html from "../../libs/html.js";
 import NetworkingUtility from "../../libs/networkingUtility.js";
-import { hasPlatformHint } from "../../libs/platformHints.js";
+import { hasPlatformHint, isEmbedded } from "../../libs/platformHints.js";
 
 let wrapper, Ui, Pid, Sfx;
 let root;
@@ -304,9 +304,12 @@ const pkg = {
    * @returns {Promise<string>} A promise that resolves with the path of the first library found.
    */
   async waitForLibrary() {
+    const isSystemEmbedded = await isEmbedded();
     const fsSvc = root.Processes.getService("FsSvc").data;
     statusP.text(
-      "No library detected. Open Library Manager to import a Library (LIB).",
+      isSystemEmbedded
+        ? "No library detected."
+        : "No library detected. Open Library Manager to import a Library (LIB).",
     );
 
     return new Promise((resolve) => {
