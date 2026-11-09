@@ -1,3 +1,5 @@
+import { isEmbedded } from "../../../libs/platformHints.js";
+
 const HOST_ID = "HOST";
 const HOST_NAME = "Main Player";
 const PERSIST_INTERVAL_MS = 15000;
@@ -47,7 +49,7 @@ export default class RetailManager {
       this.tickTimer = window.setInterval(this.boundTick, 1000);
     }
 
-    this.embedded = await window.platformHints.has("embedded");
+    this.embedded = await isEmbedded();
 
     if (this.embedded) {
       if (this.enabled) {
