@@ -1040,23 +1040,30 @@ export default class SetupManager {
           {
             title: "Display & Window",
             items: [
-              {
-                id: "fullscreen",
-                label: "Window Mode on Boot",
-                type: "select",
-                options: [
-                  { value: false, label: "Windowed" },
-                  { value: true, label: "Fullscreen" },
-                ],
-                get: () => this.ctx.config.fullscreenEnabled ?? false,
-                set: async (v) => {
-                  const fullscreenEnabled = v;
-                  this.ctx.config.fullscreenEnabled = fullscreenEnabled;
-                  window.config.setItem("fullscreenEnabled", fullscreenEnabled);
-                  await window.fullscreen.set(fullscreenEnabled);
-                  this.renderView();
-                },
-              },
+              ...(isEmbedded
+                ? []
+                : [
+                    {
+                      id: "fullscreen",
+                      label: "Window Mode on Boot",
+                      type: "select",
+                      options: [
+                        { value: false, label: "Windowed" },
+                        { value: true, label: "Fullscreen" },
+                      ],
+                      get: () => this.ctx.config.fullscreenEnabled ?? false,
+                      set: async (v) => {
+                        const fullscreenEnabled = v;
+                        this.ctx.config.fullscreenEnabled = fullscreenEnabled;
+                        window.config.setItem(
+                          "fullscreenEnabled",
+                          fullscreenEnabled,
+                        );
+                        await window.fullscreen.set(fullscreenEnabled);
+                        this.renderView();
+                      },
+                    },
+                  ]),
               {
                 id: "zoom",
                 label: "Display Zoom (%)",
