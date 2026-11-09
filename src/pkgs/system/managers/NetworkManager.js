@@ -664,12 +664,25 @@ export default class NetworkManager {
         case "request_camera_peer":
           const cameraSvc = this.ctx.services.CameraSvc;
           if (cameraSvc) {
+            if (cameraSvc.isRemoteAllowed && !cameraSvc.isRemoteAllowed()) {
+              this.socket.emit("sendData", {
+                identity: cmd.identity,
+                data: {
+                  type: "camera_error",
+                  message: "Camera support is disabled on the karaoke machine.",
+                },
+              });
+              break;
+            }
+
             if (cameraSvc.isBusy()) {
               this.socket.emit("sendData", {
                 identity: cmd.identity,
                 data: {
                   type: "camera_error",
-                  message: "Camera is already in use by another user.",
+                  message: cameraSvc.isLocalActive?.()
+                    ? "The karaoke machine's camera is currently in use."
+                    : "Camera is already in use by another user.",
                 },
               });
               break;
