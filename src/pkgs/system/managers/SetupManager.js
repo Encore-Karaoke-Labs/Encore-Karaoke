@@ -479,6 +479,23 @@ export default class SetupManager {
                         this.ctx.config.retailConfig.creditValue = v;
                       },
                     },
+                    {
+                      id: "retail_boot_video_on_credits",
+                      label: "Play Boot Video on Credits",
+                      type: "select",
+                      options: [
+                        { value: false, label: "Disabled" },
+                        { value: true, label: "Enabled" },
+                      ],
+                      get: () =>
+                        this.ctx.root.retail?.playBootVideoOnCredits ?? false,
+                      set: (v) => {
+                        this.ctx.root.retail?.setPlayBootVideoOnCredits(v);
+                        this.ctx.config.retailConfig ??= {};
+                        this.ctx.config.retailConfig.playBootVideoOnCredits = v;
+                        this.renderView();
+                      },
+                    },
                   ],
                 },
                 {
