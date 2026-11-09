@@ -1,6 +1,10 @@
 import Html from "../libs/html.js";
 import NetworkingUtility from "../libs/networkingUtility.js";
 
+const REMOTE_CAMERA_CATEGORY = "EnMoku Camera";
+const LOCAL_CAMERA_CATEGORY = "Camera";
+const CAMERA_CATEGORIES = [REMOTE_CAMERA_CATEGORY, LOCAL_CAMERA_CATEGORY];
+
 /**
  * BGVModule - Encore's BGV playback module
  * Features single-buffered video element with smooth transitions and manual override capability
@@ -55,31 +59,59 @@ export class BGVModule {
 
     this.liveStream = null;
     document.addEventListener("Encore.Camera.StreamReceived", (e) => {
-      this.liveStream = e.detail;
-      this.categories = this.categories.filter(
-        (c) => c.BGV_CATEGORY !== "EnMoku Camera",
-      );
-      this.addDynamicCategory({
-        BGV_CATEGORY: "EnMoku Camera",
-        BGV_LIST: ["live_stream"],
-        isAbsolute: true,
-      });
-      this.selectedCategory = "EnMoku Camera";
-      this.updatePlaylistForCategory();
-    });
-
-    document.addEventListener("Encore.Camera.StreamEnded", () => {
-      this.liveStream = null;
-      this.categories = this.categories.filter(
-        (c) => c.BGV_CATEGORY !== "EnMoku Camera",
-      );
-      if (this.selectedCategory === "EnMoku Camera") {
-        this.selectedCategory = "Auto";
-        this.updatePlaylistForCategory();
+      const detail = e.detail;
+      if (detail?.stream) {
+        this.setLiveStream(detail.stream, detail.source || "remote");
+      } else if (detail) {
+        // Backwards compatibility for streams emitted without source metadata.
+        this.setLiveStream(detail, "remote");
       }
     });
 
+    document.addEventListener("Encore.Camera.StreamEnded", () =>
+      this.clearLiveStream(),
+    );
+
     console.log("[BGV] BGV Player initialized.");
+  }
+
+  /**
+   * Selects a camera stream (physical camera or remote phone) as the BGV.
+   * @param {MediaStream} stream
+   * @param {"local"|"remote"} source
+   * @param {boolean} refresh - Whether to immediately refresh the playlist.
+   */
+  setLiveStream(stream, source = "remote", refresh = true) {
+    if (!stream) return;
+
+    const category =
+      source === "local" ? LOCAL_CAMERA_CATEGORY : REMOTE_CAMERA_CATEGORY;
+
+    this.liveStream = stream;
+    this.categories = this.categories.filter(
+      (c) => !CAMERA_CATEGORIES.includes(c.BGV_CATEGORY),
+    );
+    this.addDynamicCategory({
+      BGV_CATEGORY: category,
+      BGV_LIST: ["live_stream"],
+      isAbsolute: true,
+    });
+    this.selectedCategory = category;
+    if (refresh && this.container) this.updatePlaylistForCategory();
+  }
+
+  /**
+   * Removes the camera category and falls back to Auto if it was selected.
+   */
+  clearLiveStream() {
+    this.liveStream = null;
+    this.categories = this.categories.filter(
+      (c) => !CAMERA_CATEGORIES.includes(c.BGV_CATEGORY),
+    );
+    if (CAMERA_CATEGORIES.includes(this.selectedCategory)) {
+      this.selectedCategory = "Auto";
+      if (this.container) this.updatePlaylistForCategory();
+    }
   }
 
   /**
