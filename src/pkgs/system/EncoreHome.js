@@ -995,7 +995,7 @@ class EncoreController {
       console.warn("[EncoreHome] Could not query local fonts:", e);
     }
 
-    this.ui.buildAll();
+    await this.ui.buildAll();
     this.bgm.preload();
 
     this.infoBar.mount(this.dom.topBarContainer);
