@@ -1,6 +1,7 @@
 import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
 import { findSongByCode } from "../../../libs/songLookup.js";
+import { isEmbedded } from "../../../libs/platformHints.js";
 import { COLOR_PALETTES } from "./LyricsEngine.js";
 
 const LYRIC_ROLES = [
@@ -42,12 +43,14 @@ export default class UIManager {
     this._idleCycleToken = 0;
     this._fullscreenListenerAttached = false;
     this._isFullscreenDetected = false;
+    this.embedded = false;
   }
 
   /**
    * Executes all DOM generation routines.
    */
-  buildAll() {
+  async buildAll() {
+    this.embedded = await isEmbedded();
     this.buildUI();
     this.buildPostSongScreen();
     this.buildRecordingsUI();
@@ -201,7 +204,7 @@ export default class UIManager {
             desc: "Instant song recording / see saved session takes",
           },
           { key: "S", desc: "Open Sessions menu" },
-          { key: "B", desc: "Broadcast karaoke stream" },
+          ...(this.embedded ? [] : [{ key: "B", desc: "Broadcast karaoke stream" }]),
           { key: "T", desc: "Open multiplayer session chat" },
           { key: "F2", desc: "Open Setup" },
           { key: "F11", desc: "Toggle borderless fullscreen" },
@@ -528,13 +531,15 @@ export default class UIManager {
       .on("click", () => this.ctx.root.sessions.toggleSessionModal())
       .appendTo(dom.bottomActions);
 
-    new Html("div")
-      .classOn("action-button")
-      .html(
-        '<ion-icon name="radio-outline"></ion-icon> <span>Broadcast (B)</span>',
-      )
-      .on("click", () => this.ctx.modules.stream.toggleStreamModal())
-      .appendTo(dom.bottomActions);
+    if (!this.embedded) {
+      new Html("div")
+        .classOn("action-button")
+        .html(
+          '<ion-icon name="radio-outline"></ion-icon> <span>Broadcast (B)</span>',
+        )
+        .on("click", () => this.ctx.modules.stream.toggleStreamModal())
+        .appendTo(dom.bottomActions);
+    }
 
     new Html("div")
       .classOn("action-button")
