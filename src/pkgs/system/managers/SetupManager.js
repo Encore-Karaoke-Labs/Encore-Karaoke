@@ -318,7 +318,9 @@ export default class SetupManager {
       { id: "audio", label: "Sound Settings", icon: "volume-high" },
       { id: "mic", label: "Mic & Scoring Settings", icon: "mic" },
       { id: "video", label: "Video Settings", icon: "tv" },
-      { id: "retail", label: "Retail Settings", icon: "card" },
+      ...(isEmbedded
+        ? []
+        : [{ id: "retail", label: "Retail Settings", icon: "card" }]),
       { id: "security", label: "User Security", icon: "lock-closed" },
       {
         id: "firmware",
@@ -421,76 +423,80 @@ export default class SetupManager {
           },
         ],
       },
-      retail: {
-        title: "Retail Settings",
-        groups: [
-          {
-            title: "Retail Mode",
-            items: [
-              {
-                id: "retail_enabled",
-                label: "Enable Retail Mode",
-                type: "select",
-                options: [
-                  { value: false, label: "Disabled" },
-                  { value: true, label: "Enabled" },
-                ],
-                get: () => this.ctx.root.retail?.enabled ?? false,
-                set: (v) => {
-                  this.ctx.root.retail?.setEnabled(v);
-                  this.ctx.config.retailConfig ??= {};
-                  this.ctx.config.retailConfig.enabled = v;
-                  this.renderView();
+      ...(isEmbedded
+        ? {}
+        : {
+            retail: {
+              title: "Retail Settings",
+              groups: [
+                {
+                  title: "Retail Mode",
+                  items: [
+                    {
+                      id: "retail_enabled",
+                      label: "Enable Retail Mode",
+                      type: "select",
+                      options: [
+                        { value: false, label: "Disabled" },
+                        { value: true, label: "Enabled" },
+                      ],
+                      get: () => this.ctx.root.retail?.enabled ?? false,
+                      set: (v) => {
+                        this.ctx.root.retail?.setEnabled(v);
+                        this.ctx.config.retailConfig ??= {};
+                        this.ctx.config.retailConfig.enabled = v;
+                        this.renderView();
+                      },
+                    },
+                    {
+                      id: "retail_unit",
+                      label: "Credit Represents",
+                      type: "select",
+                      options: [
+                        { value: "songs", label: "Song Count" },
+                        { value: "time", label: "Session Time" },
+                      ],
+                      get: () => this.ctx.root.retail?.creditUnit ?? "songs",
+                      set: (v) => {
+                        this.ctx.root.retail?.setCreditUnit(v);
+                        this.ctx.config.retailConfig ??= {};
+                        this.ctx.config.retailConfig.creditUnit = v;
+                        this.renderView();
+                      },
+                    },
+                    {
+                      id: "retail_value",
+                      label: "Credit Value (songs or minutes)",
+                      type: "range",
+                      min: 1,
+                      max: 60,
+                      step: 1,
+                      get: () => this.ctx.root.retail?.creditValue ?? 1,
+                      set: (v) => {
+                        this.ctx.root.retail?.setCreditValue(v);
+                        this.ctx.config.retailConfig ??= {};
+                        this.ctx.config.retailConfig.creditValue = v;
+                      },
+                    },
+                  ],
                 },
-              },
-              {
-                id: "retail_unit",
-                label: "Credit Represents",
-                type: "select",
-                options: [
-                  { value: "songs", label: "Song Count" },
-                  { value: "time", label: "Session Time" },
-                ],
-                get: () => this.ctx.root.retail?.creditUnit ?? "songs",
-                set: (v) => {
-                  this.ctx.root.retail?.setCreditUnit(v);
-                  this.ctx.config.retailConfig ??= {};
-                  this.ctx.config.retailConfig.creditUnit = v;
-                  this.renderView();
+                {
+                  title: "Balance Management",
+                  items: [
+                    {
+                      id: "retail_open_cashier",
+                      label: "Open Cashier Portal",
+                      type: "action",
+                      action: () => {
+                        window.desktopIntegration.ipc.send("open-cashier");
+                        this.showToast("Opening Cashier...", "info");
+                      },
+                    },
+                  ],
                 },
-              },
-              {
-                id: "retail_value",
-                label: "Credit Value (songs or minutes)",
-                type: "range",
-                min: 1,
-                max: 60,
-                step: 1,
-                get: () => this.ctx.root.retail?.creditValue ?? 1,
-                set: (v) => {
-                  this.ctx.root.retail?.setCreditValue(v);
-                  this.ctx.config.retailConfig ??= {};
-                  this.ctx.config.retailConfig.creditValue = v;
-                },
-              },
-            ],
-          },
-          {
-            title: "Balance Management",
-            items: [
-              {
-                id: "retail_open_cashier",
-                label: "Open Cashier Portal",
-                type: "action",
-                action: () => {
-                  window.desktopIntegration.ipc.send("open-cashier");
-                  this.showToast("Opening Cashier...", "info");
-                },
-              },
-            ],
-          },
-        ],
-      },
+              ],
+            },
+          }),
       ...(isEmbedded
         ? {}
         : {
