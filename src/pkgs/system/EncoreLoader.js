@@ -1,5 +1,6 @@
 import { defineCustomElements } from "ionicons/loader";
 import Html from "../../libs/html.js";
+import playBootVideo from "../../libs/bootVideo.js";
 import NetworkingUtility from "../../libs/networkingUtility.js";
 import { hasPlatformHint, isEmbedded } from "../../libs/platformHints.js";
 
@@ -107,111 +108,12 @@ const pkg = {
     playVolume = 1,
     fillMode = "cover",
   ) {
-    return new Promise(async (resolve) => {
-      let settled = false;
-      let stallTimeout = null;
-
-      const videoContainer = new Html("div")
-        .styleJs({
-          position: "absolute",
-          top: "0",
-          left: "0",
-          width: "100%",
-          height: "100%",
-          backgroundColor: "#000",
-          zIndex: "1000",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          opacity: "0",
-          transition: "opacity 0.25s ease",
-        })
-        .appendTo(wrapper);
-
-      const video = document.createElement("video");
-      video.preload = "auto";
-      video.autoplay = true;
-      video.playsInline = true;
-      video.volume = playVolume;
-
-      Object.assign(video.style, {
-        width: "100%",
-        height: "100%",
-        objectFit: fillMode,
-        backgroundColor: "#000",
-      });
-
-      const finish = (freezeFrame = true) => {
-        if (settled) return;
-        settled = true;
-
-        if (stallTimeout) clearTimeout(stallTimeout);
-        document.removeEventListener("keydown", handleKeyDown);
-
-        video.pause();
-
-        if (!freezeFrame) {
-          video.removeAttribute("src");
-          video.load();
-          videoContainer.cleanup();
-        } else {
-          videoContainer.styleJs({ opacity: "1" });
-        }
-
-        resolve();
-      };
-
-      const handleKeyDown = (e) => {
-        if (skippable && ["Enter", " ", "Escape"].includes(e.key)) {
-          e.preventDefault();
-          finish(true);
-        }
-      };
-
-      const resetStallTimer = () => {
-        if (stallTimeout) clearTimeout(stallTimeout);
-        stallTimeout = setTimeout(() => {
-          console.warn("Boot video stalled or buffering too long. Skipping.");
-          finish(false);
-        }, 6000);
-      };
-
-      video.addEventListener("waiting", resetStallTimer);
-      video.addEventListener("stalled", resetStallTimer);
-
-      video.addEventListener("playing", () => {
-        if (stallTimeout) clearTimeout(stallTimeout);
-        videoContainer.styleJs({ opacity: "1" });
-      });
-
-      video.addEventListener("canplay", () => {
-        video.play().catch((err) => {
-          console.warn("Autoplay was prevented or video decode failed:", err);
-          finish(false);
-        });
-      });
-
-      video.addEventListener("ended", () => finish(true));
-
-      video.addEventListener("error", () => {
-        console.warn(
-          "Boot video encountered an error. Proceeding directly to app.",
-        );
-        finish(false);
-      });
-
-      if (skippable) {
-        document.addEventListener("keydown", handleKeyDown);
-      }
-
-      try {
-        const link = await NetworkingUtility.getFileLink(videoPath);
-        video.src = link.href;
-        videoContainer.elm.appendChild(video);
-      } catch (err) {
-        console.warn("Could not generate stream URL for boot video:", err);
-        finish(false);
-      }
+    return playBootVideo(videoPath, {
+      container: wrapper,
+      skippable,
+      playVolume,
+      fillMode,
+      freezeFrame: true,
     });
   },
 
