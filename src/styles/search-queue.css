@@ -548,6 +548,43 @@
   max-width: 100%;
 }
 
+.queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+}
+
+.queue-move-btn {
+  font-size: 1.1rem;
+  color: #89cff0;
+  background: rgba(137, 207, 240, 0.12);
+  border: 1px solid transparent;
+  padding: 0.3rem;
+  border-radius: 0.3rem;
+  flex-shrink: 0;
+  cursor: var(--cursor-pointer);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.queue-move-btn:hover {
+  background: #89cff0;
+  color: #ffffff;
+}
+
+.queue-move-btn.disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.queue-actions .queue-del-btn {
+  margin-left: 0;
+}
+
 .queue-del-btn {
   font-size: 1.2rem;
   color: #ff5555;
