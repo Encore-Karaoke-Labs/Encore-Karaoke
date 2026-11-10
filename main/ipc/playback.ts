@@ -147,5 +147,15 @@ export function registerPlaybackIpc(): void {
     return await requestAppView("get-queue");
   });
 
+  ipcMain.handle(
+    "karaoke:move-queue-song",
+    async (
+      _event: IpcMainInvokeEvent,
+      payload?: { from?: number; to?: number },
+    ) => {
+      return await requestAppView("move-queue-song", payload);
+    },
+  );
+
   ipcMain.handle("karaoke:app-ready", () => appState.isRendererReady);
 }
