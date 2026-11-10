@@ -160,6 +160,14 @@ input:focus-visible,
   -webkit-mask-image: url("/assets/img/icons/svg/close.svg");
   mask-image: url("/assets/img/icons/svg/close.svg");
 }
+.icon-caret-up {
+  -webkit-mask-image: url("/assets/img/icons/svg/caret-up.svg");
+  mask-image: url("/assets/img/icons/svg/caret-up.svg");
+}
+.icon-caret-down {
+  -webkit-mask-image: url("/assets/img/icons/svg/caret-down.svg");
+  mask-image: url("/assets/img/icons/svg/caret-down.svg");
+}
 .icon-keypad {
   -webkit-mask-image: url("/assets/img/icons/svg/keypad.svg");
   mask-image: url("/assets/img/icons/svg/keypad.svg");
@@ -646,6 +654,39 @@ input:focus-visible,
   gap: 10px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--line);
+}
+
+.queue-item.has-actions {
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+}
+
+.queue-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.queue-move-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.queue-move-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.queue-move-btn:disabled {
+  opacity: 0.25;
 }
 
 .queue-order {
