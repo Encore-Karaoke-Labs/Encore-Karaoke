@@ -284,6 +284,48 @@ class EncoreController {
     };
   }
 
+  /**
+   * Moves a song within the local reservation queue.
+   * Reordering is not available in Sessions, matching queue removal.
+   */
+  moveQueueSong(fromIndex, toIndex) {
+    const isSession = Boolean(
+      this.state.isSessionActive && this.services.SessionsSvc,
+    );
+
+    if (isSession) {
+      return {
+        success: false,
+        isSession: true,
+        reason: "Cannot reorder songs in Sessions mode.",
+      };
+    }
+
+    const queue = this.state.reservationQueue || [];
+    const from = Number(fromIndex);
+    const to = Number(toIndex);
+
+    if (
+      !Number.isInteger(from) ||
+      !Number.isInteger(to) ||
+      from < 0 ||
+      from >= queue.length ||
+      to < 0 ||
+      to >= queue.length
+    ) {
+      return { success: false, isSession: false, reason: "Invalid position." };
+    }
+
+    if (from === to) {
+      return { success: true, isSession: false, moved: false, from, to };
+    }
+
+    const [song] = queue.splice(from, 1);
+    queue.splice(to, 0, song);
+
+    return { success: true, isSession: false, moved: true, from, to, song };
+  }
+
   syncSetlistOverlay() {
     if (!window.setlistOverlay?.sendUpdate) return;
 
@@ -520,6 +562,16 @@ class EncoreController {
             order: index + 1,
           })),
         };
+      }
+
+      case "move-queue-song": {
+        const result = this.moveQueueSong(payload?.from, payload?.to);
+        if (result.success && this.state.isQueueOverlayVisible) {
+          this.state.highlightedQueueIndex = result.to;
+          this.state.isQueueDeleteHighlighted = false;
+          this.ui.renderQueue();
+        }
+        return result;
       }
 
       case "get-song-list": {
