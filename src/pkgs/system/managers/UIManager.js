@@ -165,6 +165,7 @@ export default class UIManager {
           { key: "BACKSPACE", desc: "Delete entered digit / clear input" },
           { key: "Y", desc: "Open song & YouTube search" },
           { key: "Q", desc: "Open Reservations menu" },
+          { key: "CTRL + ▲ / ▼", desc: "Move song in Reservations menu" },
         ],
       },
       {
@@ -1939,10 +1940,36 @@ export default class UIManager {
       new Html("span").text(song.artist).appendTo(artistRow);
 
       if (!state.isSessionActive) {
+        const actions = new Html("div").classOn("queue-actions").appendTo(item);
+
+        const moveUpBtn = new Html("div")
+          .classOn("queue-move-btn")
+          .attr({ title: "Move up", "aria-label": "Move song up" })
+          .html('<ion-icon name="chevron-up"></ion-icon>')
+          .appendTo(actions);
+        if (idx === 0) moveUpBtn.classOn("disabled");
+
+        moveUpBtn.on("click", (e) => {
+          e.stopPropagation();
+          if (idx > 0) this.moveQueueSong(idx, idx - 1);
+        });
+
+        const moveDownBtn = new Html("div")
+          .classOn("queue-move-btn")
+          .attr({ title: "Move down", "aria-label": "Move song down" })
+          .html('<ion-icon name="chevron-down"></ion-icon>')
+          .appendTo(actions);
+        if (idx === queue.length - 1) moveDownBtn.classOn("disabled");
+
+        moveDownBtn.on("click", (e) => {
+          e.stopPropagation();
+          if (idx < queue.length - 1) this.moveQueueSong(idx, idx + 1);
+        });
+
         const delBtn = new Html("div")
           .classOn("queue-del-btn")
           .html('<ion-icon name="trash"></ion-icon>')
-          .appendTo(item);
+          .appendTo(actions);
 
         delBtn.on("click", (e) => {
           e.stopPropagation();
@@ -1969,6 +1996,18 @@ export default class UIManager {
       state.highlightedQueueIndex = queue.length - 1;
     }
     this.updateQueueHighlight();
+  }
+
+  moveQueueSong(fromIndex, toIndex) {
+    const state = this.ctx.state;
+    const result = this.ctx.root.moveQueueSong?.(fromIndex, toIndex);
+
+    if (!result?.success || !result.moved) return result;
+
+    state.highlightedQueueIndex = result.to;
+    state.isQueueDeleteHighlighted = false;
+    this.renderQueue();
+    return result;
   }
 
   updateQueueHighlight() {
