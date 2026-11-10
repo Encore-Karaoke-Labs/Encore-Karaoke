@@ -56,6 +56,8 @@ contextBridge.exposeInMainWorld("karaoke", {
     ipcRenderer.invoke("karaoke:cycle-bgv", direction),
   toggleRecording: () => ipcRenderer.invoke("karaoke:toggle-recording"),
   getQueue: () => ipcRenderer.invoke("karaoke:get-queue"),
+  moveQueueSong: (from, to) =>
+    ipcRenderer.invoke("karaoke:move-queue-song", { from, to }),
   getAlbumArt: (song) => ipcRenderer.invoke("album-art:get", song),
   isAppReady: () => ipcRenderer.invoke("karaoke:app-ready"),
   onAppState: (callback) => {
