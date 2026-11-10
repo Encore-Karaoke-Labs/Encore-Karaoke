@@ -258,8 +258,45 @@ export default class InputManager {
         }
       };
 
+      const doMove = (direction) => {
+        if (state.isSessionActive) {
+          this.playNavSfx("out_of_bounds");
+          this.ctx.modules.infoBar.showTemp(
+            "QUEUE",
+            "Cannot reorder in Sessions mode.",
+            3000,
+          );
+          return;
+        }
+
+        const idx = state.highlightedQueueIndex;
+        const queue = state.reservationQueue;
+        if (idx < 0 || idx >= queue.length) return;
+
+        const target = idx + direction;
+        if (target < 0 || target >= queue.length) {
+          this.playNavSfx("out_of_bounds");
+          return;
+        }
+
+        const result = ui.moveQueueSong(idx, target);
+        if (result?.success && result.moved) {
+          this.ctx.modules.infoBar.showTemp(
+            "QUEUE",
+            direction < 0 ? "Song moved up." : "Song moved down.",
+            2000,
+          );
+          setTimeout(() => this.ctx.modules.infoBar.showDefault(), 2000);
+        }
+      };
+
       if (e.key === "Escape" || e.key.toLowerCase() === "q") {
         ui.toggleQueueOverlay(false);
+      } else if (
+        (e.ctrlKey || e.metaKey || e.shiftKey) &&
+        (e.key === "ArrowUp" || e.key === "ArrowDown")
+      ) {
+        doMove(e.key === "ArrowUp" ? -1 : 1);
       } else if (e.key === "ArrowUp") {
         const queueLen = state.isSessionActive
           ? this.ctx.services.SessionsSvc?.state?.queue?.length || 0
