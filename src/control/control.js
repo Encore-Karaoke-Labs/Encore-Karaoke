@@ -282,13 +282,38 @@ function createSongRow(song, index) {
   return row;
 }
 
-function createQueueRow(song) {
+function createQueueMoveButton(direction, disabled, onClick) {
+  const label = direction === "up" ? "Move song up" : "Move song down";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "queue-move-btn";
+  button.disabled = disabled;
+  button.title = label;
+  button.setAttribute("aria-label", label);
+
+  const icon = document.createElement("span");
+  icon.className = `svg-icon ${
+    direction === "up" ? "icon-caret-up" : "icon-caret-down"
+  }`;
+  icon.setAttribute("aria-hidden", "true");
+  button.appendChild(icon);
+
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (button.disabled) return;
+    onClick();
+  });
+
+  return button;
+}
+
+function createQueueRow(song, index, total, canMove, onMove) {
   const row = document.createElement("div");
   row.className = "queue-item";
 
   const order = document.createElement("span");
   order.className = "queue-order";
-  order.textContent = String(song.order ?? "");
+  order.textContent = String(song.order ?? index + 1);
 
   const copy = document.createElement("span");
   copy.className = "queue-copy";
@@ -312,6 +337,21 @@ function createQueueRow(song) {
   meta.append(badge, artist);
   copy.append(title, meta);
   row.append(order, copy);
+
+  if (canMove) {
+    row.classList.add("has-actions");
+
+    const actions = document.createElement("span");
+    actions.className = "queue-actions";
+    actions.append(
+      createQueueMoveButton("up", index === 0, () => onMove(index, -1)),
+      createQueueMoveButton("down", index === total - 1, () => {
+        onMove(index, 1);
+      }),
+    );
+    row.append(actions);
+  }
+
   row.title = `${title.textContent} · ${artist.textContent}`;
 
   return row;
@@ -382,6 +422,8 @@ async function init() {
   let queueSongs = [];
   let queueRequestId = 0;
   let lastQueueLength = -1;
+  let queueIsSession = false;
+  let queueMovePending = false;
   let queueEmptyTitle = "Waiting for Encore";
   let queueEmptyCopy = "The queue loads when the app is ready.";
   const artworkCache = new Map();
@@ -445,8 +487,19 @@ async function init() {
     if (!container) return;
 
     const fragment = document.createDocumentFragment();
-    for (const song of queueSongs) {
-      fragment.appendChild(createQueueRow(song));
+    const canMove = !queueIsSession;
+    for (let index = 0; index < queueSongs.length; index++) {
+      fragment.appendChild(
+        createQueueRow(
+          queueSongs[index],
+          index,
+          queueSongs.length,
+          canMove,
+          (from, direction) => {
+            void moveQueueItem(from, direction);
+          },
+        ),
+      );
     }
     container.replaceChildren(fragment);
 
@@ -456,6 +509,32 @@ async function init() {
       dom["queue-state"].hidden = queueSongs.length > 0;
     }
     setText(dom["queue-count"], formatCount(queueSongs.length));
+  }
+
+  async function moveQueueItem(index, direction) {
+    if (!appReady || queueIsSession || queueMovePending) return;
+    if (!window.karaoke?.moveQueueSong) return;
+
+    const target = index + direction;
+    if (index < 0 || index >= queueSongs.length) return;
+    if (target < 0 || target >= queueSongs.length) return;
+
+    queueMovePending = true;
+    try {
+      const response = await window.karaoke.moveQueueSong(index, target);
+      if (response?.success) {
+        await refreshQueue();
+      } else if (response?.isSession) {
+        queueIsSession = true;
+        renderQueue();
+      } else {
+        await refreshQueue();
+      }
+    } catch {
+      // The periodic refresh will resynchronize the queue.
+    } finally {
+      queueMovePending = false;
+    }
   }
 
   /**
@@ -508,6 +587,7 @@ async function init() {
       if (requestId !== queueRequestId || !appReady) return;
 
       queueSongs = Array.isArray(response?.songs) ? response.songs : [];
+      queueIsSession = Boolean(response?.isSession);
       queueEmptyTitle = "Queue is empty";
       queueEmptyCopy = "Songs you reserve will appear here.";
       renderQueue();
@@ -1253,6 +1333,8 @@ async function init() {
       artworkPreloadToken++;
       queueSongs = [];
       lastQueueLength = -1;
+      queueIsSession = false;
+      queueMovePending = false;
       queueEmptyTitle = "Waiting for Encore";
       queueEmptyCopy = "The queue loads when the app is ready.";
       renderQueue();
