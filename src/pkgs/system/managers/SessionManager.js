@@ -722,6 +722,10 @@ export default class SessionManager {
       this.ctx.services.Forte.playSfx("/assets/audio/session_end.wav");
     }
 
+    if (this.ctx.services.Forte.setScoringForced) {
+      this.ctx.services.Forte.setScoringForced(false);
+    }
+
     if (this.ctx.services.Forte.setScoringEnabled) {
       const userPref = this.ctx.config.audioConfig?.enableScoring !== false;
       this.ctx.services.Forte.setScoringEnabled(userPref);
@@ -1135,6 +1139,9 @@ export default class SessionManager {
 
             this.ctx.services.Forte.playSfx("/assets/audio/session_start.wav");
 
+            if (this.ctx.services.Forte.setScoringForced) {
+              this.ctx.services.Forte.setScoringForced(true);
+            }
             if (this.ctx.services.Forte.setScoringEnabled) {
               this.ctx.services.Forte.setScoringEnabled(true);
             }
