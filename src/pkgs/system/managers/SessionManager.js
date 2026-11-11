@@ -641,9 +641,15 @@ export default class SessionManager {
     dom.introCard.classOff("exiting").classOn("visible");
 
     if (this._sessionIntroTimer) clearTimeout(this._sessionIntroTimer);
+    if (this._sessionExitTimer) clearTimeout(this._sessionExitTimer);
     this._sessionIntroTimer = setTimeout(() => {
       this._sessionIntroTimer = null;
-      if (state.mode === "player") dom.introCard.classOff("visible");
+      if (state.mode !== "player") return;
+      dom.introCard.classOff("visible").classOn("exiting");
+      this._sessionExitTimer = setTimeout(() => {
+        this._sessionExitTimer = null;
+        dom.introCard.classOff("exiting");
+      }, 650);
     }, 3500);
   }
 
