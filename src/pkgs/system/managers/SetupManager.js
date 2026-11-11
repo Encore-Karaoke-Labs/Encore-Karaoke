@@ -1025,8 +1025,16 @@ export default class SetupManager {
                   { value: false, label: "Disabled" },
                   { value: true, label: "Enabled" },
                 ],
-                get: () => this.ctx.config.audioConfig?.enableScoring ?? true,
+                get: () =>
+                  this.ctx.state.isSessionActive ||
+                  (this.ctx.config.audioConfig?.enableScoring ?? true),
                 set: (v) => {
+                  if (this.ctx.state.isSessionActive) {
+                    if (this.ctx.services.Forte.setScoringEnabled) {
+                      this.ctx.services.Forte.setScoringEnabled(true);
+                    }
+                    return;
+                  }
                   this.ctx.config.audioConfig ??= {};
                   this.ctx.config.audioConfig.enableScoring = v;
                   window.config.setItem("audioConfig.enableScoring", v);
@@ -3826,8 +3834,9 @@ export default class SetupManager {
 
           const updateSelectVisual = (newVal) => {
             item.set(newVal);
-            const found = item.options.find((o) => o.value === newVal);
-            selectTxt.text(found ? found.label : newVal);
+            const effectiveVal = item.get();
+            const found = item.options.find((o) => o.value === effectiveVal);
+            selectTxt.text(found ? found.label : effectiveVal);
           };
 
           const cycleSelect = (dir) => {
