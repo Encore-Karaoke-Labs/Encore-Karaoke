@@ -44,6 +44,7 @@ export class FortePianoRoll {
     this.remote = null;
     this.remoteRafId = null;
     this._broadcastStatusCache = new Map();
+    this._remotePianoRollShowAt = null;
 
     this.resizeHandler = this.handleResize.bind(this);
   }
@@ -345,7 +346,10 @@ export class FortePianoRoll {
     this.noteStartIndex = 0;
     this.lastTime = -1;
 
-    this.toggleVisibility(true);
+    const firstNoteTime = notes.length > 0 ? notes[0].startTime : 0;
+    const maxLead = Math.min(firstNoteTime, 4.0);
+    this._remotePianoRollShowAt = Math.max(0, firstNoteTime - maxLead);
+
     this._startRemoteRenderLoop();
   }
 
@@ -392,6 +396,14 @@ export class FortePianoRoll {
       this.remote.currentMicMidi = pitch;
       this.remote.isSinging = Boolean(data.isSinging) && pitch > 0;
       this.remote.score = Number(data.score) || 0;
+
+      if (
+        !this.state.ui.pianoRollVisible &&
+        this._remotePianoRollShowAt !== null &&
+        time >= this._remotePianoRollShowAt
+      ) {
+        this.toggleVisibility(true);
+      }
 
       const history = this.remote.history;
       const last = history[history.length - 1];
