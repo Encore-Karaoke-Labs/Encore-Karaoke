@@ -1,7 +1,7 @@
 import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
-import { findSongByCode } from "../../../libs/songLookup.js";
 import { isEmbedded } from "../../../libs/platformHints.js";
+import { findSongByCode } from "../../../libs/songLookup.js";
 import { COLOR_PALETTES } from "./LyricsEngine.js";
 
 const LYRIC_ROLES = [
@@ -205,7 +205,9 @@ export default class UIManager {
             desc: "Instant song recording / see saved session takes",
           },
           { key: "S", desc: "Open Sessions menu" },
-          ...(this.embedded ? [] : [{ key: "B", desc: "Broadcast karaoke stream" }]),
+          ...(this.embedded
+            ? []
+            : [{ key: "B", desc: "Broadcast karaoke stream" }]),
           { key: "T", desc: "Open multiplayer session chat" },
           { key: "F2", desc: "Open Setup" },
           { key: "F11", desc: "Toggle borderless fullscreen" },
@@ -680,7 +682,7 @@ export default class UIManager {
         width: "100%",
         height: "100%",
         objectFit: "contain",
-        background: "#000",
+        background: "transparent",
       })
       .appendTo(dom.sessionRemoteContainer);
   }
