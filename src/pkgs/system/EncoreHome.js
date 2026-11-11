@@ -533,6 +533,7 @@ class EncoreController {
           hasGuideNotes: Boolean(pb?.hasGuideNotes),
           guideMelody: guideLevel?.label || "NORMAL",
           guideMelodyIndex: guideIndex,
+          guideMelodyPersistent: Boolean(this.input?.persistGuideMelody),
           rhythmName,
           rhythmIndex,
           rhythmCount,
@@ -813,13 +814,15 @@ class EncoreController {
           selectedLevel = levels[this.input.currentGuideMelodyIndex];
         }
 
+        this.input.saveGuideMelodyPreference?.();
         Forte.setGuideTrackVolume(selectedLevel.value);
 
+        const melodyColor = this.input.getGuideMelodyColor?.() || "#ffd700";
         const html = `
           <div class="volume-display" style="display: flex; align-items: center; width: 100%; gap: 1rem;">
-            <div style="font-weight: 700; color: #ffd700; width: 85px; text-align: left;">${selectedLevel.label}</div>
+            <div style="font-weight: 700; color: ${melodyColor}; width: 85px; text-align: left;">${selectedLevel.label}</div>
             <div class="volume-slider-container" style="flex-grow: 1; height: 12px; background-color: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; overflow: hidden;">
-              <div class="volume-slider-fill" style="height: 100%; background-color: #ffd700; border-radius: 6px; transition: width 0.1s linear; width: ${(selectedLevel.value / 127) * 100}%"></div>
+              <div class="volume-slider-fill" style="height: 100%; background-color: ${melodyColor}; border-radius: 6px; transition: width 0.1s linear; width: ${(selectedLevel.value / 127) * 100}%"></div>
             </div>
           </div>
         `;
