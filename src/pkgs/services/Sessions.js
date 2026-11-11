@@ -22,6 +22,7 @@ const pkg = {
     SESSION_ID_LENGTH: 16,
     CHECKSUM_LENGTH: 4,
     LYRICS_CHUNK_SIZE: 48000,
+    PIANOROLL_CHUNK_SIZE: 48000,
 
     peer: null,
     roomId: null,
@@ -453,6 +454,53 @@ const pkg = {
               }),
             );
           }
+        } else if (
+          data.type === "pianoroll_data" ||
+          data.type === "pianoroll_notes" ||
+          data.type === "pianoroll_state"
+        ) {
+          if (
+            this.state.singerId &&
+            data.senderId &&
+            data.senderId !== this.state.singerId
+          ) {
+            return;
+          }
+
+          if (this.isHost) {
+            for (let c of this.connections.values()) {
+              if (c.open && c.peer !== conn.peer) c.send(data);
+            }
+          }
+
+          if (data.senderId !== this.peer.id) {
+            const eventName =
+              data.type === "pianoroll_data"
+                ? "Encore.Sessions.PianoRollData"
+                : data.type === "pianoroll_notes"
+                  ? "Encore.Sessions.PianoRollNotes"
+                  : "Encore.Sessions.PianoRollState";
+
+            document.dispatchEvent(
+              new CustomEvent(eventName, { detail: data.payload }),
+            );
+          }
+        } else if (data.type === "pianoroll_data_chunk") {
+          if (
+            this.state.singerId &&
+            data.senderId &&
+            data.senderId !== this.state.singerId
+          ) {
+            return;
+          }
+
+          if (this.isHost) {
+            for (let c of this.connections.values()) {
+              if (c.open && c.peer !== conn.peer) c.send(data);
+            }
+          }
+
+          this.receivePianoRollChunk(data);
         }
       });
 
@@ -688,6 +736,64 @@ const pkg = {
       });
     },
 
+    /**
+     * Shares the performer's complete piano roll note chart with the room.
+     */
+    broadcastPianoRollData: function (payload) {
+      if (!this.canBroadcastSessionLyrics()) return;
+
+      const json = JSON.stringify(payload ?? null);
+      if (json.length <= this.PIANOROLL_CHUNK_SIZE) {
+        this.sendSessionLyrics({
+          type: "pianoroll_data",
+          senderId: this.peer.id,
+          payload,
+        });
+        return;
+      }
+
+      const id = `${this.peer.id}-pr-${Date.now()}`;
+      const total = Math.ceil(json.length / this.PIANOROLL_CHUNK_SIZE);
+      for (let index = 0; index < total; index++) {
+        this.sendSessionLyrics({
+          type: "pianoroll_data_chunk",
+          senderId: this.peer.id,
+          id: id,
+          index: index,
+          total: total,
+          chunk: json.slice(
+            index * this.PIANOROLL_CHUNK_SIZE,
+            (index + 1) * this.PIANOROLL_CHUNK_SIZE,
+          ),
+        });
+      }
+    },
+
+    /**
+     * Shares notes that became available after the initial piano roll bundle
+     * (e.g. multiplexed guide analysis during playback).
+     */
+    broadcastPianoRollNotes: function (payload) {
+      if (!this.canBroadcastSessionLyrics()) return;
+      this.sendSessionLyrics({
+        type: "pianoroll_notes",
+        senderId: this.peer.id,
+        payload,
+      });
+    },
+
+    /**
+     * Shares the performer's live piano roll state (position, pitch, score).
+     */
+    broadcastPianoRollState: function (payload) {
+      if (!this.canBroadcastSessionLyrics()) return;
+      this.sendSessionLyrics({
+        type: "pianoroll_state",
+        senderId: this.peer.id,
+        payload,
+      });
+    },
+
     /** Whether this peer is currently the performing singer. */
     canBroadcastSessionLyrics: function () {
       if (!this.peer) return false;
@@ -738,6 +844,41 @@ const pkg = {
         );
       } catch (err) {
         console.warn("[SESSIONS] Failed to assemble lyrics payload:", err);
+      }
+    },
+
+    /** Reassembles a chunked piano roll bundle and dispatches it. */
+    receivePianoRollChunk: function (data) {
+      if (!this._pianoRollChunkBuffers) this._pianoRollChunkBuffers = new Map();
+
+      let buffer = this._pianoRollChunkBuffers.get(data.id);
+      if (!buffer) {
+        buffer = {
+          total: data.total,
+          parts: new Array(data.total),
+          received: 0,
+        };
+        this._pianoRollChunkBuffers.set(data.id, buffer);
+      }
+
+      if (buffer.parts[data.index] === undefined) {
+        buffer.parts[data.index] = data.chunk;
+        buffer.received++;
+      }
+      if (buffer.received < buffer.total) return;
+
+      this._pianoRollChunkBuffers.delete(data.id);
+      if (data.senderId === this.peer.id) return;
+
+      try {
+        const payload = JSON.parse(buffer.parts.join(""));
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.PianoRollData", {
+            detail: payload,
+          }),
+        );
+      } catch (err) {
+        console.warn("[SESSIONS] Failed to assemble piano roll payload:", err);
       }
     },
 
@@ -813,6 +954,9 @@ const pkg = {
         document.dispatchEvent(
           new CustomEvent("Encore.Sessions.LyricsData", { detail: null }),
         );
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.PianoRollData", { detail: null }),
+        );
         this.currentPerformanceStream = null;
       }
 
@@ -873,6 +1017,7 @@ const pkg = {
       this.isDisconnecting = false;
       this.collisionResolver = null;
       if (this._lyricsChunkBuffers) this._lyricsChunkBuffers.clear();
+      if (this._pianoRollChunkBuffers) this._pianoRollChunkBuffers.clear();
 
       this.state = {
         mode: "lounge",
@@ -889,6 +1034,9 @@ const pkg = {
       document.dispatchEvent(new CustomEvent("Encore.Sessions.ClearStreams"));
       document.dispatchEvent(
         new CustomEvent("Encore.Sessions.LyricsData", { detail: null }),
+      );
+      document.dispatchEvent(
+        new CustomEvent("Encore.Sessions.PianoRollData", { detail: null }),
       );
     },
 
