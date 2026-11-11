@@ -145,7 +145,8 @@ const pkg = {
       pianoRoll.getSessionPianoRollBundle(songKey, updateStatusCache),
     getSessionPianoRollState: (currentTime) =>
       pianoRoll.getSessionPianoRollState(currentTime),
-    getSessionPianoRollNoteCount: () => pianoRoll.getSessionPianoRollNoteCount(),
+    getSessionPianoRollNoteCount: () =>
+      pianoRoll.getSessionPianoRollNoteCount(),
     getSessionPianoRollNotes: (startIndex) =>
       pianoRoll.getSessionPianoRollNotes(startIndex),
     setupRemotePianoRoll: (data) => pianoRoll.setupRemotePianoRoll(data),
@@ -212,7 +213,15 @@ const pkg = {
     getScoringState: () => scoring.getScoringState(),
     getPlaybackState: () => playback.getPlaybackState(),
     setScoringEnabled: (enabled) => {
-      state.scoring.userDisabled = !Boolean(enabled);
+      state.scoring.userDisabled = state.scoring.forced
+        ? false
+        : !Boolean(enabled);
+    },
+    setScoringForced: (enabled) => {
+      state.scoring.forced = Boolean(enabled);
+      if (state.scoring.forced) {
+        state.scoring.userDisabled = false;
+      }
     },
     setDisplayGuideMelody: (enabled) => {
       state.ui.displayGuideMelody = Boolean(enabled);
