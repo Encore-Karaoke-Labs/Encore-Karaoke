@@ -713,14 +713,17 @@ const pkg = {
     },
 
     /**
-     * Shares the singer's playback position.
+     * Shares the singer's playback position together with the current tempo.
      */
-    broadcastLyricsTime: function (currentTime) {
+    broadcastLyricsTime: function (currentTime, tempo = 1) {
       if (!this.canBroadcastSessionLyrics()) return;
       this.sendSessionLyrics({
         type: "lyrics_time",
         senderId: this.peer.id,
-        payload: currentTime,
+        payload: {
+          time: currentTime,
+          tempo: Number(tempo) || 1,
+        },
       });
     },
 
