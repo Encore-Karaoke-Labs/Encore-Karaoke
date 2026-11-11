@@ -30,6 +30,13 @@ export default class SessionManager {
       this.handleSessionLyricsRequest.bind(this);
     this.handleSessionTrackInfo = this.handleSessionTrackInfo.bind(this);
     this.handleLocalTrackInfo = this.handleLocalTrackInfo.bind(this);
+    this.handleLocalPlaybackTime = this.handleLocalPlaybackTime.bind(this);
+    this.handleSessionPianoRollData =
+      this.handleSessionPianoRollData.bind(this);
+    this.handleSessionPianoRollNotes =
+      this.handleSessionPianoRollNotes.bind(this);
+    this.handleSessionPianoRollState =
+      this.handleSessionPianoRollState.bind(this);
     this.handlePeerDisconnected = this.handlePeerDisconnected.bind(this);
     this.handleHostDisconnected = this.handleHostDisconnected.bind(this);
     this.handleKicked = this.handleKicked.bind(this);
@@ -37,6 +44,10 @@ export default class SessionManager {
     this.handleChatHistorySync = this.handleChatHistorySync.bind(this);
     this.handleChat = this.handleChat.bind(this);
     this.handleCheer = this.handleCheer.bind(this);
+
+    this._lastPianoRollBroadcast = 0;
+    this._sessionPianoRollSongKey = null;
+    this._sessionPianoRollNoteCount = 0;
   }
 
   /**
@@ -205,6 +216,22 @@ export default class SessionManager {
       "Encore.Playback.TrackInfo",
       this.handleLocalTrackInfo,
     );
+    document.addEventListener(
+      "Encore.Forte.Playback.TimeUpdate",
+      this.handleLocalPlaybackTime,
+    );
+    document.addEventListener(
+      "Encore.Sessions.PianoRollData",
+      this.handleSessionPianoRollData,
+    );
+    document.addEventListener(
+      "Encore.Sessions.PianoRollNotes",
+      this.handleSessionPianoRollNotes,
+    );
+    document.addEventListener(
+      "Encore.Sessions.PianoRollState",
+      this.handleSessionPianoRollState,
+    );
   }
 
   handleStateUpdate(e) {
@@ -274,6 +301,7 @@ export default class SessionManager {
           dom.sessionRemoteContainer.classOn("hidden");
           dom.sessionRemoteVideo.elm.srcObject = null;
           root.lyrics?.stopRemoteLyrics();
+          this.ctx.services.Forte.stopRemotePianoRoll?.();
 
           if (sState.nowPlaying) {
             root.playback.startPlayer(sState.nowPlaying);
@@ -284,6 +312,7 @@ export default class SessionManager {
           }
         } else {
           root.playback.stopPlayer();
+          this.ctx.services.Forte.stopRemotePianoRoll?.();
           root.ui.setMode("player");
           state.isTransitioning = false;
 
@@ -332,6 +361,8 @@ export default class SessionManager {
     } else if (sState.mode === "lounge" && prevMode !== "lounge") {
       dom.sessionRemoteContainer.classOn("hidden");
       dom.sessionRemoteVideo.elm.srcObject = null;
+      this.ctx.services.Forte.stopRemotePianoRoll?.();
+      this.ctx.modules.scoreHud?.hide();
       if (this.ctx.modules.recorder)
         this.ctx.modules.recorder.stopBroadcastStream();
 
@@ -371,6 +402,11 @@ export default class SessionManager {
       state.remoteScoreEntry = e.detail.entry;
       state.currentScoreEntryId = e.detail.entry.id;
 
+      // Mirror the performer, whose piano roll and live score HUD close out
+      // when the song ends.
+      this.ctx.services.Forte.stopRemotePianoRoll?.();
+      this.ctx.modules.scoreHud?.hide();
+
       await this.ctx.root.playback.showPostSongScreen(mockScoreData);
 
       state.remoteScoreEntry = null;
@@ -398,8 +434,13 @@ export default class SessionManager {
 
   handleClearStreams() {
     this.ctx.services.Forte.clearRemoteStreams();
+    this.ctx.services.Forte.stopRemotePianoRoll?.();
     this.ctx.dom.sessionRemoteVideo.elm.srcObject = null;
     this.ctx.root.lyrics?.stopRemoteLyrics();
+
+    this._lastPianoRollBroadcast = 0;
+    this._sessionPianoRollSongKey = null;
+    this._sessionPianoRollNoteCount = 0;
   }
 
   handleSessionLyricsData(e) {
@@ -416,10 +457,151 @@ export default class SessionManager {
 
   handleSessionLyricsRequest() {
     this.ctx.root.lyrics?.resendSessionLyrics();
+    this.resendSessionPianoRoll();
   }
 
   handleLocalTrackInfo(e) {
     this.ctx.services.SessionsSvc?.broadcastTrackInfo?.(e.detail || null);
+  }
+
+  /**
+   * Whether this client is the Session performer.
+   * @returns {boolean}
+   */
+  isSessionSinger() {
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    if (!SessionsSvc?.peer || !SessionsSvc.state) return false;
+    return (
+      SessionsSvc.state.mode === "performance" &&
+      SessionsSvc.state.singerId === SessionsSvc.peer.id
+    );
+  }
+
+  /**
+   * Whether this client is a non-performer in an active Session performance.
+   * @returns {boolean}
+   */
+  isSessionAudience() {
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    if (!SessionsSvc?.peer || !SessionsSvc.state) return false;
+    return (
+      SessionsSvc.state.mode === "performance" &&
+      SessionsSvc.state.singerId !== SessionsSvc.peer.id
+    );
+  }
+
+  /**
+   * Streams the performer's piano roll position, pitch, and note statuses to
+   * the audience while a Session performance is running.
+   */
+  handleLocalPlaybackTime(e) {
+    if (!this.isSessionSinger()) return;
+
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    const Forte = this.ctx.services.Forte;
+    if (!SessionsSvc || !Forte?.getSessionPianoRollState) return;
+
+    const now = performance.now();
+    if (now - this._lastPianoRollBroadcast < 50) return;
+
+    const songKey = this.ctx.state.currentSong?.path || null;
+    if (songKey !== this._sessionPianoRollSongKey) {
+      this._sessionPianoRollSongKey = songKey;
+      this._sessionPianoRollNoteCount = 0;
+      this._lastPianoRollBroadcast = 0;
+    }
+
+    const currentTime = Number(e.detail?.currentTime) || 0;
+    const noteCount = Forte.getSessionPianoRollNoteCount
+      ? Forte.getSessionPianoRollNoteCount()
+      : 0;
+
+    // Send note data before live state so statuses for newly appended notes
+    // are applied after those notes exist on the audience's chart.
+    if (noteCount > this._sessionPianoRollNoteCount) {
+      if (this._sessionPianoRollNoteCount === 0) {
+        const bundle = Forte.getSessionPianoRollBundle(songKey);
+        if (bundle) {
+          this._sessionPianoRollNoteCount = bundle.notes.length;
+          SessionsSvc.broadcastPianoRollData(bundle);
+        }
+      } else {
+        const notes = Forte.getSessionPianoRollNotes(
+          this._sessionPianoRollNoteCount,
+        );
+        if (notes.length > 0) {
+          SessionsSvc.broadcastPianoRollNotes({
+            songKey,
+            startIndex: this._sessionPianoRollNoteCount,
+            notes,
+          });
+        }
+        this._sessionPianoRollNoteCount = noteCount;
+      }
+    } else if (noteCount < this._sessionPianoRollNoteCount) {
+      this._sessionPianoRollNoteCount = 0;
+    }
+
+    this._lastPianoRollBroadcast = now;
+    SessionsSvc.broadcastPianoRollState(
+      Forte.getSessionPianoRollState(currentTime),
+    );
+  }
+
+  /**
+   * Re-shares the current piano roll bundle (e.g. a peer joined mid-song).
+   */
+  resendSessionPianoRoll() {
+    if (!this.isSessionSinger()) return;
+
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    const Forte = this.ctx.services.Forte;
+    if (!SessionsSvc || !Forte?.getSessionPianoRollBundle) return;
+
+    const songKey = this.ctx.state.currentSong?.path || null;
+    const bundle = Forte.getSessionPianoRollBundle(songKey, false);
+    if (!bundle) return;
+
+    this._sessionPianoRollNoteCount = bundle.notes.length;
+    SessionsSvc.broadcastPianoRollData(bundle);
+  }
+
+  handleSessionPianoRollData(e) {
+    if (!this.isSessionAudience()) {
+      this.ctx.services.Forte?.stopRemotePianoRoll?.();
+      return;
+    }
+
+    const Forte = this.ctx.services.Forte;
+    if (!Forte?.setupRemotePianoRoll) return;
+
+    if (!e.detail) {
+      Forte.stopRemotePianoRoll?.();
+      return;
+    }
+
+    Forte.setupRemotePianoRoll(e.detail);
+  }
+
+  handleSessionPianoRollNotes(e) {
+    if (!this.isSessionAudience()) return;
+    if (!e.detail) return;
+    this.ctx.services.Forte?.appendRemotePianoRollNotes?.(e.detail);
+  }
+
+  handleSessionPianoRollState(e) {
+    if (!this.isSessionAudience()) return;
+
+    const detail = e.detail;
+    if (!detail) return;
+
+    this.ctx.services.Forte?.updateRemotePianoRoll?.(detail);
+
+    if (!(this.ctx.state.isScoreHudEnabled ?? true)) {
+      this.ctx.modules.scoreHud?.hide();
+    } else if (Number.isFinite(detail.score)) {
+      this.ctx.modules.scoreHud?.show(detail.score);
+    }
   }
 
   handleSessionTrackInfo(e) {
@@ -519,6 +701,8 @@ export default class SessionManager {
   handleForceStop() {
     if (this.ctx.state.mode === "player") {
       this.ctx.root.playback.stopPlayer();
+      this.ctx.services.Forte.stopRemotePianoRoll?.();
+      this.ctx.modules.scoreHud?.hide();
       this.ctx.modules.infoBar.showTemp(
         "SKIPPED",
         "The host skipped the current performance.",
@@ -557,6 +741,8 @@ export default class SessionManager {
 
     root.playback.stopPlayer();
     dom.sessionRemoteContainer.classOn("hidden");
+    this.ctx.services.Forte.stopRemotePianoRoll?.();
+    this.ctx.modules.scoreHud?.hide();
 
     if (dom.sessionChatContainer) {
       dom.sessionChatContainer.classOn("hidden");
@@ -1593,6 +1779,22 @@ export default class SessionManager {
     document.removeEventListener(
       "Encore.Playback.TrackInfo",
       this.handleLocalTrackInfo,
+    );
+    document.removeEventListener(
+      "Encore.Forte.Playback.TimeUpdate",
+      this.handleLocalPlaybackTime,
+    );
+    document.removeEventListener(
+      "Encore.Sessions.PianoRollData",
+      this.handleSessionPianoRollData,
+    );
+    document.removeEventListener(
+      "Encore.Sessions.PianoRollNotes",
+      this.handleSessionPianoRollNotes,
+    );
+    document.removeEventListener(
+      "Encore.Sessions.PianoRollState",
+      this.handleSessionPianoRollState,
     );
   }
 }
