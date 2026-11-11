@@ -2061,6 +2061,8 @@ export class FortePlayback {
    * @param {number} volume - Volume mapping value (0-127).
    */
   setGuideTrackVolume(volume) {
+    this.state.playback.guideVolume = volume;
+
     const applyVolumeToGuide = async () => {
       const snapshot = await this.state.playback.synthesizer.getSnapshot();
       for (const ch of this.state.playback.guideChannels) {
