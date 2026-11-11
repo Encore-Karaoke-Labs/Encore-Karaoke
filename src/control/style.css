@@ -286,6 +286,11 @@ input:focus-visible,
   white-space: nowrap;
 }
 
+.quick-btn.is-persistent .quick-value,
+.quick-btn.is-persistent .quick-icon {
+  color: var(--accent);
+}
+
 .record-btn {
   min-height: 74px;
   display: flex;
