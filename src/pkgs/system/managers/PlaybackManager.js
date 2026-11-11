@@ -482,9 +482,17 @@ export default class PlaybackManager {
         : 120;
       const initialBpm = Math.round(state.currentBpm);
       const songKey = song.key || pbState.midiInfo?.key || "C";
+      state.currentSongKey = songKey;
 
-      if (dom.introBpmBadge) dom.introBpmBadge.text(`${initialBpm} BPM`);
-      if (dom.introKeyBadge) dom.introKeyBadge.text(songKey);
+      if (dom.introBpmBadge)
+        dom.introBpmBadge.text(`${initialBpm} BPM`).classOff("hidden");
+      if (dom.introKeyBadge) dom.introKeyBadge.text(songKey).classOff("hidden");
+
+      document.dispatchEvent(
+        new CustomEvent("Encore.Playback.TrackInfo", {
+          detail: { bpm: initialBpm, key: songKey },
+        }),
+      );
 
       dom.lyricsCanvas.styleJs({ opacity: "0" });
 
