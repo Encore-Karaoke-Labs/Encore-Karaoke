@@ -27,6 +27,14 @@ const EXPERIMENTAL_INTERLUDES = [
 // freeze (the singer paused or stalled playback).
 const SESSION_SYNC_GRACE_MS = 400;
 
+// A sync sample further than this from the predicted position is treated as a
+// seek/restart and applied immediately instead of being eased into.
+const SESSION_SYNC_RESYNC_SECONDS = 0.5;
+
+// Maximum rate (in seconds per second) at which a small sync error is corrected
+// on top of the current playback tempo.
+const SESSION_SYNC_CORRECTION_RATE = 0.5;
+
 export const COLOR_PALETTES = {
   white: {
     label: "White",
@@ -992,15 +1000,49 @@ export default class LyricsEngine {
   }
 
   /**
-   * Receives the singer's playback time and keeps the local lyric clock in
-   * sync.
-   * @param {number} time - Singer playback position in seconds.
+   * Receives the singer's playback time and tempo and keeps the local lyric
+   * clock in sync
+   * @param {number|{time:number, tempo?:number}} input
    */
-  updateRemoteTimeSync(time) {
+  updateRemoteTimeSync(input) {
     if (!this.remoteLyricsActive) return;
-    if (typeof time !== "number" || !Number.isFinite(time)) return;
 
-    this.remoteClock = { time, at: performance.now() };
+    let time;
+    let rate = 1;
+
+    if (typeof input === "number") {
+      time = input;
+    } else if (input && typeof input === "object") {
+      time = Number(input.time);
+      const tempo = Number(input.tempo);
+      if (Number.isFinite(tempo) && tempo > 0) rate = tempo;
+    }
+
+    if (!Number.isFinite(time)) return;
+    rate = Math.max(0.25, Math.min(4, rate));
+
+    const now = performance.now();
+
+    if (!this.remoteClock) {
+      this.remoteClock = { time, rate, at: now, syncAt: now, correction: 0 };
+    } else {
+      const elapsed = Math.max(0, (now - this.remoteClock.at) / 1000);
+      const predicted = this.remoteClock.time + elapsed * this.remoteClock.rate;
+      const error = time - predicted;
+
+      if (Math.abs(error) > SESSION_SYNC_RESYNC_SECONDS) {
+        this.remoteClock = { time, rate, at: now, syncAt: now, correction: 0 };
+      } else {
+        this.remoteClock = {
+          time: predicted,
+          rate,
+          at: now,
+          syncAt: now,
+          correction: error,
+        };
+      }
+    }
+
     this._startRemoteTimeLoop();
     this._ensureDrawLoop();
   }
@@ -1014,12 +1056,30 @@ export default class LyricsEngine {
         return;
       }
 
-      let elapsed = (performance.now() - this.remoteClock.at) / 1000;
-      const maxElapsed = SESSION_SYNC_GRACE_MS / 1000;
-      if (elapsed > maxElapsed) elapsed = maxElapsed;
+      const now = performance.now();
+      const clock = this.remoteClock;
+      const elapsed = Math.max(0, (now - clock.at) / 1000);
+      clock.at = now;
+
+      // Freeze if the singer's clock has gone quiet (paused or stalled).
+      if (now - clock.syncAt <= SESSION_SYNC_GRACE_MS) {
+        clock.time += elapsed * clock.rate;
+
+        if (clock.correction) {
+          let step = Math.max(
+            -elapsed * SESSION_SYNC_CORRECTION_RATE,
+            Math.min(elapsed * SESSION_SYNC_CORRECTION_RATE, clock.correction),
+          );
+          if (step < 0) step = Math.max(step, -elapsed * clock.rate * 0.9);
+          clock.time += step;
+          clock.correction -= step;
+          if (Math.abs(clock.correction) < 0.001) clock.correction = 0;
+        }
+      }
+
       if (this.boundTimeUpdate) {
         this.boundTimeUpdate({
-          detail: { currentTime: this.remoteClock.time + elapsed },
+          detail: { currentTime: clock.time },
         });
       }
       this.remoteTimeRafId = requestAnimationFrame(tick);
@@ -2101,7 +2161,9 @@ export default class LyricsEngine {
         const now = performance.now();
         if (now - this.lastLyricsTimeBroadcast >= 250) {
           this.lastLyricsTimeBroadcast = now;
-          this.ctx.services.SessionsSvc.broadcastLyricsTime(currentTime);
+          const tempo =
+            this.ctx.services.Forte?.getPlaybackState?.().tempo || 1;
+          this.ctx.services.SessionsSvc.broadcastLyricsTime(currentTime, tempo);
         }
       }
 
