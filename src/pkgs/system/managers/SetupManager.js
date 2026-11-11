@@ -728,6 +728,23 @@ export default class SetupManager {
                 },
               },
               {
+                id: "persist_guide_melody",
+                label: "Remember Guide Melody",
+                type: "select",
+                options: [
+                  { value: false, label: "No" },
+                  { value: true, label: "Yes" },
+                ],
+                get: () =>
+                  Boolean(
+                    this.ctx.root.input?.persistGuideMelody ??
+                    this.ctx.config.audioConfig?.guideMelodyPersistent,
+                  ),
+                set: (v) => {
+                  this.ctx.root.input?.setGuideMelodyPersistence?.(v);
+                },
+              },
+              {
                 id: "test",
                 label: "Test Audio Output",
                 type: "action",
