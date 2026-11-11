@@ -1,6 +1,6 @@
 import Html from "../../../libs/html.js";
-import { findSongByCode } from "../../../libs/songLookup.js";
 import playNavSfx from "../../../libs/sfx.js";
+import { findSongByCode } from "../../../libs/songLookup.js";
 
 /**
  * @param {Object} context - The shared context
@@ -21,7 +21,53 @@ export default class InputManager {
       { label: "NORMAL", value: 90 },
       { label: "STRONG", value: 127 },
     ];
-    this.currentGuideMelodyIndex = 2;
+
+    const audioConfig = context.config?.audioConfig || {};
+    this.persistGuideMelody = Boolean(audioConfig.guideMelodyPersistent);
+    const savedGuideIndex = Number(audioConfig.guideMelodyIndex);
+    this.currentGuideMelodyIndex =
+      this.persistGuideMelody &&
+      Number.isInteger(savedGuideIndex) &&
+      savedGuideIndex >= 0 &&
+      savedGuideIndex < this.guideMelodyLevels.length
+        ? savedGuideIndex
+        : 2;
+  }
+
+  getGuideMelodyColor() {
+    return this.persistGuideMelody ? "#89cff0" : "#ffd700";
+  }
+
+  /**
+   * Persists the current guide melody level so it carries over to future songs.
+   */
+  saveGuideMelodyPreference() {
+    if (!this.persistGuideMelody) return;
+
+    this.ctx.config.audioConfig ??= {};
+    this.ctx.config.audioConfig.guideMelodyIndex = this.currentGuideMelodyIndex;
+    window.config?.setItem?.(
+      "audioConfig.guideMelodyIndex",
+      this.currentGuideMelodyIndex,
+    );
+  }
+
+  /**
+   * Enables or disables carrying the guide melody level across songs.
+   *
+   * @param {boolean} enabled - Whether the melody setting should persist.
+   */
+  setGuideMelodyPersistence(enabled) {
+    this.persistGuideMelody = Boolean(enabled);
+
+    this.ctx.config.audioConfig ??= {};
+    this.ctx.config.audioConfig.guideMelodyPersistent = this.persistGuideMelody;
+    window.config?.setItem?.(
+      "audioConfig.guideMelodyPersistent",
+      this.persistGuideMelody,
+    );
+
+    if (this.persistGuideMelody) this.saveGuideMelodyPreference();
   }
 
   /**
@@ -680,13 +726,15 @@ export default class InputManager {
       (this.currentGuideMelodyIndex + 1) % this.guideMelodyLevels.length;
     const level = this.guideMelodyLevels[this.currentGuideMelodyIndex];
 
+    this.saveGuideMelodyPreference();
     Forte.setGuideTrackVolume(level.value);
 
+    const color = this.getGuideMelodyColor();
     const html = `
       <div class="volume-display" style="display: flex; align-items: center; width: 100%; gap: 1rem;">
-        <div style="font-weight: 700; color: #ffd700; width: 85px; text-align: left;">${level.label}</div>
+        <div style="font-weight: 700; color: ${color}; width: 85px; text-align: left;">${level.label}</div>
         <div class="volume-slider-container" style="flex-grow: 1; height: 12px; background-color: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; overflow: hidden;">
-          <div class="volume-slider-fill" style="height: 100%; background-color: #ffd700; border-radius: 6px; transition: width 0.1s linear; width: ${(level.value / 127) * 100}%"></div>
+          <div class="volume-slider-fill" style="height: 100%; background-color: ${color}; border-radius: 6px; transition: width 0.1s linear; width: ${(level.value / 127) * 100}%"></div>
         </div>
       </div>
     `;
