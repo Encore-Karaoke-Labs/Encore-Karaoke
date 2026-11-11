@@ -3,6 +3,10 @@ import Html from "../../../libs/html.js";
 const PIXELS_PER_SECOND = 150;
 const NOTE_HEIGHT = 16;
 
+// How long a remote Session piano roll may extrapolate past the last state
+// sync before it freezes (the performer paused or stalled playback).
+const REMOTE_SYNC_GRACE_MS = 400;
+
 export class FortePianoRoll {
   constructor(state, harana = null) {
     this.state = state;
@@ -35,6 +39,11 @@ export class FortePianoRoll {
     this.gradNeutralModulated = null;
     this.gradNeutralSubModulated = null;
     this.gradSweep = null;
+
+    // Remote (Session audience) rendering state.
+    this.remote = null;
+    this.remoteRafId = null;
+    this._broadcastStatusCache = new Map();
 
     this.resizeHandler = this.handleResize.bind(this);
   }
@@ -107,6 +116,359 @@ export class FortePianoRoll {
     sCtx.fillRect(0, 0, 40, 40);
   }
 
+  /**
+   * Returns the note chart data used for rendering.\
+   */
+  _getGuideView() {
+    if (this.remote) {
+      return {
+        notes: this.remote.notes,
+        transpose: this.remote.transpose,
+        guideRange: this.remote.guideRange,
+        midiInfo: this.remote.midiInfo,
+        isMidi: this.remote.isMidi,
+        hasMidiGuide: this.remote.hasMidiGuide,
+      };
+    }
+
+    return {
+      notes: this.state.playback.guideNotes || [],
+      transpose: this.state.playback.transpose || 0,
+      guideRange: this.state.playback.guideRange || { min: 42, max: 90 },
+      midiInfo: this.state.playback.midiInfo || null,
+      isMidi: Boolean(this.state.playback.isMidi),
+      hasMidiGuide: Boolean(this.state.playback.hasMidiGuide),
+    };
+  }
+
+  /**
+   * Returns the scoring visuals used by the pitch marker and trail.
+   */
+  _getScoringView() {
+    if (this.remote) {
+      return {
+        history: this.remote.history,
+        isSinging: this.remote.isSinging,
+        currentMicMidi: this.remote.currentMicMidi,
+        userDisabled: false,
+      };
+    }
+
+    return {
+      history: this.state.scoring.micPitchHistory,
+      isSinging: this.state.scoring.isSinging,
+      currentMicMidi: this.state.scoring.currentMicMidi,
+      userDisabled: this.state.scoring.userDisabled,
+    };
+  }
+
+  _getRemotePlaybackTime() {
+    if (!this.remote) return 0;
+    if (!this.remote.clock) return this.remote.time || 0;
+
+    const elapsed = Math.min(
+      REMOTE_SYNC_GRACE_MS / 1000,
+      Math.max(0, (performance.now() - this.remote.clock.at) / 1000),
+    );
+    return this.remote.clock.time + elapsed;
+  }
+
+  _roundNoteTime(value) {
+    return Math.round(Number(value || 0) * 1000) / 1000;
+  }
+
+  _roundNotePitch(value) {
+    return Math.round(Number(value || 0) * 100) / 100;
+  }
+
+  _compactMidiInfo(midiInfo) {
+    if (!midiInfo) return null;
+    return {
+      key: midiInfo.key ?? null,
+      scale: midiInfo.scale ?? null,
+      root: midiInfo.root ?? null,
+      pitchClass: midiInfo.pitchClass ?? null,
+      keySegments: midiInfo.keySegments || [],
+      modulations: midiInfo.modulations || [],
+    };
+  }
+
+  _serializeNotes(notes) {
+    return notes.map((note) => [
+      this._roundNotePitch(note.pitch),
+      this._roundNoteTime(note.startTime),
+      this._roundNoteTime(note.duration),
+    ]);
+  }
+
+  /**
+   * Builds the complete note chart shared with Session participants when a
+   * performance starts.
+   *
+   * @param {string|null} songKey Identifies the current song.
+   * @param {boolean} updateStatusCache Whether to sync the incremental status
+   *   cache with the bundle. Skipped for resends so statuses that changed since
+   *   the last broadcast are still sent to already-connected peers.
+   * @returns {Object|null}
+   */
+  getSessionPianoRollBundle(songKey = null, updateStatusCache = true) {
+    const view = this._getGuideView();
+    if (!view.notes || view.notes.length === 0) return null;
+
+    const statuses = [];
+    const notes = view.notes.map((note, index) => {
+      if (note.hitStatus && note.hitStatus !== "neutral") {
+        statuses.push([index, note.hitStatus]);
+      }
+      return [
+        this._roundNotePitch(note.pitch),
+        this._roundNoteTime(note.startTime),
+        this._roundNoteTime(note.duration),
+      ];
+    });
+
+    // The bundle includes every current status, so only send future changes.
+    if (updateStatusCache) {
+      this._broadcastStatusCache.clear();
+      for (const [index, status] of statuses) {
+        this._broadcastStatusCache.set(index, status);
+      }
+    }
+
+    return {
+      songKey,
+      notes,
+      guideRange: {
+        min: view.guideRange?.min ?? 42,
+        max: view.guideRange?.max ?? 90,
+      },
+      transpose: view.transpose || 0,
+      midiInfo: this._compactMidiInfo(view.midiInfo),
+      isMidi: Boolean(view.isMidi),
+      hasMidiGuide: Boolean(view.hasMidiGuide),
+      statuses,
+    };
+  }
+
+  /**
+   * Builds the lightweight per-frame state shared with Session participants.
+   *
+   * @param {number} currentTime Performer playback position in seconds.
+   * @returns {Object}
+   */
+  getSessionPianoRollState(currentTime = 0) {
+    const notes = this._getGuideView().notes || [];
+    const statuses = [];
+
+    for (let index = 0; index < notes.length; index++) {
+      const status = notes[index].hitStatus;
+      if (!status || status === "neutral") continue;
+      if (this._broadcastStatusCache.get(index) === status) continue;
+
+      this._broadcastStatusCache.set(index, status);
+      statuses.push([index, status]);
+    }
+
+    return {
+      time: currentTime,
+      currentMicMidi: this.state.scoring.currentMicMidi || 0,
+      isSinging: Boolean(this.state.scoring.isSinging),
+      isVisuallySinging: this.state.scoring.singingGraceFrames > 0,
+      currentTier: this.state.scoring.details?.currentTier || "neutral",
+      score: this.state.scoring.finalScore || 0,
+      statuses,
+      noteCount: notes.length,
+    };
+  }
+
+  /**
+   * Returns the current note count known to the piano roll.
+   */
+  getSessionPianoRollNoteCount() {
+    return (this._getGuideView().notes || []).length;
+  }
+
+  /**
+   * Returns serialized notes appended after startIndex (used while multiplexed
+   * guide analysis streams in new notes during a performance).
+   */
+  getSessionPianoRollNotes(startIndex = 0) {
+    const notes = this._getGuideView().notes || [];
+    if (startIndex < 0) startIndex = 0;
+    return this._serializeNotes(notes.slice(startIndex));
+  }
+
+  /**
+   * Displays the performer's piano roll data received from a Session.
+   */
+  setupRemotePianoRoll(data) {
+    if (!data || !Array.isArray(data.notes) || data.notes.length === 0) {
+      this.stopRemotePianoRoll();
+      return;
+    }
+
+    const songKey = data.songKey || "session";
+    if (this.remote && this.remote.songKey === songKey) return;
+
+    const notes = data.notes.map((note) => ({
+      pitch: Number(note[0]) || 0,
+      startTime: Number(note[1]) || 0,
+      duration: Math.max(0.01, Number(note[2]) || 0),
+    }));
+
+    if (Array.isArray(data.statuses)) {
+      for (const [index, status] of data.statuses) {
+        if (notes[index] && status) notes[index].hitStatus = status;
+      }
+    }
+
+    this.remote = {
+      songKey,
+      notes,
+      guideRange: data.guideRange || { min: 42, max: 90 },
+      transpose: Number(data.transpose) || 0,
+      midiInfo: data.midiInfo || null,
+      isMidi: Boolean(data.isMidi),
+      hasMidiGuide: Boolean(data.hasMidiGuide),
+      history: [],
+      isSinging: false,
+      currentMicMidi: 0,
+      clock: null,
+      time: 0,
+      score: 0,
+    };
+
+    this.cachedNotes = notes;
+    this.cachedNotesLength = notes.length;
+    this.cachedPageIndex = -1;
+    this.cachedTranspose = this.remote.transpose;
+    this.noteStartIndex = 0;
+    this.lastTime = -1;
+
+    this.toggleVisibility(true);
+    this._startRemoteRenderLoop();
+  }
+
+  /**
+   * Appends note chart data received from a Session performer.
+   */
+  appendRemotePianoRollNotes(data) {
+    if (!this.remote || !data || !Array.isArray(data.notes)) return;
+
+    const startIndex = Number(data.startIndex);
+    if (Number.isFinite(startIndex) && startIndex >= 0) {
+      if (startIndex < this.remote.notes.length) {
+        this.remote.notes.length = startIndex;
+      }
+    }
+
+    for (const note of data.notes) {
+      this.remote.notes.push({
+        pitch: Number(note[0]) || 0,
+        startTime: Number(note[1]) || 0,
+        duration: Math.max(0.01, Number(note[2]) || 0),
+      });
+    }
+
+    this.cachedNotesLength = -1;
+    this.cachedPageIndex = -1;
+  }
+
+  /**
+   * Applies the performer's live pitch, score status, and playback position.
+   */
+  updateRemotePianoRoll(data) {
+    if (!this.remote || !data) return;
+
+    const time = Number(data.time);
+    if (Number.isFinite(time)) {
+      const pitch = Number(data.currentMicMidi) || 0;
+      const isVisuallySinging = Boolean(
+        data.isVisuallySinging ?? data.isSinging,
+      );
+
+      this.remote.clock = { time, at: performance.now() };
+      this.remote.time = time;
+      this.remote.currentMicMidi = pitch;
+      this.remote.isSinging = Boolean(data.isSinging) && pitch > 0;
+      this.remote.score = Number(data.score) || 0;
+
+      const history = this.remote.history;
+      const last = history[history.length - 1];
+      if (!last || time >= last.time) {
+        history.push({
+          time,
+          pitch,
+          isSinging: isVisuallySinging,
+        });
+
+        const cutoff = time - 30;
+        while (history.length > 0 && history[0].time < cutoff) {
+          history.shift();
+        }
+      }
+    }
+
+    if (Array.isArray(data.statuses)) {
+      for (const [index, status] of data.statuses) {
+        if (this.remote.notes[index] && status) {
+          this.remote.notes[index].hitStatus = status;
+        }
+      }
+    }
+
+    this._startRemoteRenderLoop();
+  }
+
+  _startRemoteRenderLoop() {
+    if (this.remoteRafId || !this.remote) return;
+
+    const tick = () => {
+      if (!this.remote) {
+        this.remoteRafId = null;
+        return;
+      }
+
+      this.render(this._getRemotePlaybackTime());
+      this.remoteRafId = requestAnimationFrame(tick);
+    };
+
+    this.remoteRafId = requestAnimationFrame(tick);
+  }
+
+  /**
+   * Tears down the remote Session piano roll.
+   */
+  stopRemotePianoRoll() {
+    const hadRemote = Boolean(this.remote);
+
+    if (this.remoteRafId) {
+      cancelAnimationFrame(this.remoteRafId);
+      this.remoteRafId = null;
+    }
+
+    this.remote = null;
+    this.cachedNotes = null;
+    this.cachedNotesLength = -1;
+    this.cachedPageIndex = -1;
+    this.noteStartIndex = 0;
+    this.lastTime = -1;
+
+    if (this.ctx && this.canvas) {
+      this.ctx.clearRect(0, 0, this.canvas.elm.width, this.canvas.elm.height);
+    }
+    if (this.pageCtx && this.pageCanvas) {
+      this.pageCtx.clearRect(
+        0,
+        0,
+        this.pageCanvas.width,
+        this.pageCanvas.height,
+      );
+    }
+
+    if (hadRemote) this.toggleVisibility(false);
+  }
+
   handleResize() {
     if (this.canvas && this.container) {
       this.cachedWidth = this.container.elm.clientWidth || window.innerWidth;
@@ -121,7 +483,9 @@ export class FortePianoRoll {
       this.generateGradients();
       this.cachedPageIndex = -1;
 
-      if (this.state.playback.status !== "playing") {
+      if (this.remote) {
+        this.render(this._getRemotePlaybackTime());
+      } else if (this.state.playback.status !== "playing") {
         this.render(this.state.playback.smoothedTime);
       }
     }
@@ -162,7 +526,7 @@ export class FortePianoRoll {
   getNoteModulationState(note) {
     if (note._modState !== undefined) return note._modState;
 
-    const segments = this.state.playback.midiInfo?.keySegments;
+    const segments = this._getGuideView().midiInfo?.keySegments;
     if (!segments || segments.length === 0) {
       note._modState = {
         isModulated: Boolean(note.isModulated),
@@ -292,7 +656,9 @@ export class FortePianoRoll {
     const height = this.canvas.elm.height;
     if (width === 0 || height === 0) return;
 
-    const notes = this.state.playback.guideNotes || [];
+    const view = this._getGuideView();
+    const scoringView = this._getScoringView();
+    const notes = view.notes;
 
     if (this.cachedNotes !== notes || this.cachedNotesLength !== notes.length) {
       this.cachedNotes = notes;
@@ -301,8 +667,8 @@ export class FortePianoRoll {
       this.noteStartIndex = 0;
     }
 
-    if (this.cachedTranspose !== (this.state.playback.transpose || 0)) {
-      this.cachedTranspose = this.state.playback.transpose || 0;
+    if (this.cachedTranspose !== view.transpose) {
+      this.cachedTranspose = view.transpose;
       this.cachedPageIndex = -1;
     }
 
@@ -325,12 +691,8 @@ export class FortePianoRoll {
     const playheadX =
       ((adjustedTime - pageIndex * PAGE_DURATION) * PIXELS_PER_SECOND) | 0;
 
-    const minMidi =
-      (this.state.playback.guideRange?.min ?? 42) +
-      this.state.playback.transpose;
-    const maxMidi =
-      (this.state.playback.guideRange?.max ?? 90) +
-      this.state.playback.transpose;
+    const minMidi = (view.guideRange?.min ?? 42) + view.transpose;
+    const maxMidi = (view.guideRange?.max ?? 90) + view.transpose;
     const rangeDiff = Math.max(1, maxMidi - minMidi);
 
     const pitchToY = (pitch) => {
@@ -368,7 +730,7 @@ export class FortePianoRoll {
 
         const startX = (note.startTime - pageRealStartTime) * PIXELS_PER_SECOND;
         const noteWidth = Math.max(note.duration * PIXELS_PER_SECOND, 8);
-        const y = pitchToY(note.pitch + this.state.playback.transpose);
+        const y = pitchToY(note.pitch + view.transpose);
 
         note._cachedStatus = note.hitStatus || "neutral";
         this.drawNote(this.pageCtx, note, startX, y, noteWidth, false);
@@ -398,7 +760,7 @@ export class FortePianoRoll {
       const startX =
         ((note.startTime - pageRealStartTime) * PIXELS_PER_SECOND) | 0;
       const noteWidth = Math.max(note.duration * PIXELS_PER_SECOND, 8) | 0;
-      const y = pitchToY(note.pitch + this.state.playback.transpose) | 0;
+      const y = pitchToY(note.pitch + view.transpose) | 0;
 
       const isActive = playheadX >= startX && playheadX <= startX + noteWidth;
 
@@ -410,8 +772,8 @@ export class FortePianoRoll {
           (note.hitStatus === "hit" ||
             note.hitStatus === "accurate" ||
             note.hitStatus === "interpreted") &&
-          this.state.scoring.isSinging &&
-          !this.state.scoring.userDisabled
+          scoringView.isSinging &&
+          !scoringView.userDisabled
         ) {
           ctx.drawImage(this.sparkCanvas, playheadX - 20, y - 20);
         }
@@ -463,9 +825,9 @@ export class FortePianoRoll {
       dotInner = "rgba(220, 38, 38, 0.5)";
     }
 
-    const history = this.state.scoring.micPitchHistory;
+    const history = scoringView.history;
     if (
-      !this.state.scoring.userDisabled &&
+      !scoringView.userDisabled &&
       history &&
       history.length > 0 &&
       playheadX >= 0
@@ -528,12 +890,12 @@ export class FortePianoRoll {
     }
 
     if (
-      !this.state.scoring.userDisabled &&
-      this.state.scoring.isSinging &&
-      this.state.scoring.currentMicMidi > 0 &&
+      !scoringView.userDisabled &&
+      scoringView.isSinging &&
+      scoringView.currentMicMidi > 0 &&
       playheadX >= 0
     ) {
-      const userY = pitchToY(this.state.scoring.currentMicMidi) | 0;
+      const userY = pitchToY(scoringView.currentMicMidi) | 0;
       if (isFinite(userY)) {
         const pulse = (Math.sin(performance.now() / 100) * 3) | 0;
 
@@ -570,14 +932,13 @@ export class FortePianoRoll {
     width,
     height,
   ) {
+    const view = this._getGuideView();
     const isEligible =
-      (this.state.playback.isMidi || this.state.playback.hasMidiGuide) &&
-      this.state.playback.guideNotes &&
-      this.state.playback.guideNotes.length > 0;
+      (view.isMidi || view.hasMidiGuide) && view.notes && view.notes.length > 0;
 
     if (!isEligible) return;
 
-    const segments = this.state.playback.midiInfo?.keySegments;
+    const segments = view.midiInfo?.keySegments;
     if (!segments || segments.length === 0) return;
 
     for (let s = 0; s < segments.length; s++) {
@@ -664,17 +1025,16 @@ export class FortePianoRoll {
   }
 
   drawModulationMarkers(ctx, pageRealStartTime, pageRealEndTime, height) {
+    const view = this._getGuideView();
     const isEligible =
-      (this.state.playback.isMidi || this.state.playback.hasMidiGuide) &&
-      this.state.playback.guideNotes &&
-      this.state.playback.guideNotes.length > 0;
+      (view.isMidi || view.hasMidiGuide) && view.notes && view.notes.length > 0;
 
     if (!isEligible) return;
 
-    const modulations = this.state.playback.midiInfo?.modulations;
+    const modulations = view.midiInfo?.modulations;
     if (!modulations || modulations.length === 0) return;
 
-    const transpose = this.state.playback.transpose || 0;
+    const transpose = view.transpose || 0;
 
     for (let i = 0; i < modulations.length; i++) {
       const mod = modulations[i];
@@ -725,7 +1085,7 @@ export class FortePianoRoll {
         }
 
         const targetKeyObj = this.harana
-          ? this.harana.getActiveKey(mod.time + 0.05, transpose)
+          ? this.harana.getActiveKey(mod.time + 0.05, transpose, view.midiInfo)
           : null;
         const targetKeyName = targetKeyObj ? targetKeyObj.key : mod.toKey;
         const flagText = `✦ ${targetKeyName}`;
@@ -783,16 +1143,15 @@ export class FortePianoRoll {
   }
 
   drawKeyIndicator(ctx, currentTime, width, height) {
+    const view = this._getGuideView();
     const isEligible =
-      (this.state.playback.isMidi || this.state.playback.hasMidiGuide) &&
-      this.state.playback.guideNotes &&
-      this.state.playback.guideNotes.length > 0;
+      (view.isMidi || view.hasMidiGuide) && view.notes && view.notes.length > 0;
 
     if (!isEligible) return;
 
-    const transpose = this.state.playback.transpose || 0;
+    const transpose = view.transpose || 0;
     const activeKey = this.harana
-      ? this.harana.getActiveKey(currentTime, transpose)
+      ? this.harana.getActiveKey(currentTime, transpose, view.midiInfo)
       : null;
 
     if (!activeKey || !activeKey.key) return;
@@ -904,6 +1263,11 @@ export class FortePianoRoll {
    */
   cleanup() {
     window.removeEventListener("resize", this.resizeHandler);
+    if (this.remoteRafId) {
+      cancelAnimationFrame(this.remoteRafId);
+      this.remoteRafId = null;
+    }
+    this.remote = null;
     if (this.container) {
       this.container.cleanup();
       this.container = null;

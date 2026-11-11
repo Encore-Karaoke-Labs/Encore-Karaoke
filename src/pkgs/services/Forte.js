@@ -141,6 +141,19 @@ const pkg = {
       pianoRoll.setContainer(containerSelector),
     togglePianoRollVisibility: (bool) => pianoRoll.toggleVisibility(bool),
 
+    getSessionPianoRollBundle: (songKey, updateStatusCache) =>
+      pianoRoll.getSessionPianoRollBundle(songKey, updateStatusCache),
+    getSessionPianoRollState: (currentTime) =>
+      pianoRoll.getSessionPianoRollState(currentTime),
+    getSessionPianoRollNoteCount: () => pianoRoll.getSessionPianoRollNoteCount(),
+    getSessionPianoRollNotes: (startIndex) =>
+      pianoRoll.getSessionPianoRollNotes(startIndex),
+    setupRemotePianoRoll: (data) => pianoRoll.setupRemotePianoRoll(data),
+    appendRemotePianoRollNotes: (data) =>
+      pianoRoll.appendRemotePianoRollNotes(data),
+    updateRemotePianoRoll: (data) => pianoRoll.updateRemotePianoRoll(data),
+    stopRemotePianoRoll: () => pianoRoll.stopRemotePianoRoll(),
+
     loadSoundFont: (url) => synthesizer.loadSoundFont(url, playback),
     loadTrack: (url, chorusUrl = null, midiGuideUrl = null) =>
       playback.loadTrack(url, chorusUrl, midiGuideUrl),
