@@ -1293,7 +1293,7 @@ export default class SessionManager {
               setTimeout(() => {
                 copyCodeBtn
                   .html(
-                    '<ion-icon name="key-outline" style="font-size: 1.2rem;"></ion-icon><span>COPY CODE</span>',
+                    '<ion-icon name="code-working-outline" style="font-size: 1.2rem;"></ion-icon><span>COPY CODE</span>',
                   )
                   .classOff("success");
               }, 2000);
