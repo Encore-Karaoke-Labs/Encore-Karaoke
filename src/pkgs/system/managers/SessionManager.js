@@ -24,6 +24,12 @@ export default class SessionManager {
     this.handleRemoteStream = this.handleRemoteStream.bind(this);
     this.handleLoungeStream = this.handleLoungeStream.bind(this);
     this.handleClearStreams = this.handleClearStreams.bind(this);
+    this.handleSessionLyricsData = this.handleSessionLyricsData.bind(this);
+    this.handleSessionLyricsTime = this.handleSessionLyricsTime.bind(this);
+    this.handleSessionLyricsRequest =
+      this.handleSessionLyricsRequest.bind(this);
+    this.handleSessionTrackInfo = this.handleSessionTrackInfo.bind(this);
+    this.handleLocalTrackInfo = this.handleLocalTrackInfo.bind(this);
     this.handlePeerDisconnected = this.handlePeerDisconnected.bind(this);
     this.handleHostDisconnected = this.handleHostDisconnected.bind(this);
     this.handleKicked = this.handleKicked.bind(this);
@@ -161,6 +167,22 @@ export default class SessionManager {
       this.handleClearStreams,
     );
     document.addEventListener(
+      "Encore.Sessions.LyricsData",
+      this.handleSessionLyricsData,
+    );
+    document.addEventListener(
+      "Encore.Sessions.LyricsTime",
+      this.handleSessionLyricsTime,
+    );
+    document.addEventListener(
+      "Encore.Sessions.LyricsRequest",
+      this.handleSessionLyricsRequest,
+    );
+    document.addEventListener(
+      "Encore.Sessions.TrackInfo",
+      this.handleSessionTrackInfo,
+    );
+    document.addEventListener(
       "Encore.Sessions.PeerDisconnected",
       this.handlePeerDisconnected,
     );
@@ -179,6 +201,10 @@ export default class SessionManager {
     );
     document.addEventListener("Encore.Sessions.Chat", this.handleChat);
     document.addEventListener("Encore.Sessions.Cheer", this.handleCheer);
+    document.addEventListener(
+      "Encore.Playback.TrackInfo",
+      this.handleLocalTrackInfo,
+    );
   }
 
   handleStateUpdate(e) {
@@ -247,20 +273,22 @@ export default class SessionManager {
         if (sState.singerId === myId) {
           dom.sessionRemoteContainer.classOn("hidden");
           dom.sessionRemoteVideo.elm.srcObject = null;
+          root.lyrics?.stopRemoteLyrics();
 
           if (sState.nowPlaying) {
             root.playback.startPlayer(sState.nowPlaying);
             setTimeout(() => {
-              const stream = this.ctx.modules.recorder.getBroadcastStream();
+              const stream = this.ctx.modules.recorder.getSessionAudioStream();
               if (stream) SessionsSvc.broadcastPerformance(stream);
             }, 1000);
           }
         } else {
           root.playback.stopPlayer();
           root.ui.setMode("player");
+          state.isTransitioning = false;
 
-          dom.playerUi.classOn("hidden");
-          dom.bgvContainer.classOn("hidden");
+          dom.bgvContainer.classOff("hidden");
+          this.ctx.modules.bgv.resumePlaylist();
           dom.introCard.classOff("visible");
 
           if (root.lyrics && root.lyrics.lyricsCtx) {
@@ -282,19 +310,13 @@ export default class SessionManager {
               });
             }
 
+            this.applySessionTrackInfo(sState.nowPlaying);
+
             const timeSinceStart = sState.playTrigger
               ? Math.abs(Date.now() - sState.playTrigger)
               : 99999;
             if (timeSinceStart < 8000) {
-              dom.introTitle.text(
-                root.playback.truncateTitleIfNeeded(sState.nowPlaying.title),
-              );
-              dom.introArtist.text(sState.nowPlaying.artist);
-              dom.introMeta.text(`Singer: ${singerName}`);
-              dom.introCard.classOn("visible");
-              setTimeout(() => {
-                if (state.mode === "player") dom.introCard.classOff("visible");
-              }, 3500);
+              this.showSessionIntroCard(sState.nowPlaying, singerName);
             }
           }
 
@@ -376,6 +398,89 @@ export default class SessionManager {
 
   handleClearStreams() {
     this.ctx.services.Forte.clearRemoteStreams();
+    this.ctx.dom.sessionRemoteVideo.elm.srcObject = null;
+    this.ctx.root.lyrics?.stopRemoteLyrics();
+  }
+
+  handleSessionLyricsData(e) {
+    const lyrics = this.ctx.root.lyrics;
+    if (!lyrics) return;
+    lyrics.setupRemoteLyrics(e.detail || null);
+  }
+
+  handleSessionLyricsTime(e) {
+    const lyrics = this.ctx.root.lyrics;
+    if (!lyrics) return;
+    lyrics.updateRemoteTimeSync(e.detail);
+  }
+
+  handleSessionLyricsRequest() {
+    this.ctx.root.lyrics?.resendSessionLyrics();
+  }
+
+  handleLocalTrackInfo(e) {
+    this.ctx.services.SessionsSvc?.broadcastTrackInfo?.(e.detail || null);
+  }
+
+  handleSessionTrackInfo(e) {
+    this.applySessionTrackInfo(e.detail || null);
+
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    const state = this.ctx.state;
+    if (!SessionsSvc?.state) return;
+    if (SessionsSvc.state.mode !== "performance") return;
+    if (SessionsSvc.state.singerId === SessionsSvc.peer.id) return;
+    if (state.mode !== "player") return;
+
+    const nowPlaying = SessionsSvc.state.nowPlaying;
+    if (!nowPlaying) return;
+
+    const elapsed = SessionsSvc.state.playTrigger
+      ? Date.now() - SessionsSvc.state.playTrigger
+      : 0;
+    if (elapsed > 12000) return;
+    if (this.ctx.dom.introCard.elm.classList.contains("visible")) return;
+
+    this.showSessionIntroCard(
+      nowPlaying,
+      nowPlaying.requesterNickname || "Singer",
+    );
+  }
+
+  showSessionIntroCard(nowPlaying, singerName) {
+    const dom = this.ctx.dom;
+    const state = this.ctx.state;
+
+    dom.introTitle.text(
+      this.ctx.root.playback.truncateTitleIfNeeded(nowPlaying.title),
+    );
+    dom.introArtist.text(nowPlaying.artist);
+    dom.introMeta.text(`Singer: ${singerName}`);
+    dom.introCard.classOff("exiting").classOn("visible");
+
+    if (this._sessionIntroTimer) clearTimeout(this._sessionIntroTimer);
+    this._sessionIntroTimer = setTimeout(() => {
+      this._sessionIntroTimer = null;
+      if (state.mode === "player") dom.introCard.classOff("visible");
+    }, 3500);
+  }
+
+  applySessionTrackInfo(info) {
+    const dom = this.ctx.dom;
+    if (!dom.introBpmBadge || !dom.introKeyBadge) return;
+
+    const bpm = Number(info?.bpm);
+    if (Number.isFinite(bpm) && bpm > 0) {
+      dom.introBpmBadge.text(`${Math.round(bpm)} BPM`).classOff("hidden");
+    } else {
+      dom.introBpmBadge.text("").classOn("hidden");
+    }
+
+    if (info?.key) {
+      dom.introKeyBadge.text(info.key).classOff("hidden");
+    } else {
+      dom.introKeyBadge.text("").classOn("hidden");
+    }
   }
 
   handlePeerDisconnected(e) {
@@ -1451,6 +1556,22 @@ export default class SessionManager {
       this.handleClearStreams,
     );
     document.removeEventListener(
+      "Encore.Sessions.LyricsData",
+      this.handleSessionLyricsData,
+    );
+    document.removeEventListener(
+      "Encore.Sessions.LyricsTime",
+      this.handleSessionLyricsTime,
+    );
+    document.removeEventListener(
+      "Encore.Sessions.LyricsRequest",
+      this.handleSessionLyricsRequest,
+    );
+    document.removeEventListener(
+      "Encore.Sessions.TrackInfo",
+      this.handleSessionTrackInfo,
+    );
+    document.removeEventListener(
       "Encore.Sessions.PeerDisconnected",
       this.handlePeerDisconnected,
     );
@@ -1469,5 +1590,9 @@ export default class SessionManager {
     );
     document.removeEventListener("Encore.Sessions.Chat", this.handleChat);
     document.removeEventListener("Encore.Sessions.Cheer", this.handleCheer);
+    document.removeEventListener(
+      "Encore.Playback.TrackInfo",
+      this.handleLocalTrackInfo,
+    );
   }
 }
