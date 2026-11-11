@@ -2634,6 +2634,7 @@ export default class SetupManager {
     const videoUrl = await NetworkingUtility.getFileLink(mtvSong.videoPath);
 
     this.previewVideoEl.attr({ src: videoUrl.href });
+    this.previewVideoEl.elm.muted = true;
     this.previewVideoEl.elm.play().catch((e) => console.error(e));
 
     this.ctx.services.Forte.playTrack();
