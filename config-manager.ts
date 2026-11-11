@@ -23,6 +23,8 @@ export interface AudioConfig {
   micRecordingVolume?: number;
   musicRecordingVolume?: number;
   enableMicMonitor?: boolean;
+  guideMelodyPersistent?: boolean;
+  guideMelodyIndex?: number;
 }
 
 export interface VideoConfig {
