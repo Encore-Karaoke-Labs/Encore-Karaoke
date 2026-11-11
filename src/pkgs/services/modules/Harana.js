@@ -410,10 +410,12 @@ export class ForteHarana {
    * Gets the key active at a playback time, adjusted for transpose.
    * @param {number} currentTime Seconds into the track.
    * @param {number} transpose Semitone offset.
+   * @param {Object|null} midiInfoOverride Optional MIDI info used instead of
+   *   the local playback state (e.g. a Session performer's piano roll).
    * @returns {Object|null} Active key, or null if unavailable.
    */
-  getActiveKey(currentTime = 0, transpose = 0) {
-    const midiInfo = this.state?.playback?.midiInfo;
+  getActiveKey(currentTime = 0, transpose = 0, midiInfoOverride = null) {
+    const midiInfo = midiInfoOverride || this.state?.playback?.midiInfo;
     if (!midiInfo) return null;
 
     let activeSegment = null;
