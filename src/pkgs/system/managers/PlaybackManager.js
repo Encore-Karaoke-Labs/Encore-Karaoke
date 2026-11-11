@@ -206,7 +206,9 @@ export default class PlaybackManager {
     if (root.lyrics) root.lyrics.reset();
     if (root.input) root.input.currentDrumPresetIndex = -1;
     if (root.input) root.input.currentRhythmIndex = -1;
-    if (root.input) root.input.currentGuideMelodyIndex = 2;
+    if (root.input && !root.input.persistGuideMelody) {
+      root.input.currentGuideMelodyIndex = 2;
+    }
 
     if (this.introCardTimer) clearTimeout(this.introCardTimer);
     if (this.introCardExitTimer) clearTimeout(this.introCardExitTimer);
@@ -382,6 +384,12 @@ export default class PlaybackManager {
       const pbState = Forte.getPlaybackState();
       state.currentSongIsMultiplexed = pbState.isMultiplexed;
       state.currentSongIsMIDI = pbState.isMidi;
+
+      if (pbState.hasGuideNotes && root.input) {
+        const guideLevel =
+          root.input.guideMelodyLevels?.[root.input.currentGuideMelodyIndex];
+        if (guideLevel) Forte.setGuideTrackVolume(guideLevel.value);
+      }
 
       const trackHasNotes =
         state.currentSongIsMultiplexed ||
