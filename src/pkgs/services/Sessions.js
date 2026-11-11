@@ -18,9 +18,10 @@ const pkg = {
   data: {
     // Increment this ONLY when network structures, event behaviors,
     // or state payloads change in a way that breaks compatibility.
-    PROTOCOL_VERSION: 3,
+    PROTOCOL_VERSION: 4,
     SESSION_ID_LENGTH: 16,
     CHECKSUM_LENGTH: 4,
+    LYRICS_CHUNK_SIZE: 48000,
 
     peer: null,
     roomId: null,
@@ -104,11 +105,7 @@ const pkg = {
       let newSdp = sdp;
       newSdp = newSdp.replace(
         /useinbandfec=1/g,
-        "useinbandfec=1; stereo=1; sprop-stereo=1; cbr=1; maxaveragebitrate=510000",
-      );
-      newSdp = newSdp.replace(
-        /a=mid:video\r\n/g,
-        "a=mid:video\r\nb=AS:4000\r\n",
+        "useinbandfec=1; stereo=1; sprop-stereo=1; maxaveragebitrate=160000",
       );
       return newSdp;
     },
@@ -225,6 +222,20 @@ const pkg = {
           });
           this.broadcastState();
           this.handleMediaRouting();
+
+          // A peer joining mid-performance needs the timed lyric bundle.
+          if (this.state.mode === "performance" && this.state.singerId) {
+            if (this.state.singerId === this.peer.id) {
+              document.dispatchEvent(
+                new CustomEvent("Encore.Sessions.LyricsRequest"),
+              );
+            } else {
+              const singerConn = this.connections.get(this.state.singerId);
+              if (singerConn && singerConn.open) {
+                singerConn.send({ type: "lyrics_request" });
+              }
+            }
+          }
         }
 
         if (conn.peerConnection) {
@@ -368,6 +379,79 @@ const pkg = {
             for (let c of this.connections.values()) {
               if (c.open && c.peer !== conn.peer) c.send(data);
             }
+          }
+        } else if (data.type === "lyrics_data" || data.type === "lyrics_time") {
+          if (
+            this.state.singerId &&
+            data.senderId &&
+            data.senderId !== this.state.singerId
+          ) {
+            return;
+          }
+
+          // The host relays the current singer's lyrics to the rest of the room.
+          if (this.isHost) {
+            for (let c of this.connections.values()) {
+              if (c.open && c.peer !== conn.peer) c.send(data);
+            }
+          }
+
+          if (data.senderId !== this.peer.id) {
+            document.dispatchEvent(
+              new CustomEvent(
+                data.type === "lyrics_time"
+                  ? "Encore.Sessions.LyricsTime"
+                  : "Encore.Sessions.LyricsData",
+                { detail: data.payload },
+              ),
+            );
+          }
+        } else if (data.type === "lyrics_data_chunk") {
+          if (
+            this.state.singerId &&
+            data.senderId &&
+            data.senderId !== this.state.singerId
+          ) {
+            return;
+          }
+
+          if (this.isHost) {
+            for (let c of this.connections.values()) {
+              if (c.open && c.peer !== conn.peer) c.send(data);
+            }
+          }
+
+          this.receiveLyricsChunk(data);
+        } else if (data.type === "lyrics_request") {
+          if (
+            this.state.mode === "performance" &&
+            this.state.singerId === this.peer.id
+          ) {
+            document.dispatchEvent(
+              new CustomEvent("Encore.Sessions.LyricsRequest"),
+            );
+          }
+        } else if (data.type === "track_info") {
+          if (
+            this.state.singerId &&
+            data.senderId &&
+            data.senderId !== this.state.singerId
+          ) {
+            return;
+          }
+
+          if (this.isHost) {
+            for (let c of this.connections.values()) {
+              if (c.open && c.peer !== conn.peer) c.send(data);
+            }
+          }
+
+          if (data.senderId !== this.peer.id) {
+            document.dispatchEvent(
+              new CustomEvent("Encore.Sessions.TrackInfo", {
+                detail: data.payload,
+              }),
+            );
           }
         }
       });
@@ -547,6 +631,116 @@ const pkg = {
       }
     },
 
+    /**
+     * Shares the complete timed lyric bundle with the room.
+     */
+    broadcastLyricsData: function (payload) {
+      if (!this.canBroadcastSessionLyrics()) return;
+
+      const json = JSON.stringify(payload ?? null);
+      if (json.length <= this.LYRICS_CHUNK_SIZE) {
+        this.sendSessionLyrics({
+          type: "lyrics_data",
+          senderId: this.peer.id,
+          payload,
+        });
+        return;
+      }
+
+      const id = `${this.peer.id}-${Date.now()}`;
+      const total = Math.ceil(json.length / this.LYRICS_CHUNK_SIZE);
+      for (let index = 0; index < total; index++) {
+        this.sendSessionLyrics({
+          type: "lyrics_data_chunk",
+          senderId: this.peer.id,
+          id: id,
+          index: index,
+          total: total,
+          chunk: json.slice(
+            index * this.LYRICS_CHUNK_SIZE,
+            (index + 1) * this.LYRICS_CHUNK_SIZE,
+          ),
+        });
+      }
+    },
+
+    /**
+     * Shares the singer's playback position.
+     */
+    broadcastLyricsTime: function (currentTime) {
+      if (!this.canBroadcastSessionLyrics()) return;
+      this.sendSessionLyrics({
+        type: "lyrics_time",
+        senderId: this.peer.id,
+        payload: currentTime,
+      });
+    },
+
+    /**
+     * Shares the current song's key and tempo.
+     */
+    broadcastTrackInfo: function (info) {
+      if (!this.canBroadcastSessionLyrics()) return;
+      this.sendSessionLyrics({
+        type: "track_info",
+        senderId: this.peer.id,
+        payload: info,
+      });
+    },
+
+    /** Whether this peer is currently the performing singer. */
+    canBroadcastSessionLyrics: function () {
+      if (!this.peer) return false;
+      return (
+        this.state.mode === "performance" &&
+        this.state.singerId === this.peer.id
+      );
+    },
+
+    sendSessionLyrics: function (data) {
+      if (this.isHost) {
+        for (let conn of this.connections.values()) {
+          if (conn.open) conn.send(data);
+        }
+      } else {
+        const hostConn = this.connections.get(this.roomId);
+        if (hostConn && hostConn.open) hostConn.send(data);
+      }
+    },
+
+    /** Reassembles a chunked lyric bundle and dispatches it when complete. */
+    receiveLyricsChunk: function (data) {
+      if (!this._lyricsChunkBuffers) this._lyricsChunkBuffers = new Map();
+
+      let buffer = this._lyricsChunkBuffers.get(data.id);
+      if (!buffer) {
+        buffer = {
+          total: data.total,
+          parts: new Array(data.total),
+          received: 0,
+        };
+        this._lyricsChunkBuffers.set(data.id, buffer);
+      }
+
+      if (buffer.parts[data.index] === undefined) {
+        buffer.parts[data.index] = data.chunk;
+        buffer.received++;
+      }
+      if (buffer.received < buffer.total) return;
+
+      this._lyricsChunkBuffers.delete(data.id);
+      if (data.senderId === this.peer.id) return;
+
+      try {
+        const payload = JSON.parse(buffer.parts.join(""));
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.LyricsData", { detail: payload }),
+        );
+      } catch (err) {
+        console.warn("[SESSIONS] Failed to assemble lyrics payload:", err);
+      }
+    },
+
     requestSong: function (song) {
       if (this.isHost) {
         this.state.queue.push({
@@ -616,6 +810,9 @@ const pkg = {
         for (let call of this.mediaCalls.values()) call.close();
         this.mediaCalls.clear();
         document.dispatchEvent(new CustomEvent("Encore.Sessions.ClearStreams"));
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.LyricsData", { detail: null }),
+        );
         this.currentPerformanceStream = null;
       }
 
@@ -675,6 +872,7 @@ const pkg = {
       this._lastPlayTrigger = null;
       this.isDisconnecting = false;
       this.collisionResolver = null;
+      if (this._lyricsChunkBuffers) this._lyricsChunkBuffers.clear();
 
       this.state = {
         mode: "lounge",
@@ -689,6 +887,9 @@ const pkg = {
 
       console.log("[SESSIONS] Service state has been reset to default.");
       document.dispatchEvent(new CustomEvent("Encore.Sessions.ClearStreams"));
+      document.dispatchEvent(
+        new CustomEvent("Encore.Sessions.LyricsData", { detail: null }),
+      );
     },
 
     leaveRoom: function () {
