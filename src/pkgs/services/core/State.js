@@ -1,6 +1,8 @@
 export const state = {
   scoring: {
     enabled: false,
+    userDisabled: false,
+    forced: false,
     userInputEnabled: true,
     micPitchHistory: [],
     micStream: null,
