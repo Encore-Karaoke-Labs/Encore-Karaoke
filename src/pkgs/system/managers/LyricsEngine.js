@@ -23,6 +23,10 @@ const EXPERIMENTAL_INTERLUDES = [
   "”it had to wait 9 months” - Austin, Encore Karaoke Labs\n”Who's the mother? Electron Forge” - Austin, Encore Karaoke Labs\n”It's a girl! Who's the father? SkySorcerer!” - ”Dave”, Encore Karaoke Labs\n”ok 'dave'” - SkySorcerer, Founder @ Encore Karaoke Labs",
 ];
 
+// How long Session lyrics may extrapolate past the last time sync before they
+// freeze (the singer paused or stalled playback).
+const SESSION_SYNC_GRACE_MS = 400;
+
 export const COLOR_PALETTES = {
   white: {
     label: "White",
@@ -211,6 +215,17 @@ export default class LyricsEngine {
     this.currentMediaTime = 0;
     this.lastMediaTimeUpdate = null;
 
+    this.lyricMode = null;
+    this.drawLoopActive = false;
+
+    this.remoteLyricsActive = false;
+    this.remoteLyricsSongKey = null;
+    this.remoteLyricConfig = null;
+    this.remoteClock = null;
+    this.remoteTimeRafId = null;
+    this.lastLyricsTimeBroadcast = 0;
+    this.lastSessionLyricsPayload = null;
+
     this.resizeLyricsCanvas = this.resizeLyricsCanvas.bind(this);
     window.addEventListener("resize", this.resizeLyricsCanvas);
   }
@@ -226,6 +241,25 @@ export default class LyricsEngine {
     this.clearOverlayLyrics();
     this._hasBroadcastInitialLyrics = false;
     this.currentSongLineIndex = 0;
+
+    this.currentMediaTime = 0;
+    this.lastMediaTimeUpdate = null;
+
+    if (this.ctx.state.isInterludeActive) {
+      this.ctx.state.isInterludeActive = false;
+      this.ctx.dom.interludeOverlay.classOff("visible");
+    }
+
+    if (this.remoteTimeRafId) cancelAnimationFrame(this.remoteTimeRafId);
+    this.remoteTimeRafId = null;
+    this.remoteClock = null;
+    this.remoteLyricsActive = false;
+    this.remoteLyricsSongKey = null;
+    this.remoteLyricConfig = null;
+    this.lyricMode = null;
+    this.drawLoopActive = false;
+    this.lastLyricsTimeBroadcast = 0;
+    this.lastSessionLyricsPayload = null;
 
     this.romajiCache = {};
     this.pendingRomajiFetches = new Set();
@@ -386,6 +420,19 @@ export default class LyricsEngine {
     } else if (window.desktopIntegration?.ipc?.send) {
       window.desktopIntegration.ipc.send("overlay-lyrics-update", payload);
     }
+  }
+
+  /**
+   * Whether this client is the performer in an active Session.
+   * @returns {boolean}
+   */
+  isSessionSinger() {
+    const sessions = this.ctx.services?.SessionsSvc;
+    if (!sessions || !sessions.peer || !sessions.state) return false;
+    return (
+      sessions.state.mode === "performance" &&
+      sessions.state.singerId === sessions.peer.id
+    );
   }
 
   clearOverlayLyrics() {
@@ -709,6 +756,7 @@ export default class LyricsEngine {
       this.currentPpqm = ppqm;
       this.allMidiSyllables = allSyllables;
       this.midiLines = lines;
+      this.lyricMode = "midi";
       this.currentMidiLine1 = this.midiLines[0] || [];
       this.currentMidiLine2 = this.midiLines[1] || [];
 
@@ -727,46 +775,8 @@ export default class LyricsEngine {
       this.parsedLrc = await this.parseLrc(lrcText);
 
       if (this.parsedLrc.length > 0) {
-        for (let i = 0; i < this.parsedLrc.length; i++) {
-          let line = this.parsedLrc[i];
-          let needsRomaji = this.asianRegex.test(line.text);
-          let syllables = [];
-
-          let chunks = [];
-          if (!needsRomaji) {
-            chunks = line.text.match(/\S+\s*/g) || [line.text];
-          } else {
-            if (line.text.match(/[ 　]/)) {
-              chunks = line.text.match(/[^ 　]+[ 　]*/g) || [line.text];
-            } else if (line.text.length > 16) {
-              let puncChunks = line.text.match(/[^、。！？]+[、。！？]*/g) || [
-                line.text,
-              ];
-              for (let c of puncChunks) {
-                if (c.length > 16) chunks.push(...(c.match(/.{1,12}/g) || [c]));
-                else chunks.push(c);
-              }
-            } else {
-              chunks = [line.text];
-            }
-          }
-
-          for (let chunk of chunks) {
-            const trimmed = chunk.trim();
-            syllables.push({
-              text: chunk,
-              rawText: chunk,
-              furigana: null,
-              blockWidth: 0,
-              absoluteTime: line.time,
-              endTime: line.time + 1,
-              durationTicks: 0,
-              duetRole: "default",
-              isHidden: trimmed === "",
-            });
-          }
-          line.syllables = syllables;
-        }
+        this.lyricMode = "lrc";
+        this._buildLrcSyllables();
         this.currentLrcLine1 = this.parsedLrc[0];
         this.currentLrcLine2 = this.parsedLrc[1];
         this.isLrcLine2Active = false;
@@ -792,6 +802,237 @@ export default class LyricsEngine {
         }
       }
     }
+
+    if (this.isSessionSinger()) {
+      const payload = this.buildSessionLyricsPayload();
+      if (payload) {
+        this.lastSessionLyricsPayload = payload;
+        this.ctx.services.SessionsSvc.broadcastLyricsData(payload);
+      }
+    }
+  }
+
+  /**
+   * Re-shares the current lyric bundle, e.g. when a participant joins the
+   * Session in the middle of a performance.
+   */
+  resendSessionLyrics() {
+    if (!this.isSessionSinger() || !this.lastSessionLyricsPayload) return;
+    this.ctx.services.SessionsSvc.broadcastLyricsData(
+      this.lastSessionLyricsPayload,
+    );
+  }
+
+  /**
+   * Splits every parsed LRC line into renderable syllables. Shared by the
+   * local player and by Session participants that receive the lyric bundle.
+   */
+  _buildLrcSyllables() {
+    for (let i = 0; i < this.parsedLrc.length; i++) {
+      let line = this.parsedLrc[i];
+      let needsRomaji = this.asianRegex.test(line.text);
+      let syllables = [];
+
+      let chunks = [];
+      if (!needsRomaji) {
+        chunks = line.text.match(/\S+\s*/g) || [line.text];
+      } else {
+        if (line.text.match(/[ 　]/)) {
+          chunks = line.text.match(/[^ 　]+[ 　]*/g) || [line.text];
+        } else if (line.text.length > 16) {
+          let puncChunks = line.text.match(/[^、。！？]+[、。！？]*/g) || [
+            line.text,
+          ];
+          for (let c of puncChunks) {
+            if (c.length > 16) chunks.push(...(c.match(/.{1,12}/g) || [c]));
+            else chunks.push(c);
+          }
+        } else {
+          chunks = [line.text];
+        }
+      }
+
+      for (let chunk of chunks) {
+        const trimmed = chunk.trim();
+        syllables.push({
+          text: chunk,
+          rawText: chunk,
+          furigana: null,
+          blockWidth: 0,
+          absoluteTime: line.time,
+          endTime: line.time + 1,
+          durationTicks: 0,
+          duetRole: "default",
+          isHidden: trimmed === "",
+        });
+      }
+      line.syllables = syllables;
+    }
+  }
+
+  /**
+   * Serializes the current song's timed lyric data so Session participants can
+   * drive their own canvas engine with the exact same timing information.
+   * @returns {Object|null}
+   */
+  buildSessionLyricsPayload() {
+    const isMidi = this.lyricMode === "midi";
+
+    const midiLines = isMidi
+      ? (this.midiLines || []).map((line) =>
+          line.map((s) => ({
+            text: s.text ?? "",
+            rawText: s.rawText ?? s.text ?? "",
+            furigana: s.furigana || null,
+            absoluteTime: s.absoluteTime,
+            endTime: s.endTime ?? (s.absoluteTime || 0) + 0.5,
+            duetRole: s.duetRole || "default",
+            isRoleSwitch: Boolean(s.isRoleSwitch),
+            isHidden: Boolean(s.isHidden),
+          })),
+        )
+      : null;
+
+    const parsedLrc = isMidi
+      ? []
+      : (this.parsedLrc || []).map((line) => ({
+          time: line.time,
+          text: line.text,
+          romanized: line.romanized || "",
+        }));
+
+    if (!midiLines?.length && !parsedLrc.length) return null;
+
+    return {
+      songKey: this.ctx.state.currentSong?.path || null,
+      lyricMode: isMidi ? "midi" : "lrc",
+      midiLines,
+      parsedLrc,
+      interludes: this.interludes || [],
+      countdowns: this.countdowns || [],
+      isDuet: Boolean(this.ctx.state.isDuet),
+      lyricCase: this.ctx.config.videoConfig?.lyricCase || "original",
+      lyricAlignment: this.ctx.state.lyricAlignment || "center",
+    };
+  }
+
+  /**
+   * Applies a lyric bundle received from the Session singer. Rendering is done
+   * by the local canvas engine; time is fed by updateRemoteTimeSync().
+   * @param {Object|null} data
+   */
+  setupRemoteLyrics(data) {
+    const hasMidi = Boolean(data?.midiLines?.length);
+    const hasLrc = Boolean(data?.parsedLrc?.length);
+
+    if (!data || (!hasMidi && !hasLrc)) {
+      this.stopRemoteLyrics();
+      return;
+    }
+
+    const songKey = data.songKey || null;
+    if (this.remoteLyricsActive && this.remoteLyricsSongKey === songKey) {
+      return;
+    }
+
+    this.reset();
+    this.remoteLyricsActive = true;
+    this.remoteLyricsSongKey = songKey;
+    this.remoteLyricConfig = {
+      lyricCase: data.lyricCase || "original",
+      lyricAlignment: data.lyricAlignment || "center",
+    };
+    this.ctx.state.isDuet = Boolean(data.isDuet);
+    this.interludes = Array.isArray(data.interludes) ? data.interludes : [];
+    this.countdowns = Array.isArray(data.countdowns) ? data.countdowns : [];
+    this.currentSongLineIndex = 0;
+
+    if (hasMidi) {
+      this.lyricMode = "midi";
+      this.midiLines = data.midiLines;
+      this.currentMidiLine1 = this.midiLines[0] || [];
+      this.currentMidiLine2 = this.midiLines[1] || [];
+    } else {
+      this.lyricMode = "lrc";
+      this.midiLines = null;
+      this.parsedLrc = data.parsedLrc;
+      this._buildLrcSyllables();
+      this.currentLrcLine1 = this.parsedLrc[0];
+      this.currentLrcLine2 = this.parsedLrc[1];
+      this.isLrcLine2Active = false;
+      this.currentLrcIndex = -1;
+      this.lrcChangeTime = 0;
+      this.nextLineFadeStartMs = performance.now();
+      this.nextLineFadeDurationMs = 500;
+    }
+
+    this.ctx.dom.lyricsCanvas
+      .classOff("hidden")
+      .styleJs({ display: "block", opacity: "1" });
+
+    this.resizeLyricsCanvas();
+    this.calculateLyricLayout();
+    this.requestCanvasCacheUpdate = true;
+    this.setupTimeUpdate(null, false);
+    this._ensureDrawLoop();
+
+    if (this.lyricMode === "midi") {
+      this._resolveRomajiForLine(0);
+      this._resolveRomajiForLine(1);
+      this._resolveRomajiForLine(2);
+    }
+  }
+
+  /**
+   * Tears down remote lyric rendering (leaving a Session performance).
+   */
+  stopRemoteLyrics() {
+    if (!this.remoteLyricsActive) return;
+    this.reset();
+  }
+
+  /**
+   * Receives the singer's playback time and keeps the local lyric clock in
+   * sync.
+   * @param {number} time - Singer playback position in seconds.
+   */
+  updateRemoteTimeSync(time) {
+    if (!this.remoteLyricsActive) return;
+    if (typeof time !== "number" || !Number.isFinite(time)) return;
+
+    this.remoteClock = { time, at: performance.now() };
+    this._startRemoteTimeLoop();
+    this._ensureDrawLoop();
+  }
+
+  _startRemoteTimeLoop() {
+    if (this.remoteTimeRafId) return;
+
+    const tick = () => {
+      if (!this.remoteLyricsActive || !this.remoteClock) {
+        this.remoteTimeRafId = null;
+        return;
+      }
+
+      let elapsed = (performance.now() - this.remoteClock.at) / 1000;
+      const maxElapsed = SESSION_SYNC_GRACE_MS / 1000;
+      if (elapsed > maxElapsed) elapsed = maxElapsed;
+      if (this.boundTimeUpdate) {
+        this.boundTimeUpdate({
+          detail: { currentTime: this.remoteClock.time + elapsed },
+        });
+      }
+      this.remoteTimeRafId = requestAnimationFrame(tick);
+    };
+
+    this.remoteTimeRafId = requestAnimationFrame(tick);
+  }
+
+  _ensureDrawLoop() {
+    if (this.ctx.state.mode !== "player" || this.drawLoopActive) return;
+    this.drawLoopActive = true;
+    if (this.lyricsRafId) cancelAnimationFrame(this.lyricsRafId);
+    this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
   }
 
   async parseLrc(text) {
@@ -940,7 +1181,7 @@ export default class LyricsEngine {
         }
       }
     } else if (
-      !this.ctx.state.currentSongIsMIDI &&
+      this.lyricMode !== "midi" &&
       this.parsedLrc &&
       this.parsedLrc.length > 0
     ) {
@@ -1065,7 +1306,10 @@ export default class LyricsEngine {
         }
       }
 
-      const lyricCase = this.ctx.config.videoConfig?.lyricCase || "original";
+      const lyricCase =
+        this.remoteLyricConfig?.lyricCase ||
+        this.ctx.config.videoConfig?.lyricCase ||
+        "original";
 
       if (lyricCase !== "original") {
         let capitalizeNext = true;
@@ -1300,7 +1544,10 @@ export default class LyricsEngine {
         const sideMargin = (logicalWidth - maxWidth) / 2;
         let startX = (logicalWidth - rowWidth) / 2;
 
-        const alignment = this.ctx.state.lyricAlignment || "center";
+        const alignment =
+          this.remoteLyricConfig?.lyricAlignment ||
+          this.ctx.state.lyricAlignment ||
+          "center";
         if (alignment === "alternating" || alignment === "split") {
           if (lineIndex === 0) {
             startX = sideMargin;
@@ -1346,7 +1593,7 @@ export default class LyricsEngine {
       buildLineLayout(this.currentMidiLine1, isLine1Next, isLine1Prev, 0);
       buildLineLayout(this.currentMidiLine2, isLine2Next, isLine2Prev, 1);
     } else if (
-      !this.ctx.state.currentSongIsMIDI &&
+      this.lyricMode !== "midi" &&
       this.parsedLrc &&
       this.parsedLrc.length > 0
     ) {
@@ -1642,7 +1889,10 @@ export default class LyricsEngine {
   }
 
   drawLyricsFrame() {
-    if (this.ctx.state.mode !== "player") return;
+    if (this.ctx.state.mode !== "player") {
+      this.drawLoopActive = false;
+      return;
+    }
 
     if (this.ctx.state.isTransitioning) {
       this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
@@ -1838,7 +2088,7 @@ export default class LyricsEngine {
     this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
   }
 
-  setupTimeUpdate(mvPlayer) {
+  setupTimeUpdate(mvPlayer, registerListener = true) {
     let currentLrcIndex = -1;
     this.lastCountdownTick = null;
 
@@ -1846,6 +2096,14 @@ export default class LyricsEngine {
       const { currentTime } = e.detail;
       this.currentMediaTime = currentTime;
       this.lastMediaTimeUpdate = performance.now();
+
+      if (this.isSessionSinger()) {
+        const now = performance.now();
+        if (now - this.lastLyricsTimeBroadcast >= 250) {
+          this.lastLyricsTimeBroadcast = now;
+          this.ctx.services.SessionsSvc.broadcastLyricsTime(currentTime);
+        }
+      }
 
       if (
         !this._hasBroadcastInitialLyrics &&
@@ -2041,9 +2299,11 @@ export default class LyricsEngine {
         }
       }
     };
-    document.addEventListener(
-      "Encore.Forte.Playback.TimeUpdate",
-      this.boundTimeUpdate,
-    );
+    if (registerListener) {
+      document.addEventListener(
+        "Encore.Forte.Playback.TimeUpdate",
+        this.boundTimeUpdate,
+      );
+    }
   }
 }
