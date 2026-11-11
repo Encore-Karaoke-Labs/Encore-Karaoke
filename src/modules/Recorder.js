@@ -123,6 +123,8 @@ export class RecorderModule {
     this.uiRefs = null;
     this.parentContainer = null;
     this.currentStream = null;
+    this.broadcastStream = null;
+    this.sessionAudioStream = null;
     this.outputResolution = { width: 1280, height: 720 };
 
     this.canvas = null;
@@ -498,6 +500,41 @@ export class RecorderModule {
   }
 
   /**
+   * Generates and returns a live MediaStream containing only the mixed performance
+   * audio (instrumental + processed vocals) for Sessions.
+   *
+   * @returns {MediaStream|null}
+   */
+  getSessionAudioStream() {
+    if (!this.forteSvc) return null;
+
+    try {
+      const mixAudioStream = this.forteSvc.getRecordingAudioStream();
+      const sourceTrack = mixAudioStream && mixAudioStream.getAudioTracks()[0];
+
+      if (!sourceTrack) {
+        console.warn("[RECORDER] No mixed audio stream available for Session.");
+        return null;
+      }
+
+      if (this.sessionAudioStream) {
+        this.sessionAudioStream.getTracks().forEach((track) => track.stop());
+      }
+
+      const audioTrack = sourceTrack.clone();
+      if ("contentHint" in audioTrack) {
+        audioTrack.contentHint = "music";
+      }
+
+      this.sessionAudioStream = new MediaStream([audioTrack]);
+      return this.sessionAudioStream;
+    } catch (e) {
+      console.error("[RECORDER] Failed to generate Session audio stream", e);
+      return null;
+    }
+  }
+
+  /**
    * Generates and returns a live MediaStream of the current performance (Video + Mixed Audio)
    * @returns {MediaStream|null}
    */
@@ -552,6 +589,11 @@ export class RecorderModule {
     if (this.broadcastStream) {
       this.broadcastStream.getTracks().forEach((track) => track.stop());
       this.broadcastStream = null;
+    }
+
+    if (this.sessionAudioStream) {
+      this.sessionAudioStream.getTracks().forEach((track) => track.stop());
+      this.sessionAudioStream = null;
     }
   }
 
@@ -961,9 +1003,8 @@ export class RecorderModule {
     ctx.translate(offsetX, offsetY);
 
     const phrase =
-      this.uiRefs?.scoreHeadlineText?.elm?.querySelector(
-        ".score-headline-text",
-      )?.textContent || "すごいだよ！";
+      this.uiRefs?.scoreHeadlineText?.elm?.querySelector(".score-headline-text")
+        ?.textContent || "すごいだよ！";
 
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -1042,10 +1083,7 @@ export class RecorderModule {
       );
     }
 
-    if (
-      assets.rightGraphic.complete &&
-      assets.rightGraphic.naturalWidth > 0
-    ) {
+    if (assets.rightGraphic.complete && assets.rightGraphic.naturalWidth > 0) {
       ctx.drawImage(assets.rightGraphic, unit(640), 0, unit(640), unit(720));
     }
 
