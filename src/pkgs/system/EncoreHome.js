@@ -671,16 +671,7 @@ class EncoreController {
         next = Math.max(-24, Math.min(24, Math.round(next)));
         Forte.setTranspose(next);
 
-        let left = 50;
-        let width = 0;
-        if (next > 0) width = (next / 24) * 50;
-        else if (next < 0) {
-          width = (Math.abs(next) / 24) * 50;
-          left = 50 - width;
-        }
-
-        const html = `<div class="transpose-display"><div class="transpose-min">-24</div><div class="transpose-slider-container"><div class="transpose-slider-center-line"></div><div class="transpose-slider-fill" style="left: ${left}%; width: ${width}%;"></div></div><div class="transpose-max">+24</div><span class="transpose-value">${(next > 0 ? "+" : "") + next} st</span></div>`;
-        this.infoBar.showTemp("TRANSPOSE", html, 3000);
+        this.infoBar.showTranspose(next);
 
         return { success: true, transpose: next };
       }
@@ -723,10 +714,7 @@ class EncoreController {
         next = Math.max(0.5, Math.min(2, Number(next.toFixed(1))));
         Forte.setTempo(next);
 
-        const proportion = (next - 0.5) / 1.5;
-        const width = proportion * 100;
-        const html = `<div class="tempo-display"><div class="tempo-min">0.5x</div><div class="tempo-slider-container"><div class="tempo-slider-fill" style="width: ${width}%"></div></div><div class="tempo-max">2.0x</div><span class="tempo-value">${next.toFixed(1)}x</span></div>`;
-        this.infoBar.showTemp("TEMPO", html, 3000);
+        this.infoBar.showTempo(next);
 
         return { success: true, tempo: next };
       }
@@ -759,12 +747,7 @@ class EncoreController {
           isEnabled = Forte.toggleChorus();
         }
 
-        const html = `
-          <div class="volume-display" style="display: flex; align-items: center; justify-content: center; width: 100%;">
-            <div style="font-weight: 700; color: #ffd700; font-size: 1.2rem;">CHORUS ${isEnabled ? "ON" : "OFF"}</div>
-          </div>
-        `;
-        this.infoBar.showTemp("CHORUS", html, 3000);
+        this.infoBar.showChorus(isEnabled);
 
         return { success: true, isChorusEnabled: isEnabled };
       }
@@ -818,15 +801,7 @@ class EncoreController {
         Forte.setGuideTrackVolume(selectedLevel.value);
 
         const melodyColor = this.input.getGuideMelodyColor?.() || "#ffd700";
-        const html = `
-          <div class="volume-display" style="display: flex; align-items: center; width: 100%; gap: 1rem;">
-            <div style="font-weight: 700; color: ${melodyColor}; width: 85px; text-align: left;">${selectedLevel.label}</div>
-            <div class="volume-slider-container" style="flex-grow: 1; height: 12px; background-color: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; overflow: hidden;">
-              <div class="volume-slider-fill" style="height: 100%; background-color: ${melodyColor}; border-radius: 6px; transition: width 0.1s linear; width: ${(selectedLevel.value / 127) * 100}%"></div>
-            </div>
-          </div>
-        `;
-        this.infoBar.showTemp("MELODY", html, 3000);
+        this.infoBar.showMelody(selectedLevel.label, selectedLevel.value, melodyColor);
 
         return {
           success: true,

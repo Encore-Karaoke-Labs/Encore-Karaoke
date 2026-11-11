@@ -150,6 +150,163 @@ export class InfoBarModule {
   }
 
   /**
+   * Display the live instrumental volume in the InfoBar.
+   * @param {number} pct - Volume percentage (0-100).
+   */
+  showVolume(pct) {
+    this.showTemp(
+      "VOLUME",
+      `<div class="volume-display"><div class="volume-slider-container"><div class="volume-slider-fill" style="width: ${pct}%"></div></div><span class="volume-percentage">${pct}%</span></div>`,
+      3000,
+    );
+  }
+
+  /**
+   * Display the live mic monitor volume in the InfoBar.
+   * @param {number} pct - Mic volume percentage (0-200).
+   */
+  showMicVolume(pct) {
+    this.showTemp(
+      "MIC VOLUME",
+      `<div class="volume-display"><div class="volume-slider-container"><div class="volume-slider-fill" style="width: ${pct / 2}%"></div></div><span class="volume-percentage">${pct}%</span></div>`,
+      3000,
+    );
+  }
+
+  /**
+   * Display the live transpose value in the InfoBar.
+   * @param {number} value - Transpose in semitones (-24 to 24).
+   */
+  showTranspose(value) {
+    const next = Number(value);
+    let left = 50;
+    let width = 0;
+    if (next > 0) width = (next / 24) * 50;
+    else if (next < 0) {
+      width = (Math.abs(next) / 24) * 50;
+      left = 50 - width;
+    }
+    this.showTemp(
+      "TRANSPOSE",
+      `<div class="transpose-display"><div class="transpose-min">-24</div><div class="transpose-slider-container"><div class="transpose-slider-center-line"></div><div class="transpose-slider-fill" style="left: ${left}%; width: ${width}%;"></div></div><div class="transpose-max">+24</div><span class="transpose-value">${next > 0 ? "+" : ""}${next} st</span></div>`,
+      3000,
+    );
+  }
+
+  /**
+   * Display the live tempo value in the InfoBar.
+   * @param {number} value - Tempo multiplier (0.5 to 2.0).
+   */
+  showTempo(value) {
+    const next = Number(value);
+    const proportion = (next - 0.5) / 1.5;
+    const width = proportion * 100;
+    this.showTemp(
+      "TEMPO",
+      `<div class="tempo-display"><div class="tempo-min">0.5x</div><div class="tempo-slider-container"><div class="tempo-slider-fill" style="width: ${width}%"></div></div><div class="tempo-max">2.0x</div><span class="tempo-value">${next.toFixed(1)}x</span></div>`,
+      3000,
+    );
+  }
+
+  /**
+   * Display the live balance (multiplex pan) in the InfoBar.
+   * @param {number} pan - Pan value (-1 to 1).
+   */
+  showBalance(pan) {
+    let txt = "BALANCED";
+    if (pan <= -0.99) txt = "INSTRUMENTAL";
+    else if (pan >= 0.99) txt = "VOCAL GUIDE";
+    else txt = pan < 0 ? `◀ ${Math.abs(Math.round(pan * 100))}% INST` : `VOC ${Math.round(pan * 100)}% ▶`;
+    this.showTemp("BALANCE", txt, 3000);
+  }
+
+  /**
+   * Display the chorus on/off state in the InfoBar.
+   * @param {boolean} enabled - Whether chorus is enabled.
+   */
+  showChorus(enabled) {
+    this.showTemp(
+      "CHORUS",
+      `<div class="volume-display" style="display: flex; align-items: center; justify-content: center; width: 100%;"><div style="font-weight: 700; color: #ffd700; font-size: 1.2rem;">CHORUS ${enabled ? "ON" : "OFF"}</div></div>`,
+      3000,
+    );
+  }
+
+  /**
+   * Display the guide melody level in the InfoBar.
+   * @param {string} label - Level label (e.g. "NORMAL").
+   * @param {number} value - Level value (0-127).
+   * @param {string} color - Level color.
+   */
+  showMelody(label, value, color) {
+    this.showTemp(
+      "MELODY",
+      `<div class="volume-display" style="display: flex; align-items: center; width: 100%; gap: 1rem;">
+        <div style="font-weight: 700; color: ${color}; width: 85px; text-align: left;">${label}</div>
+        <div class="volume-slider-container" style="flex-grow: 1; height: 12px; background-color: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; overflow: hidden;">
+          <div class="volume-slider-fill" style="height: 100%; background-color: ${color}; border-radius: 6px; transition: width 0.1s linear; width: ${(value / 127) * 100}%"></div>
+        </div>
+      </div>`,
+      3000,
+    );
+  }
+
+  /**
+   * Display the rhythm carousel in the InfoBar.
+   * @param {Array} rhythms - The rhythm list.
+   * @param {number} currentIndex - The index of the selected rhythm.
+   */
+  showRhythm(rhythms, currentIndex) {
+    this.showTemp(
+      "RHYTHM",
+      `<div class="rhythm-carousel" style="opacity: 0; transition: opacity 0.2s ease-out;">
+        ${rhythms
+          .map((rhythm, idx) => {
+            const isSelected = idx === currentIndex;
+            const rhythmNumber = (idx + 1).toString().padStart(2, "0");
+            const label = rhythm.original
+              ? "ORIGINAL"
+              : `RHYTHM ${rhythmNumber}`;
+            return `
+            <div class="rhythm-item ${isSelected ? "selected" : ""}">
+              <span>${label}</span>
+              <span>${rhythm.name}</span>
+            </div>
+          `;
+          })
+          .join("")}
+      </div>`,
+      3000,
+    );
+  }
+
+  /**
+   * Display the drum kit carousel in the InfoBar.
+   * @param {Array} drums - The available drum presets.
+   * @param {number} currentIndex - The index of the selected preset.
+   */
+  showKit(drums, currentIndex) {
+    this.showTemp(
+      "KIT",
+      `<div class="rhythm-carousel" style="opacity: 0; transition: opacity 0.2s ease-out;">
+        ${drums
+          .map((preset, idx) => {
+            const isSelected = idx === currentIndex;
+            const kitNumber = (idx + 1).toString().padStart(2, "0");
+            return `
+            <div class="rhythm-item ${isSelected ? "selected" : ""}">
+              <span>KIT ${kitNumber}</span>
+              <span>${preset.name.substring(0, 12)}</span>
+            </div>
+          `;
+          })
+          .join("")}
+      </div>`,
+      3000,
+    );
+  }
+
+  /**
    * Show the InfoBar with persistent visibility
    */
   showBar() {

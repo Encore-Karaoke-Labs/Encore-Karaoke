@@ -687,12 +687,7 @@ export default class InputManager {
 
     const isEnabled = Forte.toggleChorus();
 
-    const html = `
-      <div class="volume-display" style="display: flex; align-items: center; justify-content: center; width: 100%;">
-        <div style="font-weight: 700; color: #ffd700; font-size: 1.2rem;">CHORUS ${isEnabled ? "ON" : "OFF"}</div>
-      </div>
-    `;
-    modules.infoBar.showTemp("CHORUS", html, 3000);
+    modules.infoBar.showChorus(isEnabled);
   }
 
   /**
@@ -730,16 +725,7 @@ export default class InputManager {
     Forte.setGuideTrackVolume(level.value);
 
     const color = this.getGuideMelodyColor();
-    const html = `
-      <div class="volume-display" style="display: flex; align-items: center; width: 100%; gap: 1rem;">
-        <div style="font-weight: 700; color: ${color}; width: 85px; text-align: left;">${level.label}</div>
-        <div class="volume-slider-container" style="flex-grow: 1; height: 12px; background-color: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; overflow: hidden;">
-          <div class="volume-slider-fill" style="height: 100%; background-color: ${color}; border-radius: 6px; transition: width 0.1s linear; width: ${(level.value / 127) * 100}%"></div>
-        </div>
-      </div>
-    `;
-
-    modules.infoBar.showTemp("MELODY", html, 3000);
+    modules.infoBar.showMelody(level.label, level.value, color);
   }
 
   handleRhythmShortcut(event, direction) {
@@ -793,27 +779,7 @@ export default class InputManager {
     this.rhythms = Forte.getRhythmList();
     this.currentRhythmIndex = result.rhythmIndex + 1;
 
-    const html = `
-      <div class="rhythm-carousel" style="opacity: 0; transition: opacity 0.2s ease-out;">
-        ${this.rhythms
-          .map((rhythm, idx) => {
-            const isSelected = idx === this.currentRhythmIndex;
-            const rhythmNumber = (idx + 1).toString().padStart(2, "0");
-            const label = rhythm.original
-              ? "ORIGINAL"
-              : `RHYTHM ${rhythmNumber}`;
-            return `
-            <div class="rhythm-item ${isSelected ? "selected" : ""}">
-              <span>${label}</span>
-              <span>${rhythm.name}</span>
-            </div>
-          `;
-          })
-          .join("")}
-      </div>
-    `;
-
-    modules.infoBar.showTemp("RHYTHM", html, 3000);
+    modules.infoBar.showRhythm(this.rhythms, this.currentRhythmIndex);
 
     setTimeout(() => {
       const carousel = document.querySelector(".rhythm-carousel");
@@ -882,24 +848,7 @@ export default class InputManager {
     if (Forte.switchActiveDrumPreset(nextPreset)) {
       this.currentDrumPresetIndex = nextIndex;
 
-      const html = `
-        <div class="rhythm-carousel" style="opacity: 0; transition: opacity 0.2s ease-out;">
-          ${this.drums
-            .map((preset, idx) => {
-              const isSelected = idx === this.currentDrumPresetIndex;
-              const kitNumber = (idx + 1).toString().padStart(2, "0");
-              return `
-              <div class="rhythm-item ${isSelected ? "selected" : ""}">
-                <span>KIT ${kitNumber}</span>
-                <span>${preset.name.substring(0, 12)}</span>
-              </div>
-            `;
-            })
-            .join("")}
-        </div>
-      `;
-
-      modules.infoBar.showTemp("KIT", html, 3000);
+      modules.infoBar.showKit(this.drums, this.currentDrumPresetIndex);
 
       setTimeout(() => {
         const carousel = document.querySelector(".rhythm-carousel");
@@ -1394,26 +1343,14 @@ export default class InputManager {
         );
         this.ctx.services.Forte.setTempo(next);
 
-        const proportion = (next - 0.5) / 1.5;
-        const width = proportion * 100;
-        const html = `<div class="tempo-display"><div class="tempo-min">0.5x</div><div class="tempo-slider-container"><div class="tempo-slider-fill" style="width: ${width}%"></div></div><div class="tempo-max">2.0x</div><span class="tempo-value">${next.toFixed(1)}x</span></div>`;
-        this.ctx.modules.infoBar.showTemp("TEMPO", html, 3000);
+        this.ctx.modules.infoBar.showTempo(next);
       } else {
         const change = dir === "up" ? 1 : -1;
         const cur = this.ctx.services.Forte.getPlaybackState().transpose || 0;
         const next = Math.max(-24, Math.min(24, cur + change));
         this.ctx.services.Forte.setTranspose(next);
 
-        let left = 50;
-        let width = 0;
-        if (next > 0) width = (next / 24) * 50;
-        else if (next < 0) {
-          width = (Math.abs(next) / 24) * 50;
-          left = 50 - width;
-        }
-
-        const html = `<div class="transpose-display"><div class="transpose-min">-24</div><div class="transpose-slider-container"><div class="transpose-slider-center-line"></div><div class="transpose-slider-fill" style="left: ${left}%; width: ${width}%;"></div></div><div class="transpose-max">+24</div><span class="transpose-value">${(next > 0 ? "+" : "") + next} st</span></div>`;
-        this.ctx.modules.infoBar.showTemp("TRANSPOSE", html, 3000);
+        this.ctx.modules.infoBar.showTranspose(next);
       }
     }
   }
@@ -1435,24 +1372,7 @@ export default class InputManager {
     );
     this.ctx.services.Forte.setMultiplexPan(pan);
 
-    let txt = "BALANCED";
-    if (pan <= -0.99) {
-      txt = "INSTRUMENTAL";
-      this.ctx.modules.dialog(
-        new Html("div").classOn("temp-dialog-text").text("VOCAL OFF"),
-      );
-    } else if (pan >= 0.99) {
-      txt = "VOCAL GUIDE";
-      this.ctx.modules.dialog(
-        new Html("div").classOn("temp-dialog-text").text("INST. OFF"),
-      );
-    } else {
-      txt =
-        pan < 0
-          ? `◀ ${Math.abs(Math.round(pan * 100))}% INST`
-          : `VOC ${Math.round(pan * 100)}% ▶`;
-    }
-    this.ctx.modules.infoBar.showTemp("BALANCE", txt, 3000);
+    this.ctx.modules.infoBar.showBalance(pan);
   }
 
   /**
@@ -1483,11 +1403,7 @@ export default class InputManager {
     }
 
     const p = Math.round(state.volume * 100);
-    this.ctx.modules.infoBar.showTemp(
-      "VOLUME",
-      `<div class="volume-display"><div class="volume-slider-container"><div class="volume-slider-fill" style="width: ${p}%"></div></div><span class="volume-percentage">${p}%</span></div>`,
-      3000,
-    );
+    this.ctx.modules.infoBar.showVolume(p);
     window.config.setItem("audioConfig.mix.instrumental.volume", state.volume);
   }
 
@@ -1514,11 +1430,7 @@ export default class InputManager {
     }, 300);
 
     const p = Math.round(newVol * 100);
-    this.ctx.modules.infoBar.showTemp(
-      "MIC VOLUME",
-      `<div class="volume-display"><div class="volume-slider-container"><div class="volume-slider-fill" style="width: ${p / 2}%"></div></div><span class="volume-percentage">${p}%</span></div>`,
-      3000,
-    );
+    this.ctx.modules.infoBar.showMicVolume(p);
   }
 
   /**
