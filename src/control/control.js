@@ -963,6 +963,10 @@ async function init() {
       dom["melody-value"],
       availability.guideAvailable ? info?.guideMelody || "—" : "—",
     );
+    dom["btn-melody"]?.classList.toggle(
+      "is-persistent",
+      availability.guideAvailable && Boolean(info?.guideMelodyPersistent),
+    );
     setText(
       dom["rhythm-value"],
         availability.rhythmAvailable
