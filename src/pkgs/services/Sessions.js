@@ -346,14 +346,25 @@ const pkg = {
           }
         } else if (data.type === "submit_score") {
           if (this.isHost) {
-            this.state.leaderboard.push(data.entry);
+            const entry = { ...data.entry };
+            const participant =
+              this.state.participants.find((p) => p.id === conn.peer) ||
+              this.state.participants.find(
+                (p) => p.id === this.state.nowPlaying?.requesterId,
+              );
+            if (participant) {
+              entry.singerName = participant.nickname || entry.singerName;
+              entry.avatar = participant.avatar || entry.avatar;
+            }
+
+            this.state.leaderboard.push(entry);
             this.state.leaderboard.sort((a, b) => b.score - a.score);
             if (this.state.leaderboard.length > 20)
               this.state.leaderboard.length = 20;
 
             this.broadcastState();
 
-            const scoreEvent = { type: "remote_score", entry: data.entry };
+            const scoreEvent = { type: "remote_score", entry: entry };
             for (let c of this.connections.values()) {
               if (c.open) c.send(scoreEvent);
             }
@@ -972,14 +983,24 @@ const pkg = {
     },
 
     submitScore: function (score, songTitle, details = null) {
-      const p = this.state.participants.find(
-        (part) => part.id === this.peer.id,
-      );
+      const p =
+        this.state.participants.find((part) => part.id === this.peer?.id) ||
+        this.state.participants.find(
+          (part) => part.id === this.state.nowPlaying?.requesterId,
+        );
+
+      const identity = pkg.root?.Processes?.getService?.("IdentitySvc")?.data;
+      const profile = identity?.getProfile?.();
 
       const entry = {
         id: Date.now() + Math.random().toString(36).substr(2, 9),
-        singerName: p ? p.nickname : "Singer",
-        avatar: p ? p.avatar : null,
+        singerName:
+          p?.nickname ||
+          this.state.nowPlaying?.requesterNickname ||
+          profile?.nickname ||
+          this.nickname ||
+          "Singer",
+        avatar: p?.avatar || profile?.avatar || null,
         songTitle: songTitle || "Unknown Song",
         score: score,
         details: details,
