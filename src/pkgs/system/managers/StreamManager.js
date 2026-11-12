@@ -23,6 +23,7 @@ export default class StreamManager {
       directBitrate: false,
       directInfo: false,
     };
+    this._sectionGroups = { obs: [], direct: [] };
 
     // Direct RTMP Configuration
     const cfg = this.ctx.config?.streamConfig || {};
@@ -235,13 +236,14 @@ export default class StreamManager {
 
   /**
    * Builds a collapsible section used inside the OBS and Direct Broadcast
-   * pages. The open/closed state is remembered across page re-renders.
+   * pages.
    * @param {Html} parent - Container the section is appended to
    * @param {string} stateKey - Key in `sectionState`
    * @param {string} title - Section heading
+   * @param {"obs"|"direct"} pageKey - Group that keeps sections exclusive
    * @returns {{wrapper: Html, content: Html}}
    */
-  buildSectionAccordion(parent, stateKey, title) {
+  buildSectionAccordion(parent, stateKey, title, pageKey) {
     const id = `stream-section-${stateKey}`;
 
     const wrapper = new Html("div")
@@ -295,8 +297,19 @@ export default class StreamManager {
 
     applyState();
 
+    const group = this._sectionGroups[pageKey];
+    const entry = { stateKey, applyState };
+    if (group) group.push(entry);
+
     toggle.on("click", () => {
-      this.sectionState[stateKey] = !this.sectionState[stateKey];
+      const willOpen = !this.sectionState[stateKey];
+
+      (group || [entry]).forEach((item) => {
+        this.sectionState[item.stateKey] = false;
+        item.applyState();
+      });
+
+      this.sectionState[stateKey] = willOpen;
       applyState();
     });
 
@@ -312,6 +325,8 @@ export default class StreamManager {
 
     dom.streamHeader.clear();
     dom.streamContentArea.clear();
+    dom.streamFooter.classOn("hidden");
+    dom.streamFooter.clear();
 
     new Html("h1").text("BROADCAST & STREAMING").appendTo(dom.streamHeader);
     new Html("p")
@@ -403,26 +418,24 @@ export default class StreamManager {
 
     dom.streamHeader.clear();
     dom.streamContentArea.clear();
+    dom.streamFooter.classOff("hidden");
+    dom.streamFooter.clear();
 
     new Html("h1").text("OBS INTEGRATION").appendTo(dom.streamHeader);
     new Html("p")
       .text("Automate scene changes and get browser overlays.")
       .appendTo(dom.streamHeader);
 
-    const contentArea = new Html("div")
-      .classOn("stream-content-area")
-      .styleJs({ padding: "0" })
+    const page = new Html("div")
+      .classOn("stream-page")
       .appendTo(dom.streamContentArea);
-
-    const leftCol = new Html("div").classOn("stream-col").appendTo(contentArea);
-    const rightCol = new Html("div")
-      .classOn("stream-col")
-      .appendTo(contentArea);
+    this._sectionGroups.obs = [];
 
     const configSection = this.buildSectionAccordion(
-      leftCol,
+      page,
       "obsConfig",
       "CONNECTION CONFIGURATION",
+      "obs",
     );
 
     const hostRow = new Html("div")
@@ -549,76 +562,11 @@ export default class StreamManager {
       .text("Automatically reconnect if OBS starts later or restarts")
       .appendTo(autoRecRow);
 
-    new Html("div")
-      .classOn("stream-section-title")
-      .styleJs({ marginTop: "0.25rem" })
-      .text("CONNECTION STATUS")
-      .appendTo(leftCol);
-
-    const statusBox = new Html("div")
-      .classOn("stream-status-box")
-      .appendTo(leftCol);
-
-    let statusTitle = "DISCONNECTED";
-    let statusClass = "status-disconnected";
-    let statusDesc = "Not connected to OBS Studio.";
-
-    if (this.obsStatus.connected) {
-      statusTitle = "CONNECTED TO OBS STUDIO";
-      statusClass = "status-connected";
-      statusDesc = `Target: ws://${this.obsHost}:${this.obsPort} | Active Scene: ${this.obsStatus.currentScene || "None"}`;
-    } else if (this.obsStatus.reconnecting) {
-      statusTitle = "CONNECTING / RECONNECTING...";
-      statusClass = "status-connecting";
-      statusDesc = `Attempting connection to ws://${this.obsHost}:${this.obsPort}. Make sure OBS is running with WebSocket enabled.`;
-    } else if (this.obsStatus.error) {
-      statusTitle = "CONNECTION FAILED";
-      statusClass = "status-error";
-      statusDesc = this.obsStatus.error;
-    }
-
-    statusBox.classOn(statusClass);
-    new Html("div")
-      .classOn("stream-status-header-text")
-      .text(statusTitle)
-      .appendTo(statusBox);
-    new Html("div")
-      .classOn("stream-status-desc-text")
-      .text(statusDesc)
-      .appendTo(statusBox);
-
-    const connBtnRow = new Html("div")
-      .styleJs({ display: "flex", gap: "1rem" })
-      .appendTo(configSection.content);
-
-    if (!this.obsStatus.connected) {
-      new Html("button")
-        .classOn("session-btn", "primary")
-        .text("CONNECT TO OBS")
-        .on("click", async () => {
-          this.saveObsConfig(true);
-          await window.obs?.connect({
-            host: this.obsHost,
-            port: this.obsPort,
-            password: this.obsPassword,
-          });
-        })
-        .appendTo(connBtnRow);
-    } else {
-      new Html("button")
-        .classOn("session-btn", "danger")
-        .text("DISCONNECT")
-        .on("click", async () => {
-          this.saveObsConfig(false);
-          await window.obs?.disconnect();
-        })
-        .appendTo(connBtnRow);
-    }
-
     const scenesSection = this.buildSectionAccordion(
-      rightCol,
+      page,
       "obsScenes",
       "AUTOMATED SCENE SWITCHING",
+      "obs",
     );
 
     const scenesAvailable =
@@ -671,11 +619,12 @@ export default class StreamManager {
     buildSceneSelect("Singing (Playing)", "singing");
     buildSceneSelect("Score Screen", "score");
 
-    new Html("div")
-      .classOn("stream-section-title")
-      .styleJs({ marginTop: "0.25rem" })
-      .text("BROWSER OVERLAY SOURCES")
-      .appendTo(rightCol);
+    const overlaysSection = this.buildSectionAccordion(
+      page,
+      "obsOverlays",
+      "BROWSER OVERLAY SOURCES",
+      "obs",
+    );
 
     const port = this.ctx.state.actualPort || 9864;
     const lyricsUrl = `http://127.0.0.1:${port}/overlay/lyrics`;
@@ -684,7 +633,7 @@ export default class StreamManager {
     const buildOverlayCard = (title, url) => {
       const row = new Html("div")
         .classOn("stream-overlay-row")
-        .appendTo(rightCol);
+        .appendTo(overlaysSection.content);
       const textGroup = new Html("div")
         .classOn("stream-overlay-text-group")
         .appendTo(row);
@@ -713,7 +662,41 @@ export default class StreamManager {
     buildOverlayCard("Live Lyrics", lyricsUrl);
     buildOverlayCard("Queue & Setlist", setlistUrl);
 
-    const btnRow = new Html("div").classOn("stream-btn-row").appendTo(rightCol);
+    const statusBox = new Html("div")
+      .classOn("stream-status-box")
+      .appendTo(page);
+
+    let statusTitle = "DISCONNECTED";
+    let statusClass = "status-disconnected";
+    let statusDesc = "Not connected to OBS Studio.";
+
+    if (this.obsStatus.connected) {
+      statusTitle = "CONNECTED TO OBS STUDIO";
+      statusClass = "status-connected";
+      statusDesc = `Target: ws://${this.obsHost}:${this.obsPort} | Active Scene: ${this.obsStatus.currentScene || "None"}`;
+    } else if (this.obsStatus.reconnecting) {
+      statusTitle = "CONNECTING / RECONNECTING...";
+      statusClass = "status-connecting";
+      statusDesc = `Attempting connection to ws://${this.obsHost}:${this.obsPort}. Make sure OBS is running with WebSocket enabled.`;
+    } else if (this.obsStatus.error) {
+      statusTitle = "CONNECTION FAILED";
+      statusClass = "status-error";
+      statusDesc = this.obsStatus.error;
+    }
+
+    statusBox.classOn(statusClass);
+    new Html("div")
+      .classOn("stream-status-header-text")
+      .text(statusTitle)
+      .appendTo(statusBox);
+    new Html("div")
+      .classOn("stream-status-desc-text")
+      .text(statusDesc)
+      .appendTo(statusBox);
+
+    const btnRow = new Html("div")
+      .classOn("stream-btn-row")
+      .appendTo(dom.streamFooter);
 
     new Html("button")
       .classOn("session-btn")
@@ -723,6 +706,30 @@ export default class StreamManager {
         this.render();
       })
       .appendTo(btnRow);
+
+    if (!this.obsStatus.connected) {
+      new Html("button")
+        .classOn("session-btn", "primary")
+        .text("CONNECT TO OBS")
+        .on("click", async () => {
+          this.saveObsConfig(true);
+          await window.obs?.connect({
+            host: this.obsHost,
+            port: this.obsPort,
+            password: this.obsPassword,
+          });
+        })
+        .appendTo(btnRow);
+    } else {
+      new Html("button")
+        .classOn("session-btn", "danger")
+        .text("DISCONNECT")
+        .on("click", async () => {
+          this.saveObsConfig(false);
+          await window.obs?.disconnect();
+        })
+        .appendTo(btnRow);
+    }
   }
 
   /**
@@ -742,30 +749,29 @@ export default class StreamManager {
 
     dom.streamHeader.clear();
     dom.streamContentArea.clear();
+    dom.streamFooter.classOff("hidden");
+    dom.streamFooter.clear();
 
     new Html("h1").text("DIRECT RTMP BROADCAST").appendTo(dom.streamHeader);
     new Html("p")
       .text("Stream live karaoke performances.")
       .appendTo(dom.streamHeader);
 
-    const contentArea = new Html("div")
-      .classOn("stream-content-area")
-      .styleJs({ padding: "0" })
+    const page = new Html("div")
+      .classOn("stream-page")
       .appendTo(dom.streamContentArea);
+    this._sectionGroups.direct = [];
 
-    const leftCol = new Html("div").classOn("stream-col").appendTo(contentArea);
-    const rightCol = new Html("div")
-      .classOn("stream-col")
-      .appendTo(contentArea);
-
-    new Html("div")
-      .classOn("stream-section-title")
-      .text("INGEST CONFIGURATION")
-      .appendTo(leftCol);
+    const ingestSection = this.buildSectionAccordion(
+      page,
+      "directIngest",
+      "INGEST CONFIGURATION",
+      "direct",
+    );
 
     const urlGroup = new Html("div")
       .classOn("stream-form-group")
-      .appendTo(leftCol);
+      .appendTo(ingestSection.content);
 
     new Html("label")
       .classOn("stream-form-label")
@@ -789,7 +795,7 @@ export default class StreamManager {
 
     const keyGroup = new Html("div")
       .classOn("stream-form-group")
-      .appendTo(leftCol);
+      .appendTo(ingestSection.content);
 
     new Html("label")
       .classOn("stream-form-label")
@@ -860,15 +866,60 @@ export default class StreamManager {
       toggleKeyBtn.text(this.isKeyVisible ? "HIDE" : "SHOW");
     });
 
-    new Html("div")
-      .classOn("stream-section-title")
-      .styleJs({ marginTop: "0.5rem" })
-      .text("STREAM STATUS")
-      .appendTo(leftCol);
+    const bitrateSection = this.buildSectionAccordion(
+      page,
+      "directBitrate",
+      "BITRATE",
+      "direct",
+    );
+
+    const bitrateRow = new Html("div")
+      .classOn("stream-bitrate-row")
+      .appendTo(bitrateSection.content);
+
+    const bitrates = [
+      { label: "2.5 Mbps", value: 2500000 },
+      { label: "3.5 Mbps", value: 3500000 },
+      { label: "6.0 Mbps", value: 6000000 },
+    ];
+
+    bitrates.forEach((b) => {
+      const bChip = new Html("div")
+        .classOn("stream-bitrate-chip")
+        .attr({ tabindex: "0" })
+        .text(b.label)
+        .appendTo(bitrateRow);
+
+      if (this.videoBitrate === b.value) bChip.classOn("active");
+
+      bChip.on("click", () => {
+        if (this.isStreaming) return;
+        this.videoBitrate = b.value;
+        this.renderDirectView();
+      });
+    });
+
+    const infoSection = this.buildSectionAccordion(
+      page,
+      "directInfo",
+      "BROADCAST INFORMATION",
+      "direct",
+    );
+
+    const infoCard = new Html("div")
+      .classOn("stream-info-card")
+      .appendTo(infoSection.content);
+
+    infoCard.html(`
+      <strong>Broadcasting Notes:</strong><br>
+      • Ensure your RTMP ingest URL points to your nearest streaming server to minimize latency.<br>
+      • Live streaming cannot be activated during an active Sessions room due to privacy reasons.<br>
+      • <strong>Be sure to take the Mic Latency test in the Setup!</strong>
+    `);
 
     const statsGrid = new Html("div")
       .classOn("stream-stats-grid")
-      .appendTo(leftCol);
+      .appendTo(page);
 
     const addStat = (id, label, initialVal) => {
       const item = new Html("div")
@@ -895,55 +946,9 @@ export default class StreamManager {
       .classOn("stream-health-bar")
       .appendTo(meter);
 
-    new Html("div")
-      .classOn("stream-section-title")
-      .text("BITRATE")
-      .appendTo(rightCol);
-
-    const bitrateRow = new Html("div")
-      .classOn("stream-bitrate-row")
-      .appendTo(rightCol);
-
-    const bitrates = [
-      { label: "2.5 Mbps", value: 2500000 },
-      { label: "3.5 Mbps", value: 3500000 },
-      { label: "6.0 Mbps", value: 6000000 },
-    ];
-
-    bitrates.forEach((b) => {
-      const bChip = new Html("div")
-        .classOn("stream-bitrate-chip")
-        .attr({ tabindex: "0" })
-        .text(b.label)
-        .appendTo(bitrateRow);
-
-      if (this.videoBitrate === b.value) bChip.classOn("active");
-
-      bChip.on("click", () => {
-        if (this.isStreaming) return;
-        this.videoBitrate = b.value;
-        this.renderDirectView();
-      });
-    });
-
-    new Html("div")
-      .classOn("stream-section-title")
-      .styleJs({ marginTop: "0.5rem" })
-      .text("BROADCAST INFORMATION")
-      .appendTo(rightCol);
-
-    const infoCard = new Html("div")
-      .classOn("stream-info-card")
-      .appendTo(rightCol);
-
-    infoCard.html(`
-      <strong>Broadcasting Notes:</strong><br>
-      • Ensure your RTMP ingest URL points to your nearest streaming server to minimize latency.<br>
-      • Live streaming cannot be activated during an active Sessions room due to privacy reasons.<br>
-      • <strong>Be sure to take the Mic Latency test in the Setup!</strong>
-    `);
-
-    const btnRow = new Html("div").classOn("stream-btn-row").appendTo(rightCol);
+    const btnRow = new Html("div")
+      .classOn("stream-btn-row")
+      .appendTo(dom.streamFooter);
 
     new Html("button")
       .classOn("session-btn")
@@ -1252,7 +1257,7 @@ export default class StreamManager {
       modalEl.querySelectorAll(
         "button:not([disabled]), input:not([disabled]), select:not([disabled]), .session-tile, .stream-bitrate-chip",
       ),
-    );
+    ).filter((el) => !el.closest("[inert]"));
     if (!focusables.length) return;
 
     const activeEl = document.activeElement;
