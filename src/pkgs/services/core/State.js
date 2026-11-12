@@ -112,6 +112,7 @@ export const state = {
     micMonitorNode: null,
     micMonitorVolume: 1.0,
     enableMicMonitor: false,
+    sessionMonitorGain: null,
   },
   ui: {
     pianoRollVisible: true,
