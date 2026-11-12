@@ -340,22 +340,35 @@ export default class StreamManager {
       })
       .appendTo(pwWrapper);
 
-    const autoRecRow = new Html("label")
-      .classOn("stream-checkbox-row")
+    const autoRecRow = new Html("div")
+      .classOn("stream-toggle-row")
       .appendTo(leftCol);
 
-    const autoRecCheckbox = new Html("input")
-      .attr({ type: "checkbox" })
+    const autoRecSwitch = new Html("button")
+      .classOn("switch")
+      .attr({
+        type: "button",
+        role: "switch",
+        "aria-checked": this.obsAutoReconnect ? "true" : "false",
+        "aria-label": "Automatically reconnect if OBS starts later or restarts",
+      })
       .appendTo(autoRecRow);
 
-    if (this.obsAutoReconnect) autoRecCheckbox.elm.checked = true;
-
-    autoRecCheckbox.on("change", () => {
-      this.obsAutoReconnect = autoRecCheckbox.elm.checked;
+    autoRecSwitch.on("click", () => {
+      this.obsAutoReconnect = !this.obsAutoReconnect;
+      autoRecSwitch.attr({
+        "aria-checked": this.obsAutoReconnect ? "true" : "false",
+      });
+      autoRecSwitch.classOff("switch-on-anim", "switch-off-anim");
+      void autoRecSwitch.elm.offsetWidth;
+      autoRecSwitch.classOn(
+        this.obsAutoReconnect ? "switch-on-anim" : "switch-off-anim",
+      );
       this.saveObsConfig();
     });
 
     new Html("span")
+      .classOn("stream-toggle-label")
       .text("Automatically reconnect if OBS starts later or restarts")
       .appendTo(autoRecRow);
 
