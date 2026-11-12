@@ -11,6 +11,8 @@ export default class StreamManager {
     this.streamRecorder = null;
     this.streamStartTime = null;
     this.modalView = "selection"; // "selection" | "obs" | "direct"
+    this._renderedModalView = null;
+    this._streamViewTimer = null;
 
     // Direct RTMP Configuration
     const cfg = this.ctx.config?.streamConfig || {};
@@ -112,21 +114,106 @@ export default class StreamManager {
       this.modalView = this.isStreaming ? "direct" : "selection";
       this.render();
     } else {
+      if (this._streamViewTimer) {
+        clearTimeout(this._streamViewTimer);
+        this._streamViewTimer = null;
+      }
+      this.ctx.dom.streamHeader.classOff("view-enter", "view-leave");
+      this.ctx.dom.streamContentArea.classOff("view-enter", "view-leave");
+      this._renderedModalView = null;
       this.ctx.dom.streamModal.classOn("hidden");
     }
   }
 
   /**
-   * Renders the current view inside the modal.
+   * Returns the navigation direction between two stream views: 1 when moving
+   * deeper into the modal, -1 when moving back.
+   * @param {string} fromView - The current view
+   * @param {string} toView - The target view
+   * @returns {number}
    */
-  render() {
+  getViewDirection(fromView, toView) {
+    const order = { selection: 0, obs: 1, direct: 1 };
+    return (order[toView] ?? 0) >= (order[fromView] ?? 0) ? 1 : -1;
+  }
+
+  /**
+   * Renders the current view inside the modal, sliding the old view out and
+   * the new view in when the target view differs from the current one.
+   * @param {boolean} animate - Whether to animate the transition
+   */
+  render(animate = true) {
+    const dom = this.ctx.dom;
+    if (!dom.streamHeader || !dom.streamContentArea) return;
+
+    const targetView = this.modalView;
+    const previousView = this._renderedModalView;
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const blockedDirect =
+      targetView === "direct" && this.ctx.state.isSessionActive;
+    const shouldAnimate =
+      animate &&
+      !blockedDirect &&
+      previousView !== null &&
+      previousView !== targetView &&
+      !dom.streamModal.elm.classList.contains("hidden") &&
+      !reduceMotion;
+
+    if (this._streamViewTimer) {
+      clearTimeout(this._streamViewTimer);
+      this._streamViewTimer = null;
+    }
+
+    if (!shouldAnimate) {
+      dom.streamHeader.classOff("view-enter", "view-leave");
+      dom.streamContentArea.classOff("view-enter", "view-leave");
+      this._buildView();
+      return;
+    }
+
+    // Track the target view immediately so background status updates do not
+    // interrupt the transition with a refresh of the previous view.
+    this._renderedModalView = targetView;
+
+    dom.streamBox.style({
+      "--stream-view-dir": String(
+        this.getViewDirection(previousView, targetView),
+      ),
+    });
+
+    dom.streamHeader.classOff("view-enter").classOn("view-leave");
+    dom.streamContentArea.classOff("view-enter").classOn("view-leave");
+
+    this._streamViewTimer = setTimeout(() => {
+      this._streamViewTimer = null;
+      dom.streamHeader.classOff("view-leave");
+      dom.streamContentArea.classOff("view-leave");
+      this._buildView();
+
+      // Restart the enter animation for the rebuilt content.
+      void dom.streamHeader.elm.offsetWidth;
+      dom.streamHeader.classOn("view-enter");
+      dom.streamContentArea.classOn("view-enter");
+    }, 170);
+  }
+
+  /**
+   * Builds the DOM for the current stream view.
+   */
+  _buildView() {
+    let renderedView = this.modalView;
     if (this.modalView === "obs") {
       this.renderObsView();
     } else if (this.modalView === "direct") {
-      this.renderDirectView();
+      if (this.renderDirectView() === false) {
+        renderedView = this._renderedModalView;
+      }
     } else {
       this.renderSelectionView();
     }
+    this._renderedModalView = renderedView;
   }
 
   /**
@@ -222,6 +309,8 @@ export default class StreamManager {
    * OBS Integration View.
    */
   renderObsView() {
+    if (this._streamViewTimer) return;
+
     const dom = this.ctx.dom;
     if (!dom.streamHeader || !dom.streamContentArea) return;
 
@@ -557,7 +646,7 @@ export default class StreamManager {
         "Streaming is disabled during an active Session.",
         3000,
       );
-      return;
+      return false;
     }
     const dom = this.ctx.dom;
     if (!dom.streamHeader || !dom.streamContentArea) return;
@@ -796,6 +885,7 @@ export default class StreamManager {
       .appendTo(btnRow);
 
     this.updateStatsUI();
+    return true;
   }
 
   saveConfig() {
@@ -1130,6 +1220,10 @@ export default class StreamManager {
   }
 
   destroy() {
+    if (this._streamViewTimer) {
+      clearTimeout(this._streamViewTimer);
+      this._streamViewTimer = null;
+    }
     if (this.isStreaming) {
       this.stopStream();
     }
