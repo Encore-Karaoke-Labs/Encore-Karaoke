@@ -1402,6 +1402,10 @@ export default class UIManager {
     dom.streamContentArea = new Html("div")
       .classOn("stream-content-area")
       .appendTo(dom.streamBox);
+
+    dom.streamFooter = new Html("div")
+      .classOn("stream-footer", "hidden")
+      .appendTo(dom.streamBox);
   }
 
   buildSessionChatUI() {
