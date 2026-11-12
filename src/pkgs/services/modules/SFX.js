@@ -433,8 +433,11 @@ export class ForteSFX {
    * Attaches an incoming remote WebRTC audio stream to the Forte audio context.
    * @param {string} peerId - Unique ID of the peer
    * @param {MediaStream} stream - Remote audio stream
+   * @param {Object} [options] - Optional routing settings
+   * @param {boolean} [options.monitorOnly] - Play the stream locally without
+   * including it in recordings or the Session performance mix
    */
-  playRemoteStream(peerId, stream) {
+  playRemoteStream(peerId, stream, options = {}) {
     if (!this.audioCore.context) return;
     this.stopRemoteStream(peerId);
 
@@ -452,7 +455,11 @@ export class ForteSFX {
     this.state.playback.remoteAudioElements.set(peerId, audioEl);
 
     const source = this.audioCore.context.createMediaStreamSource(stream);
-    source.connect(this.state.effects.musicChainInput);
+    const destination =
+      options.monitorOnly && this.state.effects.sessionMonitorGain
+        ? this.state.effects.sessionMonitorGain
+        : this.state.effects.musicChainInput;
+    source.connect(destination);
 
     this.state.playback.remoteSources.set(peerId, source);
     logVerbose(`Started playing remote stream for ${peerId}`);
