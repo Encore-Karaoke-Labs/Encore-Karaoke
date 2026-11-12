@@ -448,22 +448,13 @@ select.stream-select option {
   word-break: break-word;
 }
 
-.stream-checkbox-row {
+.stream-toggle-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   font-family: "Radio Canada", sans-serif;
   font-size: 0.95rem;
   color: rgba(255, 255, 255, 0.8);
-  cursor: var(--cursor-pointer);
   pointer-events: auto !important;
   user-select: none;
-}
-
-.stream-checkbox-row input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: #89cff0;
-  cursor: var(--cursor-pointer);
-  pointer-events: auto !important;
 }
