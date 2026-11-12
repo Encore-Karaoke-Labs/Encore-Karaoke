@@ -1,7 +1,7 @@
 <div align="center">
   <img alt="Encore Header" src="readme/header.png" style="border-radius: 15px; margin-bottom: 20px;" />
 
-# Encore Karaoke Player: Be the Star
+# Encore Karaoke Player
 
 **Be the star that shines bright and experience ultimate Filipino-style videoke right on your PC, with Encore!**
 
