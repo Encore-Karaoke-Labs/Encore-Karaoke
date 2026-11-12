@@ -49,6 +49,7 @@ export default class SessionManager {
     this._sessionPianoRollSongKey = null;
     this._sessionPianoRollNoteCount = 0;
     this._lastRenderedEveryoneAudible = null;
+    this._sessionViewTimer = null;
   }
 
   /**
@@ -137,9 +138,11 @@ export default class SessionManager {
       return;
     }
 
+    const wasHidden =
+      this.ctx.dom.sessionModal.elm.classList.contains("hidden");
     this.ctx.state.isSessionModalOpen = true;
     this.ctx.dom.sessionModal.classOff("hidden");
-    this.renderSessionView("deeplink-prompt", roomCode);
+    this.renderSessionView("deeplink-prompt", roomCode, !wasHidden);
   }
 
   /**
@@ -842,14 +845,25 @@ export default class SessionManager {
       return;
     }
 
+    const wasHidden =
+      this.ctx.dom.sessionModal.elm.classList.contains("hidden");
+
     this.ctx.state.isSessionModalOpen = isOpening;
 
     if (isOpening) {
       this.ctx.dom.sessionModal.classOff("hidden");
       this.renderSessionView(
         this.ctx.state.isSessionActive ? "active" : "select",
+        null,
+        !wasHidden,
       );
     } else {
+      if (this._sessionViewTimer) {
+        clearTimeout(this._sessionViewTimer);
+        this._sessionViewTimer = null;
+      }
+      this.ctx.dom.sessionHeader.classOff("view-enter", "view-leave");
+      this.ctx.dom.sessionContentArea.classOff("view-enter", "view-leave");
       this._lastRenderedEveryoneAudible = null;
       this.ctx.dom.sessionModal.classOn("hidden");
     }
@@ -874,7 +888,103 @@ export default class SessionManager {
     );
   }
 
-  renderSessionView(view, extraData = null) {
+  /**
+   * Returns the navigation direction between two session views: 1 when moving
+   * deeper into the session UI, -1 when moving back.
+   * @param {string} fromView - The current view
+   * @param {string} toView - The target view
+   * @returns {number}
+   */
+  getSessionViewDirection(fromView, toView) {
+    const order = {
+      select: 0,
+      "deeplink-prompt": 0,
+      host: 1,
+      join: 1,
+      active: 2,
+      leaderboard: 3,
+      games: 3,
+    };
+    return (order[toView] ?? 0) >= (order[fromView] ?? 0) ? 1 : -1;
+  }
+
+  /**
+   * Applies per-view sizing classes to the session box.
+   * @param {string} view - The view being shown
+   */
+  _updateSessionBoxViewClass(view) {
+    const box = this.ctx.dom.sessionBox;
+    box.classOff("is-leaderboard-view");
+    if (view === "leaderboard") box.classOn("is-leaderboard-view");
+  }
+
+  /**
+   * Renders a session view, sliding the old view out and the new view in when
+   * the target view differs from the current one.
+   * @param {string} view - The view to render
+   * @param {string|Object|null} extraData - View-specific data
+   * @param {boolean} animate - Whether to animate the transition
+   */
+  renderSessionView(view, extraData = null, animate = true) {
+    const state = this.ctx.state;
+    const dom = this.ctx.dom;
+    const previousView = state.sessionModalView;
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const shouldAnimate =
+      animate &&
+      previousView !== view &&
+      !dom.sessionModal.elm.classList.contains("hidden") &&
+      !reduceMotion;
+
+    if (this._sessionViewTimer) {
+      clearTimeout(this._sessionViewTimer);
+      this._sessionViewTimer = null;
+    }
+
+    if (!shouldAnimate) {
+      dom.sessionHeader.classOff("view-enter", "view-leave");
+      dom.sessionContentArea.classOff("view-enter", "view-leave");
+      this._updateSessionBoxViewClass(view);
+      state.sessionModalView = view;
+      this._buildSessionView(view, extraData);
+      return;
+    }
+
+    // Resize the box while the old view fades out so the incoming view is
+    // already laid out in its final size.
+    this._updateSessionBoxViewClass(view);
+
+    dom.sessionBox.style({
+      "--session-view-dir": String(
+        this.getSessionViewDirection(previousView, view),
+      ),
+    });
+
+    state.sessionModalView = view;
+
+    dom.sessionHeader.classOff("view-enter").classOn("view-leave");
+    dom.sessionContentArea.classOff("view-enter").classOn("view-leave");
+
+    this._sessionViewTimer = setTimeout(() => {
+      this._sessionViewTimer = null;
+      dom.sessionHeader.classOff("view-leave");
+      dom.sessionContentArea.classOff("view-leave");
+      this._buildSessionView(view, extraData);
+
+      void dom.sessionHeader.elm.offsetWidth;
+      dom.sessionHeader.classOn("view-enter");
+      dom.sessionContentArea.classOn("view-enter");
+    }, 170);
+  }
+
+  /**
+   * Builds the DOM for a session view.
+   * @param {string} view - The view to render
+   * @param {string|Object|null} extraData - View-specific data
+   */
+  _buildSessionView(view, extraData = null) {
     const state = this.ctx.state;
     const dom = this.ctx.dom;
     const Identity = this.ctx.services.Identity;
@@ -1315,20 +1425,6 @@ export default class SessionManager {
         })
         .appendTo(actionsRow);
 
-      if (state.isSessionHost && SessionsSvc.state.mode === "lounge") {
-        new Html("button")
-          .classOn("session-btn", "primary")
-          .styleJs({
-            width: "100%",
-            maxHeight: "65px",
-            fontSize: "1.3rem",
-            flexShrink: "0",
-          })
-          .text("MINIGAMES")
-          .on("click", () => this.renderSessionView("games"))
-          .appendTo(leftCol);
-      }
-
       const audioSettingsCard = new Html("div")
         .classOn("session-settings-card")
         .appendTo(leftCol);
@@ -1421,50 +1517,57 @@ export default class SessionManager {
       });
 
       const rightCol = new Html("div")
-        .classOn("session-active-col", "leaderboard-col")
+        .classOn("session-active-col", "session-action-col")
         .appendTo(layout);
-      new Html("h2")
-        .classOn("session-leaderboard-title")
-        .text("TOP PERFORMANCES")
-        .appendTo(rightCol);
-      const leaderboardList = new Html("div")
-        .classOn("session-leaderboard-list")
-        .appendTo(rightCol);
 
-      const topScores = SessionsSvc.state.leaderboard || [];
+      const leaderboardTile = new Html("div")
+        .classOn(
+          "session-tile",
+          "session-action-tile",
+          "session-action-tile--leaderboard",
+        )
+        .attr({ tabindex: "0", role: "button" })
+        .on("click", () => this.renderSessionView("leaderboard"))
+        .appendTo(rightCol);
+      new Html("div")
+        .classOn("session-tile-icon")
+        .append(
+          new Html("ion-icon")
+            .attr({ name: "trophy-outline" })
+            .styleJs({ width: "46px", height: "46px" }),
+        )
+        .appendTo(leaderboardTile);
+      new Html("div")
+        .classOn("session-tile-title")
+        .text("LEADERBOARD")
+        .appendTo(leaderboardTile);
+      new Html("div")
+        .classOn("session-tile-desc")
+        .text("See the top performances in this session")
+        .appendTo(leaderboardTile);
 
-      if (topScores.length === 0) {
+      if (state.isSessionHost && SessionsSvc.state.mode === "lounge") {
+        const minigamesTile = new Html("div")
+          .classOn("session-tile", "session-action-tile")
+          .attr({ tabindex: "0", role: "button" })
+          .on("click", () => this.renderSessionView("games"))
+          .appendTo(rightCol);
         new Html("div")
-          .classOn("session-leaderboard-empty")
-          .text("No scores yet. Sing a song to get on the board!")
-          .appendTo(leaderboardList);
-      } else {
-        topScores.slice(0, 10).forEach((entry, index) => {
-          const row = new Html("div")
-            .classOn("session-leaderboard-row")
-            .appendTo(leaderboardList);
-          new Html("div")
-            .classOn("lb-rank")
-            .text(`#${index + 1}`)
-            .appendTo(row);
-          const avatar = new Html("img").classOn("lb-avatar").appendTo(row);
-          if (entry.avatar) avatar.attr({ src: entry.avatar });
-          else avatar.styleJs({ background: "#444" });
-
-          const details = new Html("div").classOn("lb-details").appendTo(row);
-          new Html("div")
-            .classOn("lb-name")
-            .text(entry.singerName)
-            .appendTo(details);
-          new Html("div")
-            .classOn("lb-song")
-            .text(entry.songTitle)
-            .appendTo(details);
-          new Html("div")
-            .classOn("lb-score")
-            .text(Math.floor(entry.score))
-            .appendTo(row);
-        });
+          .classOn("session-tile-icon")
+          .append(
+            new Html("ion-icon")
+              .attr({ name: "game-controller-outline" })
+              .styleJs({ width: "46px", height: "46px" }),
+          )
+          .appendTo(minigamesTile);
+        new Html("div")
+          .classOn("session-tile-title")
+          .text("MINIGAMES")
+          .appendTo(minigamesTile);
+        new Html("div")
+          .classOn("session-tile-desc")
+          .text("Play games with everyone in the room")
+          .appendTo(minigamesTile);
       }
 
       const btnRow = new Html("div")
@@ -1631,7 +1734,88 @@ export default class SessionManager {
         renderList();
         renderDetails();
       }
+    } else if (view === "leaderboard") {
+      new Html("h1").text("SESSION LEADERBOARD").appendTo(dom.sessionHeader);
+      new Html("p")
+        .text("The top performances in this session.")
+        .appendTo(dom.sessionHeader);
+
+      const leaderboardView = new Html("div")
+        .classOn("session-leaderboard-view")
+        .appendTo(dom.sessionContentArea);
+
+      const leaderboardPanel = new Html("div")
+        .classOn("session-leaderboard-panel")
+        .appendTo(leaderboardView);
+
+      new Html("h2")
+        .classOn("session-leaderboard-title")
+        .text("TOP PERFORMANCES")
+        .appendTo(leaderboardPanel);
+
+      const leaderboardList = new Html("div")
+        .classOn("session-leaderboard-list")
+        .appendTo(leaderboardPanel);
+
+      this.renderLeaderboardEntries(leaderboardList);
+
+      const btnRow = new Html("div")
+        .classOn("session-btn-row")
+        .styleJs({ width: "100%", flexShrink: "0" })
+        .appendTo(leaderboardView);
+
+      new Html("button")
+        .classOn("session-btn")
+        .html(
+          '<ion-icon name="arrow-back-outline" style="font-size: 1.2rem; vertical-align: middle; margin-right: 0.5rem;"></ion-icon><span>BACK</span>',
+        )
+        .on("click", () => this.renderSessionView("active"))
+        .appendTo(btnRow);
     }
+  }
+
+  /**
+   * Renders the session leaderboard entries into the given container.
+   * @param {Html} container - The leaderboard list element
+   */
+  renderLeaderboardEntries(container) {
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    const topScores = SessionsSvc.state.leaderboard || [];
+
+    if (topScores.length === 0) {
+      new Html("div")
+        .classOn("session-leaderboard-empty")
+        .text("No scores yet. Sing a song to get on the board!")
+        .appendTo(container);
+      return;
+    }
+
+    topScores.slice(0, 10).forEach((entry, index) => {
+      const row = new Html("div")
+        .classOn("session-leaderboard-row")
+        .appendTo(container);
+      new Html("div")
+        .classOn("lb-rank")
+        .text(`#${index + 1}`)
+        .appendTo(row);
+      const avatar = new Html("img").classOn("lb-avatar").appendTo(row);
+      if (entry.avatar) avatar.attr({ src: entry.avatar });
+      else avatar.styleJs({ background: "#444" });
+
+      const details = new Html("div").classOn("lb-details").appendTo(row);
+      new Html("div")
+        .classOn("lb-name")
+        .text(entry.singerName)
+        .appendTo(details);
+      new Html("div")
+        .classOn("lb-song")
+        .text(entry.songTitle)
+        .appendTo(details);
+      new Html("div")
+        .classOn("lb-score")
+        .text(Math.floor(entry.score))
+        .appendTo(row);
+    });
   }
 
   submitSessionChat() {
@@ -1741,7 +1925,10 @@ export default class SessionManager {
         this.renderSessionView("select");
       } else if (state.sessionModalView === "deeplink-prompt") {
         this.toggleSessionModal(false);
-      } else if (state.sessionModalView === "games") {
+      } else if (
+        state.sessionModalView === "games" ||
+        state.sessionModalView === "leaderboard"
+      ) {
         this.renderSessionView("active");
       } else {
         this.toggleSessionModal(false);
@@ -1800,6 +1987,10 @@ export default class SessionManager {
   }
 
   destroy() {
+    if (this._sessionViewTimer) {
+      clearTimeout(this._sessionViewTimer);
+      this._sessionViewTimer = null;
+    }
     document.removeEventListener(
       "Encore.Sessions.StateUpdate",
       this.handleStateUpdate,
