@@ -411,6 +411,51 @@
   box-shadow: 0 0 15px rgba(85, 255, 85, 0.2) !important;
 }
 
+/* -- Session Audio Settings -- */
+.session-settings-card {
+  background: rgba(10, 10, 20, 0.6);
+  border: 1px solid rgba(137, 207, 240, 0.3);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  box-shadow: inset 0 0 15px rgba(137, 207, 240, 0.05);
+  flex-shrink: 0;
+}
+
+.session-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.session-toggle-row.is-readonly {
+  opacity: 0.75;
+}
+
+.session-toggle-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.session-toggle-label {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #89cff0;
+  line-height: 1.2;
+}
+
+.session-toggle-desc {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.3;
+}
+
 .session-participants-list {
   background: rgba(0, 0, 0, 0.4);
   border-radius: 8px;
