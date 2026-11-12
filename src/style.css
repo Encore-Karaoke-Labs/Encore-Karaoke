@@ -3,6 +3,7 @@
 @import "./styles/variables.css";
 @import "./styles/base.css";
 @import "./styles/animations.css";
+@import "./styles/switch.css";
 
 /* Shell & Screens */
 @import "./styles/menu.css";
