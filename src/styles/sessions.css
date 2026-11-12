@@ -340,6 +340,44 @@
   outline: none;
 }
 
+/* -- Creating / Joining Loader -- */
+.session-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  text-align: center;
+}
+
+.session-loading img {
+  width: 4rem;
+  height: 4rem;
+}
+
+.session-loading-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #ffd700;
+}
+
+.session-loading-desc {
+  margin: 0;
+  max-width: 26rem;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1.2rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-loading img.loading {
+    animation: none;
+  }
+}
+
 /* -- Active Room -- */
 .session-active-layout {
   display: flex;
