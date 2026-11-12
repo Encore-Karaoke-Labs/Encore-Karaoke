@@ -901,6 +901,8 @@ export default class SessionManager {
       "deeplink-prompt": 0,
       host: 1,
       join: 1,
+      creating: 1.5,
+      joining: 1.5,
       active: 2,
       leaderboard: 3,
       games: 3,
@@ -1226,14 +1228,13 @@ export default class SessionManager {
             return;
           }
 
-          await Identity.updateProfile(nickInput.getValue());
-          dom.sessionContentArea.clear();
-          new Html("h2")
-            .text(isHost ? "CREATING..." : "JOINING...")
-            .styleJs({ fontSize: "2rem", color: "#ffd700" })
-            .appendTo(dom.sessionContentArea);
+          const nickname = nickInput.getValue();
+          const room = isHost ? null : roomInput.getValue().trim();
+
+          this.renderSessionView(isHost ? "creating" : "joining");
 
           try {
+            await Identity.updateProfile(nickname);
             const updatedProfile = Identity.getProfile();
             const supportedGames = root.games.getAvailableGames().map((g) => ({
               id: g.id,
@@ -1252,7 +1253,6 @@ export default class SessionManager {
               state.sessionRoomId = roomId;
               this.updateDiscordSessionRPC();
             } else {
-              const room = roomInput.getValue().trim();
               await SessionsSvc.joinRoom(room, sessionProfile);
               state.isSessionActive = true;
               state.isSessionHost = false;
@@ -1311,6 +1311,42 @@ export default class SessionManager {
           if (firstBtn) firstBtn.focus();
         }
       }, 100);
+    } else if (view === "creating" || view === "joining") {
+      const isHost = view === "creating";
+      new Html("h1")
+        .text(isHost ? "HOST SESSION" : "JOIN SESSION")
+        .appendTo(dom.sessionHeader);
+      new Html("p")
+        .text(isHost ? "Creating your room..." : "Connecting to the room...")
+        .appendTo(dom.sessionHeader);
+
+      const loadingPane = new Html("div")
+        .classOn("session-loading")
+        .attr({ role: "status", "aria-live": "polite" })
+        .appendTo(dom.sessionContentArea);
+
+      new Html("img")
+        .classOn("loading")
+        .attr({
+          src: "/assets/img/loading-spinner.svg",
+          alt: "",
+          draggable: "false",
+        })
+        .appendTo(loadingPane);
+
+      new Html("h2")
+        .classOn("session-loading-title")
+        .text(isHost ? "CREATING..." : "JOINING...")
+        .appendTo(loadingPane);
+
+      new Html("p")
+        .classOn("session-loading-desc")
+        .text(
+          isHost
+            ? "Setting up your room. This will only take a moment."
+            : "Connecting you to the session. This will only take a moment.",
+        )
+        .appendTo(loadingPane);
     } else if (view === "active") {
       new Html("h1")
         .text(state.isSessionHost ? "HOSTING SESSION" : "IN SESSION")
