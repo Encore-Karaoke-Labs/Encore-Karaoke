@@ -14,6 +14,16 @@ export default class StreamManager {
     this._renderedModalView = null;
     this._streamViewTimer = null;
 
+    // Collapsible section state for the OBS and Direct Broadcast pages.
+    this.sectionState = {
+      obsConfig: true,
+      obsScenes: false,
+      obsOverlays: false,
+      directIngest: true,
+      directBitrate: false,
+      directInfo: false,
+    };
+
     // Direct RTMP Configuration
     const cfg = this.ctx.config?.streamConfig || {};
     this.rtmpUrl = cfg.rtmpUrl || "";
@@ -166,6 +176,13 @@ export default class StreamManager {
       this._streamViewTimer = null;
     }
 
+    // Pages shrink horizontally; the initial selection screen keeps its width.
+    if (targetView === "selection") {
+      dom.streamBox.classOff("stream-box-compact");
+    } else {
+      dom.streamBox.classOn("stream-box-compact");
+    }
+
     if (!shouldAnimate) {
       dom.streamHeader.classOff("view-enter", "view-leave");
       dom.streamContentArea.classOff("view-enter", "view-leave");
@@ -214,6 +231,76 @@ export default class StreamManager {
       this.renderSelectionView();
     }
     this._renderedModalView = renderedView;
+  }
+
+  /**
+   * Builds a collapsible section used inside the OBS and Direct Broadcast
+   * pages. The open/closed state is remembered across page re-renders.
+   * @param {Html} parent - Container the section is appended to
+   * @param {string} stateKey - Key in `sectionState`
+   * @param {string} title - Section heading
+   * @returns {{wrapper: Html, content: Html}}
+   */
+  buildSectionAccordion(parent, stateKey, title) {
+    const id = `stream-section-${stateKey}`;
+
+    const wrapper = new Html("div")
+      .classOn("stream-section-accordion")
+      .appendTo(parent);
+
+    const toggle = new Html("button")
+      .classOn("stream-section-toggle")
+      .attr({
+        type: "button",
+        "aria-expanded": this.sectionState[stateKey] ? "true" : "false",
+        "aria-controls": id,
+      })
+      .appendTo(wrapper);
+
+    new Html("span")
+      .classOn("stream-section-title")
+      .text(title)
+      .appendTo(toggle);
+
+    new Html("span")
+      .classOn("stream-section-chevron")
+      .html('<ion-icon name="chevron-down-outline"></ion-icon>')
+      .appendTo(toggle);
+
+    const panel = new Html("div")
+      .classOn("stream-section-panel")
+      .attr({
+        id,
+        role: "region",
+        "aria-hidden": this.sectionState[stateKey] ? "false" : "true",
+      })
+      .appendTo(wrapper);
+
+    const body = new Html("div")
+      .classOn("stream-section-panel-body")
+      .appendTo(panel);
+
+    const content = new Html("div")
+      .classOn("stream-section-panel-content")
+      .appendTo(body);
+
+    const applyState = () => {
+      const open = Boolean(this.sectionState[stateKey]);
+      if (open) wrapper.classOn("open");
+      else wrapper.classOff("open");
+      toggle.attr({ "aria-expanded": open ? "true" : "false" });
+      panel.attr({ "aria-hidden": open ? "false" : "true" });
+      panel.elm.inert = !open;
+    };
+
+    applyState();
+
+    toggle.on("click", () => {
+      this.sectionState[stateKey] = !this.sectionState[stateKey];
+      applyState();
+    });
+
+    return { wrapper, content };
   }
 
   /**
@@ -332,14 +419,15 @@ export default class StreamManager {
       .classOn("stream-col")
       .appendTo(contentArea);
 
-    new Html("div")
-      .classOn("stream-section-title")
-      .text("CONNECTION CONFIGURATION")
-      .appendTo(leftCol);
+    const configSection = this.buildSectionAccordion(
+      leftCol,
+      "obsConfig",
+      "CONNECTION CONFIGURATION",
+    );
 
     const hostRow = new Html("div")
       .styleJs({ display: "flex", gap: "1rem" })
-      .appendTo(leftCol);
+      .appendTo(configSection.content);
 
     const hostGroup = new Html("div")
       .classOn("stream-form-group")
@@ -387,7 +475,7 @@ export default class StreamManager {
 
     const pwGroup = new Html("div")
       .classOn("stream-form-group")
-      .appendTo(leftCol);
+      .appendTo(configSection.content);
     new Html("label")
       .classOn("stream-form-label")
       .text("Server Password")
@@ -431,7 +519,7 @@ export default class StreamManager {
 
     const autoRecRow = new Html("div")
       .classOn("stream-toggle-row")
-      .appendTo(leftCol);
+      .appendTo(configSection.content);
 
     const autoRecSwitch = new Html("button")
       .classOn("switch")
@@ -500,8 +588,8 @@ export default class StreamManager {
       .appendTo(statusBox);
 
     const connBtnRow = new Html("div")
-      .styleJs({ display: "flex", gap: "1rem", marginTop: "auto" })
-      .appendTo(leftCol);
+      .styleJs({ display: "flex", gap: "1rem" })
+      .appendTo(configSection.content);
 
     if (!this.obsStatus.connected) {
       new Html("button")
@@ -527,10 +615,11 @@ export default class StreamManager {
         .appendTo(connBtnRow);
     }
 
-    new Html("div")
-      .classOn("stream-section-title")
-      .text("AUTOMATED SCENE SWITCHING")
-      .appendTo(rightCol);
+    const scenesSection = this.buildSectionAccordion(
+      rightCol,
+      "obsScenes",
+      "AUTOMATED SCENE SWITCHING",
+    );
 
     const scenesAvailable =
       this.obsStatus.connected && this.obsStatus.scenes.length > 0;
@@ -538,7 +627,7 @@ export default class StreamManager {
     const buildSceneSelect = (label, stateKey) => {
       const row = new Html("div")
         .classOn("stream-scene-row")
-        .appendTo(rightCol);
+        .appendTo(scenesSection.content);
       new Html("span").classOn("stream-scene-label").text(label).appendTo(row);
 
       const select = new Html("select")
