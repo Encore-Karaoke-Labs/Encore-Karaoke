@@ -30,13 +30,16 @@ const pkg = {
     nickname: "Guest",
     connections: new Map(),
     mediaCalls: new Map(),
+    micCalls: new Map(),
     _lastRoutedMode: null,
+    _lastRoutedEveryoneAudible: null,
 
     state: {
       mode: "lounge",
       singerId: null,
       nowPlaying: null,
       playTrigger: null,
+      everyoneAudible: false,
       queue: [],
       participants: [],
       leaderboard: [],
@@ -125,10 +128,17 @@ const pkg = {
         this.peer.on("connection", (conn) => this.setupConnection(conn));
 
         this.peer.on("call", (call) => {
-          if (
+          const callKind = call.metadata?.kind;
+          const isPerformanceCall =
+            callKind === "performance" ||
+            (this.state.mode === "performance" &&
+              call.peer === this.state.singerId);
+          const isMicCall =
             this.state.mode === "performance" &&
-            call.peer === this.state.singerId
-          ) {
+            this.state.everyoneAudible &&
+            (callKind === "mic" || !isPerformanceCall);
+
+          if (isPerformanceCall) {
             call.answer(undefined, {
               sdpTransform: (sdp) => this.enhanceSDP(sdp),
             });
@@ -139,6 +149,15 @@ const pkg = {
                 }),
               );
             });
+            this.mediaCalls.set(call.peer, call);
+          } else if (isMicCall) {
+            if (this.peer.id === this.state.singerId) {
+              call.answer(undefined);
+            } else {
+              const forteSvc = pkg.root.Processes.getService("ForteSvc").data;
+              call.answer(forteSvc.getMicAudioStream());
+            }
+            this.attachMicCall(call.peer, call);
           } else if (this.state.mode === "lounge") {
             const forteSvc = pkg.root.Processes.getService("ForteSvc").data;
             call.answer(forteSvc.getMicAudioStream());
@@ -149,8 +168,8 @@ const pkg = {
                 }),
               );
             });
+            this.mediaCalls.set(call.peer, call);
           }
-          this.mediaCalls.set(call.peer, call);
         });
       });
     },
@@ -508,6 +527,37 @@ const pkg = {
       conn.on("error", () => this.handlePeerDisconnect(conn.peer));
     },
 
+    /**
+     * Tracks an audience microphone call and routes its remote stream to the
+     * local audio output.
+     * @param {string} peerId - Unique ID of the peer sending the microphone.
+     * @param {Object} call - PeerJS media connection.
+     */
+    attachMicCall: function (peerId, call) {
+      this.micCalls.set(peerId, call);
+
+      call.on("stream", (remoteStream) => {
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.LoungeStream", {
+            detail: { id: peerId, stream: remoteStream },
+          }),
+        );
+      });
+
+      const cleanup = () => {
+        if (this.micCalls.get(peerId) !== call) return;
+        this.micCalls.delete(peerId);
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.PeerDisconnected", {
+            detail: peerId,
+          }),
+        );
+      };
+
+      call.on("close", cleanup);
+      call.on("error", cleanup);
+    },
+
     handlePeerDisconnect: function (peerId) {
       if (this.isDisconnecting) return;
       if (!this.connections.has(peerId)) return;
@@ -521,6 +571,11 @@ const pkg = {
       if (this.mediaCalls.has(peerId)) {
         this.mediaCalls.get(peerId).close();
         this.mediaCalls.delete(peerId);
+      }
+
+      if (this.micCalls.has(peerId)) {
+        this.micCalls.get(peerId).close();
+        this.micCalls.delete(peerId);
       }
 
       document.dispatchEvent(
@@ -577,6 +632,21 @@ const pkg = {
         }
         this.advanceQueue();
       }
+    },
+
+    /**
+     * Enables or disables audience microphones during performances.
+     * @param {boolean} enabled - Whether everyone should be audible.
+     */
+    setEveryoneAudible: function (enabled) {
+      if (!this.isHost) return;
+
+      const nextValue = Boolean(enabled);
+      if (this.state.everyoneAudible === nextValue) return;
+
+      this.state.everyoneAudible = nextValue;
+      this.broadcastState();
+      this.handleMediaRouting();
     },
 
     advanceQueue: function () {
@@ -946,13 +1016,18 @@ const pkg = {
       const modeChanged = this._lastRoutedMode !== this.state.mode;
       const playTriggerChanged =
         this._lastPlayTrigger !== this.state.playTrigger;
+      const audibleChanged =
+        this._lastRoutedEveryoneAudible !== this.state.everyoneAudible;
 
       this._lastRoutedMode = this.state.mode;
       this._lastPlayTrigger = this.state.playTrigger;
+      this._lastRoutedEveryoneAudible = this.state.everyoneAudible;
 
       if (modeChanged || playTriggerChanged) {
         for (let call of this.mediaCalls.values()) call.close();
         this.mediaCalls.clear();
+        for (let call of this.micCalls.values()) call.close();
+        this.micCalls.clear();
         document.dispatchEvent(new CustomEvent("Encore.Sessions.ClearStreams"));
         document.dispatchEvent(
           new CustomEvent("Encore.Sessions.LyricsData", { detail: null }),
@@ -961,6 +1036,16 @@ const pkg = {
           new CustomEvent("Encore.Sessions.PianoRollData", { detail: null }),
         );
         this.currentPerformanceStream = null;
+      } else if (audibleChanged) {
+        for (let [peerId, call] of this.micCalls) {
+          call.close();
+          document.dispatchEvent(
+            new CustomEvent("Encore.Sessions.PeerDisconnected", {
+              detail: peerId,
+            }),
+          );
+        }
+        this.micCalls.clear();
       }
 
       if (this.state.mode === "lounge") {
@@ -989,10 +1074,15 @@ const pkg = {
             if (p.id !== this.peer.id && !this.mediaCalls.has(p.id)) {
               const call = this.peer.call(p.id, this.currentPerformanceStream, {
                 sdpTransform: (sdp) => this.enhanceSDP(sdp),
+                metadata: { kind: "performance" },
               });
               this.mediaCalls.set(p.id, call);
             }
           }
+        }
+
+        if (this.state.everyoneAudible) {
+          this.routeAudienceMicStreams();
         }
       }
 
@@ -1001,6 +1091,41 @@ const pkg = {
           this.mediaCalls.get(peerId).close();
           this.mediaCalls.delete(peerId);
         }
+      }
+
+      for (let peerId of this.micCalls.keys()) {
+        if (!this.state.participants.find((p) => p.id === peerId)) {
+          this.micCalls.get(peerId).close();
+          this.micCalls.delete(peerId);
+        }
+      }
+    },
+
+    /**
+     * Routes audience microphones during a performance when the host enables
+     * the "everyone audible" option.
+     */
+    routeAudienceMicStreams: function () {
+      if (this.state.mode !== "performance" || !this.state.everyoneAudible) {
+        return;
+      }
+      if (!this.peer || this.peer.id === this.state.singerId) return;
+
+      const forteSvc = pkg.root.Processes.getService("ForteSvc").data;
+      const micStream = forteSvc.getMicAudioStream();
+      if (!micStream) return;
+
+      for (let p of this.state.participants) {
+        if (p.id === this.peer.id) continue;
+
+        const shouldInitiate =
+          p.id === this.state.singerId || this.peer.id > p.id;
+        if (!shouldInitiate || this.micCalls.has(p.id)) continue;
+
+        const call = this.peer.call(p.id, micStream, {
+          metadata: { kind: "mic" },
+        });
+        this.attachMicCall(p.id, call);
       }
     },
 
@@ -1014,9 +1139,11 @@ const pkg = {
       this.isHost = false;
       this.connections.clear();
       this.mediaCalls.clear();
+      this.micCalls.clear();
       this.currentPerformanceStream = null;
       this._lastRoutedMode = null;
       this._lastPlayTrigger = null;
+      this._lastRoutedEveryoneAudible = null;
       this.isDisconnecting = false;
       this.collisionResolver = null;
       if (this._lyricsChunkBuffers) this._lyricsChunkBuffers.clear();
@@ -1027,6 +1154,7 @@ const pkg = {
         singerId: null,
         nowPlaying: null,
         playTrigger: null,
+        everyoneAudible: false,
         queue: [],
         participants: [],
         chatHistory: [],
