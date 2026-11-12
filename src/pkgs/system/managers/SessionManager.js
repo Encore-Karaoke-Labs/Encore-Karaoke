@@ -48,6 +48,7 @@ export default class SessionManager {
     this._lastPianoRollBroadcast = 0;
     this._sessionPianoRollSongKey = null;
     this._sessionPianoRollNoteCount = 0;
+    this._lastRenderedEveryoneAudible = null;
   }
 
   /**
@@ -429,7 +430,11 @@ export default class SessionManager {
   }
 
   handleLoungeStream(e) {
-    this.ctx.services.Forte.playRemoteStream(e.detail.id, e.detail.stream);
+    const isPerformance =
+      this.ctx.services.SessionsSvc?.state?.mode === "performance";
+    this.ctx.services.Forte.playRemoteStream(e.detail.id, e.detail.stream, {
+      monitorOnly: isPerformance,
+    });
   }
 
   handleClearStreams() {
@@ -740,6 +745,7 @@ export default class SessionManager {
     state.isSessionActive = false;
     state.sessionRoomId = null;
     state.knownParticipants = [];
+    this._lastRenderedEveryoneAudible = null;
     this.updateDiscordSessionRPC();
 
     root.queueSetlistSync();
@@ -844,6 +850,7 @@ export default class SessionManager {
         this.ctx.state.isSessionActive ? "active" : "select",
       );
     } else {
+      this._lastRenderedEveryoneAudible = null;
       this.ctx.dom.sessionModal.classOn("hidden");
     }
   }
@@ -1322,6 +1329,63 @@ export default class SessionManager {
           .appendTo(leftCol);
       }
 
+      const audioSettingsCard = new Html("div")
+        .classOn("session-settings-card")
+        .appendTo(leftCol);
+
+      const audibleRow = new Html("div")
+        .classOn("session-toggle-row")
+        .appendTo(audioSettingsCard);
+
+      const audibleText = new Html("span")
+        .classOn("session-toggle-text")
+        .appendTo(audibleRow);
+
+      new Html("span")
+        .classOn("session-toggle-label")
+        .text("EVERYONE AUDIBLE")
+        .appendTo(audibleText);
+
+      new Html("span")
+        .classOn("session-toggle-desc")
+        .text(
+          state.isSessionHost
+            ? "Hear all guests during performances."
+            : "Only the host can change this.",
+        )
+        .appendTo(audibleText);
+
+      const audibleValue = Boolean(SessionsSvc.state.everyoneAudible);
+      const audibleChanged =
+        this._lastRenderedEveryoneAudible !== null &&
+        this._lastRenderedEveryoneAudible !== audibleValue;
+      this._lastRenderedEveryoneAudible = audibleValue;
+
+      const audibleSwitch = new Html("button")
+        .classOn("switch")
+        .attr({
+          type: "button",
+          role: "switch",
+          "aria-checked": audibleValue ? "true" : "false",
+          "aria-label": "Everyone audible during performances",
+        })
+        .appendTo(audibleRow);
+
+      if (audibleChanged) {
+        audibleSwitch.classOn(
+          audibleValue ? "switch-on-anim" : "switch-off-anim",
+        );
+      }
+
+      if (state.isSessionHost) {
+        audibleSwitch.on("click", () => {
+          SessionsSvc.setEveryoneAudible(!SessionsSvc.state.everyoneAudible);
+        });
+      } else {
+        audibleSwitch.attr({ disabled: "disabled" });
+        audibleRow.classOn("is-readonly");
+      }
+
       const partList = new Html("div")
         .classOn("session-participants-list")
         .appendTo(leftCol);
@@ -1687,16 +1751,22 @@ export default class SessionManager {
 
     const modalEl = dom.sessionContentArea.elm;
     const focusables = Array.from(
-      modalEl.querySelectorAll("button, input, .session-tile"),
+      modalEl.querySelectorAll(
+        "button:not([disabled]), input:not([disabled]), .session-tile",
+      ),
     );
     if (!focusables.length) return;
 
     const activeEl = document.activeElement;
     const currentIndex = focusables.indexOf(activeEl);
     const isInput = activeEl && activeEl.tagName === "INPUT";
+    const isCheckbox = isInput && activeEl.type === "checkbox";
 
     if (e.key === "Enter") {
-      if (activeEl && activeEl.classList.contains("session-tile")) {
+      if (isCheckbox) {
+        e.preventDefault();
+        activeEl.click();
+      } else if (activeEl && activeEl.classList.contains("session-tile")) {
         e.preventDefault();
         activeEl.click();
       } else if (isInput) {
