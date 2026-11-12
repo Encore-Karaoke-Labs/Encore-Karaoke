@@ -94,6 +94,9 @@ export class ForteAudioCore {
 
       this.state.effects.micMonitorNode.connect(this.context.destination);
 
+      this.state.effects.sessionMonitorGain = this.context.createGain();
+      this.state.effects.sessionMonitorGain.connect(this.masterGain);
+
       this.state.effects.chorusPitchNode = new AudioWorkletNode(
         this.context,
         "pitch-shifter-processor",
@@ -238,6 +241,8 @@ export class ForteAudioCore {
         this.state.effects.micChainOutput.disconnect();
       if (this.state.effects.micMonitorNode)
         this.state.effects.micMonitorNode.disconnect();
+      if (this.state.effects.sessionMonitorGain)
+        this.state.effects.sessionMonitorGain.disconnect();
       if (this.state.effects.musicChainInput)
         this.state.effects.musicChainInput.disconnect();
       if (this.state.effects.musicChainOutput)
