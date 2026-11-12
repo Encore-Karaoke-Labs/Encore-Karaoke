@@ -1,0 +1,88 @@
+.switch {
+  position: relative;
+  width: 54px;
+  height: 30px;
+  min-width: 54px;
+  padding: 0;
+  border: 2px solid rgba(137, 207, 240, 0.5);
+  border-radius: 999px;
+  background-color: rgba(0, 0, 0, 0.5);
+  cursor: var(--cursor-pointer), pointer;
+  flex-shrink: 0;
+  pointer-events: auto;
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.15s ease;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #89cff0;
+  transition:
+    transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 0.18s ease,
+    background-color 0.25s ease;
+}
+
+.switch[aria-checked="true"] {
+  background-color: #89cff0;
+  border-color: #89cff0;
+}
+
+.switch[aria-checked="true"]::after {
+  transform: translateX(24px);
+  background: #0a0a14;
+}
+
+.switch:hover:not(:disabled) {
+  border-color: #89cff0;
+}
+
+.switch:focus-visible {
+  outline: none;
+  border-color: #89cff0;
+}
+
+.switch:active:not(:disabled)::after {
+  width: 24px;
+}
+
+.switch[aria-checked="true"]:active:not(:disabled)::after {
+  transform: translateX(20px);
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.switch.switch-on-anim::after {
+  animation: switch-knob-on 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.switch.switch-off-anim::after {
+  animation: switch-knob-off 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.switch.switch-on-anim {
+  animation: switch-track-on 0.3s ease;
+}
+
+.switch.switch-off-anim {
+  animation: switch-track-off 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch::after {
+    transition: none;
+    animation: none !important;
+  }
+}
