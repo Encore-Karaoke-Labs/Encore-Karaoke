@@ -3,7 +3,7 @@
 
 # Encore Karaoke Player: Be the Star
 
-**Experience ultimate Filipino-style videoke right on your PC, with your own music!**
+**Be the star that shines bright and experience ultimate Filipino-style videoke right on your PC, with Encore!**
 
 ![Version badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fversioning.encorekaraoke.org%2FversionInfo&query=%24.number&prefix=v&label=version&color=%2389CFF0)
 ![Channel badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fversioning.encorekaraoke.org%2FversionInfo&query=%24.channel&label=channel&color=%23FFD700)
