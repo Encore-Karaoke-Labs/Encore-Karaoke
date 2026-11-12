@@ -29,6 +29,14 @@
   height: 80vh;
   max-width: 1200px;
   overflow: hidden;
+  transition:
+    transform 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.28s ease;
+}
+
+.stream-modal.hidden .stream-box {
+  transform: translateY(14px) scale(0.975);
+  opacity: 0;
 }
 
 .stream-header {
@@ -60,6 +68,54 @@
   padding: 2rem;
   gap: 3rem;
   overflow-y: auto;
+}
+
+/* -- View Transitions -- */
+.stream-box > .stream-header,
+.stream-box > .stream-content-area {
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity, transform;
+}
+
+.stream-box > .stream-header.view-leave,
+.stream-box > .stream-content-area.view-leave {
+  opacity: 0;
+  transform: translateX(calc(-24px * var(--stream-view-dir, 1)));
+}
+
+.stream-box > .stream-header.view-enter,
+.stream-box > .stream-content-area.view-enter {
+  animation: stream-view-enter 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes stream-view-enter {
+  from {
+    opacity: 0;
+    transform: translateX(calc(24px * var(--stream-view-dir, 1)));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream-box,
+  .stream-box > .stream-header,
+  .stream-box > .stream-content-area {
+    transition: none;
+  }
+
+  .stream-box > .stream-header.view-enter,
+  .stream-box > .stream-content-area.view-enter {
+    animation: none;
+  }
+
+  .stream-modal.hidden .stream-box {
+    transform: none;
+  }
 }
 
 .stream-col {
