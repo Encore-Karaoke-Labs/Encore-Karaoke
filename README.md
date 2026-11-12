@@ -81,7 +81,7 @@
 > [!WARNING]
 > Due to copyright restrictions, Encore does not come with a Library by default. Learn more on how you can make your own libraries below, or contact us at [sky@encorekaraoke.org](mailto:sky@encorekaraoke.org).
 
-Encore automatically scans your local drives for a folder named **`EncoreLibrary`**, or you can use the Library Manager to import your library.
+Encore automatically scans your local drives for a folder named **`EncoreLibrary`**. You can also use the Library Manager to import your library.
 
 <div align="center">
   <img alt="Encore Library Manager" src="readme/library-manager.jpg" style="border-radius: 15px; margin-bottom: 20px; margin-top: 20px;" />
