@@ -184,8 +184,39 @@ export interface TwitchConfig {
   accessToken?: string;
   refreshToken?: string;
   tokenExpiresAt?: number;
+  scopes?: string[];
   user?: TwitchUser;
   channel?: string;
   autoConnect?: boolean;
   showChatAsDanmaku?: boolean;
+}
+
+export interface TwitchChannelInfo {
+  title: string;
+  gameId: string;
+  gameName: string;
+  gameBoxArtUrl?: string;
+  language: string;
+  tags: string[];
+  contentClassificationLabels: string[];
+  isBrandedContent: boolean;
+  delay: number;
+}
+
+export interface TwitchLiveInfo {
+  isLive: boolean;
+  startedAt: string | null;
+  viewerCount: number | null;
+}
+
+export interface TwitchContentClassificationLabel {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface TwitchBroadcastInfo {
+  channel: TwitchChannelInfo;
+  live: TwitchLiveInfo;
+  contentClassificationLabels: TwitchContentClassificationLabel[];
 }
