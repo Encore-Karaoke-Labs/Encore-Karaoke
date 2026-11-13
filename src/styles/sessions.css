@@ -185,6 +185,13 @@
   outline: none;
 }
 
+.session-content-area .mixer-item:focus {
+  background-color: rgba(137, 207, 240, 0.12);
+  border-left-color: #89cff0;
+  outline: 2px solid rgba(137, 207, 240, 0.5);
+  outline-offset: -2px;
+}
+
 .session-tile-icon {
   color: #89cff0;
   margin-bottom: 1.5rem;
