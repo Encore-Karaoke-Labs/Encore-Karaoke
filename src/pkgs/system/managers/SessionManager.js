@@ -1756,6 +1756,7 @@ export default class SessionManager {
           games.forEach((game) => {
             const item = new Html("div")
               .classOn("mixer-item")
+              .attr({ tabindex: "0", role: "button" })
               .text(game.name)
               .appendTo(listPanel);
             if (activeGame.id === game.id) item.classOn("mixer-item--active");
@@ -1763,6 +1764,10 @@ export default class SessionManager {
               activeGame = game;
               renderList();
               renderDetails();
+              const selected = listPanel.elm.querySelector(
+                ".mixer-item--active",
+              );
+              if (selected) selected.focus();
             });
           });
         };
@@ -1947,6 +1952,133 @@ export default class SessionManager {
     container.scrollTop = container.scrollHeight;
   }
 
+  /**
+   * Returns whether an element is currently laid out and focusable.
+   * @param {HTMLElement} el - The element to check
+   * @returns {boolean}
+   */
+  _isSessionFocusableVisible(el) {
+    if (!el || !el.isConnected) return false;
+
+    const style = window.getComputedStyle(el);
+    if (
+      style.display === "none" ||
+      style.visibility === "hidden" ||
+      style.visibility === "collapse"
+    ) {
+      return false;
+    }
+
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  /**
+   * Collects every focusable control in the current session view.
+   * @returns {HTMLElement[]}
+   */
+  _getSessionFocusables() {
+    const modalEl = this.ctx.dom.sessionContentArea.elm;
+    return Array.from(
+      modalEl.querySelectorAll(
+        "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), .session-tile, .mixer-item",
+      ),
+    ).filter((el) => this._isSessionFocusableVisible(el));
+  }
+
+  /**
+   * Measures the gap between two intervals on the same axis.
+   * @param {number} minA - Start of the first interval
+   * @param {number} maxA - End of the first interval
+   * @param {number} minB - Start of the second interval
+   * @param {number} maxB - End of the second interval
+   * @returns {number}
+   */
+  _getIntervalGap(minA, maxA, minB, maxB) {
+    if (maxB < minA) return minA - maxB;
+    if (maxA < minB) return minB - maxA;
+    return 0;
+  }
+
+  /**
+   * Finds the next focusable element in a direction based on the rendered
+   * layout. Candidates are ranked by travel distance along the pressed axis,
+   * then by how well they line up on the perpendicular axis.
+   * @param {HTMLElement[]} focusables - Focusable elements in the view
+   * @param {HTMLElement} activeEl - Currently focused element
+   * @param {string} key - The arrow key that was pressed
+   * @returns {HTMLElement|null}
+   */
+  _getSessionDirectionalTarget(focusables, activeEl, key) {
+    const direction = {
+      ArrowUp: "up",
+      ArrowDown: "down",
+      ArrowLeft: "left",
+      ArrowRight: "right",
+    }[key];
+
+    if (!direction) return null;
+    if (!activeEl || !focusables.includes(activeEl)) {
+      return focusables[0] || null;
+    }
+
+    const source = activeEl.getBoundingClientRect();
+    const sourceCx = source.left + source.width / 2;
+    const sourceCy = source.top + source.height / 2;
+    let best = null;
+    let bestScore = Infinity;
+
+    for (const el of focusables) {
+      if (el === activeEl) continue;
+
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) continue;
+
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const isVertical = direction === "up" || direction === "down";
+
+      if (isVertical) {
+        if (direction === "up" ? cy >= sourceCy : cy <= sourceCy) continue;
+      } else if (direction === "left" ? cx >= sourceCx : cx <= sourceCx) {
+        continue;
+      }
+
+      const along = Math.max(
+        0,
+        isVertical
+          ? direction === "up"
+            ? source.top - rect.bottom
+            : rect.top - source.bottom
+          : direction === "left"
+            ? source.left - rect.right
+            : rect.left - source.right,
+      );
+
+      // Keep navigation within the same visual row/column when possible by
+      // penalising elements that do not overlap on the perpendicular axis.
+      const crossGap = isVertical
+        ? this._getIntervalGap(source.left, source.right, rect.left, rect.right)
+        : this._getIntervalGap(
+            source.top,
+            source.bottom,
+            rect.top,
+            rect.bottom,
+          );
+      const crossCenterDelta = Math.abs(
+        isVertical ? cx - sourceCx : cy - sourceCy,
+      );
+
+      const score = along + crossGap * 3 + crossCenterDelta * 0.05;
+      if (score < bestScore - 0.001) {
+        best = el;
+        bestScore = score;
+      }
+    }
+
+    return best;
+  }
+
   handleKeyDown(e) {
     const dom = this.ctx.dom;
     const state = this.ctx.state;
@@ -1973,15 +2105,10 @@ export default class SessionManager {
     }
 
     const modalEl = dom.sessionContentArea.elm;
-    const focusables = Array.from(
-      modalEl.querySelectorAll(
-        "button:not([disabled]), input:not([disabled]), .session-tile",
-      ),
-    );
+    const focusables = this._getSessionFocusables();
     if (!focusables.length) return;
 
     const activeEl = document.activeElement;
-    const currentIndex = focusables.indexOf(activeEl);
     const isInput = activeEl && activeEl.tagName === "INPUT";
     const isCheckbox = isInput && activeEl.type === "checkbox";
 
@@ -1989,7 +2116,11 @@ export default class SessionManager {
       if (isCheckbox) {
         e.preventDefault();
         activeEl.click();
-      } else if (activeEl && activeEl.classList.contains("session-tile")) {
+      } else if (
+        activeEl &&
+        (activeEl.classList.contains("session-tile") ||
+          activeEl.classList.contains("mixer-item"))
+      ) {
         e.preventDefault();
         activeEl.click();
       } else if (isInput) {
@@ -2000,26 +2131,40 @@ export default class SessionManager {
       return;
     }
 
+    // Left/right inside a text field move the caret instead of focus.
     if (isInput && ["ArrowLeft", "ArrowRight"].includes(e.key)) {
       return;
     }
 
-    if (["ArrowDown", "ArrowRight", "Tab"].includes(e.key)) {
+    if (e.key === "Tab") {
       e.preventDefault();
-      this.playNavSfx("nav");
-      let nextIndex = currentIndex + 1;
+      const currentIndex = focusables.indexOf(activeEl);
+      let nextIndex = currentIndex + (e.shiftKey ? -1 : 1);
       if (nextIndex >= focusables.length) nextIndex = 0;
-      focusables[nextIndex].focus();
-    } else if (
-      ["ArrowUp", "ArrowLeft"].includes(e.key) ||
-      (e.key === "Tab" && e.shiftKey)
-    ) {
-      e.preventDefault();
-      this.playNavSfx("nav");
-      let nextIndex = currentIndex - 1;
       if (nextIndex < 0) nextIndex = focusables.length - 1;
+      this.playNavSfx("nav");
       focusables[nextIndex].focus();
+      return;
     }
+
+    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      return;
+    }
+
+    e.preventDefault();
+    const target = this._getSessionDirectionalTarget(
+      focusables,
+      activeEl,
+      e.key,
+    );
+    if (!target) {
+      this.playNavSfx("out_of_bounds");
+      return;
+    }
+
+    this.playNavSfx("nav");
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
   destroy() {
