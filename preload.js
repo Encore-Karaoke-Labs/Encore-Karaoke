@@ -120,6 +120,12 @@ contextBridge.exposeInMainWorld("twitch", {
   disconnect: () => ipcRenderer.invoke("twitch-disconnect"),
   setPreferences: (preferences) =>
     ipcRenderer.invoke("twitch-set-preferences", preferences),
+  getBroadcastInfo: () => ipcRenderer.invoke("twitch-get-broadcast-info"),
+  updateBroadcastInfo: (update) =>
+    ipcRenderer.invoke("twitch-update-broadcast-info", update),
+  searchCategories: (query) =>
+    ipcRenderer.invoke("twitch-search-categories", query),
+  getStreamKey: () => ipcRenderer.invoke("twitch-get-stream-key"),
   onStatusUpdate: (callback) => {
     const listener = (_e, data) => callback(data);
     ipcRenderer.on("twitch-status-update", listener);
