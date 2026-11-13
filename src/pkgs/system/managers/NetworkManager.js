@@ -25,6 +25,10 @@ export default class NetworkManager {
     this.isDanmakuDirty = false;
 
     this.resizeDanmakuCanvas = this.resizeDanmakuCanvas.bind(this);
+    this._twitchChatCleanup =
+      window.twitch?.onChatMessage?.((message) =>
+        this.handleTwitchChat(message),
+      ) ?? null;
   }
 
   async init() {
@@ -194,12 +198,33 @@ export default class NetworkManager {
       y,
       speed,
       fontSize,
+      senderColor: cheer.color || "#ffd700",
     });
 
     if (!this.danmakuRafId) {
       this.lastDanmakuTime = performance.now(); // Reset time to prevent massive dt jump
       this.drawDanmakuFrame();
     }
+  }
+
+  /**
+   * Turns a Twitch chat message into a cheer entry.
+   * @param {Object} message - Chat message sent by the main process
+   */
+  handleTwitchChat(message) {
+    if (!message || typeof message.text !== "string" || !message.text) return;
+
+    if (this.ctx.config?.twitchConfig?.showChatAsDanmaku === false) return;
+
+    const nickname = message.displayName || message.login || "Twitch";
+
+    this.ctx.state.cheerQueue.push({
+      nickname,
+      message: message.text,
+      color: "#89cff0",
+      source: "twitch",
+    });
+    this.processCheerQueue();
   }
 
   drawDanmakuFrame() {
@@ -245,7 +270,7 @@ export default class NetworkManager {
 
         this.danmakuCtx.strokeStyle = "#000000";
         this.danmakuCtx.strokeText(d.sender, d.x, d.y);
-        this.danmakuCtx.fillStyle = "#ffd700";
+        this.danmakuCtx.fillStyle = d.senderColor || "#ffd700";
         this.danmakuCtx.fillText(d.sender, d.x, d.y);
 
         const msgX = d.x + d.senderWidth;
@@ -748,6 +773,10 @@ export default class NetworkManager {
 
   destroy() {
     window.removeEventListener("resize", this.resizeDanmakuCanvas);
+    if (this._twitchChatCleanup) {
+      this._twitchChatCleanup();
+      this._twitchChatCleanup = null;
+    }
     if (this.danmakuRafId) {
       cancelAnimationFrame(this.danmakuRafId);
       this.danmakuRafId = null;
