@@ -2,21 +2,81 @@ import { ipcMain } from "electron";
 import Config from "../config-manager";
 import { logger } from "./logger";
 import { appState } from "./state";
-import type { TwitchConfig, TwitchUser } from "./types";
+import type {
+  TwitchChannelInfo,
+  TwitchConfig,
+  TwitchContentClassificationLabel,
+  TwitchLiveInfo,
+  TwitchUser,
+} from "./types";
 
 const TWITCH_DEVICE_URL = "https://id.twitch.tv/oauth2/device";
 const TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
 const TWITCH_VALIDATE_URL = "https://id.twitch.tv/oauth2/validate";
-const TWITCH_HELIX_USERS_URL = "https://api.twitch.tv/helix/users";
+const TWITCH_HELIX_BASE_URL = "https://api.twitch.tv/helix";
+const TWITCH_HELIX_USERS_URL = `${TWITCH_HELIX_BASE_URL}/users`;
 const TWITCH_EVENTSUB_URL = "wss://eventsub.wss.twitch.tv/ws";
 const TWITCH_EVENTSUB_SUBSCRIPTIONS_URL =
   "https://api.twitch.tv/helix/eventsub/subscriptions";
 
+const TWITCH_INGEST_URL = "rtmp://live.twitch.tv/app/";
+const CCL_CACHE_TTL = 30 * 60 * 1000;
+
 const OFFICIAL_CLIENT_ID = "o2qq87u7gsa2o2f3te95jw2al496rx";
 const FALLBACK_CLIENT_ID = (process.env.ENCORE_TWITCH_CLIENT_ID ?? "").trim();
 
-const REQUIRED_SCOPE = "user:read:chat";
-const TWITCH_SCOPES = [REQUIRED_SCOPE];
+const REQUIRED_SCOPES = [
+  "user:read:chat",
+  "channel:manage:broadcast",
+  "channel:read:stream_key",
+];
+const TWITCH_SCOPES = [...REQUIRED_SCOPES];
+
+const FALLBACK_CONTENT_CLASSIFICATION_LABELS: TwitchContentClassificationLabel[] =
+  [
+    {
+      id: "DebatedSocialIssuesAndPolitics",
+      name: "Politics and Sensitive Social Issues",
+      description:
+        "Discussions or debates about politics or sensitive social issues such as elections, civic integrity, military conflict, and civil rights in a polarizing manner.",
+    },
+    {
+      id: "DrugsIntoxication",
+      name: "Drugs, Intoxication, or Excessive Tobacco Use",
+      description:
+        "Excessive tobacco glorification or promotion, any marijuana consumption/use, legal drug and alcohol induced intoxication, discussions of illegal drugs.",
+    },
+    {
+      id: "Gambling",
+      name: "Gambling",
+      description:
+        "Participating in online or in-person gambling, poker or fantasy sports, that involve the exchange of real money.",
+    },
+    {
+      id: "MatureGame",
+      name: "Mature-rated game",
+      description:
+        "Games that are rated Mature or less suitable for a younger audience.",
+    },
+    {
+      id: "ProfanityVulgarity",
+      name: "Significant Profanity or Vulgarity",
+      description:
+        "Prolonged, and repeated use of obscenities, profanities, and vulgarities, especially as a regular part of speech.",
+    },
+    {
+      id: "SexualThemes",
+      name: "Sexual Themes",
+      description:
+        "Content that focuses on sexualized physical attributes and activities, sexual topics, or experiences.",
+    },
+    {
+      id: "ViolentGraphic",
+      name: "Violent and Graphic Depictions",
+      description:
+        "Simulations and/or depictions of realistic violence, gore, extreme injury, or death.",
+    },
+  ];
 
 const WELCOME_TIMEOUT = 15000;
 const RECONNECT_BASE_DELAY = 5000;
@@ -112,6 +172,49 @@ interface SubscribeParams {
 
 type ConnectResult = { success: boolean; error?: string };
 
+interface TwitchApiContext {
+  clientId: string;
+  token: string;
+  userId: string;
+}
+
+interface HelixResult<T> {
+  ok: boolean;
+  status: number;
+  data?: T;
+  error?: string;
+}
+
+interface TwitchCategory {
+  id: string;
+  name: string;
+  boxArtUrl?: string;
+}
+
+interface TwitchBroadcastResult {
+  success: boolean;
+  channel?: TwitchChannelInfo;
+  live?: TwitchLiveInfo;
+  contentClassificationLabels?: TwitchContentClassificationLabel[];
+  error?: string;
+  reloginRequired?: boolean;
+}
+
+interface TwitchCategoriesResult {
+  success: boolean;
+  categories?: TwitchCategory[];
+  error?: string;
+  reloginRequired?: boolean;
+}
+
+interface TwitchStreamKeyResult {
+  success: boolean;
+  streamKey?: string;
+  ingestUrl?: string;
+  error?: string;
+  reloginRequired?: boolean;
+}
+
 class TwitchService {
   private ws: WebSocket | null = null;
   private connected = false;
@@ -127,6 +230,10 @@ class TwitchService {
   private loginGeneration = 0;
   private connectPromise: Promise<ConnectResult> | null = null;
   private connectionGeneration = 0;
+  private cclCache: {
+    labels: TwitchContentClassificationLabel[];
+    fetchedAt: number;
+  } | null = null;
 
   public registerIpc(): void {
     ipcMain.handle("twitch-get-status", () => this.getStatus());
@@ -156,6 +263,28 @@ class TwitchService {
 
     ipcMain.handle("twitch-set-preferences", (_event, preferences: unknown) => {
       return this.setPreferences(preferences);
+    });
+
+    ipcMain.handle("twitch-get-broadcast-info", async () => {
+      return await this.getBroadcastInfo();
+    });
+
+    ipcMain.handle(
+      "twitch-update-broadcast-info",
+      async (_event, update: unknown) => {
+        return await this.updateBroadcastInfo(update);
+      },
+    );
+
+    ipcMain.handle(
+      "twitch-search-categories",
+      async (_event, query: unknown) => {
+        return await this.searchCategories(query);
+      },
+    );
+
+    ipcMain.handle("twitch-get-stream-key", async () => {
+      return await this.getStreamKey();
     });
   }
 
@@ -435,9 +564,12 @@ class TwitchService {
         ? data.expires_in
         : 3600;
 
+    const grantedScopes = normalizeScopes(scope);
+
     config.accessToken = data.access_token;
     config.refreshToken = data.refresh_token ?? config.refreshToken;
     config.tokenExpiresAt = Date.now() + expiresIn * 1000;
+    if (grantedScopes.length > 0) config.scopes = grantedScopes;
     this.reloginRequired = false;
 
     this.saveConfig(config);
@@ -445,7 +577,7 @@ class TwitchService {
 
     logger.info(
       "TWITCH",
-      `Authorized with scopes: ${Array.isArray(scope) ? scope.join(", ") : typeof scope === "string" ? scope : "unknown"}`,
+      `Authorized with scopes: ${grantedScopes.length > 0 ? grantedScopes.join(", ") : "unknown"}`,
     );
 
     try {
@@ -487,6 +619,7 @@ class TwitchService {
     delete config.accessToken;
     delete config.refreshToken;
     delete config.tokenExpiresAt;
+    delete config.scopes;
     delete config.user;
   }
 
@@ -547,13 +680,17 @@ class TwitchService {
       );
     }
 
-    if (!validation.scopes.includes(REQUIRED_SCOPE)) {
+    const missingScopes = REQUIRED_SCOPES.filter(
+      (scope) => !validation.scopes.includes(scope),
+    );
+
+    if (missingScopes.length > 0) {
       const config = this.getConfig();
       this.clearAuthInConfig(config);
       this.saveConfig(config);
       this.reloginRequired = true;
       return this.failConnect(
-        "Twitch permissions have changed. Please log in again to renew access.",
+        "Twitch permissions have changed. Please log in again to renew access to your channel.",
       );
     }
 
@@ -589,6 +726,7 @@ class TwitchService {
 
     config.user = user;
     config.channel = channel;
+    config.scopes = validation.scopes;
     if (typeof validation.expiresIn === "number") {
       config.tokenExpiresAt = Date.now() + validation.expiresIn * 1000;
     }
@@ -1034,6 +1172,457 @@ class TwitchService {
     return { success: true };
   }
 
+  private async getApiContext(): Promise<TwitchApiContext | null> {
+    const config = this.getConfig();
+    if (!config.accessToken || !config.user?.id) {
+      this.lastError = "Log in with Twitch to manage your channel.";
+      return null;
+    }
+
+    const token = await this.ensureAccessToken();
+    if (!token) {
+      this.reloginRequired = true;
+      if (!this.lastError) {
+        this.lastError = "Your Twitch session expired. Please log in again.";
+      }
+      return null;
+    }
+
+    const current = this.getConfig();
+    const scopes = current.scopes;
+    if (Array.isArray(scopes) && scopes.length > 0) {
+      const missingScopes = REQUIRED_SCOPES.filter(
+        (scope) => !scopes.includes(scope),
+      );
+      if (missingScopes.length > 0) {
+        this.reloginRequired = true;
+        this.lastError =
+          "Twitch permissions need to be renewed. Log in again to manage and start your broadcast.";
+        this.broadcastStatus();
+        return null;
+      }
+    }
+
+    const user = current.user;
+    if (!user) {
+      this.lastError = "Log in with Twitch to manage your channel.";
+      return null;
+    }
+
+    return { clientId: this.resolveClientId(), token, userId: user.id };
+  }
+
+  private async helixRequest<T>(
+    path: string,
+    options: {
+      method?: string;
+      body?: unknown;
+      context?: TwitchApiContext;
+      retry?: boolean;
+    } = {},
+  ): Promise<HelixResult<T>> {
+    const context = options.context ?? (await this.getApiContext());
+    if (!context) {
+      return {
+        ok: false,
+        status: 0,
+        error: this.lastError ?? "Twitch is not available right now.",
+      };
+    }
+
+    try {
+      const response = await fetch(`${TWITCH_HELIX_BASE_URL}${path}`, {
+        method: options.method ?? "GET",
+        headers: {
+          "Client-Id": context.clientId,
+          Authorization: `Bearer ${context.token}`,
+          ...(options.body === undefined
+            ? {}
+            : { "Content-Type": "application/json" }),
+        },
+        body:
+          options.body === undefined ? undefined : JSON.stringify(options.body),
+      });
+
+      if (response.status === 401 && options.retry !== false) {
+        const config = this.getConfig();
+        if (
+          config.refreshToken &&
+          (await this.refreshAccessToken(context.clientId, config.refreshToken))
+        ) {
+          const refreshedToken = this.getConfig().accessToken;
+          if (refreshedToken) {
+            return await this.helixRequest<T>(path, {
+              ...options,
+              context: { ...context, token: refreshedToken },
+              retry: false,
+            });
+          }
+        }
+      }
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as {
+          message?: unknown;
+          error?: unknown;
+        };
+        const message = getTwitchErrorMessage(data, response.status);
+
+        if (response.status === 401 || /scope/i.test(message)) {
+          this.reloginRequired = true;
+          this.lastError =
+            "Twitch permissions need to be renewed. Log in again to manage and start your broadcast.";
+          this.broadcastStatus();
+        }
+
+        return { ok: false, status: response.status, error: message };
+      }
+
+      if (response.status === 204) {
+        return { ok: true, status: 204 };
+      }
+
+      const data = (await response.json().catch(() => ({}))) as T;
+      return { ok: true, status: response.status, data };
+    } catch (error) {
+      return {
+        ok: false,
+        status: 0,
+        error: `Could not reach Twitch: ${(error as Error).message}`,
+      };
+    }
+  }
+
+  private async fetchContentClassificationLabels(
+    context: TwitchApiContext,
+    force = false,
+  ): Promise<TwitchContentClassificationLabel[]> {
+    if (
+      !force &&
+      this.cclCache &&
+      Date.now() - this.cclCache.fetchedAt < CCL_CACHE_TTL
+    ) {
+      return this.cclCache.labels;
+    }
+
+    const result = await this.helixRequest<{ data?: unknown }>(
+      "/content_classification_labels",
+      { context },
+    );
+    const rawLabels = getDataItems(result.data);
+
+    const labels: TwitchContentClassificationLabel[] = [];
+    for (const rawLabel of rawLabels) {
+      if (!rawLabel || typeof rawLabel !== "object") continue;
+      const values = rawLabel as Record<string, unknown>;
+      if (typeof values.id !== "string" || !values.id) continue;
+      labels.push({
+        id: values.id,
+        name:
+          typeof values.name === "string" && values.name
+            ? values.name
+            : values.id,
+        description:
+          typeof values.description === "string" ? values.description : "",
+      });
+    }
+
+    if (labels.length > 0) {
+      this.cclCache = { labels, fetchedAt: Date.now() };
+      return labels;
+    }
+
+    return (
+      this.cclCache?.labels ?? FALLBACK_CONTENT_CLASSIFICATION_LABELS
+    );
+  }
+
+  private async getBroadcastInfo(): Promise<TwitchBroadcastResult> {
+    const context = await this.getApiContext();
+    if (!context) {
+      return {
+        success: false,
+        error:
+          this.lastError ?? "Log in with Twitch to manage your channel.",
+        reloginRequired: this.reloginRequired,
+      };
+    }
+
+    const [channelResult, streamResult, labels] = await Promise.all([
+      this.helixRequest<{ data?: unknown }>(
+        `/channels?broadcaster_id=${encodeURIComponent(context.userId)}`,
+        { context },
+      ),
+      this.helixRequest<{ data?: unknown }>(
+        `/streams?user_id=${encodeURIComponent(context.userId)}`,
+        { context },
+      ),
+      this.fetchContentClassificationLabels(context),
+    ]);
+
+    if (!channelResult.ok) {
+      return {
+        success: false,
+        error:
+          channelResult.error ??
+          "Twitch did not return your channel information.",
+        reloginRequired: this.reloginRequired,
+      };
+    }
+
+    const channel = parseChannelInfo(getFirstDataItem(channelResult.data));
+    if (!channel) {
+      return {
+        success: false,
+        error: "Twitch did not return your channel information.",
+      };
+    }
+
+    if (channel.gameId) {
+      const gamesResult = await this.helixRequest<{ data?: unknown }>(
+        `/games?id=${encodeURIComponent(channel.gameId)}`,
+        { context },
+      );
+      if (gamesResult.ok) {
+        const game = getFirstDataItem(gamesResult.data);
+        if (game && typeof game === "object") {
+          channel.gameBoxArtUrl = resolveBoxArtUrl(
+            (game as Record<string, unknown>).box_art_url,
+            144,
+            192,
+          );
+        }
+      }
+    }
+
+    const live = parseLiveInfo(
+      streamResult.ok ? getFirstDataItem(streamResult.data) : undefined,
+    );
+
+    return {
+      success: true,
+      channel,
+      live,
+      contentClassificationLabels: labels,
+    };
+  }
+
+  private async updateBroadcastInfo(update: unknown): Promise<TwitchBroadcastResult> {
+    if (!update || typeof update !== "object") {
+      return { success: false, error: "Invalid channel update." };
+    }
+
+    const context = await this.getApiContext();
+    if (!context) {
+      return {
+        success: false,
+        error:
+          this.lastError ?? "Log in with Twitch to manage your channel.",
+        reloginRequired: this.reloginRequired,
+      };
+    }
+
+    const values = update as {
+      title?: unknown;
+      gameId?: unknown;
+      language?: unknown;
+      tags?: unknown;
+      contentClassificationLabels?: unknown;
+      isBrandedContent?: unknown;
+    };
+
+    const body: Record<string, unknown> = {};
+
+    if (typeof values.title === "string") {
+      const title = values.title.trim();
+      if (!title) {
+        return {
+          success: false,
+          error: "Add a stream title before going live.",
+        };
+      }
+      if (title.length > 140) {
+        return {
+          success: false,
+          error: "Twitch stream titles are limited to 140 characters.",
+        };
+      }
+      body.title = title;
+    }
+
+    if (typeof values.gameId === "string" && values.gameId.trim()) {
+      body.game_id = values.gameId.trim();
+    }
+
+    if (typeof values.language === "string") {
+      const language = values.language.trim().toLowerCase();
+      if (!/^(?:[a-z]{2}|other)$/.test(language)) {
+        return { success: false, error: "Choose a valid Twitch language." };
+      }
+      body.broadcaster_language = language;
+    }
+
+    if (Array.isArray(values.tags)) {
+      const tags = values.tags
+        .filter((tag): tag is string => typeof tag === "string")
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+
+      if (tags.length > 10) {
+        return {
+          success: false,
+          error: "Twitch allows a maximum of 10 tags.",
+        };
+      }
+
+      const invalidTag = tags.find(
+        (tag) => tag.length > 25 || !/^[\p{L}\p{N}]+$/u.test(tag),
+      );
+      if (invalidTag) {
+        return {
+          success: false,
+          error: `"${invalidTag}" is not a valid Twitch tag. Use letters and numbers only.`,
+        };
+      }
+
+      body.tags = tags;
+    }
+
+    if (Array.isArray(values.contentClassificationLabels)) {
+      const selected = new Set(
+        values.contentClassificationLabels.filter(
+          (label): label is string => typeof label === "string",
+        ),
+      );
+      const labels = await this.fetchContentClassificationLabels(context);
+
+      body.content_classification_labels = labels
+        .filter((label) => label.id !== "MatureGame")
+        .map((label) => ({
+          id: label.id,
+          is_enabled: selected.has(label.id),
+        }));
+    }
+
+    if (typeof values.isBrandedContent === "boolean") {
+      body.is_branded_content = values.isBrandedContent;
+    }
+
+    if (Object.keys(body).length === 0) {
+      return { success: false, error: "There are no changes to save." };
+    }
+
+    const result = await this.helixRequest(
+      `/channels?broadcaster_id=${encodeURIComponent(context.userId)}`,
+      { method: "PATCH", body, context },
+    );
+
+    if (!result.ok) {
+      return {
+        success: false,
+        error: result.error ?? "Twitch could not update your channel.",
+        reloginRequired: this.reloginRequired,
+      };
+    }
+
+    return await this.getBroadcastInfo();
+  }
+
+  private async searchCategories(
+    query: unknown,
+  ): Promise<TwitchCategoriesResult> {
+    if (typeof query !== "string") {
+      return { success: false, error: "Enter a category to search." };
+    }
+
+    const term = query.trim();
+    if (term.length < 2) {
+      return { success: true, categories: [] };
+    }
+
+    const context = await this.getApiContext();
+    if (!context) {
+      return {
+        success: false,
+        error:
+          this.lastError ?? "Log in with Twitch to search categories.",
+        reloginRequired: this.reloginRequired,
+      };
+    }
+
+    const result = await this.helixRequest<{ data?: unknown }>(
+      `/search/categories?query=${encodeURIComponent(term)}&first=10`,
+      { context },
+    );
+
+    if (!result.ok) {
+      return {
+        success: false,
+        error: result.error ?? "Could not search Twitch categories.",
+      };
+    }
+
+    const categories: TwitchCategory[] = [];
+    for (const rawCategory of getDataItems(result.data)) {
+      if (!rawCategory || typeof rawCategory !== "object") continue;
+      const values = rawCategory as Record<string, unknown>;
+      if (typeof values.id !== "string" || typeof values.name !== "string") {
+        continue;
+      }
+      categories.push({
+        id: values.id,
+        name: values.name,
+        boxArtUrl: resolveBoxArtUrl(values.box_art_url, 52, 72),
+      });
+    }
+
+    return { success: true, categories };
+  }
+
+  private async getStreamKey(): Promise<TwitchStreamKeyResult> {
+    const context = await this.getApiContext();
+    if (!context) {
+      return {
+        success: false,
+        error:
+          this.lastError ?? "Log in with Twitch to start your broadcast.",
+        reloginRequired: this.reloginRequired,
+      };
+    }
+
+    const result = await this.helixRequest<{ data?: unknown }>(
+      `/streams/key?broadcaster_id=${encodeURIComponent(context.userId)}`,
+      { context },
+    );
+
+    if (!result.ok) {
+      const error =
+        result.error ?? "Twitch could not provide your stream key.";
+      logger.warn("TWITCH", `Could not get the channel stream key: ${error}`);
+      return {
+        success: false,
+        error,
+        reloginRequired: this.reloginRequired,
+      };
+    }
+
+    const rawKey = getFirstDataItem(result.data);
+    const streamKey =
+      rawKey && typeof rawKey === "object"
+        ? (rawKey as Record<string, unknown>).stream_key
+        : undefined;
+
+    if (typeof streamKey !== "string" || !streamKey) {
+      return {
+        success: false,
+        error: "Twitch did not return a stream key for this channel.",
+      };
+    }
+
+    logger.info("TWITCH", "Retrieved the channel stream key for a broadcast.");
+    return { success: true, streamKey, ingestUrl: TWITCH_INGEST_URL };
+  }
+
   private async ensureAccessToken(): Promise<string | null> {
     const config = this.getConfig();
     if (!config.accessToken) return null;
@@ -1098,9 +1687,12 @@ class TwitchService {
           ? data.expires_in
           : 3600;
 
+      const grantedScopes = normalizeScopes(data.scope);
+
       config.accessToken = data.access_token;
       config.refreshToken = data.refresh_token ?? config.refreshToken;
       config.tokenExpiresAt = Date.now() + expiresIn * 1000;
+      if (grantedScopes.length > 0) config.scopes = grantedScopes;
       this.saveConfig(config);
 
       logger.info("TWITCH", "Refreshed Twitch access token.");
@@ -1233,6 +1825,102 @@ class TwitchService {
 function normalizeChannel(channel: string): string {
   const cleaned = channel.trim().replace(/^#/, "").toLowerCase();
   return /^[a-z0-9_]{1,25}$/.test(cleaned) ? cleaned : "";
+}
+
+function normalizeScopes(scope: unknown): string[] {
+  if (Array.isArray(scope)) {
+    return scope.filter((value): value is string => typeof value === "string");
+  }
+
+  if (typeof scope === "string") {
+    return scope
+      .split(" ")
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function getDataItems(payload: unknown): unknown[] {
+  if (!payload || typeof payload !== "object") return [];
+  const data = (payload as { data?: unknown }).data;
+  return Array.isArray(data) ? data : [];
+}
+
+function getFirstDataItem(payload: unknown): unknown {
+  return getDataItems(payload)[0];
+}
+
+function resolveBoxArtUrl(
+  raw: unknown,
+  width: number,
+  height: number,
+): string | undefined {
+  if (typeof raw !== "string" || !raw) return undefined;
+  return raw
+    .replace("{width}", String(width))
+    .replace("{height}", String(height));
+}
+
+function getTwitchErrorMessage(payload: unknown, status: number): string {
+  if (payload && typeof payload === "object") {
+    const values = payload as { message?: unknown; error?: unknown };
+    if (typeof values.message === "string" && values.message) {
+      return values.message;
+    }
+    if (typeof values.error === "string" && values.error) {
+      return values.error;
+    }
+  }
+
+  return `Twitch returned HTTP ${status}.`;
+}
+
+function parseChannelInfo(raw: unknown): TwitchChannelInfo | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const values = raw as Record<string, unknown>;
+
+  return {
+    title: typeof values.title === "string" ? values.title : "",
+    gameId: typeof values.game_id === "string" ? values.game_id : "",
+    gameName: typeof values.game_name === "string" ? values.game_name : "",
+    language:
+      typeof values.broadcaster_language === "string"
+        ? values.broadcaster_language
+        : "en",
+    tags: stringArray(values.tags),
+    contentClassificationLabels: stringArray(
+      values.content_classification_labels,
+    ),
+    isBrandedContent: values.is_branded_content === true,
+    delay: typeof values.delay === "number" ? values.delay : 0,
+  };
+}
+
+function parseLiveInfo(raw: unknown): TwitchLiveInfo {
+  if (!raw || typeof raw !== "object") {
+    return { isLive: false, startedAt: null, viewerCount: null };
+  }
+
+  const values = raw as Record<string, unknown>;
+
+  return {
+    isLive: values.type === "live",
+    startedAt:
+      typeof values.started_at === "string" && values.started_at
+        ? values.started_at
+        : null,
+    viewerCount:
+      typeof values.viewer_count === "number" ? values.viewer_count : null,
+  };
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 function sanitizeChatText(raw: string): string {
