@@ -836,7 +836,7 @@ export default class StreamManager {
     } else if (this.obsStatus.reconnecting) {
       statusTitle = "CONNECTING";
       statusClass = "status-connecting";
-      statusDesc = `Attempting connection to ws://${this.obsHost}:${this.obsPort}. Make sure OBS is running with WebSocket enabled.`;
+      statusDesc = `Make sure OBS is running with WebSocket enabled.`;
     } else if (this.obsStatus.error) {
       statusTitle = "CONNECTION FAILED";
       statusClass = "status-error";
