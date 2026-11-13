@@ -612,3 +612,145 @@ select.stream-select option {
   pointer-events: auto !important;
   user-select: none;
 }
+
+/* -- Twitch Integration -- */
+.stream-tile-container {
+  max-width: 1120px;
+  gap: 1.5rem;
+}
+
+.stream-tile-container .session-tile {
+  padding: 2.5rem 1.5rem;
+}
+
+.stream-tile-container .session-tile-title {
+  font-size: 1.5rem;
+}
+
+.stream-tile-container .session-tile-desc {
+  font-size: 1rem;
+}
+
+.twitch-tile {
+  border-color: rgba(137, 207, 240, 0.35);
+}
+
+.twitch-tile .session-tile-icon {
+  color: #89cff0;
+}
+
+.twitch-tile:hover,
+.twitch-tile:focus {
+  background: rgba(137, 207, 240, 0.12);
+  border-color: #89cff0;
+  box-shadow:
+    0 15px 30px rgba(0, 0, 0, 0.5),
+    inset 0 0 20px rgba(137, 207, 240, 0.18);
+}
+
+.twitch-tile:hover .session-tile-icon,
+.twitch-tile:focus .session-tile-icon {
+  color: #cfefff;
+}
+
+.twitch-user-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(137, 207, 240, 0.08);
+  border: 1px solid rgba(137, 207, 240, 0.45);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}
+
+.twitch-user-avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 2px solid #89cff0;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.6);
+  flex-shrink: 0;
+}
+
+.twitch-user-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #89cff0;
+  font-size: 1.8rem;
+}
+
+.twitch-user-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.twitch-user-name {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.1;
+}
+
+.twitch-user-login {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.twitch-user-status {
+  margin-top: 0.25rem;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #89cff0;
+}
+
+.twitch-signin-desc {
+  margin: 0.75rem 0 1rem;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.twitch-login-btn {
+  width: 100%;
+  font-family: "Rajdhani", sans-serif;
+}
+
+.twitch-login-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(137, 207, 240, 0.08);
+  border: 1px solid rgba(137, 207, 240, 0.45);
+  border-radius: 10px;
+  padding: 1.5rem 1.25rem;
+  text-align: center;
+}
+
+.twitch-login-waiting img {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.twitch-login-waiting-title {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #89cff0;
+}
+
+.twitch-login-waiting-desc {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.65);
+}
