@@ -832,7 +832,7 @@ export default class StreamManager {
     if (this.obsStatus.connected) {
       statusTitle = "CONNECTED TO OBS STUDIO";
       statusClass = "status-connected";
-      statusDesc = `Target: ws://${this.obsHost}:${this.obsPort} | Active Scene: ${this.obsStatus.currentScene || "None"}`;
+      statusDesc = `Active scene: ${this.obsStatus.currentScene || "None"}`;
     } else if (this.obsStatus.reconnecting) {
       statusTitle = "CONNECTING";
       statusClass = "status-connecting";
