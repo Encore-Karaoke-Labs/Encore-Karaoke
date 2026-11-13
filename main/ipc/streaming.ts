@@ -185,9 +185,13 @@ export function registerStreamingIpc(): void {
           ffmpegStreamProcess = null;
         });
 
+        const loggedDestination = targetDestination
+          .replace(/^(rtmp:\/\/live\.twitch\.tv\/app\/).+$/i, "$1******")
+          .replace(/(live2?\/)[^/]+/, "$1******");
+
         logger.info(
           "STREAM",
-          `Streaming pipe opened to ${targetDestination.replace(/(live2?\/)[^/]+/, "$1******")}`,
+          `Streaming pipe opened to ${loggedDestination}`,
         );
         return { success: true };
       } catch (error) {
