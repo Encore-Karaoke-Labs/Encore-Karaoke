@@ -155,6 +155,10 @@
   margin: 0 auto;
 }
 
+.twitch-live-page {
+  padding-bottom: 1.5rem;
+}
+
 .stream-section-title {
   font-family: "Rajdhani", sans-serif;
   font-size: 1.4rem;
@@ -287,6 +291,23 @@ input.stream-input:focus,
 
 .stream-input-wrapper .stream-input {
   padding-right: 165px !important;
+}
+
+input.twitch-category-search::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0 0 0 0.6rem;
+  cursor: pointer;
+  border: none;
+  background: transparent
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa2b1' stroke-width='2.5' stroke-linecap='round'><path d='M6 6l12 12M18 6L6 18'/></svg>")
+    center / 16px 16px no-repeat;
+}
+
+input.twitch-category-search::-webkit-search-cancel-button:hover {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round'><path d='M6 6l12 12M18 6L6 18'/></svg>");
 }
 
 .stream-key-actions {
@@ -753,4 +774,349 @@ select.stream-select option {
   font-size: 0.9rem;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.65);
+}
+
+/* -- Twitch Go Live -- */
+.twitch-live-cta {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.1rem 1.25rem;
+  background: rgba(137, 207, 240, 0.1);
+  border: 1px solid rgba(137, 207, 240, 0.35);
+  border-radius: 12px;
+}
+
+.twitch-live-cta-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.twitch-live-cta-text strong {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #89cff0;
+  text-transform: uppercase;
+}
+
+.twitch-live-cta-text p {
+  margin: 0;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.twitch-live-cta-btn {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  width: auto !important;
+  min-width: unset !important;
+  padding-left: 1.5rem !important;
+  padding-right: 1.5rem !important;
+}
+
+.stream-modal .session-btn {
+  font-family: "Rajdhani", sans-serif;
+}
+
+.stream-modal .session-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.4);
+}
+
+.stream-modal .session-btn:disabled:hover {
+  background: rgba(137, 207, 240, 0.15);
+  color: #89cff0;
+  border-color: #89cff0;
+}
+
+.stream-modal .session-btn.primary:disabled:hover {
+  background: rgba(255, 215, 0, 0.15);
+  color: #ffd700;
+  border-color: #ffd700;
+}
+
+.twitch-char-count {
+  align-self: flex-end;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.twitch-category-current {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 38px;
+  padding: 0.5rem 0.85rem;
+  background: rgba(137, 207, 240, 0.1);
+  border: 1px solid rgba(137, 207, 240, 0.35);
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.twitch-category-chip-art {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.twitch-category-current + input.twitch-category-search {
+  margin-top: 0.85rem;
+}
+
+.twitch-category-chip-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #cfefff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.twitch-category-empty {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.twitch-category-results {
+  display: none;
+  flex-direction: column;
+  max-height: 230px;
+  overflow-y: auto;
+  background: rgba(5, 5, 12, 0.95);
+  border: 1px solid rgba(137, 207, 240, 0.4);
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+
+.twitch-category-results.open {
+  display: flex;
+}
+
+.twitch-category-result {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: unset;
+  padding: 0.55rem 0.85rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(137, 207, 240, 0.14);
+  border-radius: 0;
+  color: #fff;
+  text-align: left;
+  cursor: var(--cursor-pointer);
+  transition: background 0.15s ease;
+}
+
+.twitch-category-result:last-child {
+  border-bottom: none;
+}
+
+.twitch-category-result:hover,
+.twitch-category-result:focus {
+  background: rgba(137, 207, 240, 0.16);
+  outline: none;
+}
+
+.twitch-category-art {
+  width: 34px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.twitch-category-result-name {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #eaf9ff;
+}
+
+.twitch-category-message {
+  padding: 0.65rem 0.85rem;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.twitch-category-error {
+  color: #ff8888;
+}
+
+.twitch-language-select {
+  width: 100%;
+  height: 52px;
+  font-size: 1.15rem;
+}
+
+.twitch-tag-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.twitch-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  min-height: 34px;
+  align-items: center;
+}
+
+.twitch-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.7rem;
+  background: rgba(137, 207, 240, 0.15);
+  border: 1px solid rgba(137, 207, 240, 0.45);
+  border-radius: 999px;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #cfefff;
+}
+
+.twitch-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  min-width: unset;
+  min-height: unset;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: var(--cursor-pointer);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.twitch-tag-remove:hover,
+.twitch-tag-remove:focus {
+  background: rgba(255, 85, 85, 0.25);
+  color: #ff8888;
+  outline: none;
+}
+
+.twitch-tag-empty {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.twitch-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.twitch-tag-row .stream-input {
+  flex: 1;
+}
+
+.twitch-tag-add {
+  flex-shrink: 0;
+  height: 52px;
+  min-width: unset;
+  padding: 0 1.25rem;
+  background: rgba(137, 207, 240, 0.15);
+  border: 2px solid rgba(137, 207, 240, 0.4);
+  border-radius: 8px;
+  color: #89cff0;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: var(--cursor-pointer);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.twitch-tag-add:hover,
+.twitch-tag-add:focus {
+  background: #89cff0;
+  border-color: #89cff0;
+  color: #000;
+  outline: none;
+}
+
+.twitch-field-hint {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.twitch-ccl-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(137, 207, 240, 0.2);
+  border-radius: 8px;
+}
+
+.twitch-ccl-row .switch {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.twitch-ccl-auto {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.twitch-ccl-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.twitch-ccl-name {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #dfeff7;
+}
+
+.twitch-ccl-desc {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+input.stream-input:disabled,
+.stream-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed !important;
 }
