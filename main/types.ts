@@ -172,3 +172,20 @@ export interface OBSConfig {
     score?: string;
   };
 }
+
+export interface TwitchUser {
+  id: string;
+  login: string;
+  displayName: string;
+  profileImageUrl?: string;
+}
+
+export interface TwitchConfig {
+  accessToken?: string;
+  refreshToken?: string;
+  tokenExpiresAt?: number;
+  user?: TwitchUser;
+  channel?: string;
+  autoConnect?: boolean;
+  showChatAsDanmaku?: boolean;
+}
