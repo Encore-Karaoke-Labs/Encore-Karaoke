@@ -14,6 +14,7 @@ import { registerProtocolsIfEnabled } from "./main/protocols";
 import { deepLinks } from "./main/deep-links";
 import { discordRpc } from "./main/discord-rpc";
 import { obsService } from "./main/obs";
+import { twitchService } from "./main/twitch";
 import { OverlayHub } from "./main/overlays";
 import { WebServer } from "./main/web-server";
 import { startUpdateServerDiscovery } from "./main/update-servers";
@@ -161,6 +162,7 @@ void app.whenReady().then(async () => {
   deepLinks.registerIpc();
   discordRpc.registerIpc();
   obsService.registerIpc();
+  twitchService.registerIpc();
   overlayHub.registerIpc();
 
   if (platformHints.embedded) {
@@ -168,6 +170,7 @@ void app.whenReady().then(async () => {
   }
 
   obsService.initialize();
+  twitchService.initialize();
 
   await webServer.start();
   createMainWindow();
@@ -176,6 +179,7 @@ void app.whenReady().then(async () => {
 app.on("before-quit", () => {
   appState.isAppQuitting = true;
   overlayHub.dispose();
+  twitchService.dispose();
   if (kioskMode && process.platform === "win32") {
     exec("explorer.exe", (error) => {
       if (error) {
