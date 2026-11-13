@@ -70,7 +70,7 @@
   - Comes with a setlist overlay, so you don't have to alt-tab to update your queue!
   - Comes with a lyric overlay, so your viewers can sing along with you!
 - **OBS Scene Automation**
-  - Switch to different OBS scenes automatically as you go through your karaoke session.
+  - Switch to different OBS scenes automatically as you go through your karaoke sessions.
 
 ---
 
