@@ -111,6 +111,27 @@ contextBridge.exposeInMainWorld("obs", {
   },
 });
 
+contextBridge.exposeInMainWorld("twitch", {
+  getStatus: () => ipcRenderer.invoke("twitch-get-status"),
+  startLogin: () => ipcRenderer.invoke("twitch-start-login"),
+  cancelLogin: () => ipcRenderer.invoke("twitch-cancel-login"),
+  logout: () => ipcRenderer.invoke("twitch-logout"),
+  connect: () => ipcRenderer.invoke("twitch-connect"),
+  disconnect: () => ipcRenderer.invoke("twitch-disconnect"),
+  setPreferences: (preferences) =>
+    ipcRenderer.invoke("twitch-set-preferences", preferences),
+  onStatusUpdate: (callback) => {
+    const listener = (_e, data) => callback(data);
+    ipcRenderer.on("twitch-status-update", listener);
+    return () => ipcRenderer.removeListener("twitch-status-update", listener);
+  },
+  onChatMessage: (callback) => {
+    const listener = (_e, data) => callback(data);
+    ipcRenderer.on("twitch-chat-message", listener);
+    return () => ipcRenderer.removeListener("twitch-chat-message", listener);
+  },
+});
+
 contextBridge.exposeInMainWorld("networking", {
   port: async () => ipcRenderer.invoke("get-port"),
   accessToken: async () => ipcRenderer.invoke("get-file-token"),
