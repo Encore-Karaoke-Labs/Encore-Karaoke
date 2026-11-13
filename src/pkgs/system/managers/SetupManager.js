@@ -78,6 +78,7 @@ export default class SetupManager {
     this.offsetDisplay = null;
     this.previewSyncFrame = null;
     this.textEditInput = null;
+    this.bgvSuspended = false;
 
     this.boundBuildProgress = (e) => {
       if (!this.setupState.buildingLibrary) return;
@@ -147,10 +148,26 @@ export default class SetupManager {
   }
 
   /**
+   * Returns true while the BGV player is feeding something that must not be
+   * interrupted.
+   * @returns {boolean}
+   */
+  _shouldKeepBgvRunning() {
+    const recorder = this.ctx.modules.recorder;
+    return Boolean(
+      this.ctx.modules.stream?.isStreaming ||
+      recorder?.isRecording ||
+      recorder?.broadcastStream ||
+      this.ctx.modules.bgv?.isCurrentMediaCamera,
+    );
+  }
+
+  /**
    * Triggers the setup mode, taking over the screen and loading initial configurations.
    */
   open() {
-    this.ctx.modules.bgv.stop();
+    this.bgvSuspended = !this._shouldKeepBgvRunning();
+    if (this.bgvSuspended) this.ctx.modules.bgv.stop();
     this.ctx.services.Forte.stopTrack();
 
     this.setupState.view = "auth";
@@ -237,9 +254,13 @@ export default class SetupManager {
 
     this.ctx.root.ui.setMode("menu");
 
-    this.ctx.root.library.init().then(() => {
-      this.ctx.modules.bgv.start();
-      this.ctx.modules.bgv.updatePlaylistForCategory();
+    const resumeBgv = this.bgvSuspended;
+    this.bgvSuspended = false;
+
+    this.ctx.root.library.init().then(async () => {
+      if (resumeBgv) {
+        await this.ctx.modules.bgv.updatePlaylistForCategory();
+      }
     });
   }
 
@@ -2121,8 +2142,10 @@ export default class SetupManager {
       this.ctx.dom.setupScreen.classOn("hidden");
     }
 
-    this.ctx.modules.bgv.start();
-    await this.ctx.modules.bgv.updatePlaylistForCategory();
+    if (this.bgvSuspended) {
+      this.bgvSuspended = false;
+      await this.ctx.modules.bgv.updatePlaylistForCategory();
+    }
 
     this.ctx.state.pendingLyricCustomizerOpen = true;
 
