@@ -22,8 +22,11 @@ export default class StreamManager {
       directIngest: true,
       directBitrate: false,
       directInfo: false,
+      twitchAccount: true,
+      twitchChat: false,
+      twitchInfo: false,
     };
-    this._sectionGroups = { obs: [], direct: [] };
+    this._sectionGroups = { obs: [], direct: [], twitch: [] };
 
     // Direct RTMP Configuration
     const cfg = this.ctx.config?.streamConfig || {};
@@ -100,6 +103,32 @@ export default class StreamManager {
         this.renderObsView();
       }
     });
+
+    // Twitch Configuration
+    const twitchCfg = this.ctx.config?.twitchConfig || {};
+    this.twitchStatus = {
+      authenticated: false,
+      user: null,
+      channel: twitchCfg.channel || "",
+      connected: false,
+      connecting: false,
+      error: null,
+      reloginRequired: false,
+      login: null,
+      autoConnect: twitchCfg.autoConnect !== false,
+      showChatAsDanmaku: twitchCfg.showChatAsDanmaku !== false,
+    };
+
+    window.twitch?.getStatus?.().then((status) => {
+      if (status) this.twitchStatus = status;
+    });
+
+    window.twitch?.onStatusUpdate?.((status) => {
+      this.twitchStatus = status;
+      if (this.ctx.state.isStreamModalOpen && this.modalView === "twitch") {
+        this.renderTwitchView();
+      }
+    });
   }
 
   /**
@@ -144,7 +173,7 @@ export default class StreamManager {
    * @returns {number}
    */
   getViewDirection(fromView, toView) {
-    const order = { selection: 0, obs: 1, direct: 1 };
+    const order = { selection: 0, obs: 1, direct: 1, twitch: 1 };
     return (order[toView] ?? 0) >= (order[fromView] ?? 0) ? 1 : -1;
   }
 
@@ -228,6 +257,8 @@ export default class StreamManager {
       if (this.renderDirectView() === false) {
         renderedView = this._renderedModalView;
       }
+    } else if (this.modalView === "twitch") {
+      this.renderTwitchView();
     } else {
       this.renderSelectionView();
     }
@@ -338,7 +369,7 @@ export default class StreamManager {
       .appendTo(dom.streamContentArea);
 
     const tileContainer = new Html("div")
-      .classOn("session-tile-container")
+      .classOn("session-tile-container", "stream-tile-container")
       .appendTo(selectionArea);
 
     // OBS Tile
@@ -393,6 +424,31 @@ export default class StreamManager {
 
     directTile.on("click", () => {
       this.modalView = "direct";
+      this.render();
+    });
+
+    const twitchTile = new Html("div")
+      .classOn("session-tile", "twitch-tile")
+      .attr({ tabindex: "0" })
+      .appendTo(tileContainer);
+
+    new Html("div")
+      .classOn("session-tile-icon")
+      .html('<ion-icon name="logo-twitch" style="font-size: 3rem;"></ion-icon>')
+      .appendTo(twitchTile);
+
+    new Html("div")
+      .classOn("session-tile-title")
+      .text("TWITCH INTEGRATION")
+      .appendTo(twitchTile);
+
+    new Html("div")
+      .classOn("session-tile-desc")
+      .text("Connect your Twitch account and bring your stream into Encore.")
+      .appendTo(twitchTile);
+
+    twitchTile.on("click", () => {
+      this.modalView = "twitch";
       this.render();
     });
 
@@ -727,6 +783,360 @@ export default class StreamManager {
         .on("click", async () => {
           this.saveObsConfig(false);
           await window.obs?.disconnect();
+        })
+        .appendTo(btnRow);
+    }
+  }
+
+  /**
+   * Twitch Integration View.
+   */
+  renderTwitchView() {
+    if (this._streamViewTimer) return;
+
+    const dom = this.ctx.dom;
+    if (!dom.streamHeader || !dom.streamContentArea) return;
+
+    dom.streamHeader.clear();
+    dom.streamContentArea.clear();
+    dom.streamFooter.classOff("hidden");
+    dom.streamFooter.clear();
+
+    new Html("h1").text("TWITCH INTEGRATION").appendTo(dom.streamHeader);
+    new Html("p")
+      .text("Connect your Twitch account and bring your stream into Encore.")
+      .appendTo(dom.streamHeader);
+
+    const page = new Html("div")
+      .classOn("stream-page")
+      .appendTo(dom.streamContentArea);
+    this._sectionGroups.twitch = [];
+
+    const status = this.twitchStatus;
+    const login = status.login;
+
+    const accountSection = this.buildSectionAccordion(
+      page,
+      "twitchAccount",
+      "TWITCH ACCOUNT",
+      "twitch",
+    );
+
+    if (status.authenticated) {
+      if (!status.user) {
+        new Html("div")
+          .classOn("stream-info-card")
+          .html(
+            "<strong>Logged in.</strong><br>Your Twitch profile could not be loaded. Try logging out and back in.",
+          )
+          .appendTo(accountSection.content);
+      } else {
+        const userCard = new Html("div")
+          .classOn("twitch-user-card")
+          .appendTo(accountSection.content);
+
+        if (status.user.profileImageUrl) {
+          new Html("img")
+            .classOn("twitch-user-avatar")
+            .attr({
+              src: status.user.profileImageUrl,
+              alt: status.user.displayName,
+            })
+            .appendTo(userCard);
+        } else {
+          new Html("div")
+            .classOn("twitch-user-avatar", "twitch-user-avatar-fallback")
+            .html('<ion-icon name="logo-twitch"></ion-icon>')
+            .appendTo(userCard);
+        }
+
+        const userMeta = new Html("div")
+          .classOn("twitch-user-meta")
+          .appendTo(userCard);
+
+        new Html("span")
+          .classOn("twitch-user-name")
+          .text(status.user.displayName)
+          .appendTo(userMeta);
+
+        new Html("span")
+          .classOn("twitch-user-login")
+          .text(`@${status.user.login}`)
+          .appendTo(userMeta);
+
+        new Html("span")
+          .classOn("twitch-user-status")
+          .text("CONNECTED ACCOUNT")
+          .appendTo(userMeta);
+      }
+    } else if (login) {
+      const waitingPane = new Html("div")
+        .classOn("twitch-login-waiting")
+        .attr({ role: "status", "aria-live": "polite" })
+        .appendTo(accountSection.content);
+
+      new Html("img")
+        .classOn("loading")
+        .attr({
+          src: "/assets/img/loading-spinner.svg",
+          alt: "",
+          draggable: "false",
+        })
+        .appendTo(waitingPane);
+
+      new Html("div")
+        .classOn("twitch-login-waiting-title")
+        .text("WAITING FOR TWITCH...")
+        .appendTo(waitingPane);
+
+      const minutes = Math.max(
+        1,
+        Math.round((login.expiresAt - Date.now()) / 60000),
+      );
+
+      new Html("div")
+        .classOn("twitch-login-waiting-desc")
+        .text(
+          `Approve access in your browser. This request expires in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+        )
+        .appendTo(waitingPane);
+    } else {
+      const signInCard = new Html("div")
+        .classOn("stream-info-card", "twitch-signin-card")
+        .appendTo(accountSection.content);
+
+      new Html("strong")
+        .text("Sign in to connect Encore with Twitch")
+        .appendTo(signInCard);
+
+      new Html("p")
+        .classOn("twitch-signin-desc")
+        .text(
+          "You will be sent to Twitch to approve access. The code is copied for you automatically.",
+        )
+        .appendTo(signInCard);
+
+      new Html("button")
+        .classOn("session-btn", "primary", "twitch-login-btn")
+        .text("LOG IN WITH TWITCH")
+        .on("click", async () => {
+          const res = await window.twitch?.startLogin?.();
+          if (!res || !res.success) {
+            this.ctx.modules.infoBar.showTemp(
+              "TWITCH",
+              res?.error || "Could not start Twitch login.",
+              5000,
+            );
+            return;
+          }
+
+          if (res.userCode) {
+            try {
+              await navigator.clipboard.writeText(res.userCode);
+            } catch {}
+          }
+
+          if (res.verificationUri) {
+            window.desktopIntegration?.openExternal?.(res.verificationUri);
+          }
+        })
+        .appendTo(signInCard);
+    }
+
+    const chatSection = this.buildSectionAccordion(
+      page,
+      "twitchChat",
+      "PREFERENCES",
+      "twitch",
+    );
+
+    const danmakuRow = new Html("div")
+      .classOn("stream-toggle-row")
+      .appendTo(chatSection.content);
+
+    const danmakuSwitch = new Html("button")
+      .classOn("switch")
+      .attr({
+        type: "button",
+        role: "switch",
+        "aria-checked": status.showChatAsDanmaku ? "true" : "false",
+        "aria-label": "Show chat on screen",
+      })
+      .appendTo(danmakuRow);
+
+    danmakuSwitch.on("click", () => {
+      const enabled = !this.twitchStatus.showChatAsDanmaku;
+      this.twitchStatus.showChatAsDanmaku = enabled;
+      danmakuSwitch.attr({ "aria-checked": enabled ? "true" : "false" });
+      danmakuSwitch.classOff("switch-on-anim", "switch-off-anim");
+      void danmakuSwitch.elm.offsetWidth;
+      danmakuSwitch.classOn(enabled ? "switch-on-anim" : "switch-off-anim");
+
+      this.ctx.config.twitchConfig = {
+        ...(this.ctx.config.twitchConfig || {}),
+        showChatAsDanmaku: enabled,
+      };
+      void window.twitch?.setPreferences?.({
+        showChatAsDanmaku: enabled,
+      });
+    });
+
+    new Html("span")
+      .classOn("stream-toggle-label")
+      .text("Show chat on screen")
+      .appendTo(danmakuRow);
+
+    const autoConnectRow = new Html("div")
+      .classOn("stream-toggle-row")
+      .appendTo(chatSection.content);
+
+    const autoConnectSwitch = new Html("button")
+      .classOn("switch")
+      .attr({
+        type: "button",
+        role: "switch",
+        "aria-checked": status.autoConnect ? "true" : "false",
+        "aria-label": "Connect to Twitch automatically on startup",
+      })
+      .appendTo(autoConnectRow);
+
+    autoConnectSwitch.on("click", () => {
+      const enabled = !this.twitchStatus.autoConnect;
+      this.twitchStatus.autoConnect = enabled;
+      autoConnectSwitch.attr({ "aria-checked": enabled ? "true" : "false" });
+      autoConnectSwitch.classOff("switch-on-anim", "switch-off-anim");
+      void autoConnectSwitch.elm.offsetWidth;
+      autoConnectSwitch.classOn(enabled ? "switch-on-anim" : "switch-off-anim");
+      void window.twitch?.setPreferences?.({ autoConnect: enabled });
+    });
+
+    new Html("span")
+      .classOn("stream-toggle-label")
+      .text("Connect to Twitch automatically on startup")
+      .appendTo(autoConnectRow);
+
+    const infoSection = this.buildSectionAccordion(
+      page,
+      "twitchInfo",
+      "HOW IT WORKS",
+      "twitch",
+    );
+
+    new Html("div")
+      .classOn("stream-info-card")
+      .html(
+        `
+        <strong>What Twitch integration does:</strong><br>
+        • Connects Encore to your Twitch account.<br>
+        • Brings your channel and audience into Encore.<br>
+        • Shows chat on screen and runs alongside OBS or Direct RTMP.
+      `,
+      )
+      .appendTo(infoSection.content);
+
+    const statusBox = new Html("div")
+      .classOn("stream-status-box")
+      .appendTo(page);
+
+    let statusTitle = "NOT CONNECTED";
+    let statusClass = "status-disconnected";
+    let statusDesc = "Sign in with Twitch to connect Encore to your channel.";
+
+    if (!status.authenticated && status.error) {
+      statusTitle = "TWITCH LOGIN ERROR";
+      statusClass = "status-error";
+      statusDesc = status.error;
+    } else if (status.reloginRequired) {
+      statusTitle = "TWITCH LOGIN REQUIRED";
+      statusClass = "status-error";
+      statusDesc =
+        "Your Twitch permissions need to be renewed. Log in again to reconnect.";
+    } else if (status.authenticated) {
+      if (status.connected) {
+        statusTitle = `CONNECTED: #${status.channel}`;
+        statusClass = "status-connected";
+        statusDesc = "Encore is connected to your Twitch channel.";
+      } else if (status.connecting) {
+        statusTitle = "CONNECTING TO TWITCH...";
+        statusClass = "status-connecting";
+        statusDesc = `Linking #${status.channel || status.user?.login || "your channel"}.`;
+      } else if (status.error) {
+        statusTitle = "TWITCH CONNECTION ERROR";
+        statusClass = "status-error";
+        statusDesc = status.error;
+      } else {
+        statusTitle = "READY TO CONNECT";
+        statusClass = "status-connecting";
+        statusDesc =
+          "Your Twitch account is connected. Click Connect Twitch to link your channel.";
+      }
+    }
+
+    statusBox.classOn(statusClass);
+    new Html("div")
+      .classOn("stream-status-header-text")
+      .text(statusTitle)
+      .appendTo(statusBox);
+    new Html("div")
+      .classOn("stream-status-desc-text")
+      .text(statusDesc)
+      .appendTo(statusBox);
+
+    const btnRow = new Html("div")
+      .classOn("stream-btn-row")
+      .appendTo(dom.streamFooter);
+
+    new Html("button")
+      .classOn("session-btn")
+      .text("BACK")
+      .on("click", () => {
+        this.modalView = "selection";
+        this.render();
+      })
+      .appendTo(btnRow);
+
+    if (login) {
+      new Html("button")
+        .classOn("session-btn", "danger")
+        .text("CANCEL LOGIN")
+        .on("click", async () => {
+          await window.twitch?.cancelLogin?.();
+        })
+        .appendTo(btnRow);
+    } else if (status.authenticated) {
+      new Html("button")
+        .classOn("session-btn", "danger")
+        .text("LOG OUT")
+        .on("click", async () => {
+          await window.twitch?.logout?.();
+        })
+        .appendTo(btnRow);
+
+      new Html("button")
+        .classOn(
+          "session-btn",
+          status.connected || status.connecting ? "danger" : "primary",
+        )
+        .text(
+          status.connected
+            ? "DISCONNECT TWITCH"
+            : status.connecting
+              ? "CANCEL CONNECTION"
+              : "CONNECT TWITCH",
+        )
+        .on("click", async () => {
+          if (status.connected || status.connecting) {
+            await window.twitch?.disconnect?.();
+          } else {
+            const res = await window.twitch?.connect?.();
+            if (res && !res.success) {
+              this.ctx.modules.infoBar.showTemp(
+                "TWITCH",
+                res.error || "Could not connect to Twitch.",
+                4000,
+              );
+            }
+          }
         })
         .appendTo(btnRow);
     }
