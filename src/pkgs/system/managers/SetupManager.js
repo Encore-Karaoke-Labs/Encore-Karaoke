@@ -375,7 +375,6 @@ export default class SetupManager {
       value: d.deviceId,
     }));
 
-    const cameraSource = this.ctx.config.videoConfig?.cameraSource || "remote";
     const savedCameraDeviceId =
       this.ctx.config.videoConfig?.cameraDeviceId || "";
     const cameraOptions = [
@@ -1156,18 +1155,6 @@ export default class SetupManager {
           {
             title: "Camera",
             items: [
-              {
-                id: "camera_source",
-                label: "Camera Source",
-                type: "select",
-                options: [
-                  { value: "remote", label: "Remote Device (Phone)" },
-                  { value: "local", label: "Physical Camera" },
-                  { value: "off", label: "Disabled" },
-                ],
-                get: () => cameraSource,
-                set: (v) => this.setCameraSource(v),
-              },
               {
                 id: "camera_device",
                 label: "Physical Camera Device",
@@ -2708,64 +2695,22 @@ export default class SetupManager {
     this.renderView();
   }
 
-  async setCameraSource(value) {
-    this.ctx.config.videoConfig ??= {};
-    this.ctx.config.videoConfig.cameraSource = value;
-    window.config.setItem("videoConfig.cameraSource", value);
-
-    const camera = this.ctx.services.CameraSvc;
-    const deviceId = this.ctx.config.videoConfig.cameraDeviceId || "";
-
-    try {
-      if (value === "local") {
-        this.showToast("Starting physical camera...", "info");
-      }
-
-      if (camera?.applySource) {
-        await camera.applySource(value, deviceId);
-      }
-
-      if (value === "local") {
-        if (camera?.getActiveStream?.()) {
-          this.cameraDevices = (await camera.getVideoDevices?.()) || [];
-          this.showToast("Physical camera started", "success");
-        } else {
-          this.showToast("No physical camera feed available", "error");
-        }
-      } else if (value === "off") {
-        this.showToast("Camera disabled", "info");
-      } else {
-        this.showToast("Remote camera enabled", "info");
-      }
-    } catch (error) {
-      console.error("Failed to change camera source:", error);
-      this.showToast("Could not start the physical camera", "error");
-    }
-
-    await this.buildSettingsMap();
-    this.renderView();
-  }
-
   async setCameraDevice(deviceId) {
     this.ctx.config.videoConfig ??= {};
     this.ctx.config.videoConfig.cameraDeviceId = deviceId;
-    this.ctx.config.videoConfig.cameraSource = "local";
     window.config.setItem("videoConfig.cameraDeviceId", deviceId);
-    window.config.setItem("videoConfig.cameraSource", "local");
 
     const camera = this.ctx.services.CameraSvc;
 
     try {
       this.showToast("Starting physical camera...", "info");
-      if (camera?.applySource) {
-        await camera.applySource("local", deviceId);
-      }
+      await camera?.startLocal?.(deviceId || undefined);
       this.cameraDevices = (await camera?.getVideoDevices?.()) || [];
       this.showToast(
-        camera?.getActiveStream?.()
+        camera?.isLocalActive?.()
           ? "Physical camera started"
           : "No physical camera feed available",
-        camera?.getActiveStream?.() ? "success" : "error",
+        camera?.isLocalActive?.() ? "success" : "error",
       );
     } catch (error) {
       console.error("Failed to start the selected camera:", error);
@@ -2799,11 +2744,10 @@ export default class SetupManager {
     const camera = this.ctx.services.CameraSvc;
     let stream = camera?.getActiveStream?.();
 
-    if (!stream && this.ctx.config.videoConfig?.cameraSource === "local") {
+    if (!stream) {
       try {
-        await camera?.applySource?.(
-          "local",
-          this.ctx.config.videoConfig?.cameraDeviceId || "",
+        await camera?.startLocal?.(
+          this.ctx.config.videoConfig?.cameraDeviceId || undefined,
         );
         stream = camera?.getActiveStream?.();
       } catch (error) {
