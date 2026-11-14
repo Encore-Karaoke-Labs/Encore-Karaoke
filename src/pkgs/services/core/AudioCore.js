@@ -76,8 +76,14 @@ export class ForteAudioCore {
       this.state.recording.musicDestinationNode =
         this.context.createMediaStreamDestination();
 
+      this.state.recording.sessionDestinationNode =
+        this.context.createMediaStreamDestination();
+      this.state.recording.sessionAudioStream =
+        this.state.recording.sessionDestinationNode.stream;
+
       this.sfxGain.connect(this.state.recording.destinationNode);
       this.sfxGain.connect(this.state.recording.musicDestinationNode);
+      this.sfxGain.connect(this.state.recording.sessionDestinationNode);
 
       this.state.recording.micAudioStream =
         this.state.recording.micDestinationNode.stream;
@@ -96,6 +102,10 @@ export class ForteAudioCore {
 
       this.state.effects.sessionMonitorGain = this.context.createGain();
       this.state.effects.sessionMonitorGain.connect(this.masterGain);
+
+      this.state.effects.sessionMonitorGain.connect(
+        this.state.recording.destinationNode,
+      );
 
       this.state.effects.chorusPitchNode = new AudioWorkletNode(
         this.context,
@@ -124,6 +134,9 @@ export class ForteAudioCore {
       );
       this.state.effects.micChainOutput.connect(
         this.state.recording.micDestinationNode,
+      );
+      this.state.effects.micChainOutput.connect(
+        this.state.recording.sessionDestinationNode,
       );
 
       this.state.playback.midiGain = this.context.createGain();
@@ -252,6 +265,8 @@ export class ForteAudioCore {
       if (this.sfxGain) this.sfxGain.disconnect();
       if (this.state.recording.destinationNode)
         this.state.recording.destinationNode.disconnect();
+      if (this.state.recording.sessionDestinationNode)
+        this.state.recording.sessionDestinationNode.disconnect();
 
       this.context.close();
     }
