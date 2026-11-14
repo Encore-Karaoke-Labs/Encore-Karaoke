@@ -629,6 +629,21 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.session-recording-indicator {
+  display: inline-flex;
+  align-items: center;
+  color: #ff5555;
+  font-size: 1.1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-recording-indicator .pulse-status {
+    animation: none;
+  }
+}
+
 .session-kick-btn {
   min-width: unset !important;
   width: auto !important;
