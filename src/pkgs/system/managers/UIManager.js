@@ -3220,6 +3220,7 @@ export default class UIManager {
   }
 
   startLoungeBackground() {
+    if (this.ctx.root.sessions?.isCameraBackgroundActive?.()) return;
     if (this.loungeRafId) return;
     this.ctx.modules.bgv.setCanvasOnlyMode(true);
 
@@ -3292,6 +3293,7 @@ export default class UIManager {
   }
 
   stopLoungeBackground() {
+    if (this.ctx.root.sessions?.isCameraBackgroundActive?.()) return;
     if (this.loungeRafId) {
       cancelAnimationFrame(this.loungeRafId);
       this.loungeRafId = null;
