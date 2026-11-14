@@ -504,8 +504,9 @@ document.addEventListener("DOMContentLoaded", () => {
           stream = await navigator.mediaDevices.getUserMedia({
             video: {
               deviceId: { exact: videoDevices[currentCameraIndex].deviceId },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              frameRate: { ideal: 30, max: 30 },
             },
             audio: false,
           });
@@ -572,8 +573,9 @@ document.addEventListener("DOMContentLoaded", () => {
           newStream = await navigator.mediaDevices.getUserMedia({
             video: {
               deviceId: { exact: videoDevices[nextIndex].deviceId },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              frameRate: { ideal: 30, max: 30 },
             },
             audio: false,
           });
@@ -593,8 +595,9 @@ document.addEventListener("DOMContentLoaded", () => {
         newStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: currentFacingMode },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 30, max: 30 },
           },
           audio: false,
         });
