@@ -26,18 +26,17 @@ const pkg = {
     localStream: null,
     localDeviceId: null,
     localStartToken: 0,
-    source: "remote",
 
     isBusy: function () {
-      return this.currentCall !== null || this.localStream !== null;
+      return this.currentCall !== null || this.remoteStream !== null;
     },
 
     isLocalActive: function () {
       return this.localStream !== null;
     },
 
-    isRemoteAllowed: function () {
-      return this.source !== "off";
+    isRemoteActive: function () {
+      return this.remoteStream !== null;
     },
 
     getActiveStream: function () {
@@ -52,6 +51,21 @@ const pkg = {
         return { stream: this.remoteStream, source: "remote" };
       }
       return null;
+    },
+
+    /**
+     * Returns every live camera.
+     * @returns {Array<{stream: MediaStream, source: "local"|"remote"}>}
+     */
+    getActiveCameras: function () {
+      const cameras = [];
+      if (this.localStream) {
+        cameras.push({ stream: this.localStream, source: "local" });
+      }
+      if (this.remoteStream) {
+        cameras.push({ stream: this.remoteStream, source: "remote" });
+      }
+      return cameras;
     },
 
     /**
@@ -101,17 +115,26 @@ const pkg = {
 
       this.stopLocal(false);
 
+      const videoConstraints = {
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30, max: 30 },
+      };
+      if (deviceId) videoConstraints.deviceId = { exact: deviceId };
+
       let stream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: deviceId
-            ? { deviceId: { exact: deviceId } }
-            : { width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: videoConstraints,
           audio: false,
         });
       } catch (error) {
         if (previousStream) {
-          document.dispatchEvent(new CustomEvent("Encore.Camera.StreamEnded"));
+          document.dispatchEvent(
+            new CustomEvent("Encore.Camera.StreamEnded", {
+              detail: { source: "local" },
+            }),
+          );
         }
         throw error;
       }
@@ -129,16 +152,6 @@ const pkg = {
 
       if (track) {
         track.onended = () => this.handleLocalStreamEnd();
-      }
-
-      if (this.currentCall) {
-        try {
-          this.currentCall.close();
-        } catch (error) {
-          console.warn("[CAMERA] Could not close remote stream:", error);
-        }
-        this.currentCall = null;
-        this.remoteStream = null;
       }
 
       document.dispatchEvent(
@@ -167,7 +180,11 @@ const pkg = {
       });
 
       if (notify) {
-        document.dispatchEvent(new CustomEvent("Encore.Camera.StreamEnded"));
+        document.dispatchEvent(
+          new CustomEvent("Encore.Camera.StreamEnded", {
+            detail: { source: "local" },
+          }),
+        );
       }
     },
 
@@ -176,50 +193,34 @@ const pkg = {
 
       this.stopLocal(false);
 
-      if (!this.currentCall) {
-        document.dispatchEvent(new CustomEvent("Encore.Camera.StreamEnded"));
-      }
-    },
-
-    /**
-     * Switches between the remote phone camera, a physical camera, or off.
-     * @param {"remote"|"local"|"off"} source
-     * @param {string} [deviceId]
-     */
-    applySource: async function (source, deviceId) {
-      this.source = source || "remote";
-
-      if (this.source === "local") {
-        await this.startLocal(deviceId || undefined);
-      } else if (this.source === "off") {
-        this.stopAll();
-      } else {
-        // Cancel any physical camera request that is still in flight.
-        this.localStartToken += 1;
-        this.stopLocal();
-      }
+      document.dispatchEvent(
+        new CustomEvent("Encore.Camera.StreamEnded", {
+          detail: { source: "local" },
+        }),
+      );
     },
 
     applySavedConfig: async function () {
       try {
-        const source =
-          (await window.config.getItem("videoConfig.cameraSource")) || "remote";
         const deviceId =
           (await window.config.getItem("videoConfig.cameraDeviceId")) || "";
+        const source =
+          (await window.config.getItem("videoConfig.cameraSource")) || "";
 
-        await this.applySource(source, deviceId);
+        if (deviceId || source === "local") {
+          await this.startLocal(deviceId || undefined);
+        }
       } catch (error) {
         console.warn("[CAMERA] Could not start the configured camera:", error);
       }
     },
 
     /**
-     * Stops both the local camera and any active remote phone stream.
+     * Stops the physical camera and any active EnMoku phone stream.
      */
     stopAll: function () {
-      const hadStream = Boolean(
-        this.localStream || this.currentCall || this.remoteStream,
-      );
+      const hadLocal = Boolean(this.localStream);
+      const hadRemote = Boolean(this.currentCall || this.remoteStream);
 
       this.localStartToken += 1;
       this.stopLocal(false);
@@ -235,8 +236,20 @@ const pkg = {
       this.currentCall = null;
       this.remoteStream = null;
 
-      if (hadStream) {
-        document.dispatchEvent(new CustomEvent("Encore.Camera.StreamEnded"));
+      if (hadLocal) {
+        document.dispatchEvent(
+          new CustomEvent("Encore.Camera.StreamEnded", {
+            detail: { source: "local" },
+          }),
+        );
+      }
+
+      if (hadRemote) {
+        document.dispatchEvent(
+          new CustomEvent("Encore.Camera.StreamEnded", {
+            detail: { source: "remote" },
+          }),
+        );
       }
     },
 
@@ -254,19 +267,13 @@ const pkg = {
         this.peer.on("error", (err) => reject(err));
 
         this.peer.on("call", (call) => {
-          if (this.localStream || !this.isRemoteAllowed()) {
+          if (this.currentCall) {
             try {
-              call.close();
+              this.currentCall.close();
             } catch (error) {
-              console.warn(
-                "[CAMERA] Could not reject remote camera call:",
-                error,
-              );
+              console.warn("[CAMERA] Could not replace remote stream:", error);
             }
-            return;
           }
-
-          if (this.currentCall) this.currentCall.close();
 
           this.currentCall = call;
           call.answer();
@@ -295,10 +302,11 @@ const pkg = {
       this.currentCall = null;
       this.remoteStream = null;
 
-      // A physical camera may still be active; don't clear the background.
-      if (!this.localStream) {
-        document.dispatchEvent(new CustomEvent("Encore.Camera.StreamEnded"));
-      }
+      document.dispatchEvent(
+        new CustomEvent("Encore.Camera.StreamEnded", {
+          detail: { source: "remote" },
+        }),
+      );
     },
   },
 };
