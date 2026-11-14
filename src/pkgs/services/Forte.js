@@ -114,9 +114,17 @@ const pkg = {
 
   data: {
     getRecordingAudioStream: () => state.recording.audioStream,
-    getSessionPerformanceAudioStream: () =>
-      state.recording.sessionAudioStream,
+    getSessionPerformanceAudioStream: () => state.recording.sessionAudioStream,
     getMicAudioStream: () => state.recording.micAudioStream,
+    getSessionMicAudioStream: () => state.recording.sessionMicAudioStream,
+    setSessionMicMuted: (muted) => {
+      const node = state.recording.sessionMicGainNode;
+      if (!node) return;
+
+      const now = node.context.currentTime;
+      node.gain.cancelScheduledValues(now);
+      node.gain.setTargetAtTime(muted ? 0 : 1, now, 0.015);
+    },
     getMusicAudioStream: () => state.recording.musicAudioStream,
 
     loadSfx: (url) => sfx.loadSfx(url),
