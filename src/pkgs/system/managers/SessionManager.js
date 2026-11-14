@@ -1,6 +1,10 @@
 import Html from "../../../libs/html.js";
 import playNavSfx from "../../../libs/sfx.js";
 
+// Remote Session audio uses a fixed mixing key so a new performance cleanly
+// replaces the previous performer without leaving a stale Web Audio source.
+const SESSION_PERFORMANCE_STREAM_ID = "session-performance";
+
 export default class SessionManager {
   /**
    * @param {Object} context - The shared context
@@ -41,6 +45,8 @@ export default class SessionManager {
     this.handleHostDisconnected = this.handleHostDisconnected.bind(this);
     this.handleKicked = this.handleKicked.bind(this);
     this.handleForceStop = this.handleForceStop.bind(this);
+    this.handleSessionRecordingStateChange =
+      this.handleSessionRecordingStateChange.bind(this);
     this.handleChatHistorySync = this.handleChatHistorySync.bind(this);
     this.handleChat = this.handleChat.bind(this);
     this.handleCheer = this.handleCheer.bind(this);
@@ -110,15 +116,6 @@ export default class SessionManager {
   promptDeepLinkSession(roomCode) {
     if (!roomCode) return;
     const state = this.ctx.state;
-
-    if (this.ctx.modules.stream?.isStreaming) {
-      this.ctx.modules.infoBar.showTemp(
-        "SESSION",
-        "Cannot join a Session while live streaming.",
-        4000,
-      );
-      return;
-    }
 
     if (state.isSessionActive && state.sessionRoomId === roomCode) {
       this.ctx.modules.infoBar.showTemp(
@@ -209,6 +206,10 @@ export default class SessionManager {
     document.addEventListener(
       "Encore.Sessions.ForceStop",
       this.handleForceStop,
+    );
+    document.addEventListener(
+      "Encore.Recorder.SessionStateChange",
+      this.handleSessionRecordingStateChange,
     );
     document.addEventListener(
       "Encore.Sessions.ChatHistorySync",
@@ -315,6 +316,8 @@ export default class SessionManager {
             }, 1000);
           }
         } else {
+          if (this.ctx.modules.recorder)
+            this.ctx.modules.recorder.stopSessionAudioStream();
           root.playback.stopPlayer();
           this.ctx.services.Forte.stopRemotePianoRoll?.();
           root.ui.setMode("player");
@@ -344,6 +347,7 @@ export default class SessionManager {
             }
 
             this.applySessionTrackInfo(sState.nowPlaying);
+            this.syncSessionRecorderInfo(sState.nowPlaying);
 
             const timeSinceStart = sState.playTrigger
               ? Math.abs(Date.now() - sState.playTrigger)
@@ -362,20 +366,32 @@ export default class SessionManager {
         }
       }
       this.updateDiscordSessionRPC();
-    } else if (sState.mode === "lounge" && prevMode !== "lounge") {
-      dom.sessionRemoteContainer.classOn("hidden");
-      dom.sessionRemoteVideo.elm.srcObject = null;
-      this.ctx.services.Forte.stopRemotePianoRoll?.();
-      this.ctx.modules.scoreHud?.hide();
-      if (this.ctx.modules.recorder)
-        this.ctx.modules.recorder.stopBroadcastStream();
+    } else if (sState.mode === "lounge") {
+      const enteringLounge = prevMode !== "lounge";
 
-      state.isTransitioning = false;
-      root.ui.setMode("menu");
-      root.ui.startLoungeBackground();
+      if (enteringLounge) {
+        dom.sessionRemoteContainer.classOn("hidden");
+        dom.sessionRemoteVideo.elm.srcObject = null;
+        this.ctx.services.Forte.stopRemotePianoRoll?.();
+        this.ctx.modules.scoreHud?.hide();
+        if (this.ctx.modules.recorder)
+          this.ctx.modules.recorder.stopSessionAudioStream();
 
-      if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
-      this.updateDiscordSessionRPC();
+        state.isTransitioning = false;
+        this.syncSessionRecorderInfo(null);
+        if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
+      }
+
+      // Never leave a finished performance playing behind the Lounge UI.
+      if (state.mode === "player" || state.currentSong) {
+        root.playback.stopPlayer();
+        root.ui.setMode("menu");
+      }
+      if (enteringLounge) {
+        root.ui.setMode("menu");
+        root.ui.startLoungeBackground();
+        this.updateDiscordSessionRPC();
+      }
     }
 
     if (infoBar.isTempVisible) {
@@ -428,19 +444,30 @@ export default class SessionManager {
   }
 
   handleRemoteStream(e) {
-    this.ctx.dom.sessionRemoteVideo.elm.srcObject = e.detail;
-    this.ctx.dom.sessionRemoteVideo.elm.volume = this.ctx.state.volume;
+    const { stream } = e.detail || {};
+    if (!stream) return;
+
+    const videoEl = this.ctx.dom.sessionRemoteVideo.elm;
+    videoEl.srcObject = stream;
+    // Audio is routed through Forte's Session bus so it can be recorded and
+    // streamed. Keep the element muted to avoid hearing the performer twice.
+    videoEl.muted = true;
+    videoEl.volume = 0;
+    this.ctx.services.Forte.playRemoteStream(
+      SESSION_PERFORMANCE_STREAM_ID,
+      stream,
+      { session: true },
+    );
   }
 
   handleLoungeStream(e) {
-    const isPerformance =
-      this.ctx.services.SessionsSvc?.state?.mode === "performance";
     this.ctx.services.Forte.playRemoteStream(e.detail.id, e.detail.stream, {
-      monitorOnly: isPerformance,
+      session: true,
     });
   }
 
   handleClearStreams() {
+    this.ctx.services.Forte.stopRemoteStream(SESSION_PERFORMANCE_STREAM_ID);
     this.ctx.services.Forte.clearRemoteStreams();
     this.ctx.services.Forte.stopRemotePianoRoll?.();
     this.ctx.dom.sessionRemoteVideo.elm.srcObject = null;
@@ -661,6 +688,25 @@ export default class SessionManager {
     }, 3500);
   }
 
+  /**
+   * Keeps the on-video metadata of a whole-session recording in sync with what
+   * the room is hearing. Between songs the metadata overlay is cleared entirely.
+   *
+   * @param {Object|null} info - Session "now playing" metadata, if any.
+   */
+  syncSessionRecorderInfo(info) {
+    const recorder = this.ctx.modules.recorder;
+    if (!recorder?.isSessionRecording) return;
+
+    const title = typeof info?.title === "string" ? info.title.trim() : "";
+    if (title) {
+      // Session feeds are rendered locally, so their lyrics are never CD+G.
+      recorder.setSessionInfo(title, info.artist || "");
+    } else {
+      recorder.clearSongInfo();
+    }
+  }
+
   applySessionTrackInfo(info) {
     const dom = this.ctx.dom;
     if (!dom.introBpmBadge || !dom.introKeyBadge) return;
@@ -680,7 +726,14 @@ export default class SessionManager {
   }
 
   handlePeerDisconnected(e) {
-    this.ctx.services.Forte.stopRemoteStream(e.detail);
+    const peerId = e.detail;
+    this.ctx.services.Forte.stopRemoteStream(peerId);
+
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    if (SessionsSvc?.state?.singerId === peerId) {
+      this.ctx.services.Forte.stopRemoteStream(SESSION_PERFORMANCE_STREAM_ID);
+      this.ctx.dom.sessionRemoteVideo.elm.srcObject = null;
+    }
   }
 
   handleHostDisconnected() {
@@ -713,6 +766,9 @@ export default class SessionManager {
   }
 
   handleForceStop() {
+    if (this.ctx.modules.recorder)
+      this.ctx.modules.recorder.stopSessionAudioStream();
+
     if (this.ctx.state.mode === "player") {
       this.ctx.root.playback.stopPlayer();
       this.ctx.services.Forte.stopRemotePianoRoll?.();
@@ -723,6 +779,18 @@ export default class SessionManager {
         4000,
       );
     }
+  }
+
+  /**
+   * Shares this participant's whole-session recording state with the room.
+   *
+   * @param {CustomEvent} e - Recorder session state change event.
+   */
+  handleSessionRecordingStateChange(e) {
+    if (!this.ctx.state.isSessionActive) return;
+    this.ctx.services.SessionsSvc?.setRecordingStatus?.(
+      Boolean(e.detail?.recording),
+    );
   }
 
   performSessionDisconnect() {
@@ -755,8 +823,12 @@ export default class SessionManager {
 
     root.ui.stopLoungeBackground();
     this.ctx.services.Forte.clearRemoteStreams();
-    if (this.ctx.modules.recorder)
-      this.ctx.modules.recorder.stopBroadcastStream();
+    this.ctx.services.Forte.stopRemoteStream(SESSION_PERFORMANCE_STREAM_ID);
+    const recorder = this.ctx.modules.recorder;
+    if (recorder) {
+      recorder.stopSessionAudioStream();
+      if (recorder.isSessionRecording) recorder.stop();
+    }
 
     root.playback.stopPlayer();
     dom.sessionRemoteContainer.classOn("hidden");
@@ -835,15 +907,6 @@ export default class SessionManager {
   toggleSessionModal(forceState = null) {
     const isOpening =
       forceState !== null ? forceState : !this.ctx.state.isSessionModalOpen;
-
-    if (isOpening && this.ctx.modules.stream?.isStreaming) {
-      this.ctx.modules.infoBar.showTemp(
-        "SESSION",
-        "Cannot open Sessions while live streaming.",
-        4000,
-      );
-      return;
-    }
 
     const wasHidden =
       this.ctx.dom.sessionModal.elm.classList.contains("hidden");
@@ -1219,15 +1282,6 @@ export default class SessionManager {
         .on("click", async () => {
           if (!isHost && !roomInput.getValue().trim()) return;
 
-          if (this.ctx.modules.stream?.isStreaming) {
-            this.ctx.modules.infoBar.showTemp(
-              "SESSIONS",
-              "Cannot start or join a Session while live streaming.",
-              4000,
-            );
-            return;
-          }
-
           const nickname = nickInput.getValue();
           const room = isHost ? null : roomInput.getValue().trim();
 
@@ -1274,6 +1328,7 @@ export default class SessionManager {
               dom.sessionChatContainer.classOff("hidden");
             this.renderSessionView("active");
             root.ui.startLoungeBackground();
+            this.ctx.modules.infoBar.showDefault();
           } catch (e) {
             this.ctx.modules.infoBar.showTemp(
               "SESSIONS",
@@ -1482,7 +1537,7 @@ export default class SessionManager {
         .classOn("session-toggle-desc")
         .text(
           state.isSessionHost
-            ? "Hear all guests during performances."
+            ? "Hear all guests during performances and include them in recordings and broadcasts."
             : "Only the host can change this.",
         )
         .appendTo(audibleText);
@@ -1518,6 +1573,69 @@ export default class SessionManager {
         audibleRow.classOn("is-readonly");
       }
 
+      const recorder = this.ctx.modules.recorder;
+      const recordingConflict =
+        Boolean(recorder?.isRecording) && !recorder?.isSessionRecording;
+
+      const recordCard = new Html("div")
+        .classOn("session-settings-card")
+        .appendTo(leftCol);
+
+      const recordRow = new Html("div")
+        .classOn("session-toggle-row")
+        .appendTo(recordCard);
+
+      const recordText = new Html("span")
+        .classOn("session-toggle-text")
+        .appendTo(recordRow);
+
+      new Html("span")
+        .classOn("session-toggle-label")
+        .text("RECORD SESSION")
+        .appendTo(recordText);
+
+      const sessionRecording = Boolean(recorder?.isSessionRecording);
+
+      new Html("span")
+        .classOn("session-toggle-desc")
+        .text(
+          recordingConflict
+            ? "A song recording is already in progress."
+            : sessionRecording
+              ? "Recording now. Stop to save the whole session."
+              : "Capture performances and lounge breaks as one continuous recording.",
+        )
+        .appendTo(recordText);
+
+      const recordSwitch = new Html("button")
+        .classOn("switch")
+        .attr({
+          type: "button",
+          role: "switch",
+          "aria-checked": sessionRecording ? "true" : "false",
+          "aria-label": "Record the whole session",
+        })
+        .appendTo(recordRow);
+
+      if (recordingConflict) {
+        recordSwitch.attr({ disabled: "disabled" });
+        recordRow.classOn("is-readonly");
+      } else {
+        recordSwitch.on("click", () => {
+          if (!recorder) return;
+          if (recorder.isSessionRecording) {
+            recorder.stop();
+          } else if (recorder.startSessionRecording()) {
+            this.syncSessionRecorderInfo(
+              SessionsSvc.state.mode === "performance"
+                ? SessionsSvc.state.nowPlaying
+                : null,
+            );
+          }
+          this.renderSessionView("active");
+        });
+      }
+
       const partList = new Html("div")
         .classOn("session-participants-list")
         .appendTo(leftCol);
@@ -1539,6 +1657,22 @@ export default class SessionManager {
           .text(`${p.nickname} ${p.isHost ? "(Host)" : ""}`)
           .styleJs({ fontSize: "1.2rem", fontWeight: "600" })
           .appendTo(infoWrapper);
+
+        if (p.isRecording) {
+          new Html("span")
+            .classOn("session-recording-indicator")
+            .attr({
+              role: "img",
+              title: "Recording",
+              "aria-label": "Recording",
+            })
+            .append(
+              new Html("ion-icon")
+                .classOn("pulse-status")
+                .attr({ name: "radio-button-on" }),
+            )
+            .appendTo(infoWrapper);
+        }
 
         if (state.isSessionHost && !p.isHost) {
           new Html("button")
@@ -2224,6 +2358,10 @@ export default class SessionManager {
     document.removeEventListener(
       "Encore.Sessions.ForceStop",
       this.handleForceStop,
+    );
+    document.removeEventListener(
+      "Encore.Recorder.SessionStateChange",
+      this.handleSessionRecordingStateChange,
     );
     document.removeEventListener(
       "Encore.Sessions.ChatHistorySync",
