@@ -145,7 +145,7 @@ const pkg = {
             call.on("stream", (remoteStream) => {
               document.dispatchEvent(
                 new CustomEvent("Encore.Sessions.RemoteStream", {
-                  detail: remoteStream,
+                  detail: { id: call.peer, stream: remoteStream },
                 }),
               );
             });
@@ -186,6 +186,7 @@ const pkg = {
         nickname: profile.nickname,
         avatar: profile.avatar,
         isHost: true,
+        isRecording: false,
         supportedGames: profile.supportedGames || [],
       });
       this.broadcastState();
@@ -238,6 +239,7 @@ const pkg = {
             nickname: uniqueName,
             avatar: incomingProfile.avatar || null,
             isHost: false,
+            isRecording: false,
             supportedGames: incomingProfile.supportedGames || [],
           });
           this.broadcastState();
@@ -309,6 +311,8 @@ const pkg = {
             );
           }
           this.handleMediaRouting();
+        } else if (data.type === "recording_status" && this.isHost) {
+          this.setParticipantRecording(conn.peer, data.recording);
         } else if (data.type === "reserve_song" && this.isHost) {
           const requesterNickname = conn.metadata.profile
             ? conn.metadata.profile.nickname
@@ -658,6 +662,48 @@ const pkg = {
       this.state.everyoneAudible = nextValue;
       this.broadcastState();
       this.handleMediaRouting();
+    },
+
+    /**
+     * Publishes whether this participant is currently recording the session.
+     *
+     * @param {boolean} recording - Whether this participant is recording.
+     */
+    setRecordingStatus: function (recording) {
+      const nextValue = Boolean(recording);
+      const myId = this.peer?.id;
+      const self = this.state.participants.find((p) => p.id === myId);
+
+      if (self) self.isRecording = nextValue;
+
+      if (this.isHost) {
+        this.broadcastState();
+        return;
+      }
+
+      const hostConn = this.connections.get(this.roomId);
+      if (hostConn && hostConn.open) {
+        hostConn.send({ type: "recording_status", recording: nextValue });
+      }
+    },
+
+    /**
+     * Host-side update of a participant's recording indicator.
+     *
+     * @param {string} peerId - Participant peer id.
+     * @param {boolean} recording - Whether they are recording.
+     */
+    setParticipantRecording: function (peerId, recording) {
+      if (!this.isHost) return;
+
+      const participant = this.state.participants.find((p) => p.id === peerId);
+      if (!participant) return;
+
+      const nextValue = Boolean(recording);
+      if (Boolean(participant.isRecording) === nextValue) return;
+
+      participant.isRecording = nextValue;
+      this.broadcastState();
     },
 
     advanceQueue: function () {
