@@ -171,14 +171,28 @@ class EncoreController {
         );
         const sessionState = isSession ? this.services.SessionsSvc.state : null;
 
+        const isNumberEntryActive =
+          this.state.mode === "player"
+            ? Boolean(this.state.reservationNumber)
+            : Boolean(this.state.numberEntryInInfoBar && this.state.songNumber);
+
+        if (isSession && sessionState?.mode === "lounge") {
+          return {
+            currentSong: null,
+            reservationQueue: [],
+            songMap: this.state.songMap,
+            mode: "menu",
+            isNumberEntryActive,
+          };
+        }
+
         let currentSong = null;
         if (!this.state.isScoreScreenActive) {
           if (isSession) {
             if (sessionState?.mode === "performance") {
-              currentSong =
-                sessionState.nowPlaying || this.state.currentSong || null;
+              currentSong = sessionState.nowPlaying || null;
             }
-          } else if (this.state.currentSong) {
+          } else if (this.state.mode === "player" && this.state.currentSong) {
             currentSong = this.state.currentSong;
           }
         }
@@ -200,6 +214,7 @@ class EncoreController {
             : this.state.reservationQueue || [],
           songMap: this.state.songMap,
           mode: this.state.mode,
+          isNumberEntryActive,
         };
       },
       () =>
@@ -342,10 +357,9 @@ class EncoreController {
     if (!this.state.isScoreScreenActive) {
       if (isSession) {
         if (sessionState?.mode === "performance") {
-          currentSong =
-            sessionState.nowPlaying || this.state.currentSong || null;
+          currentSong = sessionState.nowPlaying || null;
         }
-      } else if (this.state.currentSong) {
+      } else if (this.state.mode === "player" && this.state.currentSong) {
         currentSong = this.state.currentSong;
       }
     }
@@ -801,7 +815,11 @@ class EncoreController {
         Forte.setGuideTrackVolume(selectedLevel.value);
 
         const melodyColor = this.input.getGuideMelodyColor?.() || "#ffd700";
-        this.infoBar.showMelody(selectedLevel.label, selectedLevel.value, melodyColor);
+        this.infoBar.showMelody(
+          selectedLevel.label,
+          selectedLevel.value,
+          melodyColor,
+        );
 
         return {
           success: true,
