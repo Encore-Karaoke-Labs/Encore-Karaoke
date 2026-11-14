@@ -91,6 +91,8 @@ export class BGVModule {
     const category =
       source === "local" ? LOCAL_CAMERA_CATEGORY : REMOTE_CAMERA_CATEGORY;
 
+    const wasWatchingCamera = CAMERA_CATEGORIES.includes(this.selectedCategory);
+
     this.liveStream = stream;
     this.liveStreamSource = source;
     this.categories = this.categories.filter(
@@ -101,8 +103,11 @@ export class BGVModule {
       BGV_LIST: ["live_stream"],
       isAbsolute: true,
     });
-    this.selectedCategory = category;
-    if (refresh && this.container) this.updatePlaylistForCategory();
+
+    if (wasWatchingCamera) {
+      this.selectedCategory = category;
+      if (refresh && this.container) this.updatePlaylistForCategory();
+    }
   }
 
   /**
