@@ -1523,6 +1523,9 @@ export class FortePlayback {
       this.state.recording.trackDelayNode.connect(recordingGain);
       recordingGain.connect(this.state.recording.destinationNode);
       recordingGain.connect(this.state.recording.musicDestinationNode);
+      if (this.state.recording.sessionDestinationNode) {
+        recordingGain.connect(this.state.recording.sessionDestinationNode);
+      }
 
       if (this.state.effects.musicChainOutput) {
         this.state.effects.musicChainOutput.connect(
