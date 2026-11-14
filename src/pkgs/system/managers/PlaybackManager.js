@@ -839,9 +839,10 @@ export default class PlaybackManager {
         state.currentScoreEntryId = null;
       }
 
-      if (this.ctx.modules.recorder.isRecording) {
-        this.ctx.modules.recorder.stop();
-        this.ctx.modules.recorder.clearSongInfo();
+      const recorder = this.ctx.modules.recorder;
+      if (recorder.isRecording && !recorder.isSessionRecording) {
+        recorder.stop();
+        recorder.clearSongInfo();
       }
 
       this.transitionAfterSong();
@@ -859,7 +860,7 @@ export default class PlaybackManager {
         this.ctx.services.SessionsSvc.state.singerId ===
           this.ctx.services.SessionsSvc.peer.id
       ) {
-        this.ctx.modules.recorder.stopBroadcastStream();
+        this.ctx.modules.recorder.stopSessionAudioStream();
         if (this.ctx.services.SessionsSvc.isHost) {
           this.ctx.services.SessionsSvc.advanceQueue();
         } else {
