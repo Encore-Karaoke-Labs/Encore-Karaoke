@@ -50,12 +50,22 @@ export default class SessionManager {
     this.handleChatHistorySync = this.handleChatHistorySync.bind(this);
     this.handleChat = this.handleChat.bind(this);
     this.handleCheer = this.handleCheer.bind(this);
+    this.handleSessionCameraStream = this.handleSessionCameraStream.bind(this);
+    this.handleSessionCameraStreamEnded =
+      this.handleSessionCameraStreamEnded.bind(this);
+    this.handleSessionMediaStateUpdate =
+      this.handleSessionMediaStateUpdate.bind(this);
 
     this._lastPianoRollBroadcast = 0;
     this._sessionPianoRollSongKey = null;
     this._sessionPianoRollNoteCount = 0;
     this._lastRenderedEveryoneAudible = null;
     this._sessionViewTimer = null;
+
+    // Session camera background state
+    this._cameraStreams = new Map();
+    this._cameraSlots = [];
+    this._cameraBgRafId = null;
   }
 
   /**
@@ -218,6 +228,18 @@ export default class SessionManager {
     document.addEventListener("Encore.Sessions.Chat", this.handleChat);
     document.addEventListener("Encore.Sessions.Cheer", this.handleCheer);
     document.addEventListener(
+      "Encore.Sessions.CameraStream",
+      this.handleSessionCameraStream,
+    );
+    document.addEventListener(
+      "Encore.Sessions.CameraStreamEnded",
+      this.handleSessionCameraStreamEnded,
+    );
+    document.addEventListener(
+      "Encore.Sessions.CameraStateUpdate",
+      this.handleSessionMediaStateUpdate,
+    );
+    document.addEventListener(
       "Encore.Playback.TrackInfo",
       this.handleLocalTrackInfo,
     );
@@ -249,6 +271,12 @@ export default class SessionManager {
 
     const prevMode = state.sessionMode;
     state.sessionMode = sState.mode;
+
+    // The camera wall is the Lounge background. Hand the canvas back to BGV
+    // before performance playback starts so song videos can attach and show.
+    if (state.sessionMode === "performance" && this._cameraBgRafId !== null) {
+      this.stopCameraBackground(true);
+    }
 
     const newParticipants = sState.participants || [];
     const oldParticipants = state.knownParticipants || [];
@@ -301,7 +329,9 @@ export default class SessionManager {
     }
 
     if (sState.mode === "performance") {
-      root.ui.stopLoungeBackground();
+      if (!this.isCameraBackgroundActive()) {
+        root.ui.stopLoungeBackground();
+      }
 
       if (sState.playTrigger !== state.lastPlayTrigger) {
         state.lastPlayTrigger = sState.playTrigger;
@@ -398,6 +428,8 @@ export default class SessionManager {
       }
     }
 
+    this.updateCameraBackground();
+
     if (infoBar.isTempVisible) {
       if (this._deferredQueueUpdate) clearInterval(this._deferredQueueUpdate);
       this._deferredQueueUpdate = setInterval(() => {
@@ -480,6 +512,647 @@ export default class SessionManager {
     this._lastPianoRollBroadcast = 0;
     this._sessionPianoRollSongKey = null;
     this._sessionPianoRollNoteCount = 0;
+  }
+
+  /**
+   * Stores an incoming participant camera stream and refreshes the background.
+   * @param {CustomEvent} e - Encore.Sessions.CameraStream event.
+   */
+  handleSessionCameraStream(e) {
+    const { id, stream, source = "local" } = e.detail || {};
+    if (!id || !stream) return;
+
+    const key = this.cameraEntryKey(id, source);
+    const existing = this._cameraStreams.get(key);
+    if (existing?.stream === stream) return;
+
+    if (existing) this.destroyCameraEntry(existing);
+    this._cameraStreams.set(key, this.createCameraEntry(stream));
+    this.updateCameraBackground();
+  }
+
+  /**
+   * Removes a participant camera stream from the background.
+   * @param {CustomEvent|string} e - Event or peer id.
+   */
+  handleSessionCameraStreamEnded(e) {
+    if (typeof e === "string") {
+      this.removeCameraEntriesForPeer(e);
+    } else {
+      const detail = e.detail;
+      if (typeof detail === "string") {
+        this.removeCameraEntriesForPeer(detail);
+      } else if (detail?.id) {
+        if (detail.source) {
+          this.removeCameraEntry(this.cameraEntryKey(detail.id, detail.source));
+        } else {
+          this.removeCameraEntriesForPeer(detail.id);
+        }
+      }
+    }
+    this.updateCameraBackground();
+  }
+
+  /**
+   * Builds the key for one participant camera source.
+   * @param {string} peerId
+   * @param {"local"|"remote"} source
+   * @returns {string}
+   */
+  cameraEntryKey(peerId, source) {
+    return `${source}:${peerId}`;
+  }
+
+  removeCameraEntry(key) {
+    const entry = this._cameraStreams.get(key);
+    if (!entry) return;
+    this.destroyCameraEntry(entry);
+    this._cameraStreams.delete(key);
+  }
+
+  removeCameraEntriesForPeer(peerId) {
+    for (const key of [...this._cameraStreams.keys()]) {
+      if (key.endsWith(`:${peerId}`)) this.removeCameraEntry(key);
+    }
+  }
+
+  handleSessionMediaStateUpdate() {
+    this.updateCameraBackground();
+
+    const state = this.ctx.state;
+    if (state.isSessionModalOpen && state.sessionModalView === "active") {
+      this.renderSessionView("active");
+    }
+  }
+
+  /**
+   * Creates a detached video element for a camera stream. Rendering happens on
+   * the BGV canvas, so the element never enters the DOM.
+   * @param {MediaStream} stream
+   */
+  createCameraEntry(stream) {
+    const video = document.createElement("video");
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.defaultMuted = true;
+
+    const startPlayback = () => {
+      const playResult = video.play();
+      if (playResult?.catch) playResult.catch(() => {});
+    };
+
+    video.addEventListener("loadedmetadata", startPlayback);
+    video.srcObject = stream;
+    startPlayback();
+
+    return { stream, video };
+  }
+
+  destroyCameraEntry(entry) {
+    const video = entry?.video;
+    if (!video) return;
+
+    try {
+      video.pause();
+    } catch {
+      // Ignore teardown errors from detached media elements.
+    }
+    video.srcObject = null;
+    video.removeAttribute("src");
+    video.load?.();
+  }
+
+  clearCameraStreams() {
+    for (const entry of this._cameraStreams.values()) {
+      this.destroyCameraEntry(entry);
+    }
+    this._cameraStreams.clear();
+  }
+
+  /**
+   * Ensures every local camera stream is represented in the background.
+   */
+  syncLocalCameraStream() {
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    const myId = SessionsSvc?.peer?.id;
+    if (!myId) return;
+
+    const streams = SessionsSvc.cameraStreams || {};
+    const activeKeys = new Set();
+
+    for (const [source, stream] of Object.entries(streams)) {
+      if (!stream) continue;
+
+      const key = this.cameraEntryKey(myId, source);
+      activeKeys.add(key);
+      const existing = this._cameraStreams.get(key);
+      if (existing?.stream !== stream) {
+        if (existing) this.destroyCameraEntry(existing);
+        this._cameraStreams.set(key, this.createCameraEntry(stream));
+      }
+    }
+
+    for (const key of [...this._cameraStreams.keys()]) {
+      if (key.endsWith(`:${myId}`) && !activeKeys.has(key)) {
+        this.removeCameraEntry(key);
+      }
+    }
+  }
+
+  /**
+   * Builds the list of camera tiles in stable participant order.
+   * @returns {Array<Object>}
+   */
+  getCameraSlots() {
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    if (!SessionsSvc?.state) return [];
+
+    const myId = SessionsSvc.peer?.id;
+    const participants = SessionsSvc.state.participants || [];
+    const slots = [];
+    const seen = new Set();
+    const orderedSources = ["local", "remote"];
+
+    for (const participant of participants) {
+      const isLocal = participant.id === myId;
+
+      const published = isLocal
+        ? Object.keys(SessionsSvc.cameraStreams || {}).filter(
+            (source) => SessionsSvc.cameraStreams[source],
+          )
+        : Array.isArray(participant.cameraSources)
+          ? participant.cameraSources
+          : participant.cameraEnabled
+            ? ["local"]
+            : [];
+
+      let firstTile = true;
+
+      for (const source of orderedSources) {
+        if (!published.includes(source)) continue;
+
+        const key = this.cameraEntryKey(participant.id, source);
+        const entry = this._cameraStreams.get(key);
+
+        slots.push({
+          id: participant.id,
+          source,
+          nickname: participant.nickname || "Guest",
+          isMuted: isLocal
+            ? Boolean(SessionsSvc.isMuted)
+            : Boolean(participant.isMuted),
+          showMuteBadge: firstTile,
+          isLocal,
+          entry: entry || null,
+        });
+
+        firstTile = false;
+        seen.add(key);
+      }
+    }
+
+    for (const [key, entry] of this._cameraStreams) {
+      if (seen.has(key)) continue;
+
+      const separator = key.indexOf(":");
+      const source = key.slice(0, separator);
+      const id = key.slice(separator + 1);
+      if (id === myId) continue;
+
+      slots.push({
+        id,
+        source,
+        nickname: "Guest",
+        isMuted: false,
+        showMuteBadge: true,
+        isLocal: false,
+        entry,
+      });
+    }
+
+    return slots;
+  }
+
+  isCameraBackgroundActive() {
+    return this._cameraBgRafId !== null;
+  }
+
+  /**
+   * Recomputes camera slots and starts or stops the canvas background.
+   */
+  updateCameraBackground() {
+    const state = this.ctx.state;
+
+    if (!state.isSessionActive) {
+      this.clearCameraStreams();
+      this._cameraSlots = [];
+      if (this._cameraBgRafId !== null) this.stopCameraBackground(false);
+      return;
+    }
+
+    this.syncLocalCameraStream();
+    this._cameraSlots = this.getCameraSlots();
+
+    const shouldRender =
+      this._cameraSlots.length > 0 && state.sessionMode === "lounge";
+
+    if (shouldRender) {
+      this.startCameraBackground();
+    } else if (this._cameraBgRafId !== null) {
+      this.stopCameraBackground(true);
+    }
+  }
+
+  /**
+   * Renders all active participant cameras onto the shared BGV canvas.
+   */
+  startCameraBackground() {
+    if (this._cameraBgRafId !== null) return;
+
+    const bgv = this.ctx.modules.bgv;
+    const canvas = bgv?.getCustomCanvas?.();
+    const context = bgv?.getCustomContext?.();
+    if (!canvas || !context) return;
+
+    const ui = this.ctx.root.ui;
+    if (ui?.loungeRafId) {
+      cancelAnimationFrame(ui.loungeRafId);
+      ui.loungeRafId = null;
+    }
+    bgv.clearCustomGraphics?.();
+
+    bgv.setCanvasOnlyMode(true);
+    this.ctx.dom.bgvContainer.classOff("hidden");
+    this.ctx.wrapper.classOn("session-camera-wall");
+
+    const draw = () => {
+      if (
+        !this.ctx.state.isSessionActive ||
+        this.ctx.state.sessionMode !== "lounge" ||
+        this._cameraSlots.length === 0
+      ) {
+        this.stopCameraBackground(true);
+        return;
+      }
+
+      this.drawCameraBackground();
+      this._cameraBgRafId = requestAnimationFrame(draw);
+    };
+
+    this._cameraBgRafId = requestAnimationFrame(draw);
+  }
+
+  /**
+   * Stops the camera canvas and optionally restores the previous BGV.
+   * @param {boolean} restore - Restore lounge/BGV rendering when true.
+   */
+  stopCameraBackground(restore = true) {
+    if (this._cameraBgRafId !== null) {
+      cancelAnimationFrame(this._cameraBgRafId);
+      this._cameraBgRafId = null;
+    }
+
+    this.ctx.wrapper?.classOff("session-camera-wall");
+
+    const bgv = this.ctx.modules.bgv;
+    bgv?.clearCustomGraphics?.();
+
+    if (!restore || !this.ctx.state.isSessionActive) return;
+
+    if (this.ctx.state.sessionMode === "lounge") {
+      this.ctx.root.ui.startLoungeBackground();
+    } else {
+      bgv?.setCanvasOnlyMode?.(false);
+    }
+  }
+
+  /**
+   * Draws the camera grid for the current frame.
+   */
+  drawCameraBackground() {
+    const bgv = this.ctx.modules.bgv;
+    const context = bgv?.getCustomContext?.();
+    const canvas = bgv?.getCustomCanvas?.();
+    if (!context || !canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(1, rect.width);
+    const height = Math.max(1, rect.height);
+
+    context.clearRect(0, 0, width, height);
+
+    const backdrop = context.createLinearGradient(0, 0, 0, height);
+    backdrop.addColorStop(0, "#05060c");
+    backdrop.addColorStop(1, "#0f1224");
+    context.fillStyle = backdrop;
+    context.fillRect(0, 0, width, height);
+
+    const slots = this._cameraSlots;
+    if (slots.length === 0) return;
+
+    const layout = this.computeCameraLayout(slots.length, width, height);
+    let slotIndex = 0;
+
+    for (const row of layout.rows) {
+      for (let index = 0; index < row.count; index++) {
+        const slot = slots[slotIndex++];
+        if (!slot) break;
+
+        const x = row.left + index * (row.tileWidth + layout.gap);
+        this.drawCameraTile(
+          context,
+          slot,
+          x,
+          row.top,
+          row.tileWidth,
+          row.rowHeight,
+          layout.radius,
+        );
+      }
+    }
+  }
+
+  /**
+   * Computes a gapless grid that packs every camera into the viewport. Rows are
+   * balanced (for example 5 participants become 3 + 2 instead of 3 + 2 with an
+   * empty sixth cell) and the layout is scored against a comfortable tile
+   * aspect so wide, tall, and unusual windows all stay usable.
+   *
+   * @param {number} count - Number of visible cameras.
+   * @param {number} width - Viewport width in CSS pixels.
+   * @param {number} height - Viewport height in CSS pixels.
+   */
+  computeCameraLayout(count, width, height) {
+    const gap = Math.max(
+      6,
+      Math.min(18, Math.round(Math.min(width, height) * 0.014)),
+    );
+    const radius = Math.max(
+      8,
+      Math.min(20, Math.round(Math.min(width, height) * 0.012)),
+    );
+    const preferredAspect = 16 / 9;
+
+    const distribute = (total, rows) => {
+      const base = Math.floor(total / rows);
+      const remainder = total % rows;
+      return Array.from(
+        { length: rows },
+        (_, index) => base + (index < remainder ? 1 : 0),
+      );
+    };
+
+    const aspectScore = (aspect) => {
+      const clamped = Math.max(0.5, Math.min(3.2, aspect));
+      const distance = Math.abs(Math.log(clamped / preferredAspect)) / Math.LN2;
+      return 1 / (1 + distance);
+    };
+
+    let best = null;
+
+    for (let rowCount = 1; rowCount <= count; rowCount++) {
+      const rowHeight = (height - gap * (rowCount - 1)) / rowCount;
+      if (rowHeight <= 0) continue;
+
+      const sizes = distribute(count, rowCount);
+      const rows = [];
+      let score = 0;
+
+      for (const rowSize of sizes) {
+        const tileWidth = (width - gap * (rowSize - 1)) / rowSize;
+        if (tileWidth <= 0) {
+          score = -Infinity;
+          break;
+        }
+
+        rows.push({ count: rowSize, tileWidth, rowHeight });
+        score += (rowSize / count) * aspectScore(tileWidth / rowHeight);
+      }
+
+      if (!best || score > best.score + 0.0001) {
+        best = { rows, rowHeight, score };
+      }
+    }
+
+    if (!best) {
+      const rowHeight = height;
+      best = {
+        rows: [{ count, tileWidth: width / count, rowHeight }],
+        rowHeight,
+        score: 0,
+      };
+    }
+
+    let top = 0;
+    const rows = best.rows.map((row) => {
+      const contentWidth = row.count * row.tileWidth + gap * (row.count - 1);
+      const positioned = {
+        ...row,
+        top,
+        left: (width - contentWidth) / 2,
+      };
+      top += row.rowHeight + gap;
+      return positioned;
+    });
+
+    return { gap, radius, rows };
+  }
+
+  /**
+   * Renders one camera tile with cover-cropped video and an identity overlay.
+   */
+  drawCameraTile(context, slot, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+
+    context.save();
+    this.roundRectPath(context, x, y, width, height, r);
+    context.clip();
+
+    context.fillStyle = "#10101c";
+    context.fillRect(x, y, width, height);
+
+    const video = slot.entry?.video;
+    const hasFrame =
+      video &&
+      video.readyState >= 2 &&
+      video.videoWidth > 0 &&
+      video.videoHeight > 0;
+
+    if (hasFrame) {
+      const videoWidth = video.videoWidth;
+      const videoHeight = video.videoHeight;
+      const scale = Math.max(width / videoWidth, height / videoHeight);
+      const sourceWidth = width / scale;
+      const sourceHeight = height / scale;
+      const sourceX = (videoWidth - sourceWidth) / 2;
+      const sourceY = (videoHeight - sourceHeight) / 2;
+
+      context.drawImage(
+        video,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        x,
+        y,
+        width,
+        height,
+      );
+    } else {
+      this.drawCameraPlaceholder(context, slot, x, y, width, height);
+    }
+
+    const labelHeight = Math.max(36, height * 0.21);
+    const labelGradient = context.createLinearGradient(
+      0,
+      y + height - labelHeight,
+      0,
+      y + height,
+    );
+    labelGradient.addColorStop(0, "rgba(0, 0, 0, 0)");
+    labelGradient.addColorStop(1, "rgba(0, 0, 0, 0.82)");
+    context.fillStyle = labelGradient;
+    context.fillRect(x, y + height - labelHeight, width, labelHeight);
+
+    const padding = Math.max(10, Math.min(24, width * 0.035));
+    const fontSize = Math.max(13, Math.min(26, Math.min(width, height) * 0.1));
+
+    context.font = `700 ${fontSize}px Rajdhani, sans-serif`;
+    context.textBaseline = "alphabetic";
+    context.fillStyle = slot.isLocal ? "#ffd700" : "#ffffff";
+    context.shadowColor = "rgba(0, 0, 0, 0.8)";
+    context.shadowBlur = 8;
+
+    const name = this.truncateCanvasText(
+      context,
+      `${slot.nickname}${slot.isLocal ? " (You)" : ""}${
+        slot.source === "remote" ? " • EnMoku" : ""
+      }`,
+      width - padding * 2,
+    );
+    context.fillText(name, x + padding, y + height - padding);
+
+    context.shadowBlur = 0;
+
+    if (slot.isMuted && slot.showMuteBadge) {
+      const badgeText = "MUTED";
+      const badgeFont = Math.max(9, Math.min(13, fontSize * 0.55));
+      context.font = `700 ${badgeFont}px Rajdhani, sans-serif`;
+      const badgePadding = Math.max(6, fontSize * 0.32);
+      const badgeWidth =
+        context.measureText(badgeText).width + badgePadding * 2;
+      const badgeHeight = badgeFont + badgePadding * 1.2;
+      const badgeX = x + width - badgeWidth - padding;
+      const badgeY = y + padding;
+
+      context.fillStyle = "rgba(255, 85, 85, 0.92)";
+      this.roundRectPath(
+        context,
+        badgeX,
+        badgeY,
+        badgeWidth,
+        badgeHeight,
+        badgeHeight / 2,
+      );
+      context.fill();
+      context.fillStyle = "#ffffff";
+      context.textBaseline = "middle";
+      context.fillText(
+        badgeText,
+        badgeX + badgePadding,
+        badgeY + badgeHeight / 2 + 0.5,
+      );
+    }
+
+    context.restore();
+
+    context.save();
+    this.roundRectPath(context, x + 1, y + 1, width - 2, height - 2, r - 1);
+    context.lineWidth = 2;
+    context.strokeStyle = slot.isLocal
+      ? "rgba(255, 215, 0, 0.6)"
+      : "rgba(137, 207, 240, 0.45)";
+    context.stroke();
+    context.restore();
+  }
+
+  drawCameraPlaceholder(context, slot, x, y, width, height) {
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    const avatarRadius = Math.max(
+      18,
+      Math.min(64, Math.min(width, height) * 0.16),
+    );
+
+    const placeholder = context.createRadialGradient(
+      centerX,
+      centerY,
+      0,
+      centerX,
+      centerY,
+      Math.max(width, height) * 0.7,
+    );
+    placeholder.addColorStop(0, "rgba(137, 207, 240, 0.16)");
+    placeholder.addColorStop(1, "rgba(10, 10, 20, 0)");
+    context.fillStyle = placeholder;
+    context.fillRect(x, y, width, height);
+
+    context.beginPath();
+    context.arc(centerX, centerY, avatarRadius, 0, Math.PI * 2);
+    context.fillStyle = "rgba(137, 207, 240, 0.18)";
+    context.fill();
+
+    context.font = `700 ${avatarRadius}px Rajdhani, sans-serif`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillStyle = "rgba(137, 207, 240, 0.9)";
+    context.fillText(
+      (slot.nickname || "Guest").trim().charAt(0).toUpperCase(),
+      centerX,
+      centerY + avatarRadius * 0.06,
+    );
+
+    if (height > 110) {
+      context.font = `600 ${Math.max(11, Math.min(15, width * 0.055))}px Radio Canada, sans-serif`;
+      context.fillStyle = "rgba(255, 255, 255, 0.65)";
+      context.fillText(
+        "CAMERA CONNECTING…",
+        centerX,
+        centerY + avatarRadius + Math.max(20, height * 0.06),
+      );
+    }
+
+    context.textAlign = "start";
+    context.textBaseline = "alphabetic";
+  }
+
+  roundRectPath(context, x, y, width, height, radius) {
+    const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+    context.beginPath();
+    context.moveTo(x + r, y);
+    context.lineTo(x + width - r, y);
+    context.quadraticCurveTo(x + width, y, x + width, y + r);
+    context.lineTo(x + width, y + height - r);
+    context.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    context.lineTo(x + r, y + height);
+    context.quadraticCurveTo(x, y + height, x, y + height - r);
+    context.lineTo(x, y + r);
+    context.quadraticCurveTo(x, y, x + r, y);
+    context.closePath();
+  }
+
+  truncateCanvasText(context, text, maxWidth) {
+    if (context.measureText(text).width <= maxWidth) return text;
+
+    let output = text;
+    while (
+      output.length > 1 &&
+      context.measureText(`${output}…`).width > maxWidth
+    ) {
+      output = output.slice(0, -1);
+    }
+    return `${output}…`;
   }
 
   handleSessionLyricsData(e) {
@@ -832,6 +1505,15 @@ export default class SessionManager {
 
     root.queueSetlistSync();
 
+    // Leaving the room must release the local camera and unmute the Session
+    // mic bus, even on the "join another room" path that skips leaveRoom().
+    const sessionsSvc = this.ctx.services.SessionsSvc;
+    sessionsSvc?.stopCamera?.(false);
+    sessionsSvc?.applySessionMute?.(false);
+
+    this.clearCameraStreams();
+    this._cameraSlots = [];
+    this.stopCameraBackground(false);
     root.ui.stopLoungeBackground();
     this.ctx.services.Forte.clearRemoteStreams();
     this.ctx.services.Forte.stopRemoteStream(SESSION_PERFORMANCE_STREAM_ID);
@@ -1470,6 +2152,7 @@ export default class SessionManager {
               dom.sessionChatContainer.classOff("hidden");
             this.renderSessionView("active");
             root.ui.startLoungeBackground();
+            this.updateCameraBackground();
             this.ctx.modules.infoBar.showDefault();
           } catch (e) {
             this.ctx.modules.infoBar.showTemp(
@@ -1657,6 +2340,58 @@ export default class SessionManager {
             });
         })
         .appendTo(actionsRow);
+
+      const mediaCard = new Html("div")
+        .classOn("session-invite-card", "session-media-card")
+        .appendTo(leftCol);
+      const mediaRow = new Html("div")
+        .classOn("invite-actions-row")
+        .appendTo(mediaCard);
+
+      const muted = Boolean(SessionsSvc.isMuted);
+      const muteBtn = new Html("button")
+        .classOn("invite-action-btn", muted ? "danger" : "secondary")
+        .attr({
+          type: "button",
+          "aria-pressed": String(muted),
+          "aria-label": muted
+            ? "Unmute your Session microphone"
+            : "Mute your Session microphone",
+          title: muted ? "Unmute microphone" : "Mute microphone",
+        })
+        .html(
+          `<ion-icon name="${muted ? "mic-off-outline" : "mic-outline"}"></ion-icon>`,
+        )
+        .on("click", () => {
+          SessionsSvc.setMuted(!SessionsSvc.isMuted);
+        })
+        .appendTo(mediaRow);
+
+      const cameraOn = Boolean(SessionsSvc.cameraEnabled);
+      const cameraBtn = new Html("button")
+        .classOn("invite-action-btn", cameraOn ? "secondary" : "danger")
+        .attr({
+          type: "button",
+          "aria-pressed": String(cameraOn),
+          "aria-label": cameraOn ? "Stop your camera" : "Start your camera",
+          title: cameraOn ? "Stop camera" : "Start camera",
+        })
+        .html(
+          `<ion-icon name="${cameraOn ? "videocam-outline" : "videocam-off-outline"}"></ion-icon>`,
+        )
+        .on("click", async () => {
+          try {
+            await SessionsSvc.setCameraEnabled(!SessionsSvc.cameraEnabled);
+          } catch (error) {
+            console.warn("[SESSIONS] Could not start camera:", error);
+            this.ctx.modules.infoBar.showTemp(
+              "SESSION CAMERA",
+              error?.message || "Could not start your camera.",
+              4000,
+            );
+          }
+        })
+        .appendTo(mediaRow);
 
       const partList = new Html("div")
         .classOn("session-participants-list")
@@ -2391,6 +3126,10 @@ export default class SessionManager {
       clearTimeout(this._sessionViewTimer);
       this._sessionViewTimer = null;
     }
+
+    this.clearCameraStreams();
+    this._cameraSlots = [];
+    this.stopCameraBackground(false);
     document.removeEventListener(
       "Encore.Sessions.StateUpdate",
       this.handleStateUpdate,
@@ -2454,6 +3193,18 @@ export default class SessionManager {
     );
     document.removeEventListener("Encore.Sessions.Chat", this.handleChat);
     document.removeEventListener("Encore.Sessions.Cheer", this.handleCheer);
+    document.removeEventListener(
+      "Encore.Sessions.CameraStream",
+      this.handleSessionCameraStream,
+    );
+    document.removeEventListener(
+      "Encore.Sessions.CameraStreamEnded",
+      this.handleSessionCameraStreamEnded,
+    );
+    document.removeEventListener(
+      "Encore.Sessions.CameraStateUpdate",
+      this.handleSessionMediaStateUpdate,
+    );
     document.removeEventListener(
       "Encore.Playback.TrackInfo",
       this.handleLocalTrackInfo,
