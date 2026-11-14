@@ -475,21 +475,7 @@ export default class NetworkManager {
             !state.currentSongIsYouTube &&
             !state.isScoreScreenActive
           ) {
-            if (state.isSessionActive) {
-              this.ctx.modules.infoBar.showTemp(
-                "RECORDING",
-                "Disabled during an active Session.",
-                4000,
-              );
-              this.ctx.modules.dialog(
-                new Html("div")
-                  .classOn("temp-dialog-text")
-                  .text("NOT AVAILABLE"),
-                2000,
-              );
-            } else {
-              this.ctx.modules.recorder.toggle();
-            }
+            this.ctx.modules.recorder.toggle();
           }
           break;
         case "toggle_bgv":
