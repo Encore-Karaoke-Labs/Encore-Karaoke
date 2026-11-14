@@ -117,7 +117,6 @@ export class RecorderModule {
     this.musicChunks = [];
 
     this.recordingStartTime = 0;
-    this.recordingInterval = null;
     this.animationFrameId = null;
     this.currentSongInfo = null;
     this.uiRefs = null;
@@ -125,6 +124,7 @@ export class RecorderModule {
     this.currentStream = null;
     this.broadcastStream = null;
     this.sessionAudioStream = null;
+    this.isSessionRecording = false;
     this.outputResolution = { width: 1280, height: 720 };
 
     this.canvas = null;
@@ -277,6 +277,35 @@ export class RecorderModule {
   }
 
   /**
+   * Sets on-video metadata for a song playing inside a whole-session
+   * recording. Call `clearSongInfo()` when no song is playing.
+   *
+   * @param {string} title - Song title.
+   * @param {string} [subtitle=""] - Song artist.
+   */
+  setSessionInfo(title, subtitle = "") {
+    this.currentSongInfo = {
+      title,
+      artist: subtitle,
+      isCdg: false,
+    };
+    this._preRenderMeta();
+  }
+
+  /**
+   * Broadcasts whether a whole-session recording is currently running.
+   * @private
+   * @param {boolean} recording - Whether the session is being recorded.
+   */
+  _emitSessionRecordingState(recording) {
+    document.dispatchEvent(
+      new CustomEvent("Encore.Recorder.SessionStateChange", {
+        detail: { recording: Boolean(recording) },
+      }),
+    );
+  }
+
+  /**
    * Toggles recording state between active and inactive.
    */
   toggle() {
@@ -284,12 +313,31 @@ export class RecorderModule {
   }
 
   /**
+   * Starts a continuous recording of the whole Session. Unlike a performance
+   * recording, this is not stopped automatically when a song ends.
+   *
+   * @param {string} [title="Full Session"] - Title used for the saved recording.
+   * @returns {boolean} Whether recording started successfully.
+   */
+  startSessionRecording(title = "Full Session") {
+    if (this.isRecording) return false;
+    this.clearSongInfo();
+    this.start({ session: true, title });
+    return this.isSessionRecording;
+  }
+
+  /**
    * Starts video recording along with multi-track audio mapping.
    * Initializes canvas, media recorders, and begins frame rendering.
+   *
+   * @param {{session?: boolean, title?: string|null}} [options] - Recording options.
    */
-  start() {
+  start(options = {}) {
     if (this.isRecording || !this.forteSvc || !this.bgvPlayer) return;
 
+    const { session = false, title = null } = options;
+
+    this.isSessionRecording = session;
     this._initCanvas();
     this.bgvCurrentOpacity = 1.0;
     this.lyricOpacity = 1.0;
@@ -305,6 +353,7 @@ export class RecorderModule {
         throw new Error("No primary audio stream found.");
       }
     } catch (e) {
+      this.isSessionRecording = false;
       this.infoBar.showTemp("RECORDING", `Error: ${e.message}`, 4000);
       this.dialogShow(
         new Html("div").classOn("temp-dialog-text").text("NOT AVAILABLE"),
@@ -356,6 +405,7 @@ export class RecorderModule {
       );
     } catch (e) {
       console.error("Failed to create MediaRecorders:", e);
+      this.isSessionRecording = false;
       this.infoBar.showTemp(
         "RECORDING",
         "Error: Could not start recorders.",
@@ -391,7 +441,7 @@ export class RecorderModule {
         resolve(new Blob(this.musicChunks, { type: musicMime }));
     });
 
-    const recordedSongTitle = this.currentSongInfo?.title || "Unknown";
+    const recordedSongTitle = title || this.currentSongInfo?.title || "Unknown";
 
     Promise.all([mixPromise, micPromise, musicPromise]).then(
       async ([mixBlob, micBlob, musicBlob]) => {
@@ -443,16 +493,14 @@ export class RecorderModule {
     );
 
     this.recordingStartTime = Date.now();
-    if (this.recordingInterval) clearInterval(this.recordingInterval);
-    this.recordingInterval = setInterval(() => {
-      if (this.isRecording) this.infoBar.showDefault();
-    }, 1000);
 
     this.mediaRecorder.start();
     this.micRecorder.start();
     this.musicRecorder.start();
 
     this.isRecording = true;
+
+    if (this.isSessionRecording) this._emitSessionRecordingState(true);
 
     if (!this.animationFrameId) {
       this.drawFrame();
@@ -467,6 +515,8 @@ export class RecorderModule {
   stop() {
     if (!this.isRecording || !this.mediaRecorder) return;
 
+    const wasSessionRecording = this.isSessionRecording;
+
     this.mediaRecorder.stop();
     if (this.micRecorder && this.micRecorder.state !== "inactive")
       this.micRecorder.stop();
@@ -474,11 +524,7 @@ export class RecorderModule {
       this.musicRecorder.stop();
 
     this.isRecording = false;
-
-    if (this.recordingInterval) {
-      clearInterval(this.recordingInterval);
-      this.recordingInterval = null;
-    }
+    this.isSessionRecording = false;
 
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
@@ -496,12 +542,14 @@ export class RecorderModule {
     this.micRecorder = null;
     this.musicRecorder = null;
 
+    if (wasSessionRecording) this._emitSessionRecordingState(false);
+
     this.infoBar.showDefault();
   }
 
   /**
-   * Generates and returns a live MediaStream containing only the mixed performance
-   * audio (instrumental + processed vocals) for Sessions.
+   * Generates and returns a live MediaStream containing only this peer's mixed
+   * performance audio (instrumental + processed vocals) for Sessions.
    *
    * @returns {MediaStream|null}
    */
@@ -509,7 +557,9 @@ export class RecorderModule {
     if (!this.forteSvc) return null;
 
     try {
-      const mixAudioStream = this.forteSvc.getRecordingAudioStream();
+      const mixAudioStream = this.forteSvc.getSessionPerformanceAudioStream
+        ? this.forteSvc.getSessionPerformanceAudioStream()
+        : this.forteSvc.getRecordingAudioStream();
       const sourceTrack = mixAudioStream && mixAudioStream.getAudioTracks()[0];
 
       if (!sourceTrack) {
@@ -575,7 +625,18 @@ export class RecorderModule {
   }
 
   /**
-   * Stops a broadcast stream if we aren't simultaneously saving a recording.
+   * Stops the audio-only stream that is broadcast as the Session performance.
+   */
+  stopSessionAudioStream() {
+    if (this.sessionAudioStream) {
+      this.sessionAudioStream.getTracks().forEach((track) => track.stop());
+      this.sessionAudioStream = null;
+    }
+  }
+
+  /**
+   * Stops the live broadcast stream if we aren't simultaneously saving a
+   * recording.
    */
   stopBroadcastStream() {
     if (!this.mediaRecorder) {
@@ -589,11 +650,6 @@ export class RecorderModule {
     if (this.broadcastStream) {
       this.broadcastStream.getTracks().forEach((track) => track.stop());
       this.broadcastStream = null;
-    }
-
-    if (this.sessionAudioStream) {
-      this.sessionAudioStream.getTracks().forEach((track) => track.stop());
-      this.sessionAudioStream = null;
     }
   }
 
