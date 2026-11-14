@@ -555,18 +555,6 @@ export default class InputManager {
 
     if (e.key.toLowerCase() === "r") {
       if (state.isTypingNumber && state.mode === "menu") {
-        if (state.isSessionActive) {
-          modules.infoBar.showTemp(
-            "RECORDING",
-            "Disabled during an active Session.",
-            4000,
-          );
-          modules.dialog(
-            new Html("div").classOn("temp-dialog-text").text("NOT AVAILABLE"),
-            2000,
-          );
-          return;
-        }
         const song = findSongByCode(state.songMap, state.songNumber);
         if (song) {
           if (!this.ctx.root.retail?.authorizeAndConsume("HOST")) {
@@ -582,19 +570,7 @@ export default class InputManager {
         return;
       }
       if (state.mode === "player" && !state.currentSongIsYouTube) {
-        if (state.isSessionActive) {
-          modules.infoBar.showTemp(
-            "RECORDING",
-            "Disabled during an active Session.",
-            4000,
-          );
-          modules.dialog(
-            new Html("div").classOn("temp-dialog-text").text("NOT AVAILABLE"),
-            2000,
-          );
-        } else {
-          modules.recorder.toggle();
-        }
+        modules.recorder.toggle();
       } else if (state.mode === "menu") {
         recordings.toggleRecordingsList();
       }
