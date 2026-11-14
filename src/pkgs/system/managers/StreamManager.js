@@ -289,12 +289,8 @@ export default class StreamManager {
     const reduceMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
-    const blockedDirect =
-      (targetView === "direct" || targetView === "twitchLive") &&
-      this.ctx.state.isSessionActive;
     const shouldAnimate =
       animate &&
-      !blockedDirect &&
       previousView !== null &&
       previousView !== targetView &&
       !dom.streamModal.elm.classList.contains("hidden") &&
@@ -1314,15 +1310,6 @@ export default class StreamManager {
    * Reopening while a Twitch broadcast is running keeps the current draft.
    */
   openTwitchLiveView() {
-    if (this.ctx.state.isSessionActive && !this.isStreaming) {
-      this.ctx.modules.infoBar.showTemp(
-        "STREAM",
-        "Streaming is disabled during an active Session.",
-        3000,
-      );
-      return;
-    }
-
     this.modalView = "twitchLive";
 
     if (
@@ -1450,15 +1437,6 @@ export default class StreamManager {
    */
   renderTwitchLiveView() {
     if (this._streamViewTimer) return;
-
-    if (this.ctx.state.isSessionActive && !this.isStreaming) {
-      this.ctx.modules.infoBar.showTemp(
-        "STREAM",
-        "Streaming is disabled during an active Session.",
-        3000,
-      );
-      return false;
-    }
 
     const dom = this.ctx.dom;
     if (!dom.streamHeader || !dom.streamContentArea) return;
@@ -2529,14 +2507,6 @@ export default class StreamManager {
    * Direct RTMP Broadcast View.
    */
   renderDirectView() {
-    if (this.ctx.state.isSessionActive) {
-      this.ctx.modules.infoBar.showTemp(
-        "STREAM",
-        "Streaming is disabled during an active Session.",
-        3000,
-      );
-      return false;
-    }
     const dom = this.ctx.dom;
     if (!dom.streamHeader || !dom.streamContentArea) return;
 
@@ -2706,7 +2676,7 @@ export default class StreamManager {
     infoCard.html(`
       <strong>Broadcasting Notes:</strong><br>
       • Ensure your RTMP ingest URL points to your nearest streaming server to minimize latency.<br>
-      • Live streaming cannot be activated during an active Sessions room due to privacy reasons.<br>
+      • In a Session, all room audio you can hear will be mixed into the broadcast.<br>
       • <strong>Be sure to take the Mic Latency test in the Setup!</strong>
     `);
 
@@ -2786,15 +2756,6 @@ export default class StreamManager {
     const destination = options.destination === "twitch" ? "twitch" : "direct";
     const rtmpUrl = (options.rtmpUrl ?? this.rtmpUrl ?? "").trim();
     const streamKey = (options.streamKey ?? this.streamKey ?? "").trim();
-
-    if (this.ctx.state.isSessionActive) {
-      this.ctx.modules.infoBar.showTemp(
-        "STREAM",
-        "Live streaming is not allowed during an active Session.",
-        4000,
-      );
-      return false;
-    }
 
     if (!rtmpUrl) {
       this.ctx.modules.infoBar.showTemp(
