@@ -62,9 +62,45 @@ export class InfoBarModule {
     this.defaultIcon = DEFAULT_INFO_BAR_ICON;
 
     this.cycleInterval = null;
+    this.recordingClock = null;
     this.currentCycleView = "UP_NEXT"; // "UP_NEXT" | "NOW_PLAYING"
     this.cycleDuration = 10000; // Time in ms between views
     this._isInternalCycleUpdate = false;
+  }
+
+  /**
+   * Starts refreshing the elapsed recording time in the InfoBar.
+   */
+  startRecordingClock() {
+    if (this.recordingClock) return;
+
+    this.recordingClock = setInterval(() => {
+      if (this.persistentState.label !== "RECORDING") {
+        this.stopRecordingClock();
+        return;
+      }
+
+      const status = this.checkRecording?.();
+      if (!status) {
+        this.stopRecordingClock();
+        return;
+      }
+
+      if (!this.isTempVisible) {
+        this.show("RECORDING", typeof status === "string" ? status : "REC ●");
+        this.showBar();
+      }
+    }, 1000);
+  }
+
+  /**
+   * Stops the elapsed recording time refresh timer.
+   */
+  stopRecordingClock() {
+    if (this.recordingClock) {
+      clearInterval(this.recordingClock);
+      this.recordingClock = null;
+    }
   }
 
   /**
@@ -216,7 +252,11 @@ export class InfoBarModule {
     let txt = "BALANCED";
     if (pan <= -0.99) txt = "INSTRUMENTAL";
     else if (pan >= 0.99) txt = "VOCAL GUIDE";
-    else txt = pan < 0 ? `◀ ${Math.abs(Math.round(pan * 100))}% INST` : `VOC ${Math.round(pan * 100)}% ▶`;
+    else
+      txt =
+        pan < 0
+          ? `◀ ${Math.abs(Math.round(pan * 100))}% INST`
+          : `VOC ${Math.round(pan * 100)}% ▶`;
     this.showTemp("BALANCE", txt, 3000);
   }
 
@@ -318,6 +358,7 @@ export class InfoBarModule {
    */
   hideBar() {
     this.stopCycle();
+    this.stopRecordingClock();
     this.bar?.classOff("persist-visible");
   }
 
@@ -497,10 +538,22 @@ export class InfoBarModule {
    * Display default information based on application state (recording, now playing, or up next)
    */
   showDefault() {
+    const {
+      currentSong,
+      reservationQueue = [],
+      mode,
+      isNumberEntryActive = false,
+    } = this.getState() || {};
+
+    // While a song code is being entered, that entry owns the bar. Background
+    // refreshes (recording clock, session state updates) must not replace it.
+    if (isNumberEntryActive) return;
+
     if (this.checkRecording) {
       const recStatus = this.checkRecording();
       if (recStatus) {
         this.stopCycle();
+        this.startRecordingClock();
         const textToDisplay =
           typeof recStatus === "string" ? recStatus : "REC ●";
         this.show("RECORDING", textToDisplay);
@@ -509,7 +562,7 @@ export class InfoBarModule {
       }
     }
 
-    const { currentSong, reservationQueue = [], mode } = this.getState() || {};
+    this.stopRecordingClock();
     const hasQueue = reservationQueue && reservationQueue.length > 0;
     const hasCurrent = Boolean(currentSong);
 
@@ -573,6 +626,7 @@ export class InfoBarModule {
    */
   destroy() {
     this.stopCycle();
+    this.stopRecordingClock();
     if (this.timeout) {
       clearTimeout(this.timeout);
       this.timeout = null;
