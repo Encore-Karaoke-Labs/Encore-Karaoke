@@ -288,8 +288,12 @@ export default class SessionManager {
 
     root.queueSetlistSync();
 
-    if (state.isSessionModalOpen && state.sessionModalView === "active") {
-      this.renderSessionView("active");
+    if (
+      state.isSessionModalOpen &&
+      (state.sessionModalView === "active" ||
+        state.sessionModalView === "settings")
+    ) {
+      this.renderSessionView(state.sessionModalView);
     }
 
     if (state.isSessionActive) {
@@ -791,6 +795,13 @@ export default class SessionManager {
     this.ctx.services.SessionsSvc?.setRecordingStatus?.(
       Boolean(e.detail?.recording),
     );
+
+    if (
+      this.ctx.state.isSessionModalOpen &&
+      this.ctx.state.sessionModalView === "settings"
+    ) {
+      this.renderSessionView("settings");
+    }
   }
 
   performSessionDisconnect() {
@@ -969,6 +980,7 @@ export default class SessionManager {
       active: 2,
       leaderboard: 3,
       games: 3,
+      settings: 3,
     };
     return (order[toView] ?? 0) >= (order[fromView] ?? 0) ? 1 : -1;
   }
@@ -979,8 +991,138 @@ export default class SessionManager {
    */
   _updateSessionBoxViewClass(view) {
     const box = this.ctx.dom.sessionBox;
-    box.classOff("is-leaderboard-view");
+    box.classOff("is-leaderboard-view", "is-options-view");
     if (view === "leaderboard") box.classOn("is-leaderboard-view");
+    else if (view === "settings") box.classOn("is-options-view");
+  }
+
+  /**
+   * Appends the Session options cards (room audio and whole-session recording)
+   * to the given container.
+   * @param {Html} container - Container to render the option cards into.
+   */
+  buildSessionOptions(container) {
+    const state = this.ctx.state;
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    const recorder = this.ctx.modules.recorder;
+
+    const audioSettingsCard = new Html("div")
+      .classOn("session-settings-card")
+      .appendTo(container);
+
+    const audibleRow = new Html("div")
+      .classOn("session-toggle-row")
+      .appendTo(audioSettingsCard);
+
+    const audibleText = new Html("span")
+      .classOn("session-toggle-text")
+      .appendTo(audibleRow);
+
+    new Html("span")
+      .classOn("session-toggle-label")
+      .text("EVERYONE AUDIBLE")
+      .appendTo(audibleText);
+
+    new Html("span")
+      .classOn("session-toggle-desc")
+      .text(
+        state.isSessionHost
+          ? "Hear all guests during performances and include them in recordings and broadcasts."
+          : "Only the host can change this.",
+      )
+      .appendTo(audibleText);
+
+    const audibleValue = Boolean(SessionsSvc.state.everyoneAudible);
+    const audibleChanged =
+      this._lastRenderedEveryoneAudible !== null &&
+      this._lastRenderedEveryoneAudible !== audibleValue;
+    this._lastRenderedEveryoneAudible = audibleValue;
+
+    const audibleSwitch = new Html("button")
+      .classOn("switch")
+      .attr({
+        type: "button",
+        role: "switch",
+        "aria-checked": audibleValue ? "true" : "false",
+        "aria-label": "Everyone audible during performances",
+      })
+      .appendTo(audibleRow);
+
+    if (audibleChanged) {
+      audibleSwitch.classOn(
+        audibleValue ? "switch-on-anim" : "switch-off-anim",
+      );
+    }
+
+    if (state.isSessionHost) {
+      audibleSwitch.on("click", () => {
+        SessionsSvc.setEveryoneAudible(!SessionsSvc.state.everyoneAudible);
+      });
+    } else {
+      audibleSwitch.attr({ disabled: "disabled" });
+      audibleRow.classOn("is-readonly");
+    }
+
+    const recordingConflict =
+      Boolean(recorder?.isRecording) && !recorder?.isSessionRecording;
+
+    const recordCard = new Html("div")
+      .classOn("session-settings-card")
+      .appendTo(container);
+
+    const recordRow = new Html("div")
+      .classOn("session-toggle-row")
+      .appendTo(recordCard);
+
+    const recordText = new Html("span")
+      .classOn("session-toggle-text")
+      .appendTo(recordRow);
+
+    new Html("span")
+      .classOn("session-toggle-label")
+      .text("RECORD SESSION")
+      .appendTo(recordText);
+
+    const sessionRecording = Boolean(recorder?.isSessionRecording);
+
+    new Html("span")
+      .classOn("session-toggle-desc")
+      .text(
+        recordingConflict
+          ? "A song recording is already in progress."
+          : sessionRecording
+            ? "Recording now. Stop to save the whole session."
+            : "Capture performances and lounge breaks as one continuous recording.",
+      )
+      .appendTo(recordText);
+
+    const recordSwitch = new Html("button")
+      .classOn("switch")
+      .attr({
+        type: "button",
+        role: "switch",
+        "aria-checked": sessionRecording ? "true" : "false",
+        "aria-label": "Record the whole session",
+      })
+      .appendTo(recordRow);
+
+    if (recordingConflict) {
+      recordSwitch.attr({ disabled: "disabled" });
+      recordRow.classOn("is-readonly");
+    } else {
+      recordSwitch.on("click", () => {
+        if (!recorder) return;
+        if (recorder.isSessionRecording) {
+          recorder.stop();
+        } else if (recorder.startSessionRecording()) {
+          this.syncSessionRecorderInfo(
+            SessionsSvc.state.mode === "performance"
+              ? SessionsSvc.state.nowPlaying
+              : null,
+          );
+        }
+      });
+    }
   }
 
   /**
@@ -1516,126 +1658,6 @@ export default class SessionManager {
         })
         .appendTo(actionsRow);
 
-      const audioSettingsCard = new Html("div")
-        .classOn("session-settings-card")
-        .appendTo(leftCol);
-
-      const audibleRow = new Html("div")
-        .classOn("session-toggle-row")
-        .appendTo(audioSettingsCard);
-
-      const audibleText = new Html("span")
-        .classOn("session-toggle-text")
-        .appendTo(audibleRow);
-
-      new Html("span")
-        .classOn("session-toggle-label")
-        .text("EVERYONE AUDIBLE")
-        .appendTo(audibleText);
-
-      new Html("span")
-        .classOn("session-toggle-desc")
-        .text(
-          state.isSessionHost
-            ? "Hear all guests during performances and include them in recordings and broadcasts."
-            : "Only the host can change this.",
-        )
-        .appendTo(audibleText);
-
-      const audibleValue = Boolean(SessionsSvc.state.everyoneAudible);
-      const audibleChanged =
-        this._lastRenderedEveryoneAudible !== null &&
-        this._lastRenderedEveryoneAudible !== audibleValue;
-      this._lastRenderedEveryoneAudible = audibleValue;
-
-      const audibleSwitch = new Html("button")
-        .classOn("switch")
-        .attr({
-          type: "button",
-          role: "switch",
-          "aria-checked": audibleValue ? "true" : "false",
-          "aria-label": "Everyone audible during performances",
-        })
-        .appendTo(audibleRow);
-
-      if (audibleChanged) {
-        audibleSwitch.classOn(
-          audibleValue ? "switch-on-anim" : "switch-off-anim",
-        );
-      }
-
-      if (state.isSessionHost) {
-        audibleSwitch.on("click", () => {
-          SessionsSvc.setEveryoneAudible(!SessionsSvc.state.everyoneAudible);
-        });
-      } else {
-        audibleSwitch.attr({ disabled: "disabled" });
-        audibleRow.classOn("is-readonly");
-      }
-
-      const recorder = this.ctx.modules.recorder;
-      const recordingConflict =
-        Boolean(recorder?.isRecording) && !recorder?.isSessionRecording;
-
-      const recordCard = new Html("div")
-        .classOn("session-settings-card")
-        .appendTo(leftCol);
-
-      const recordRow = new Html("div")
-        .classOn("session-toggle-row")
-        .appendTo(recordCard);
-
-      const recordText = new Html("span")
-        .classOn("session-toggle-text")
-        .appendTo(recordRow);
-
-      new Html("span")
-        .classOn("session-toggle-label")
-        .text("RECORD SESSION")
-        .appendTo(recordText);
-
-      const sessionRecording = Boolean(recorder?.isSessionRecording);
-
-      new Html("span")
-        .classOn("session-toggle-desc")
-        .text(
-          recordingConflict
-            ? "A song recording is already in progress."
-            : sessionRecording
-              ? "Recording now. Stop to save the whole session."
-              : "Capture performances and lounge breaks as one continuous recording.",
-        )
-        .appendTo(recordText);
-
-      const recordSwitch = new Html("button")
-        .classOn("switch")
-        .attr({
-          type: "button",
-          role: "switch",
-          "aria-checked": sessionRecording ? "true" : "false",
-          "aria-label": "Record the whole session",
-        })
-        .appendTo(recordRow);
-
-      if (recordingConflict) {
-        recordSwitch.attr({ disabled: "disabled" });
-        recordRow.classOn("is-readonly");
-      } else {
-        recordSwitch.on("click", () => {
-          if (!recorder) return;
-          if (recorder.isSessionRecording) {
-            recorder.stop();
-          } else if (recorder.startSessionRecording()) {
-            this.syncSessionRecorderInfo(
-              SessionsSvc.state.mode === "performance"
-                ? SessionsSvc.state.nowPlaying
-                : null,
-            );
-          }
-          this.renderSessionView("active");
-        });
-      }
-
       const partList = new Html("div")
         .classOn("session-participants-list")
         .appendTo(leftCol);
@@ -1740,6 +1762,32 @@ export default class SessionManager {
           .appendTo(minigamesTile);
       }
 
+      const optionsTile = new Html("div")
+        .classOn(
+          "session-tile",
+          "session-action-tile",
+          "session-action-tile--settings",
+        )
+        .attr({ tabindex: "0", role: "button" })
+        .on("click", () => this.renderSessionView("settings"))
+        .appendTo(rightCol);
+      new Html("div")
+        .classOn("session-tile-icon")
+        .append(
+          new Html("ion-icon")
+            .attr({ name: "options-outline" })
+            .styleJs({ width: "46px", height: "46px" }),
+        )
+        .appendTo(optionsTile);
+      new Html("div")
+        .classOn("session-tile-title")
+        .text("OPTIONS")
+        .appendTo(optionsTile);
+      new Html("div")
+        .classOn("session-tile-desc")
+        .text("Room settings")
+        .appendTo(optionsTile);
+
       const btnRow = new Html("div")
         .classOn("session-btn-row")
         .styleJs({ marginTop: "auto", width: "100%" })
@@ -1770,6 +1818,42 @@ export default class SessionManager {
           this.performSessionDisconnect();
         })
         .appendTo(btnRow);
+    } else if (view === "settings") {
+      new Html("h1").text("SESSION OPTIONS").appendTo(dom.sessionHeader);
+      new Html("p")
+        .text("Recording and room audio settings.")
+        .appendTo(dom.sessionHeader);
+
+      const optionsView = new Html("div")
+        .classOn("session-options-view")
+        .appendTo(dom.sessionContentArea);
+
+      const optionsPanel = new Html("div")
+        .classOn("session-options-panel")
+        .appendTo(optionsView);
+
+      this.buildSessionOptions(optionsPanel);
+
+      const btnRow = new Html("div")
+        .classOn("session-btn-row")
+        .styleJs({ width: "100%", flexShrink: "0" })
+        .appendTo(optionsView);
+
+      new Html("button")
+        .classOn("session-btn")
+        .html(
+          '<ion-icon name="arrow-back-outline" style="font-size: 1.2rem; vertical-align: middle; margin-right: 0.5rem;"></ion-icon><span>BACK</span>',
+        )
+        .on("click", () => this.renderSessionView("active"))
+        .appendTo(btnRow);
+
+      setTimeout(() => {
+        if (state.sessionModalView !== "settings") return;
+        const target =
+          optionsPanel.elm.querySelector(".switch:not([disabled])") ||
+          optionsView.elm.querySelector(".session-btn");
+        if (target) target.focus();
+      }, 100);
     } else if (view === "games") {
       new Html("h1").text("SESSION MINIGAMES").appendTo(dom.sessionHeader);
       new Html("p")
@@ -2229,7 +2313,8 @@ export default class SessionManager {
         this.toggleSessionModal(false);
       } else if (
         state.sessionModalView === "games" ||
-        state.sessionModalView === "leaderboard"
+        state.sessionModalView === "leaderboard" ||
+        state.sessionModalView === "settings"
       ) {
         this.renderSessionView("active");
       } else {
