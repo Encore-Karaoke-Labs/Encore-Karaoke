@@ -434,8 +434,10 @@ export class ForteSFX {
    * @param {string} peerId - Unique ID of the peer
    * @param {MediaStream} stream - Remote audio stream
    * @param {Object} [options] - Optional routing settings
-   * @param {boolean} [options.monitorOnly] - Play the stream locally without
-   * including it in recordings or the Session performance mix
+   * @param {boolean} [options.session] - Route through the Session bus so the
+   * stream is monitored and included in recordings/broadcasts
+   * @param {boolean} [options.monitorOnly] - Legacy alias for `session`; the
+   * stream is monitored and recorded, but not relayed back to the room
    */
   playRemoteStream(peerId, stream, options = {}) {
     if (!this.audioCore.context) return;
@@ -446,6 +448,18 @@ export class ForteSFX {
     if (!this.state.playback.remoteAudioElements)
       this.state.playback.remoteAudioElements = new Map();
 
+    const useSessionBus = Boolean(options.session || options.monitorOnly);
+    const destination = useSessionBus
+      ? this.state.effects.sessionMonitorGain
+      : this.state.effects.musicChainInput;
+
+    if (!destination) {
+      console.warn(
+        `[FORTE SVC] No audio destination available for remote stream ${peerId}`,
+      );
+      return;
+    }
+
     // i'm still spiteful, Google
     // why the F*CK do I have to do this?
     const audioEl = new Audio();
@@ -455,10 +469,6 @@ export class ForteSFX {
     this.state.playback.remoteAudioElements.set(peerId, audioEl);
 
     const source = this.audioCore.context.createMediaStreamSource(stream);
-    const destination =
-      options.monitorOnly && this.state.effects.sessionMonitorGain
-        ? this.state.effects.sessionMonitorGain
-        : this.state.effects.musicChainInput;
     source.connect(destination);
 
     this.state.playback.remoteSources.set(peerId, source);
