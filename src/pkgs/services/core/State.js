@@ -95,6 +95,8 @@ export const state = {
   recording: {
     destinationNode: null,
     audioStream: null,
+    sessionDestinationNode: null,
+    sessionAudioStream: null,
     trackDelayNode: null,
     musicRecordingGainNode: null,
   },
