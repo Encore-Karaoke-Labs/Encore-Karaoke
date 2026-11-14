@@ -202,6 +202,11 @@ const pkg = {
 
     applySavedConfig: async function () {
       try {
+        const enabled =
+          (await window.config.getItem("videoConfig.enableCameraBGV")) === true;
+
+        if (!enabled) return;
+
         const deviceId =
           (await window.config.getItem("videoConfig.cameraDeviceId")) || "";
         const source =

@@ -1156,6 +1156,23 @@ export default class SetupManager {
             title: "Camera",
             items: [
               {
+                id: "camera_bgv_launch",
+                label: "Camera BGV",
+                type: "select",
+                options: [
+                  { value: false, label: "Disabled" },
+                  { value: true, label: "Enabled" },
+                ],
+                get: () =>
+                  this.ctx.config.videoConfig?.enableCameraBGV === true,
+                set: (v) => {
+                  const enabled = v === true;
+                  this.ctx.config.videoConfig ??= {};
+                  this.ctx.config.videoConfig.enableCameraBGV = enabled;
+                  window.config.setItem("videoConfig.enableCameraBGV", enabled);
+                },
+              },
+              {
                 id: "camera_device",
                 label: "Physical Camera Device",
                 type: "select",

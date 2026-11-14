@@ -55,6 +55,20 @@ export default class SessionManager {
       this.handleSessionCameraStreamEnded.bind(this);
     this.handleSessionMediaStateUpdate =
       this.handleSessionMediaStateUpdate.bind(this);
+    this.handleCameraServiceUpdate = this.handleCameraServiceUpdate.bind(this);
+
+    this._previewCameraOn = false;
+    this._previewCameraBusy = false;
+    this._previewCameraStartedByUs = false;
+    this._previewCameraToken = 0;
+    this._sessionPreviewRefs = null;
+    this._sessionFlowIsHost = false;
+    this._sessionFormDraft = { view: null, nickname: null, room: null };
+
+    this._sessionCreateOptions = {
+      everyoneAudible: false,
+      recordSession: false,
+    };
 
     this._lastPianoRollBroadcast = 0;
     this._sessionPianoRollSongKey = null;
@@ -238,6 +252,14 @@ export default class SessionManager {
     document.addEventListener(
       "Encore.Sessions.CameraStateUpdate",
       this.handleSessionMediaStateUpdate,
+    );
+    document.addEventListener(
+      "Encore.Camera.StreamReceived",
+      this.handleCameraServiceUpdate,
+    );
+    document.addEventListener(
+      "Encore.Camera.StreamEnded",
+      this.handleCameraServiceUpdate,
     );
     document.addEventListener(
       "Encore.Playback.TrackInfo",
@@ -1510,6 +1532,7 @@ export default class SessionManager {
     const sessionsSvc = this.ctx.services.SessionsSvc;
     sessionsSvc?.stopCamera?.(false);
     sessionsSvc?.applySessionMute?.(false);
+    this._releaseSessionCameraPreview();
 
     this.clearCameraStreams();
     this._cameraSlots = [];
@@ -1618,6 +1641,10 @@ export default class SessionManager {
         clearTimeout(this._sessionViewTimer);
         this._sessionViewTimer = null;
       }
+      if (!this.ctx.state.isSessionActive) {
+        this._releaseSessionCameraPreview();
+        this._resetSessionFlowState();
+      }
       this.ctx.dom.sessionHeader.classOff("view-enter", "view-leave");
       this.ctx.dom.sessionContentArea.classOff("view-enter", "view-leave");
       this._lastRenderedEveryoneAudible = null;
@@ -1657,12 +1684,14 @@ export default class SessionManager {
       "deeplink-prompt": 0,
       host: 1,
       join: 1,
-      creating: 1.5,
-      joining: 1.5,
-      active: 2,
-      leaderboard: 3,
-      games: 3,
-      settings: 3,
+      "host-settings": 1.5,
+      preview: 2,
+      creating: 2.5,
+      joining: 2.5,
+      active: 3,
+      leaderboard: 4,
+      games: 4,
+      settings: 4,
     };
     return (order[toView] ?? 0) >= (order[fromView] ?? 0) ? 1 : -1;
   }
@@ -1675,7 +1704,12 @@ export default class SessionManager {
     const box = this.ctx.dom.sessionBox;
     box.classOff("is-leaderboard-view", "is-options-view");
     if (view === "leaderboard") box.classOn("is-leaderboard-view");
-    else if (view === "settings") box.classOn("is-options-view");
+    else if (
+      view === "settings" ||
+      view === "host-settings" ||
+      view === "preview"
+    )
+      box.classOn("is-options-view");
   }
 
   /**
@@ -1709,7 +1743,7 @@ export default class SessionManager {
       .classOn("session-toggle-desc")
       .text(
         state.isSessionHost
-          ? "Hear all guests during performances and include them in recordings and broadcasts."
+          ? "Hear all guests during performances. May be distracting to the performer."
           : "Only the host can change this.",
       )
       .appendTo(audibleText);
@@ -1772,9 +1806,7 @@ export default class SessionManager {
       .text(
         recordingConflict
           ? "A song recording is already in progress."
-          : sessionRecording
-            ? "Recording now. Stop to save the whole session."
-            : "Capture performances and lounge breaks as one continuous recording.",
+          : "Record your entire Session.",
       )
       .appendTo(recordText);
 
@@ -1784,7 +1816,7 @@ export default class SessionManager {
         type: "button",
         role: "switch",
         "aria-checked": sessionRecording ? "true" : "false",
-        "aria-label": "Record the whole session",
+        "aria-label": "Record the entire session",
       })
       .appendTo(recordRow);
 
@@ -1808,6 +1840,689 @@ export default class SessionManager {
   }
 
   /**
+   * Refreshes the pre-Session camera preview after a camera stream change.
+   */
+  handleCameraServiceUpdate() {
+    const state = this.ctx.state;
+    if (!state.isSessionModalOpen) return;
+    if (state.sessionModalView !== "preview") return;
+
+    this._refreshSessionCameraPreview();
+  }
+
+  /**
+   * Clears everything gathered by the pre-Session host/join wizard so a new
+   * visit to the menu starts from its defaults.
+   */
+  _resetSessionFlowState() {
+    this._sessionFormDraft = { view: null, nickname: null, room: null };
+    this._sessionCreateOptions = {
+      everyoneAudible: false,
+      recordSession: false,
+    };
+  }
+
+  /**
+   * Renders the host/join step indicator.
+   * @param {Html} container - Element to render the stepper into.
+   * @param {number} activeIndex - Zero-based index of the current step.
+   */
+  buildSessionStepper(container, activeIndex) {
+    const steps = this._sessionFlowIsHost
+      ? ["PROFILE", "SETTINGS", "CAMERA"]
+      : ["PROFILE", "CAMERA"];
+
+    const stepper = new Html("div")
+      .classOn("session-stepper")
+      .attr({
+        role: "list",
+        "aria-label": `Step ${activeIndex + 1} of ${steps.length}`,
+      })
+      .appendTo(container);
+
+    steps.forEach((label, index) => {
+      const step = new Html("div")
+        .classOn("session-step")
+        .attr({
+          role: "listitem",
+          "aria-current": index === activeIndex ? "step" : null,
+        })
+        .appendTo(stepper);
+
+      if (index === activeIndex) step.classOn("is-active");
+      else if (index < activeIndex) step.classOn("is-complete");
+
+      new Html("span")
+        .classOn("session-step-index")
+        .text(String(index + 1))
+        .appendTo(step);
+
+      new Html("span").classOn("session-step-label").text(label).appendTo(step);
+
+      if (index < steps.length - 1) {
+        new Html("span")
+          .classOn("session-step-line")
+          .attr({ "aria-hidden": "true" })
+          .appendTo(stepper);
+      }
+    });
+  }
+
+  /**
+   * Builds the camera preview card shown before hosting or joining.
+   * @param {Html} container - Column to render the preview into.
+   */
+  buildSessionCameraPreview(container) {
+    const card = new Html("div")
+      .classOn("session-settings-card", "session-camera-preview-card")
+      .appendTo(container);
+
+    const frame = new Html("div")
+      .classOn("session-camera-preview-frame")
+      .appendTo(card);
+
+    const video = new Html("video")
+      .classOn("session-camera-preview-video")
+      .attr({ autoplay: "", muted: "", playsinline: "" })
+      .appendTo(frame);
+    video.elm.muted = true;
+    video.elm.defaultMuted = true;
+
+    const placeholder = new Html("div")
+      .classOn("session-camera-preview-placeholder")
+      .appendTo(frame);
+
+    const placeholderIcon = new Html("ion-icon")
+      .attr({ name: "videocam-outline" })
+      .appendTo(placeholder);
+
+    const placeholderTitle = new Html("span")
+      .classOn("session-camera-preview-placeholder-title")
+      .appendTo(placeholder);
+
+    const placeholderHint = new Html("span")
+      .classOn("session-camera-preview-placeholder-hint")
+      .appendTo(placeholder);
+
+    const badge = new Html("span")
+      .classOn("session-camera-preview-badge")
+      .appendTo(frame);
+
+    const row = new Html("div").classOn("session-toggle-row").appendTo(card);
+
+    const text = new Html("span").classOn("session-toggle-text").appendTo(row);
+
+    new Html("span")
+      .classOn("session-toggle-label")
+      .text("CAMERA")
+      .appendTo(text);
+
+    const description = new Html("span")
+      .classOn("session-toggle-desc")
+      .appendTo(text);
+
+    const toggle = new Html("button")
+      .classOn("switch")
+      .attr({
+        type: "button",
+        role: "switch",
+        "aria-checked": "false",
+        "aria-label": "Share your camera",
+      })
+      .appendTo(row);
+
+    toggle.on("click", () => {
+      void this._setSessionCameraPreviewEnabled(!this._previewCameraOn);
+    });
+
+    const deviceRow = new Html("div")
+      .classOn("session-camera-device-row")
+      .appendTo(card);
+
+    new Html("span")
+      .classOn("session-toggle-label")
+      .text("CAMERA DEVICE")
+      .appendTo(deviceRow);
+
+    const deviceSelect = new Html("select")
+      .classOn("session-camera-select")
+      .attr({ "aria-label": "Camera device" })
+      .appendTo(deviceRow);
+
+    deviceSelect.on("change", () => {
+      void this._setSessionPreviewCameraDevice(deviceSelect.getValue());
+    });
+
+    void this._populateSessionCameraDevices(deviceSelect);
+
+    this._sessionPreviewRefs = {
+      frame,
+      video,
+      placeholder,
+      placeholderIcon,
+      placeholderTitle,
+      placeholderHint,
+      badge,
+      toggle,
+      deviceSelect,
+      description,
+    };
+
+    this._refreshSessionCameraPreview();
+  }
+
+  /**
+   * Fills the preview camera picker with the available video inputs and
+   * selects the configured device.
+   * @param {Html} select - The select element to populate.
+   */
+  async _populateSessionCameraDevices(select) {
+    if (!select?.elm) return;
+    if (select.elm.dataset.populating === "1") return;
+    select.elm.dataset.populating = "1";
+
+    try {
+      const camera = this.ctx.services.CameraSvc;
+      const savedId = this.ctx.config?.videoConfig?.cameraDeviceId || "";
+
+      select.clear();
+      new Html("option")
+        .attr({ value: "" })
+        .text("System Default Camera")
+        .appendTo(select);
+
+      let devices = [];
+      try {
+        devices = (await camera?.getVideoDevices?.(false)) || [];
+      } catch (error) {
+        console.warn("[SESSIONS] Could not enumerate cameras:", error);
+      }
+
+      devices.forEach((device, index) => {
+        new Html("option")
+          .attr({ value: device.deviceId })
+          .text(device.label?.trim() || `Camera ${index + 1}`)
+          .appendTo(select);
+      });
+
+      if (savedId && !devices.some((device) => device.deviceId === savedId)) {
+        new Html("option")
+          .attr({ value: savedId })
+          .text("Saved Camera (unavailable)")
+          .appendTo(select);
+      }
+
+      select.val(savedId);
+    } finally {
+      select.elm.dataset.populating = "";
+    }
+  }
+
+  /**
+   * Stores the chosen camera device and
+   * @param {string} deviceId - Device ID, or an empty string for the default.
+   */
+  async _setSessionPreviewCameraDevice(deviceId) {
+    const camera = this.ctx.services.CameraSvc;
+    const nextId = deviceId || "";
+
+    this.ctx.config.videoConfig ??= {};
+    this.ctx.config.videoConfig.cameraDeviceId = nextId;
+    window.config.setItem("videoConfig.cameraDeviceId", nextId);
+
+    if (!camera?.startLocal) return;
+    if (!this._previewCameraOn && !camera.getActiveStream?.()) return;
+
+    const token = (this._previewCameraToken = this._previewCameraToken + 1);
+
+    this._previewCameraBusy = true;
+    this._refreshSessionCameraPreview();
+
+    try {
+      await camera.startLocal(nextId || undefined);
+    } catch (error) {
+      console.warn("[SESSIONS] Could not switch camera:", error);
+      if (token === this._previewCameraToken) {
+        this._previewCameraOn = false;
+        this.ctx.modules.infoBar.showTemp(
+          "SESSION CAMERA",
+          error?.message || "Could not switch your camera.",
+          4000,
+        );
+      }
+    } finally {
+      if (token === this._previewCameraToken) {
+        this._previewCameraBusy = false;
+        this._refreshSessionCameraPreview();
+      }
+    }
+  }
+
+  /**
+   * Returns the active camera feed for the pre-Session preview.
+   * @returns {{stream: MediaStream, source: "local"|"remote"}|null}
+   */
+  getSessionPreviewCamera() {
+    const camera = this.ctx.services.CameraSvc;
+    if (!camera) return null;
+    return camera.getActiveCamera?.() || null;
+  }
+
+  /**
+   * Updates the preview card to match the current camera state without
+   * re-rendering the form, so typed nicknames and room codes are preserved.
+   */
+  _refreshSessionCameraPreview() {
+    const refs = this._sessionPreviewRefs;
+    if (!refs) return;
+
+    const camera = this.ctx.services.CameraSvc;
+    const active = this.getSessionPreviewCamera();
+    const stream = active?.stream || null;
+    const video = refs.video.elm;
+
+    if (
+      stream &&
+      refs.deviceSelect?.elm &&
+      refs.deviceSelect.elm.options.length <= 1
+    ) {
+      void this._populateSessionCameraDevices(refs.deviceSelect);
+    }
+
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+      if (stream) video.play().catch(() => {});
+    }
+
+    if (stream) refs.frame.classOn("has-stream");
+    else refs.frame.classOff("has-stream");
+
+    refs.placeholder.styleJs({ display: stream ? "none" : "flex" });
+    refs.placeholderIcon.attr({
+      name: stream ? "videocam-outline" : "videocam-off-outline",
+    });
+
+    if (this._previewCameraBusy) {
+      refs.placeholderTitle.text("STARTING CAMERA");
+      refs.placeholderHint.text(
+        "Your camera should show up at any moment now...",
+      );
+      refs.badge.text("CONNECTING").classOff("is-live");
+    } else if (stream) {
+      refs.placeholderTitle.text("CAMERA READY");
+      refs.placeholderHint.text("You shouldn't really see this...");
+      if (this._previewCameraOn) {
+        refs.badge
+          .text(active.source === "remote" ? "PHONE" : "ON")
+          .classOn("is-live");
+      } else {
+        refs.badge.text("PREVIEW").classOff("is-live");
+      }
+    } else {
+      refs.placeholderTitle.text("CAMERA OFF");
+      refs.placeholderHint.text(
+        this._previewCameraOn
+          ? "No camera feed is available."
+          : "Turn on the camera to preview it.",
+      );
+      refs.badge.text("OFF").classOff("is-live");
+    }
+
+    refs.toggle.attr({
+      "aria-checked": this._previewCameraOn ? "true" : "false",
+    });
+
+    if (!camera) {
+      refs.description.text("Camera is unavailable on this device.");
+    } else {
+      refs.description.text("Share your lovely face in this Session.");
+    }
+  }
+
+  /**
+   * Starts or stops the pre-Session camera preview.
+   * @param {boolean} enabled - Whether the preview should run.
+   */
+  async _setSessionCameraPreviewEnabled(enabled) {
+    const next = Boolean(enabled);
+    if (next === this._previewCameraOn) return;
+
+    const camera = this.ctx.services.CameraSvc;
+    const token = (this._previewCameraToken = this._previewCameraToken + 1);
+
+    this._previewCameraOn = next;
+
+    if (!next) {
+      this._previewCameraBusy = false;
+      if (this._previewCameraStartedByUs) {
+        camera?.stopLocal?.();
+        this._previewCameraStartedByUs = false;
+      }
+      this._refreshSessionCameraPreview();
+      return;
+    }
+
+    if (!camera) {
+      this._previewCameraOn = false;
+      this._previewCameraBusy = false;
+      this._refreshSessionCameraPreview();
+      this.ctx.modules.infoBar.showTemp(
+        "SESSION CAMERA",
+        "Camera preview is unavailable on this device.",
+        4000,
+      );
+      return;
+    }
+
+    this._previewCameraBusy = true;
+    this._refreshSessionCameraPreview();
+
+    try {
+      if (!camera.getActiveStream?.()) {
+        const deviceId =
+          (await window.config?.getItem?.("videoConfig.cameraDeviceId")) || "";
+        await camera.startLocal?.(deviceId || undefined);
+
+        if (token !== this._previewCameraToken || !this._previewCameraOn) {
+          camera.stopLocal?.();
+          return;
+        }
+        this._previewCameraStartedByUs = true;
+      }
+    } catch (error) {
+      console.warn("[SESSIONS] Could not start camera preview:", error);
+      if (token === this._previewCameraToken) {
+        this._previewCameraOn = false;
+        this.ctx.modules.infoBar.showTemp(
+          "SESSION CAMERA",
+          error?.message || "Could not start your camera.",
+          4000,
+        );
+      }
+    } finally {
+      if (token === this._previewCameraToken) {
+        this._previewCameraBusy = false;
+        this._refreshSessionCameraPreview();
+      }
+    }
+  }
+
+  /**
+   * Detaches the preview video element without stopping the camera. Used when
+   * navigating between the form and the separate preview screen.
+   */
+  _detachSessionCameraPreview() {
+    if (this._sessionPreviewRefs?.video?.elm) {
+      this._sessionPreviewRefs.video.elm.srcObject = null;
+    }
+    this._sessionPreviewRefs = null;
+  }
+
+  /**
+   * Releases the preview when leaving the host/join form. A camera started by
+   * the preview is stopped; cameras already active elsewhere are left alone.
+   */
+  _releaseSessionCameraPreview() {
+    this._previewCameraToken += 1;
+
+    if (this._previewCameraStartedByUs) {
+      this.ctx.services.CameraSvc?.stopLocal?.();
+      this._previewCameraStartedByUs = false;
+    }
+
+    this._previewCameraOn = false;
+    this._previewCameraBusy = false;
+    this._detachSessionCameraPreview();
+  }
+
+  /**
+   * Builds the room options shown while creating a Session.
+   * @param {Html} container - Column to render the options into.
+   */
+  buildSessionCreateOptions(container) {
+    const recorder = this.ctx.modules.recorder;
+    const options = this._sessionCreateOptions;
+
+    const card = new Html("div")
+      .classOn("session-settings-card", "session-create-options-card")
+      .appendTo(container);
+
+    const audibleRow = new Html("div")
+      .classOn("session-toggle-row")
+      .appendTo(card);
+
+    const audibleText = new Html("span")
+      .classOn("session-toggle-text")
+      .appendTo(audibleRow);
+
+    new Html("span")
+      .classOn("session-toggle-label")
+      .text("EVERYONE AUDIBLE")
+      .appendTo(audibleText);
+
+    new Html("span")
+      .classOn("session-toggle-desc")
+      .text(
+        "Hear all guests during performances. May be distracting to the performer.",
+      )
+      .appendTo(audibleText);
+
+    const audibleSwitch = new Html("button")
+      .classOn("switch")
+      .attr({
+        type: "button",
+        role: "switch",
+        "aria-checked": options.everyoneAudible ? "true" : "false",
+        "aria-label": "Everyone audible during performances",
+      })
+      .appendTo(audibleRow);
+
+    audibleSwitch.on("click", () => {
+      options.everyoneAudible = !options.everyoneAudible;
+      audibleSwitch.attr({
+        "aria-checked": options.everyoneAudible ? "true" : "false",
+      });
+      audibleSwitch
+        .classOff("switch-on-anim", "switch-off-anim")
+        .classOn(
+          options.everyoneAudible ? "switch-on-anim" : "switch-off-anim",
+        );
+    });
+
+    const recordingConflict =
+      Boolean(recorder?.isRecording) && !recorder?.isSessionRecording;
+    if (recordingConflict) options.recordSession = false;
+
+    const recordRow = new Html("div")
+      .classOn("session-toggle-row")
+      .appendTo(card);
+
+    const recordText = new Html("span")
+      .classOn("session-toggle-text")
+      .appendTo(recordRow);
+
+    new Html("span")
+      .classOn("session-toggle-label")
+      .text("RECORD SESSION")
+      .appendTo(recordText);
+
+    new Html("span")
+      .classOn("session-toggle-desc")
+      .text(
+        recordingConflict
+          ? "A song recording is already in progress."
+          : "Record your entire Session.",
+      )
+      .appendTo(recordText);
+
+    const recordSwitch = new Html("button")
+      .classOn("switch")
+      .attr({
+        type: "button",
+        role: "switch",
+        "aria-checked": options.recordSession ? "true" : "false",
+        "aria-label": "Record the entire session",
+      })
+      .appendTo(recordRow);
+
+    if (recordingConflict) {
+      recordSwitch.attr({ disabled: "disabled" });
+      recordRow.classOn("is-readonly");
+    } else {
+      recordSwitch.on("click", () => {
+        options.recordSession = !options.recordSession;
+        recordSwitch.attr({
+          "aria-checked": options.recordSession ? "true" : "false",
+        });
+        recordSwitch
+          .classOff("switch-on-anim", "switch-off-anim")
+          .classOn(
+            options.recordSession ? "switch-on-anim" : "switch-off-anim",
+          );
+      });
+    }
+  }
+
+  /**
+   * Applies the camera preview choice after the room connection succeeds.
+   */
+  async _applyPreSessionCameraChoice() {
+    if (!this._previewCameraOn) return;
+
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+
+    try {
+      await SessionsSvc?.setCameraEnabled?.(true);
+
+      // The preview started this camera, so the Session now owns it and can
+      // release it when the camera is turned off or the room is left.
+      if (SessionsSvc?.cameraEnabled && this._previewCameraStartedByUs) {
+        SessionsSvc.cameraOwnsLocal = true;
+        this._previewCameraStartedByUs = false;
+      }
+    } catch (error) {
+      console.warn("[SESSIONS] Could not start the Session camera:", error);
+      this.ctx.modules.infoBar.showTemp(
+        "SESSION CAMERA",
+        error?.message || "Could not start your camera.",
+        4000,
+      );
+    }
+  }
+
+  /**
+   * Applies the options selected while creating a room.
+   */
+  _applySessionCreateOptions() {
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    const options = this._sessionCreateOptions;
+
+    if (options.everyoneAudible) {
+      SessionsSvc?.setEveryoneAudible?.(true);
+    }
+
+    if (options.recordSession) {
+      const recorder = this.ctx.modules.recorder;
+      if (recorder && !recorder.isRecording) {
+        if (recorder.startSessionRecording()) {
+          this.syncSessionRecorderInfo(
+            SessionsSvc?.state.mode === "performance"
+              ? SessionsSvc.state.nowPlaying
+              : null,
+          );
+        }
+      }
+    }
+
+    this._sessionCreateOptions = {
+      everyoneAudible: false,
+      recordSession: false,
+    };
+  }
+
+  /**
+   * Completes the host/join flow from the final camera preview step.
+   */
+  async _completeSessionFlow() {
+    const state = this.ctx.state;
+    const dom = this.ctx.dom;
+    const Identity = this.ctx.services.Identity;
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    const root = this.ctx.root;
+
+    const isHost = this._sessionFlowIsHost;
+    const draft = this._sessionFormDraft;
+    const nickname = draft.nickname || "";
+    const room = isHost ? null : (draft.room || "").trim();
+
+    if (!isHost && !room) {
+      this.renderSessionView("join");
+      return;
+    }
+
+    this.renderSessionView(isHost ? "creating" : "joining");
+
+    try {
+      await Identity.updateProfile(nickname);
+      const updatedProfile = Identity.getProfile();
+      const supportedGames = root.games.getAvailableGames().map((g) => ({
+        id: g.id,
+        version: g.version,
+      }));
+      const sessionProfile = { ...updatedProfile, supportedGames };
+
+      if (isHost) {
+        const collisionFn = Identity.resolveCollision.bind(Identity);
+        const roomId = await SessionsSvc.hostRoom(sessionProfile, collisionFn);
+        state.isSessionActive = true;
+        state.isSessionHost = true;
+        state.sessionRoomId = roomId;
+        this.updateDiscordSessionRPC();
+      } else {
+        await SessionsSvc.joinRoom(room, sessionProfile);
+        state.isSessionActive = true;
+        state.isSessionHost = false;
+        state.sessionRoomId = room;
+        this.updateDiscordSessionRPC();
+      }
+
+      if (isHost) {
+        this._applySessionCreateOptions();
+      }
+      await this._applyPreSessionCameraChoice();
+      this._previewCameraOn = false;
+      this._previewCameraBusy = false;
+      this._detachSessionCameraPreview();
+      this._resetSessionFlowState();
+
+      this.ctx.services.Forte.playSfx("/assets/audio/session_start.wav");
+
+      if (this.ctx.services.Forte.setScoringForced) {
+        this.ctx.services.Forte.setScoringForced(true);
+      }
+      if (this.ctx.services.Forte.setScoringEnabled) {
+        this.ctx.services.Forte.setScoringEnabled(true);
+      }
+
+      state.sessionMode = "lounge";
+      if (dom.sessionChatContainer) dom.sessionChatContainer.classOff("hidden");
+      this.renderSessionView("active");
+      root.ui.startLoungeBackground();
+      this.updateCameraBackground();
+      this.ctx.modules.infoBar.showDefault();
+    } catch (e) {
+      this.ctx.modules.infoBar.showTemp(
+        "SESSIONS",
+        isHost
+          ? "Failed to connect to signaling server."
+          : "Failed to join room. Check ID.",
+        3000,
+      );
+      this.renderSessionView("select");
+    }
+  }
+
+  /**
    * Renders a session view, sliding the old view out and the new view in when
    * the target view differs from the current one.
    * @param {string} view - The view to render
@@ -1818,6 +2533,25 @@ export default class SessionManager {
     const state = this.ctx.state;
     const dom = this.ctx.dom;
     const previousView = state.sessionModalView;
+
+    if (view === "host" || view === "join") {
+      this._sessionFlowIsHost = view === "host";
+    }
+
+    if (view === "select" || view === "deeplink-prompt") {
+      this._releaseSessionCameraPreview();
+    } else if (previousView === "preview" && view !== "preview") {
+      this._detachSessionCameraPreview();
+    }
+
+    if (
+      (view === "host" || view === "join") &&
+      previousView !== "preview" &&
+      previousView !== "host-settings"
+    ) {
+      this._resetSessionFlowState();
+    }
+
     const reduceMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
@@ -2018,12 +2752,24 @@ export default class SessionManager {
       new Html("p")
         .text(
           isHost
-            ? "Configure your profile and create a virtual room."
-            : "Enter a Room ID and configure your profile.",
+            ? "Set up your profile."
+            : "Enter a Room ID, and set up your profile.",
         )
         .appendTo(dom.sessionHeader);
 
       const profile = Identity.getProfile();
+
+      const draft = this._sessionFormDraft;
+      if (draft.view !== view) {
+        draft.view = view;
+        draft.nickname = profile.nickname || "";
+        draft.room = !isHost && typeof extraData === "string" ? extraData : "";
+      } else if (!isHost && typeof extraData === "string" && extraData) {
+        draft.room = extraData;
+      }
+
+      this.buildSessionStepper(dom.sessionHeader, 0);
+
       const formLayout = new Html("div")
         .classOn("session-form-layout")
         .appendTo(dom.sessionContentArea);
@@ -2031,6 +2777,7 @@ export default class SessionManager {
       const avatarCol = new Html("div")
         .classOn("session-avatar-col")
         .appendTo(formLayout);
+
       const avatarImgWrapper = new Html("div")
         .classOn("session-avatar-wrapper")
         .appendTo(avatarCol);
@@ -2074,11 +2821,14 @@ export default class SessionManager {
 
       let roomInput = null;
       if (!isHost) {
-        const initialRoomValue = typeof extraData === "string" ? extraData : "";
         roomInput = new Html("input")
           .classOn("session-input")
-          .attr({ placeholder: "Room ID", value: initialRoomValue })
+          .attr({ placeholder: "Room ID", value: draft.room })
           .appendTo(inputCol);
+
+        roomInput.on("input", () => {
+          draft.room = roomInput.getValue();
+        });
       }
 
       const nickInput = new Html("input")
@@ -2086,9 +2836,13 @@ export default class SessionManager {
         .attr({
           placeholder: "Your Nickname",
           maxlength: 15,
-          value: profile.nickname,
+          value: draft.nickname,
         })
         .appendTo(inputCol);
+
+      nickInput.on("input", () => {
+        draft.nickname = nickInput.getValue();
+      });
 
       const btnRow = new Html("div")
         .classOn("session-btn-row")
@@ -2096,74 +2850,29 @@ export default class SessionManager {
         .appendTo(inputCol);
       new Html("button")
         .classOn("session-btn")
-        .text("BACK")
+        .html(
+          '<ion-icon name="arrow-back-outline" style="font-size: 1.2rem; vertical-align: middle; margin-right: 0.5rem;"></ion-icon><span>BACK</span>',
+        )
         .on("click", () => this.renderSessionView("select"))
         .appendTo(btnRow);
 
       new Html("button")
         .classOn("session-btn", "primary")
-        .text(isHost ? "CREATE" : "JOIN")
-        .on("click", async () => {
-          if (!isHost && !roomInput.getValue().trim()) return;
-
-          const nickname = nickInput.getValue();
-          const room = isHost ? null : roomInput.getValue().trim();
-
-          this.renderSessionView(isHost ? "creating" : "joining");
-
-          try {
-            await Identity.updateProfile(nickname);
-            const updatedProfile = Identity.getProfile();
-            const supportedGames = root.games.getAvailableGames().map((g) => ({
-              id: g.id,
-              version: g.version,
-            }));
-            const sessionProfile = { ...updatedProfile, supportedGames };
-
-            if (isHost) {
-              const collisionFn = Identity.resolveCollision.bind(Identity);
-              const roomId = await SessionsSvc.hostRoom(
-                sessionProfile,
-                collisionFn,
-              );
-              state.isSessionActive = true;
-              state.isSessionHost = true;
-              state.sessionRoomId = roomId;
-              this.updateDiscordSessionRPC();
-            } else {
-              await SessionsSvc.joinRoom(room, sessionProfile);
-              state.isSessionActive = true;
-              state.isSessionHost = false;
-              state.sessionRoomId = room;
-              this.updateDiscordSessionRPC();
-            }
-
-            this.ctx.services.Forte.playSfx("/assets/audio/session_start.wav");
-
-            if (this.ctx.services.Forte.setScoringForced) {
-              this.ctx.services.Forte.setScoringForced(true);
-            }
-            if (this.ctx.services.Forte.setScoringEnabled) {
-              this.ctx.services.Forte.setScoringEnabled(true);
-            }
-
-            state.sessionMode = "lounge";
-            if (dom.sessionChatContainer)
-              dom.sessionChatContainer.classOff("hidden");
-            this.renderSessionView("active");
-            root.ui.startLoungeBackground();
-            this.updateCameraBackground();
-            this.ctx.modules.infoBar.showDefault();
-          } catch (e) {
+        .html(
+          '<span>NEXT</span><ion-icon name="arrow-forward-outline" style="font-size: 1.2rem; vertical-align: middle; margin-left: 0.5rem;"></ion-icon>',
+        )
+        .on("click", () => {
+          if (!isHost && !roomInput.getValue().trim()) {
             this.ctx.modules.infoBar.showTemp(
               "SESSIONS",
-              isHost
-                ? "Failed to connect to signaling server."
-                : "Failed to join room. Check ID.",
+              "Enter a Room ID to join.",
               3000,
             );
-            this.renderSessionView("select");
+            roomInput.elm.focus();
+            return;
           }
+
+          this.renderSessionView(isHost ? "host-settings" : "preview");
         })
         .appendTo(btnRow);
 
@@ -2190,6 +2899,104 @@ export default class SessionManager {
           const firstBtn = modalEl.querySelector("button");
           if (firstBtn) firstBtn.focus();
         }
+      }, 100);
+    } else if (view === "preview") {
+      const isHost = this._sessionFlowIsHost;
+
+      new Html("h1").text("LOOKING GOOD?").appendTo(dom.sessionHeader);
+      new Html("p")
+        .text(
+          isHost
+            ? "Check your camera, and maybe do some makeup while we're at it?"
+            : "Take a look at your gorgeous face before you join!",
+        )
+        .appendTo(dom.sessionHeader);
+
+      this.buildSessionStepper(dom.sessionHeader, isHost ? 2 : 1);
+
+      const previewView = new Html("div")
+        .classOn("session-preview-view")
+        .appendTo(dom.sessionContentArea);
+
+      const previewPanel = new Html("div")
+        .classOn("session-options-panel")
+        .appendTo(previewView);
+
+      this.buildSessionCameraPreview(previewPanel);
+
+      const btnRow = new Html("div")
+        .classOn("session-btn-row")
+        .styleJs({ width: "100%", flexShrink: "0" })
+        .appendTo(previewView);
+
+      new Html("button")
+        .classOn("session-btn")
+        .html(
+          '<ion-icon name="arrow-back-outline" style="font-size: 1.2rem; vertical-align: middle; margin-right: 0.5rem;"></ion-icon><span>BACK</span>',
+        )
+        .on("click", () =>
+          this.renderSessionView(isHost ? "host-settings" : "join"),
+        )
+        .appendTo(btnRow);
+
+      new Html("button")
+        .classOn("session-btn", "primary")
+        .text(isHost ? "CREATE SESSION" : "JOIN SESSION")
+        .on("click", () => void this._completeSessionFlow())
+        .appendTo(btnRow);
+
+      setTimeout(() => {
+        if (state.sessionModalView !== "preview") return;
+        const target =
+          previewPanel.elm.querySelector(".switch") ||
+          previewView.elm.querySelector(".session-btn");
+        if (target) target.focus();
+      }, 100);
+    } else if (view === "host-settings") {
+      new Html("h1").text("SETTINGS").appendTo(dom.sessionHeader);
+      new Html("p")
+        .text("Choose how your room behaves.")
+        .appendTo(dom.sessionHeader);
+
+      this.buildSessionStepper(dom.sessionHeader, 1);
+
+      const optionsView = new Html("div")
+        .classOn("session-options-view")
+        .appendTo(dom.sessionContentArea);
+
+      const optionsPanel = new Html("div")
+        .classOn("session-options-panel")
+        .appendTo(optionsView);
+
+      this.buildSessionCreateOptions(optionsPanel);
+
+      const btnRow = new Html("div")
+        .classOn("session-btn-row")
+        .styleJs({ width: "100%", flexShrink: "0" })
+        .appendTo(optionsView);
+
+      new Html("button")
+        .classOn("session-btn")
+        .html(
+          '<ion-icon name="arrow-back-outline" style="font-size: 1.2rem; vertical-align: middle; margin-right: 0.5rem;"></ion-icon><span>BACK</span>',
+        )
+        .on("click", () => this.renderSessionView("host"))
+        .appendTo(btnRow);
+
+      new Html("button")
+        .classOn("session-btn", "primary")
+        .html(
+          '<span>NEXT</span><ion-icon name="arrow-forward-outline" style="font-size: 1.2rem; vertical-align: middle; margin-left: 0.5rem;"></ion-icon>',
+        )
+        .on("click", () => this.renderSessionView("preview"))
+        .appendTo(btnRow);
+
+      setTimeout(() => {
+        if (state.sessionModalView !== "host-settings") return;
+        const target =
+          optionsPanel.elm.querySelector(".switch:not([disabled])") ||
+          optionsView.elm.querySelector(".session-btn");
+        if (target) target.focus();
       }, 100);
     } else if (view === "creating" || view === "joining") {
       const isHost = view === "creating";
@@ -3044,6 +3851,12 @@ export default class SessionManager {
         !state.isSessionActive
       ) {
         this.renderSessionView("select");
+      } else if (state.sessionModalView === "preview") {
+        this.renderSessionView(
+          this._sessionFlowIsHost ? "host-settings" : "join",
+        );
+      } else if (state.sessionModalView === "host-settings") {
+        this.renderSessionView("host");
       } else if (state.sessionModalView === "deeplink-prompt") {
         this.toggleSessionModal(false);
       } else if (
@@ -3127,6 +3940,7 @@ export default class SessionManager {
       this._sessionViewTimer = null;
     }
 
+    this._releaseSessionCameraPreview();
     this.clearCameraStreams();
     this._cameraSlots = [];
     this.stopCameraBackground(false);
@@ -3204,6 +4018,14 @@ export default class SessionManager {
     document.removeEventListener(
       "Encore.Sessions.CameraStateUpdate",
       this.handleSessionMediaStateUpdate,
+    );
+    document.removeEventListener(
+      "Encore.Camera.StreamReceived",
+      this.handleCameraServiceUpdate,
+    );
+    document.removeEventListener(
+      "Encore.Camera.StreamEnded",
+      this.handleCameraServiceUpdate,
     );
     document.removeEventListener(
       "Encore.Playback.TrackInfo",

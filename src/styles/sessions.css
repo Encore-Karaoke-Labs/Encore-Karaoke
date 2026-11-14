@@ -267,6 +267,220 @@
   box-shadow: 0 0 15px rgba(137, 207, 240, 0.3);
 }
 
+/* -- Pre-Session Camera Preview -- */
+.session-camera-preview-card {
+  width: 100%;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-sizing: border-box;
+}
+
+.session-camera-preview-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  border: 1px solid rgba(137, 207, 240, 0.3);
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 0 15px rgba(137, 207, 240, 0.05);
+  overflow: hidden;
+}
+
+.session-camera-preview-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.session-camera-preview-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.session-camera-preview-placeholder ion-icon {
+  font-size: 2.5rem;
+  color: rgba(137, 207, 240, 0.5);
+  margin-bottom: 0.25rem;
+}
+
+.session-camera-preview-placeholder-title {
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.session-camera-preview-placeholder-hint {
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.session-camera-preview-badge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(10, 10, 20, 0.7);
+  color: rgba(255, 255, 255, 0.55);
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+}
+
+.session-camera-preview-badge.is-live {
+  color: #55ff55;
+  border-color: rgba(85, 255, 85, 0.4);
+  background: rgba(10, 20, 10, 0.7);
+  box-shadow: 0 0 10px rgba(85, 255, 85, 0.2);
+}
+
+.session-camera-preview-card .session-toggle-row {
+  gap: 0.75rem;
+}
+
+.session-camera-preview-card .session-toggle-desc {
+  font-size: 0.85rem;
+}
+
+.session-camera-device-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.session-camera-select {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(137, 207, 240, 0.35);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.95rem;
+  outline: none;
+  cursor: var(--cursor-pointer);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.session-camera-select:focus {
+  border-color: #ffd700;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.25);
+}
+
+.session-camera-select option {
+  background: #0a0a14;
+  color: #fff;
+}
+
+/* -- Pre-Session Room Options Screen -- */
+.session-create-options-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* -- Pre-Session Camera Preview Screen -- */
+.session-preview-view {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 640px;
+  height: 100%;
+  min-height: 0;
+  gap: 1rem;
+}
+
+/* -- Host/Join Step Indicator -- */
+.session-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.session-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0.45;
+  transition: opacity 0.2s ease;
+}
+
+.session-step-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  border: 2px solid rgba(137, 207, 240, 0.45);
+  color: rgba(137, 207, 240, 0.8);
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.session-step-label {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.session-step.is-active {
+  opacity: 1;
+}
+
+.session-step.is-active .session-step-index {
+  background: #89cff0;
+  border-color: #89cff0;
+  color: #05060c;
+  box-shadow: 0 0 12px rgba(137, 207, 240, 0.45);
+}
+
+.session-step.is-active .session-step-label {
+  color: #89cff0;
+}
+
+.session-step.is-complete {
+  opacity: 0.8;
+}
+
+.session-step.is-complete .session-step-index {
+  background: rgba(137, 207, 240, 0.2);
+}
+
+.session-step-line {
+  width: 1.75rem;
+  height: 2px;
+  background: rgba(137, 207, 240, 0.25);
+}
+
 .session-input-col {
   display: flex;
   flex-direction: column;
