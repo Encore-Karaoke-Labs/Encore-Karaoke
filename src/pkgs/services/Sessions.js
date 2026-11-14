@@ -31,6 +31,16 @@ const pkg = {
     connections: new Map(),
     mediaCalls: new Map(),
     micCalls: new Map(),
+    cameraCalls: new Map(),
+    incomingCameraCalls: new Map(),
+    cameraStreams: {},
+    cameraEnabled: false,
+    cameraOwnsLocal: false,
+    cameraStartToken: 0,
+    _cameraStreamReceivedListener: null,
+    _cameraStreamEndedListener: null,
+    _cameraStopping: false,
+    isMuted: false,
     _lastRoutedMode: null,
     _lastRoutedEveryoneAudible: null,
 
@@ -114,6 +124,136 @@ const pkg = {
       return newSdp;
     },
 
+    /**
+     * Returns the microphone stream used for Session audio. This bus can be
+     * muted independently of the local karaoke mic.
+     * @returns {MediaStream|null}
+     */
+    getSessionMicStream: function () {
+      const forte = pkg.root?.Processes?.getService("ForteSvc")?.data;
+      return (
+        forte?.getSessionMicAudioStream?.() ||
+        forte?.getMicAudioStream?.() ||
+        null
+      );
+    },
+
+    /**
+     * Returns the shared Camera service, which owns the camera the user
+     * configured in Setup.
+     * @returns {object|null}
+     */
+    getCameraService: function () {
+      return pkg.root?.Processes?.getService("CameraSvc")?.data || null;
+    },
+
+    /**
+     * Checks whether a media stream still has a live video track.
+     * @param {MediaStream|null} stream
+     * @returns {boolean}
+     */
+    isCameraStreamLive: function (stream) {
+      if (!stream?.getVideoTracks) return false;
+      return stream
+        .getVideoTracks()
+        .some((track) => track.readyState === "live");
+    },
+
+    /**
+     * Reads the physical camera device selected in Setup.
+     * @returns {Promise<string>} The saved device id, or an empty string.
+     */
+    getConfiguredCameraDeviceId: async function () {
+      try {
+        return (
+          (await window.config?.getItem?.("videoConfig.cameraDeviceId")) || ""
+        );
+      } catch (error) {
+        console.warn("[SESSIONS] Could not read camera config:", error);
+        return "";
+      }
+    },
+
+    /**
+     * Returns the camera sources currently published by this participant.
+     * @returns {Array<"local"|"remote">}
+     */
+    getLocalCameraSources: function () {
+      return ["local", "remote"].filter((source) =>
+        this.isCameraStreamLive(this.cameraStreams[source]),
+      );
+    },
+
+    /**
+     * Keeps the published camera set in sync while a Session is active.
+     */
+    attachCameraSourceListeners: function () {
+      if (!this._cameraStreamReceivedListener) {
+        this._cameraStreamReceivedListener = (event) => {
+          if (!this.cameraEnabled) return;
+
+          const detail = event.detail || {};
+          const source = detail.source === "remote" ? "remote" : "local";
+          const stream = detail.stream;
+          if (!this.isCameraStreamLive(stream)) return;
+          if (this.cameraStreams[source] === stream) return;
+
+          const previous = this.cameraStreams[source];
+          this.cameraStreams[source] = stream;
+
+          // Rebuild outgoing calls so peers receive the replacement stream.
+          if (previous) this.closeOutgoingCameraCallsForSource(source);
+          this.publishCameraStatus();
+        };
+
+        document.addEventListener(
+          "Encore.Camera.StreamReceived",
+          this._cameraStreamReceivedListener,
+        );
+      }
+
+      if (!this._cameraStreamEndedListener) {
+        this._cameraStreamEndedListener = (event) => {
+          if (this._cameraStopping || !this.cameraEnabled) return;
+
+          const source = event.detail?.source === "remote" ? "remote" : "local";
+          if (!this.cameraStreams[source]) return;
+
+          delete this.cameraStreams[source];
+          if (source === "local") this.cameraOwnsLocal = false;
+          this.closeOutgoingCameraCallsForSource(source);
+
+          if (this.getLocalCameraSources().length === 0) {
+            this.stopCamera(false, false);
+          }
+          this.publishCameraStatus();
+        };
+
+        document.addEventListener(
+          "Encore.Camera.StreamEnded",
+          this._cameraStreamEndedListener,
+        );
+      }
+    },
+
+    detachCameraSourceListeners: function () {
+      if (this._cameraStreamReceivedListener) {
+        document.removeEventListener(
+          "Encore.Camera.StreamReceived",
+          this._cameraStreamReceivedListener,
+        );
+        this._cameraStreamReceivedListener = null;
+      }
+
+      if (this._cameraStreamEndedListener) {
+        document.removeEventListener(
+          "Encore.Camera.StreamEnded",
+          this._cameraStreamEndedListener,
+        );
+        this._cameraStreamEndedListener = null;
+      }
+    },
+
     initPeer: function (nickname, customId = null) {
       this.isDisconnecting = false;
       this.nickname = nickname;
@@ -129,6 +269,13 @@ const pkg = {
 
         this.peer.on("call", (call) => {
           const callKind = call.metadata?.kind;
+
+          if (callKind === "camera") {
+            call.answer();
+            this.attachCameraCall(call.peer, call);
+            return;
+          }
+
           const isPerformanceCall =
             callKind === "performance" ||
             (this.state.mode === "performance" &&
@@ -154,13 +301,11 @@ const pkg = {
             if (this.peer.id === this.state.singerId) {
               call.answer(undefined);
             } else {
-              const forteSvc = pkg.root.Processes.getService("ForteSvc").data;
-              call.answer(forteSvc.getMicAudioStream());
+              call.answer(this.getSessionMicStream());
             }
             this.attachMicCall(call.peer, call);
           } else if (this.state.mode === "lounge") {
-            const forteSvc = pkg.root.Processes.getService("ForteSvc").data;
-            call.answer(forteSvc.getMicAudioStream());
+            call.answer(this.getSessionMicStream());
             call.on("stream", (remoteStream) => {
               document.dispatchEvent(
                 new CustomEvent("Encore.Sessions.LoungeStream", {
@@ -177,6 +322,11 @@ const pkg = {
     hostRoom: async function (profile, collisionResolverFn) {
       this.isHost = true;
       this.collisionResolver = collisionResolverFn;
+      this.isMuted = false;
+      this.cameraEnabled = false;
+      this.cameraStreams = {};
+      this.cameraOwnsLocal = false;
+      this.applySessionMute(false);
 
       const { code } = await this.createSessionCode(profile.nickname);
       const myId = await this.initPeer(profile.nickname, code);
@@ -187,6 +337,9 @@ const pkg = {
         avatar: profile.avatar,
         isHost: true,
         isRecording: false,
+        isMuted: false,
+        cameraEnabled: false,
+        cameraSources: [],
         supportedGames: profile.supportedGames || [],
       });
       this.broadcastState();
@@ -196,6 +349,11 @@ const pkg = {
 
     joinRoom: async function (roomId, profile) {
       this.isHost = false;
+      this.isMuted = false;
+      this.cameraEnabled = false;
+      this.cameraStreams = {};
+      this.cameraOwnsLocal = false;
+      this.applySessionMute(false);
       const myId = await this.initPeer(profile.nickname);
       this.roomId = roomId;
 
@@ -240,6 +398,9 @@ const pkg = {
             avatar: incomingProfile.avatar || null,
             isHost: false,
             isRecording: false,
+            isMuted: false,
+            cameraEnabled: false,
+            cameraSources: [],
             supportedGames: incomingProfile.supportedGames || [],
           });
           this.broadcastState();
@@ -313,6 +474,10 @@ const pkg = {
           this.handleMediaRouting();
         } else if (data.type === "recording_status" && this.isHost) {
           this.setParticipantRecording(conn.peer, data.recording);
+        } else if (data.type === "camera_status" && this.isHost) {
+          this.setParticipantCamera(conn.peer, data.camera);
+        } else if (data.type === "mute_status" && this.isHost) {
+          this.setParticipantMuted(conn.peer, data.muted);
         } else if (data.type === "reserve_song" && this.isHost) {
           const requesterNickname = conn.metadata.profile
             ? conn.metadata.profile.nickname
@@ -573,6 +738,406 @@ const pkg = {
       call.on("error", cleanup);
     },
 
+    /**
+     * Builds the map key for one participant camera source.
+     * @param {"local"|"remote"} source
+     * @param {string} peerId
+     * @returns {string}
+     */
+    cameraCallKey: function (source, peerId) {
+      return `${source}:${peerId}`;
+    },
+
+    /**
+     * Splits a camera call key back into its source and peer id.
+     * @param {string} key
+     * @returns {{source: "local"|"remote", peerId: string}}
+     */
+    parseCameraCallKey: function (key) {
+      const separator = key.indexOf(":");
+      return {
+        source: key.slice(0, separator) === "remote" ? "remote" : "local",
+        peerId: key.slice(separator + 1),
+      };
+    },
+
+    /**
+     * Tracks an incoming participant camera call.
+     * @param {string} peerId - Unique ID of the peer sending their camera.
+     * @param {Object} call - PeerJS media connection.
+     */
+    attachCameraCall: function (peerId, call) {
+      const source =
+        call.metadata?.cameraSource === "remote" ? "remote" : "local";
+      const key = this.cameraCallKey(source, peerId);
+
+      const existing = this.incomingCameraCalls.get(key);
+      if (existing && existing !== call) {
+        try {
+          existing.close();
+        } catch (error) {
+          console.warn("[SESSIONS] Could not replace camera call:", error);
+        }
+      }
+
+      this.incomingCameraCalls.set(key, call);
+
+      const publishStream = (stream) => {
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.CameraStream", {
+            detail: { id: peerId, source, stream },
+          }),
+        );
+      };
+
+      call.on("stream", publishStream);
+
+      const cleanup = () => {
+        if (this.incomingCameraCalls.get(key) !== call) return;
+        this.incomingCameraCalls.delete(key);
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.CameraStreamEnded", {
+            detail: { id: peerId, source },
+          }),
+        );
+      };
+
+      call.on("close", cleanup);
+      call.on("error", cleanup);
+    },
+
+    /**
+     * Creates outgoing camera calls for every other room participant and every
+     * published camera.
+     */
+    handleCameraRouting: function () {
+      if (!this.peer) return;
+
+      const sources = this.cameraEnabled ? this.getLocalCameraSources() : [];
+      if (sources.length === 0) {
+        this.closeOutgoingCameraCalls();
+        return;
+      }
+
+      const validPeers = new Set(
+        this.state.participants
+          .map((participant) => participant.id)
+          .filter((id) => id !== this.peer.id),
+      );
+
+      for (const key of [...this.cameraCalls.keys()]) {
+        const { source, peerId } = this.parseCameraCallKey(key);
+        if (!validPeers.has(peerId) || !sources.includes(source)) {
+          this.closeOutgoingCameraCall(key);
+        }
+      }
+
+      for (const peerId of validPeers) {
+        for (const source of sources) {
+          const key = this.cameraCallKey(source, peerId);
+          if (this.cameraCalls.has(key)) continue;
+
+          const call = this.peer.call(peerId, this.cameraStreams[source], {
+            metadata: { kind: "camera", cameraSource: source },
+          });
+
+          if (!call) continue;
+
+          this.cameraCalls.set(key, call);
+
+          const cleanup = () => {
+            if (this.cameraCalls.get(key) !== call) return;
+            this.cameraCalls.delete(key);
+          };
+
+          call.on("close", cleanup);
+          call.on("error", cleanup);
+        }
+      }
+    },
+
+    closeOutgoingCameraCall: function (key) {
+      const call = this.cameraCalls.get(key);
+      if (!call) return;
+
+      this.cameraCalls.delete(key);
+      try {
+        call.close();
+      } catch (error) {
+        console.warn("[SESSIONS] Could not close camera call:", error);
+      }
+    },
+
+    closeOutgoingCameraCallsForSource: function (source) {
+      for (const key of [...this.cameraCalls.keys()]) {
+        if (this.parseCameraCallKey(key).source === source) {
+          this.closeOutgoingCameraCall(key);
+        }
+      }
+    },
+
+    closeOutgoingCameraCallsForPeer: function (peerId) {
+      for (const key of [...this.cameraCalls.keys()]) {
+        if (this.parseCameraCallKey(key).peerId === peerId) {
+          this.closeOutgoingCameraCall(key);
+        }
+      }
+    },
+
+    closeOutgoingCameraCalls: function () {
+      for (const key of [...this.cameraCalls.keys()]) {
+        this.closeOutgoingCameraCall(key);
+      }
+    },
+
+    /**
+     * Enables or disables the local Session camera.
+     * @param {boolean} enabled - Whether to start the camera.
+     * @returns {Promise<boolean>} Whether the requested state was applied.
+     */
+    setCameraEnabled: async function (enabled) {
+      const next = Boolean(enabled);
+
+      if (!next) {
+        const wasEnabled =
+          this.cameraEnabled || this.getLocalCameraSources().length > 0;
+        this.stopCamera(false);
+        if (wasEnabled) this.publishCameraStatus();
+        return true;
+      }
+
+      if (this.cameraEnabled && this.getLocalCameraSources().length > 0) {
+        return true;
+      }
+
+      const cameraSvc = this.getCameraService();
+      if (!cameraSvc) {
+        throw new Error("Camera service is not available.");
+      }
+
+      this.stopCamera(false);
+      const token = (this.cameraStartToken = this.cameraStartToken + 1);
+
+      let ownsLocal = false;
+
+      try {
+        const activeSources = new Set(
+          (cameraSvc.getActiveCameras?.() || [])
+            .filter((camera) => this.isCameraStreamLive(camera.stream))
+            .map((camera) => camera.source),
+        );
+
+        if (!activeSources.has("local")) {
+          const deviceId = await this.getConfiguredCameraDeviceId();
+          ownsLocal = true;
+          this._cameraStopping = true;
+          try {
+            await cameraSvc.startLocal?.(deviceId || undefined);
+          } catch (error) {
+            ownsLocal = false;
+            console.warn("[SESSIONS] Physical camera unavailable:", error);
+          } finally {
+            this._cameraStopping = false;
+          }
+        }
+
+        if (token !== this.cameraStartToken) {
+          if (ownsLocal) cameraSvc.stopLocal?.(false);
+          return false;
+        }
+
+        const cameras = (cameraSvc.getActiveCameras?.() || []).filter(
+          (camera) => this.isCameraStreamLive(camera.stream),
+        );
+
+        if (cameras.length === 0) {
+          if (ownsLocal) cameraSvc.stopLocal?.(false);
+          throw new Error(
+            "No camera is available. Connect a camera or your phone.",
+          );
+        }
+
+        this.cameraStreams = {};
+        for (const camera of cameras) {
+          this.cameraStreams[camera.source] = camera.stream;
+        }
+        this.cameraEnabled = true;
+        this.cameraOwnsLocal = ownsLocal;
+        this.attachCameraSourceListeners();
+        this.publishCameraStatus();
+        return true;
+      } catch (error) {
+        if (ownsLocal) cameraSvc.stopLocal?.(false);
+        if (token === this.cameraStartToken) {
+          this.cameraEnabled = false;
+          this.cameraStreams = {};
+          this.publishCameraStatus();
+        }
+        throw error;
+      }
+    },
+
+    /**
+     * Stops every published Session camera and tears down its outgoing calls.
+     * @param {boolean} notify - Whether to announce the state change.
+     * @param {boolean} releaseSource - Whether to stop a physical camera that
+     *   this Session started. Cameras already running for BGV are left alone.
+     */
+    stopCamera: function (notify = true, releaseSource = true) {
+      this.cameraStartToken += 1;
+      this.closeOutgoingCameraCalls();
+
+      const cameraSvc = this.getCameraService();
+      const ownsLocal = this.cameraOwnsLocal;
+
+      this.cameraStreams = {};
+      this.cameraEnabled = false;
+      this.cameraOwnsLocal = false;
+
+      if (releaseSource && ownsLocal && cameraSvc?.stopLocal) {
+        this._cameraStopping = true;
+        try {
+          cameraSvc.stopLocal();
+        } catch (error) {
+          console.warn("[SESSIONS] Could not stop the Session camera:", error);
+        } finally {
+          this._cameraStopping = false;
+        }
+      }
+
+      this.detachCameraSourceListeners();
+
+      if (notify) {
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.CameraStateUpdate", {
+            detail: {
+              cameraEnabled: false,
+              cameraSources: [],
+              isMuted: this.isMuted,
+            },
+          }),
+        );
+      }
+    },
+
+    /**
+     * Enables or disables the local Session microphone without muting the
+     * local karaoke monitoring path.
+     * @param {boolean} muted - Whether the Session mic should be muted.
+     */
+    setMuted: function (muted) {
+      const next = Boolean(muted);
+      this.isMuted = next;
+      this.applySessionMute(next);
+
+      const myId = this.peer?.id;
+      const self = this.state.participants.find((p) => p.id === myId);
+      if (self) self.isMuted = next;
+
+      if (this.isHost) {
+        this.broadcastState();
+      } else {
+        const hostConn = this.connections.get(this.roomId);
+        if (hostConn && hostConn.open) {
+          hostConn.send({ type: "mute_status", muted: next });
+        }
+      }
+
+      document.dispatchEvent(
+        new CustomEvent("Encore.Sessions.CameraStateUpdate", {
+          detail: {
+            cameraEnabled: this.cameraEnabled,
+            cameraSources: this.getLocalCameraSources(),
+            isMuted: next,
+          },
+        }),
+      );
+    },
+
+    applySessionMute: function (muted) {
+      const forte = pkg.root?.Processes?.getService("ForteSvc")?.data;
+      forte?.setSessionMicMuted?.(Boolean(muted));
+    },
+
+    publishCameraStatus: function () {
+      const sources = this.getLocalCameraSources();
+      const enabled = sources.length > 0;
+
+      const myId = this.peer?.id;
+      const self = this.state.participants.find((p) => p.id === myId);
+      if (self) {
+        self.cameraEnabled = enabled;
+        self.cameraSources = sources;
+      }
+
+      if (this.isHost) {
+        this.broadcastState();
+      } else {
+        const hostConn = this.connections.get(this.roomId);
+        if (hostConn && hostConn.open) {
+          hostConn.send({ type: "camera_status", camera: sources });
+        }
+      }
+
+      document.dispatchEvent(
+        new CustomEvent("Encore.Sessions.CameraStateUpdate", {
+          detail: {
+            cameraEnabled: enabled,
+            cameraSources: sources,
+            isMuted: this.isMuted,
+          },
+        }),
+      );
+
+      this.handleCameraRouting();
+    },
+
+    /**
+     * Host-side update of a participant's camera indicators.
+     * @param {string} peerId - Participant peer id.
+     * @param {Array<"local"|"remote">|boolean} cameras - Published sources.
+     */
+    setParticipantCamera: function (peerId, cameras) {
+      if (!this.isHost) return;
+
+      const participant = this.state.participants.find((p) => p.id === peerId);
+      if (!participant) return;
+
+      const list = Array.isArray(cameras)
+        ? cameras.filter((source) => source === "local" || source === "remote")
+        : cameras
+          ? ["local"]
+          : [];
+      const next = Array.from(new Set(list)).sort();
+
+      const current = Array.isArray(participant.cameraSources)
+        ? [...participant.cameraSources].sort()
+        : [];
+      if (JSON.stringify(current) === JSON.stringify(next)) return;
+
+      participant.cameraSources = next;
+      participant.cameraEnabled = next.length > 0;
+      this.broadcastState();
+    },
+
+    /**
+     * Host-side update of a participant's microphone mute indicator.
+     * @param {string} peerId - Participant peer id.
+     * @param {boolean} muted - Whether their Session mic is muted.
+     */
+    setParticipantMuted: function (peerId, muted) {
+      if (!this.isHost) return;
+
+      const participant = this.state.participants.find((p) => p.id === peerId);
+      if (!participant) return;
+
+      const next = Boolean(muted);
+      if (Boolean(participant.isMuted) === next) return;
+
+      participant.isMuted = next;
+      this.broadcastState();
+    },
+
     handlePeerDisconnect: function (peerId) {
       if (this.isDisconnecting) return;
       if (!this.connections.has(peerId)) return;
@@ -591,6 +1156,26 @@ const pkg = {
       if (this.micCalls.has(peerId)) {
         this.micCalls.get(peerId).close();
         this.micCalls.delete(peerId);
+      }
+
+      this.closeOutgoingCameraCallsForPeer(peerId);
+
+      for (const key of [...this.incomingCameraCalls.keys()]) {
+        if (this.parseCameraCallKey(key).peerId !== peerId) continue;
+
+        const incomingCameraCall = this.incomingCameraCalls.get(key);
+        this.incomingCameraCalls.delete(key);
+        try {
+          incomingCameraCall.close();
+        } catch (error) {
+          console.warn("[SESSIONS] Could not close camera call:", error);
+        }
+
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.CameraStreamEnded", {
+            detail: { id: peerId, source: this.parseCameraCallKey(key).source },
+          }),
+        );
       }
 
       document.dispatchEvent(
@@ -1116,19 +1701,21 @@ const pkg = {
       }
 
       if (this.state.mode === "lounge") {
-        const forteSvc = pkg.root.Processes.getService("ForteSvc").data;
-        for (let p of this.state.participants) {
-          if (p.id !== this.peer.id && this.peer.id > p.id) {
-            if (!this.mediaCalls.has(p.id)) {
-              const call = this.peer.call(p.id, forteSvc.getMicAudioStream());
-              this.mediaCalls.set(p.id, call);
-              call.on("stream", (stream) => {
-                document.dispatchEvent(
-                  new CustomEvent("Encore.Sessions.LoungeStream", {
-                    detail: { id: p.id, stream },
-                  }),
-                );
-              });
+        const micStream = this.getSessionMicStream();
+        if (micStream) {
+          for (let p of this.state.participants) {
+            if (p.id !== this.peer.id && this.peer.id > p.id) {
+              if (!this.mediaCalls.has(p.id)) {
+                const call = this.peer.call(p.id, micStream);
+                this.mediaCalls.set(p.id, call);
+                call.on("stream", (stream) => {
+                  document.dispatchEvent(
+                    new CustomEvent("Encore.Sessions.LoungeStream", {
+                      detail: { id: p.id, stream },
+                    }),
+                  );
+                });
+              }
             }
           }
         }
@@ -1166,6 +1753,8 @@ const pkg = {
           this.micCalls.delete(peerId);
         }
       }
+
+      this.handleCameraRouting();
     },
 
     /**
@@ -1178,8 +1767,7 @@ const pkg = {
       }
       if (!this.peer || this.peer.id === this.state.singerId) return;
 
-      const forteSvc = pkg.root.Processes.getService("ForteSvc").data;
-      const micStream = forteSvc.getMicAudioStream();
+      const micStream = this.getSessionMicStream();
       if (!micStream) return;
 
       for (let p of this.state.participants) {
@@ -1213,6 +1801,27 @@ const pkg = {
       this._lastRoutedEveryoneAudible = null;
       this.isDisconnecting = false;
       this.collisionResolver = null;
+
+      this.stopCamera(false);
+      for (const [key, call] of this.incomingCameraCalls) {
+        try {
+          call.close();
+        } catch (error) {
+          console.warn("[SESSIONS] Could not close camera call:", error);
+        }
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.CameraStreamEnded", {
+            detail: {
+              id: this.parseCameraCallKey(key).peerId,
+              source: this.parseCameraCallKey(key).source,
+            },
+          }),
+        );
+      }
+      this.incomingCameraCalls.clear();
+      this.isMuted = false;
+      this.applySessionMute(false);
+
       if (this._lyricsChunkBuffers) this._lyricsChunkBuffers.clear();
       if (this._pianoRollChunkBuffers) this._pianoRollChunkBuffers.clear();
 
@@ -1230,6 +1839,11 @@ const pkg = {
 
       console.log("[SESSIONS] Service state has been reset to default.");
       document.dispatchEvent(new CustomEvent("Encore.Sessions.ClearStreams"));
+      document.dispatchEvent(
+        new CustomEvent("Encore.Sessions.CameraStateUpdate", {
+          detail: { cameraEnabled: false, cameraSources: [], isMuted: false },
+        }),
+      );
       document.dispatchEvent(
         new CustomEvent("Encore.Sessions.LyricsData", { detail: null }),
       );
