@@ -114,6 +114,8 @@ const pkg = {
 
   data: {
     getRecordingAudioStream: () => state.recording.audioStream,
+    getSessionPerformanceAudioStream: () =>
+      state.recording.sessionAudioStream,
     getMicAudioStream: () => state.recording.micAudioStream,
     getMusicAudioStream: () => state.recording.musicAudioStream,
 
