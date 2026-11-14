@@ -58,6 +58,7 @@ export class BGVModule {
     this.currentLoadId = null;
 
     this.liveStream = null;
+    this.liveStreamSource = null;
     document.addEventListener("Encore.Camera.StreamReceived", (e) => {
       const detail = e.detail;
       if (detail?.stream) {
@@ -68,9 +69,12 @@ export class BGVModule {
       }
     });
 
-    document.addEventListener("Encore.Camera.StreamEnded", () =>
-      this.clearLiveStream(),
-    );
+    document.addEventListener("Encore.Camera.StreamEnded", (e) => {
+      const source = e.detail?.source;
+      if (!source || source === this.liveStreamSource) {
+        this.clearLiveStream();
+      }
+    });
 
     console.log("[BGV] BGV Player initialized.");
   }
@@ -88,6 +92,7 @@ export class BGVModule {
       source === "local" ? LOCAL_CAMERA_CATEGORY : REMOTE_CAMERA_CATEGORY;
 
     this.liveStream = stream;
+    this.liveStreamSource = source;
     this.categories = this.categories.filter(
       (c) => !CAMERA_CATEGORIES.includes(c.BGV_CATEGORY),
     );
@@ -105,6 +110,7 @@ export class BGVModule {
    */
   clearLiveStream() {
     this.liveStream = null;
+    this.liveStreamSource = null;
     this.categories = this.categories.filter(
       (c) => !CAMERA_CATEGORIES.includes(c.BGV_CATEGORY),
     );
