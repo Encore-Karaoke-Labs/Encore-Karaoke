@@ -527,6 +527,45 @@
   box-shadow: 0 0 15px rgba(85, 255, 85, 0.2) !important;
 }
 
+.session-invite-card .invite-action-btn.danger {
+  background: rgba(255, 85, 85, 0.15);
+  border: 1px solid rgba(255, 85, 85, 0.4);
+  color: #ff7777;
+}
+
+.session-invite-card .invite-action-btn.danger:hover,
+.session-invite-card .invite-action-btn.danger:focus {
+  background: rgba(255, 85, 85, 0.3);
+  border-color: #ff5555;
+  color: #fff;
+  box-shadow: 0 0 15px rgba(255, 85, 85, 0.35);
+}
+
+/* -- Session Camera & Mic Controls -- */
+.session-media-card {
+  padding: 0.5rem;
+  gap: 0;
+}
+
+.session-media-card .session-media-btn {
+  height: 64px;
+  padding: 0;
+}
+
+.session-media-card .session-media-btn ion-icon {
+  font-size: 2.25rem;
+}
+
+/* -- Session Camera Wall -- */
+.session-camera-wall .overlay-ui {
+  background: none;
+}
+
+.session-camera-wall .standby-bumper-image,
+.session-camera-wall .new-song-screen {
+  display: none;
+}
+
 /* -- Session Audio Settings -- */
 .session-settings-card {
   background: rgba(10, 10, 20, 0.6);
