@@ -1048,116 +1048,587 @@ export class RecorderModule {
     return this.scorePalette;
   }
 
+  /**
+   * Resolves the live score overlay's geometry into the recorder's 1280x720
+   * logical stage space.
+   * @private
+   */
+  _getScoreGeometry() {
+    const host = this.uiRefs?.postSongScreen?.elm;
+    if (!host) return null;
+
+    const hostRect = host.getBoundingClientRect();
+    if (hostRect.width < 2 || hostRect.height < 2) return null;
+
+    const scale = Math.min(hostRect.width / 1280, hostRect.height / 720);
+    if (!Number.isFinite(scale) || scale <= 0) return null;
+
+    const stageLeft = hostRect.left + (hostRect.width - 1280 * scale) / 2;
+    const stageTop = hostRect.top + (hostRect.height - 720 * scale) / 2;
+
+    const rect = (el) => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return null;
+      return {
+        x: (r.left - stageLeft) / scale,
+        y: (r.top - stageTop) / scale,
+        w: r.width / scale,
+        h: r.height / scale,
+      };
+    };
+
+    const opacity = (el) => {
+      if (!el) return 0;
+      return parseFloat(getComputedStyle(el).opacity || "1");
+    };
+
+    const style = (el) => {
+      if (!el) return null;
+      const cs = getComputedStyle(el);
+      return {
+        color: cs.color,
+        fontSize: parseFloat(cs.fontSize) || 16,
+        fontFamily: cs.fontFamily || "Rajdhani, sans-serif",
+        fontWeight: cs.fontWeight || "400",
+        opacity: parseFloat(cs.opacity || "1"),
+        textTransform: cs.textTransform,
+      };
+    };
+
+    return {
+      host,
+      rect,
+      opacity,
+      style,
+      query: (selector) => host.querySelector(selector),
+      queryAll: (selector) => Array.from(host.querySelectorAll(selector)),
+    };
+  }
+
+  /**
+   * Draws a single text element using the live DOM's resolved typography.
+   * @private
+   */
+  _drawScoreText(ctx, text, rect, style, options = {}) {
+    const { alpha = 1, maxWidth = null, align = "left" } = options;
+    if (!rect || !text) return;
+
+    const value =
+      style?.textTransform === "uppercase" ? text.toUpperCase() : text;
+    const opacity = Math.max(0, Math.min(1, alpha * (style?.opacity ?? 1)));
+    if (opacity <= 0.005) return;
+
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.fillStyle = style?.color || "#ffffff";
+    ctx.font = `${style?.fontWeight || 400} ${Math.floor(
+      style?.fontSize || 16,
+    )}px ${style?.fontFamily || "Rajdhani, sans-serif"}`;
+    ctx.textBaseline = "middle";
+    ctx.textAlign = align;
+
+    const x =
+      align === "center"
+        ? rect.x + rect.w / 2
+        : align === "right"
+          ? rect.x + rect.w
+          : rect.x;
+    const y = rect.y + rect.h / 2;
+
+    ctx.fillText(value, x, y, maxWidth || Math.max(8, rect.w * 1.02));
+    ctx.restore();
+  }
+
+  /**
+   * Draws the score breakdown panel, including the animated metric rows,
+   * their progress bars, and the note interpretation tiers.
+   * @private
+   */
+  _drawScoreBreakdown(ctx, geom, colors, parentAlpha) {
+    const panel = geom.query(".score-breakdown");
+    if (!panel || panel.classList.contains("hidden")) return;
+
+    const panelRect = geom.rect(panel);
+    if (!panelRect) return;
+
+    const panelAlpha = parentAlpha * geom.opacity(panel);
+    if (panelAlpha <= 0.005) return;
+
+    const cs = getComputedStyle(panel);
+
+    const borderWidth = parseFloat(cs.borderLeftWidth) || 0;
+    if (borderWidth > 0) {
+      ctx.save();
+      ctx.globalAlpha = panelAlpha;
+      ctx.fillStyle = cs.borderLeftColor || "rgba(255, 255, 255, 0.14)";
+      ctx.fillRect(panelRect.x, panelRect.y, borderWidth, panelRect.h);
+      ctx.restore();
+    }
+
+    const head = geom.query(".score-breakdown-head");
+    const headRect = geom.rect(head);
+    const headCs = head ? getComputedStyle(head) : null;
+
+    const titleEl = geom.query(".score-breakdown-title");
+    this._drawScoreText(
+      ctx,
+      titleEl?.textContent,
+      geom.rect(titleEl),
+      geom.style(titleEl),
+      { alpha: panelAlpha },
+    );
+
+    const feverEl = geom.query(".score-breakdown-fever");
+    const feverRect = geom.rect(feverEl);
+    if (feverEl && feverRect) {
+      const feverCs = getComputedStyle(feverEl);
+      const radius = parseFloat(feverCs.borderRadius) || feverRect.h / 2;
+      ctx.save();
+      ctx.globalAlpha = panelAlpha;
+      ctx.fillStyle = feverCs.backgroundColor || colors.accent;
+      ctx.beginPath();
+      ctx.roundRect(
+        feverRect.x,
+        feverRect.y,
+        feverRect.w,
+        feverRect.h,
+        Math.min(radius, feverRect.h / 2),
+      );
+      ctx.fill();
+      ctx.restore();
+      this._drawScoreText(
+        ctx,
+        feverEl.textContent,
+        feverRect,
+        {
+          color: feverCs.color || colors.ink,
+          fontSize: parseFloat(feverCs.fontSize) || 10,
+          fontFamily: feverCs.fontFamily || "Rajdhani, sans-serif",
+          fontWeight: feverCs.fontWeight || "700",
+          opacity: parseFloat(feverCs.opacity || "1"),
+          textTransform: feverCs.textTransform,
+        },
+        { alpha: panelAlpha, align: "center" },
+      );
+    }
+
+    if (headRect && headCs) {
+      const borderBottom = parseFloat(headCs.borderBottomWidth) || 0;
+      if (borderBottom > 0) {
+        ctx.save();
+        ctx.globalAlpha = panelAlpha;
+        ctx.fillStyle = headCs.borderBottomColor || "rgba(255, 255, 255, 0.14)";
+        ctx.fillRect(
+          headRect.x,
+          headRect.y + headRect.h - borderBottom,
+          headRect.w,
+          borderBottom,
+        );
+        ctx.restore();
+      }
+    }
+
+    for (const row of geom.queryAll(".score-stat-row")) {
+      const rowAlpha = panelAlpha * geom.opacity(row);
+
+      const nameEl = row.querySelector(".score-stat-name");
+      const valueEl = row.querySelector(".score-stat-value");
+      this._drawScoreText(
+        ctx,
+        nameEl?.textContent,
+        geom.rect(nameEl),
+        geom.style(nameEl),
+        { alpha: rowAlpha },
+      );
+      this._drawScoreText(
+        ctx,
+        valueEl?.textContent,
+        geom.rect(valueEl),
+        geom.style(valueEl),
+        { alpha: rowAlpha },
+      );
+
+      const barEl = row.querySelector(".score-stat-bar");
+      const barRect = geom.rect(barEl);
+      if (barEl && barRect) {
+        const barCs = getComputedStyle(barEl);
+        const radius = barRect.h / 2;
+        ctx.save();
+        ctx.globalAlpha = rowAlpha;
+        ctx.fillStyle = barCs.backgroundColor || "rgba(28, 41, 85, 0.72)";
+        ctx.beginPath();
+        ctx.roundRect(barRect.x, barRect.y, barRect.w, barRect.h, radius);
+        ctx.fill();
+        ctx.restore();
+
+        const fillEl = row.querySelector(".score-stat-fill");
+        const fillRect = geom.rect(fillEl);
+        if (fillRect && fillRect.w > 0.5) {
+          const gradient = ctx.createLinearGradient(
+            fillRect.x,
+            fillRect.y,
+            fillRect.x + fillRect.w,
+            fillRect.y,
+          );
+          gradient.addColorStop(0, colors.accent);
+          gradient.addColorStop(1, "rgba(255, 255, 255, 0.88)");
+          ctx.save();
+          ctx.globalAlpha = rowAlpha;
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.roundRect(fillRect.x, fillRect.y, fillRect.w, fillRect.h, radius);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+
+    for (const tier of geom.queryAll(".score-tier")) {
+      const tierRect = geom.rect(tier);
+      if (!tierRect) continue;
+
+      const tierAlpha = panelAlpha * geom.opacity(tier);
+      const tierCs = getComputedStyle(tier);
+      const radius = parseFloat(tierCs.borderRadius) || 10;
+      const borderWidth = parseFloat(tierCs.borderTopWidth) || 0;
+
+      ctx.save();
+      ctx.globalAlpha = tierAlpha;
+      ctx.fillStyle = tierCs.backgroundColor || colors.wash;
+      ctx.beginPath();
+      ctx.roundRect(tierRect.x, tierRect.y, tierRect.w, tierRect.h, radius);
+      ctx.fill();
+      if (borderWidth > 0) {
+        ctx.strokeStyle = tierCs.borderTopColor || "rgba(255, 255, 255, 0.08)";
+        ctx.lineWidth = borderWidth;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      const countEl = tier.querySelector(".score-tier-count");
+      const labelEl = tier.querySelector(".score-tier-label");
+      this._drawScoreText(
+        ctx,
+        countEl?.textContent,
+        geom.rect(countEl),
+        geom.style(countEl),
+        { alpha: tierAlpha },
+      );
+      this._drawScoreText(
+        ctx,
+        labelEl?.textContent,
+        geom.rect(labelEl),
+        geom.style(labelEl),
+        { alpha: tierAlpha },
+      );
+    }
+
+    const creditEl = geom.query(".score-breakdown-credit");
+    if (creditEl && !creditEl.classList.contains("hidden")) {
+      const creditAlpha = panelAlpha * geom.opacity(creditEl);
+      const labelEl = creditEl.querySelector(".score-breakdown-credit-label");
+      const trackEl = creditEl.querySelector(".score-breakdown-credit-track");
+      this._drawScoreText(
+        ctx,
+        labelEl?.textContent,
+        geom.rect(labelEl),
+        geom.style(labelEl),
+        { alpha: creditAlpha },
+      );
+      this._drawScoreText(
+        ctx,
+        trackEl?.textContent,
+        geom.rect(trackEl),
+        geom.style(trackEl),
+        { alpha: creditAlpha },
+      );
+    }
+  }
+
+  /**
+   * Draws the session leaderboard when the score screen reveals it.
+   * @private
+   */
+  _drawScoreLeaderboard(ctx, geom, colors) {
+    const panel = geom.query(".score-session-leaderboard");
+    if (!panel || panel.classList.contains("hidden")) return;
+
+    const panelRect = geom.rect(panel);
+    if (!panelRect) return;
+
+    const panelAlpha = this.scoreScreenOpacity * geom.opacity(panel);
+    if (panelAlpha <= 0.005) return;
+
+    const cs = getComputedStyle(panel);
+    const radius = parseFloat(cs.borderRadius) || 25;
+    const borderWidth = parseFloat(cs.borderTopWidth) || 0;
+
+    ctx.save();
+    ctx.globalAlpha = panelAlpha;
+    ctx.fillStyle = cs.backgroundColor || colors.card;
+    ctx.beginPath();
+    ctx.roundRect(panelRect.x, panelRect.y, panelRect.w, panelRect.h, radius);
+    ctx.fill();
+    if (borderWidth > 0) {
+      ctx.strokeStyle = cs.borderTopColor || "rgba(255, 255, 255, 0.14)";
+      ctx.lineWidth = borderWidth;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    const heading = panel.querySelector("h3");
+    if (heading) {
+      const headingCs = getComputedStyle(heading);
+      const headingRect = geom.rect(heading);
+      if (headingRect) {
+        const headingBorder = parseFloat(headingCs.borderBottomWidth) || 0;
+        if (headingBorder > 0) {
+          ctx.save();
+          ctx.globalAlpha = panelAlpha;
+          ctx.fillStyle =
+            headingCs.borderBottomColor || "rgba(255, 255, 255, 0.14)";
+          ctx.fillRect(
+            headingRect.x,
+            headingRect.y + headingRect.h - headingBorder,
+            headingRect.w,
+            headingBorder,
+          );
+          ctx.restore();
+        }
+      }
+      this._drawScoreText(
+        ctx,
+        heading.textContent,
+        headingRect,
+        geom.style(heading),
+        { alpha: panelAlpha },
+      );
+    }
+
+    for (const row of geom.queryAll(".score-lb-row")) {
+      const rowRect = geom.rect(row);
+      if (!rowRect) continue;
+
+      const rowCs = getComputedStyle(row);
+      const rowRadius = parseFloat(rowCs.borderRadius) || 12;
+      const rowBorder = parseFloat(rowCs.borderTopWidth) || 0;
+
+      ctx.save();
+      ctx.globalAlpha = panelAlpha;
+      ctx.fillStyle = rowCs.backgroundColor || "rgba(28, 41, 85, 0.62)";
+      ctx.beginPath();
+      ctx.roundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, rowRadius);
+      ctx.fill();
+      if (rowBorder > 0) {
+        ctx.strokeStyle = rowCs.borderTopColor || "rgba(255, 255, 255, 0.08)";
+        ctx.lineWidth = rowBorder;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      const rankEl = row.querySelector(".score-lb-rank");
+      const nameEl = row.querySelector(".score-lb-name");
+      const songEl = row.querySelector(".score-lb-song");
+      const scoreEl = row.querySelector(".score-lb-score");
+
+      this._drawScoreText(
+        ctx,
+        rankEl?.textContent,
+        geom.rect(rankEl),
+        geom.style(rankEl),
+        { alpha: panelAlpha },
+      );
+      this._drawScoreText(
+        ctx,
+        nameEl?.textContent,
+        geom.rect(nameEl),
+        geom.style(nameEl),
+        { alpha: panelAlpha },
+      );
+      this._drawScoreText(
+        ctx,
+        songEl?.textContent,
+        geom.rect(songEl),
+        geom.style(songEl),
+        { alpha: panelAlpha },
+      );
+      this._drawScoreText(
+        ctx,
+        scoreEl?.textContent,
+        geom.rect(scoreEl),
+        geom.style(scoreEl),
+        { alpha: panelAlpha },
+      );
+
+      const avatarEl = row.querySelector(".score-lb-avatar");
+      const avatarRect = geom.rect(avatarEl);
+      if (
+        avatarEl &&
+        avatarRect &&
+        avatarEl.complete !== false &&
+        avatarEl.naturalWidth > 0
+      ) {
+        ctx.save();
+        ctx.globalAlpha = panelAlpha;
+        ctx.beginPath();
+        ctx.arc(
+          avatarRect.x + avatarRect.w / 2,
+          avatarRect.y + avatarRect.h / 2,
+          Math.min(avatarRect.w, avatarRect.h) / 2,
+          0,
+          Math.PI * 2,
+        );
+        ctx.clip();
+        ctx.drawImage(
+          avatarEl,
+          avatarRect.x,
+          avatarRect.y,
+          avatarRect.w,
+          avatarRect.h,
+        );
+        ctx.restore();
+      }
+    }
+  }
+
   _drawPostSongScreen(ctx, w, h) {
     const colors = this._getScorePalette();
     if (!colors) return;
 
+    const geom = this._getScoreGeometry();
+    if (!geom) return;
+
     const assets = this._getScoreAssets();
     const scale = Math.min(w / 1280, h / 720);
-    const unit = (value) => value * scale;
-    const stageW = unit(1280);
-    const stageH = unit(720);
-    const offsetX = (w - stageW) / 2;
-    const offsetY = (h - stageH) / 2;
+    const offsetX = (w - 1280 * scale) / 2;
+    const offsetY = (h - 720 * scale) / 2;
+    const baseAlpha = this.scoreScreenOpacity;
 
     ctx.save();
-    ctx.globalAlpha = this.scoreScreenOpacity;
+    ctx.globalAlpha = baseAlpha;
 
     ctx.fillStyle = colors.surface;
     ctx.fillRect(0, 0, w, h);
 
-    if (assets.background.complete && assets.background.naturalWidth > 0) {
-      ctx.drawImage(assets.background, offsetX, offsetY, stageW, stageH);
-    }
-
-    ctx.fillStyle = colors.wash;
-    ctx.fillRect(offsetX, offsetY, stageW, stageH);
-
     ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
 
-    const phrase =
-      this.uiRefs?.scoreHeadlineText?.elm?.querySelector(".score-headline-text")
-        ?.textContent || "すごいだよ！";
-
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    ctx.font = `400 ${Math.floor(unit(120))}px "GenEiKiwamiGo", sans-serif`;
-
-    const headlineX = unit(44);
-    const headlineY = unit(26);
-    ctx.fillStyle = colors.ink;
-    ctx.fillText("「", headlineX, headlineY);
-    let headlineCursor = headlineX + ctx.measureText("「").width;
-    ctx.fillStyle = colors.accent;
-    ctx.fillText(phrase, headlineCursor, headlineY);
-    headlineCursor += ctx.measureText(phrase).width;
-    ctx.fillStyle = colors.ink;
-    ctx.fillText("」", headlineCursor, headlineY);
-
-    const cardX = unit(44);
-    const cardY = unit(178);
-    const cardW = unit(883);
-    const cardH = unit(414);
-    const cardRadius = unit(25);
-
-    ctx.fillStyle = colors.card;
     ctx.beginPath();
-    ctx.roundRect(cardX, cardY, cardW, cardH, cardRadius);
-    ctx.fill();
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(cardX, cardY, cardW, cardH, cardRadius);
+    ctx.rect(0, 0, 1280, 720);
     ctx.clip();
 
-    const label = this.uiRefs?.scoreTitleText?.elm?.textContent ?? "";
-    if (label) {
-      ctx.fillStyle = colors.ink;
-      ctx.font = `400 ${Math.floor(unit(50))}px "GenEiKiwamiGo", sans-serif`;
-      ctx.fillText(label, cardX + unit(39), cardY + unit(26) + unit(50) * 0.15);
+    ctx.save();
+    if (assets.background.complete && assets.background.naturalWidth > 0) {
+      ctx.drawImage(assets.background, 0, 0, 1280, 720);
     }
+    ctx.fillStyle = colors.wash;
+    ctx.fillRect(0, 0, 1280, 720);
+    ctx.restore();
 
-    const scoreText =
-      this.uiRefs?.finalScoreDisplay?.elm?.textContent ?? "0.00";
-    ctx.fillStyle = colors.accent;
-    ctx.font = `400 ${Math.floor(unit(155))}px "GenEiKiwamiGo", sans-serif`;
-    ctx.fillText(
-      scoreText,
-      cardX + unit(39),
-      cardY + unit(133) + unit(155) * 0.15,
-    );
-
-    const rankEl = this.uiRefs?.rankDisplay?.elm;
-    if (rankEl) {
-      const rankText = (rankEl.textContent || "").toUpperCase();
-      const rankOpacity = parseFloat(rankEl.style.opacity || "0");
-      if (rankText && rankOpacity > 0.01) {
-        ctx.globalAlpha = this.scoreScreenOpacity * rankOpacity;
-        ctx.fillStyle = colors.text;
-        ctx.font = `400 ${Math.floor(unit(30))}px "GenEiKiwamiGo", sans-serif`;
-        ctx.fillText(
-          rankText,
-          cardX + unit(39),
-          cardY + unit(133) + unit(155) * 1.3 + unit(12),
+    const headline = geom.query(".score-headline");
+    if (headline) {
+      const headlineAlpha = baseAlpha * geom.opacity(headline);
+      for (const span of headline.querySelectorAll("span")) {
+        this._drawScoreText(
+          ctx,
+          span.textContent,
+          geom.rect(span),
+          geom.style(span),
+          {
+            alpha: headlineAlpha,
+          },
         );
-        ctx.globalAlpha = this.scoreScreenOpacity;
       }
     }
 
-    ctx.restore();
+    // -- Score card --
+    const card = geom.query(".score-card");
+    const cardRect = geom.rect(card);
+    if (card && cardRect) {
+      const cardAlpha = baseAlpha * geom.opacity(card);
+      const cardCs = getComputedStyle(card);
+      const radius = parseFloat(cardCs.borderRadius) || 25;
+      const cardColor =
+        cardCs.backgroundColor && cardCs.backgroundColor !== "rgba(0, 0, 0, 0)"
+          ? cardCs.backgroundColor
+          : colors.card;
 
-    if (assets.logo.complete && assets.logo.naturalWidth > 0) {
-      ctx.drawImage(
-        assets.logo,
-        unit(44),
-        unit(624),
-        unit(191),
-        unit(191) * (122 / 368),
+      ctx.save();
+      ctx.globalAlpha = cardAlpha;
+      ctx.fillStyle = cardColor;
+      ctx.beginPath();
+      ctx.roundRect(cardRect.x, cardRect.y, cardRect.w, cardRect.h, radius);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(cardRect.x, cardRect.y, cardRect.w, cardRect.h, radius);
+      ctx.clip();
+
+      const titleEl = geom.query(".score-title-text");
+      const titleRect = geom.rect(titleEl);
+      this._drawScoreText(
+        ctx,
+        titleEl?.textContent,
+        titleRect,
+        geom.style(titleEl),
+        { alpha: cardAlpha, maxWidth: titleRect?.w },
       );
+
+      const scoreEl = geom.query(".score-display-number");
+      this._drawScoreText(
+        ctx,
+        scoreEl?.textContent,
+        geom.rect(scoreEl),
+        geom.style(scoreEl),
+        { alpha: cardAlpha },
+      );
+
+      const rankEl = geom.query(".rank-display-text");
+      this._drawScoreText(
+        ctx,
+        rankEl?.textContent,
+        geom.rect(rankEl),
+        geom.style(rankEl),
+        { alpha: cardAlpha },
+      );
+
+      this._drawScoreBreakdown(ctx, geom, colors, cardAlpha);
+      ctx.restore();
     }
 
-    if (assets.rightGraphic.complete && assets.rightGraphic.naturalWidth > 0) {
-      ctx.drawImage(assets.rightGraphic, unit(640), 0, unit(640), unit(720));
+    const logoEl = geom.query(".score-logo");
+    const logoRect = geom.rect(logoEl);
+    if (
+      logoEl &&
+      logoRect &&
+      logoEl.complete !== false &&
+      logoEl.naturalWidth > 0
+    ) {
+      ctx.globalAlpha = baseAlpha * geom.opacity(logoEl);
+      ctx.drawImage(logoEl, logoRect.x, logoRect.y, logoRect.w, logoRect.h);
+    }
+
+    this._drawScoreLeaderboard(ctx, geom, colors);
+
+    const graphicEl = geom.query(".score-right-graphic");
+    const graphicRect = geom.rect(graphicEl);
+    if (
+      graphicEl &&
+      graphicRect &&
+      graphicEl.complete !== false &&
+      graphicEl.naturalWidth > 0
+    ) {
+      ctx.globalAlpha = baseAlpha * geom.opacity(graphicEl);
+      ctx.drawImage(
+        graphicEl,
+        graphicRect.x,
+        graphicRect.y,
+        graphicRect.w,
+        graphicRect.h,
+      );
     }
 
     ctx.restore();
