@@ -893,6 +893,27 @@
   flex-shrink: 0;
 }
 
+.session-voice-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.session-voice-indicator ion-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.session-voice-indicator--muted {
+  color: #ff5555;
+}
+
+.session-voice-indicator--deafened {
+  color: #ff5555;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .session-recording-indicator .pulse-status {
     animation: none;
