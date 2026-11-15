@@ -807,6 +807,23 @@ export class RecorderModule {
       ctx.globalAlpha = 1.0;
     }
 
+    const sessionCameraCanvas = this.bgvPlayer.sessionCameraCanvas;
+    if (
+      sessionCameraCanvas &&
+      sessionCameraCanvas.style.display !== "none" &&
+      sessionCameraCanvas.width > 0 &&
+      sessionCameraCanvas.height > 0
+    ) {
+      this._drawContain(
+        ctx,
+        sessionCameraCanvas,
+        sessionCameraCanvas.width,
+        sessionCameraCanvas.height,
+        w,
+        h,
+      );
+    }
+
     // Render CD+G graphics layer directly on top
     const customCanvas = this.bgvPlayer.customCanvas;
     if (customCanvas && customCanvas.width > 0 && customCanvas.height > 0) {

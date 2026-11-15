@@ -775,6 +775,7 @@ export default class PlaybackManager {
     state.currentSongIsMV = false;
     state.currentSongIsYouTube = false;
     state.currentSongIsMultiplexed = false;
+    state.currentSongIsStandaloneVideo = false;
     state.currentSong = null;
     this.ctx.root.syncSetlistOverlay?.();
 

@@ -294,12 +294,6 @@ export default class SessionManager {
     const prevMode = state.sessionMode;
     state.sessionMode = sState.mode;
 
-    // The camera wall is the Lounge background. Hand the canvas back to BGV
-    // before performance playback starts so song videos can attach and show.
-    if (state.sessionMode === "performance" && this._cameraBgRafId !== null) {
-      this.stopCameraBackground(true);
-    }
-
     const newParticipants = sState.participants || [];
     const oldParticipants = state.knownParticipants || [];
     const myId = SessionsSvc.peer.id;
@@ -777,7 +771,7 @@ export default class SessionManager {
     this._cameraSlots = this.getCameraSlots();
 
     const shouldRender =
-      this._cameraSlots.length > 0 && state.sessionMode === "lounge";
+      this._cameraSlots.length > 0 && !this.isSongVideoRequired();
 
     if (shouldRender) {
       this.startCameraBackground();
@@ -787,14 +781,14 @@ export default class SessionManager {
   }
 
   /**
-   * Renders all active participant cameras onto the shared BGV canvas.
+   * Renders all active participant cameras onto the Session camera canvas.
    */
   startCameraBackground() {
     if (this._cameraBgRafId !== null) return;
 
     const bgv = this.ctx.modules.bgv;
-    const canvas = bgv?.getCustomCanvas?.();
-    const context = bgv?.getCustomContext?.();
+    const canvas = bgv?.getSessionCameraCanvas?.();
+    const context = bgv?.getSessionCameraContext?.();
     if (!canvas || !context) return;
 
     const ui = this.ctx.root.ui;
@@ -804,16 +798,14 @@ export default class SessionManager {
     }
     bgv.clearCustomGraphics?.();
 
-    bgv.setCanvasOnlyMode(true);
     this.ctx.dom.bgvContainer.classOff("hidden");
+    bgv.setSessionCameraWallVisible?.(true);
+    this.drawCameraBackground();
+    bgv.setCanvasOnlyMode(true);
     this.ctx.wrapper.classOn("session-camera-wall");
 
     const draw = () => {
-      if (
-        !this.ctx.state.isSessionActive ||
-        this.ctx.state.sessionMode !== "lounge" ||
-        this._cameraSlots.length === 0
-      ) {
+      if (!this.ctx.state.isSessionActive || this._cameraSlots.length === 0) {
         this.stopCameraBackground(true);
         return;
       }
@@ -826,7 +818,7 @@ export default class SessionManager {
   }
 
   /**
-   * Stops the camera canvas and optionally restores the previous BGV.
+   * Stops the camera wall and optionally restores the previous BGV.
    * @param {boolean} restore - Restore lounge/BGV rendering when true.
    */
   stopCameraBackground(restore = true) {
@@ -838,13 +830,13 @@ export default class SessionManager {
     this.ctx.wrapper?.classOff("session-camera-wall");
 
     const bgv = this.ctx.modules.bgv;
-    bgv?.clearCustomGraphics?.();
+    bgv?.setSessionCameraWallVisible?.(false);
 
     if (!restore || !this.ctx.state.isSessionActive) return;
 
     if (this.ctx.state.sessionMode === "lounge") {
       this.ctx.root.ui.startLoungeBackground();
-    } else {
+    } else if (!this.ctx.state.currentSongIsYouTube) {
       bgv?.setCanvasOnlyMode?.(false);
     }
   }
@@ -854,8 +846,8 @@ export default class SessionManager {
    */
   drawCameraBackground() {
     const bgv = this.ctx.modules.bgv;
-    const context = bgv?.getCustomContext?.();
-    const canvas = bgv?.getCustomCanvas?.();
+    const context = bgv?.getSessionCameraContext?.();
+    const canvas = bgv?.getSessionCameraCanvas?.();
     if (!context || !canvas) return;
 
     const rect = canvas.getBoundingClientRect();
@@ -1196,6 +1188,20 @@ export default class SessionManager {
 
   handleLocalTrackInfo(e) {
     this.ctx.services.SessionsSvc?.broadcastTrackInfo?.(e.detail || null);
+    this.updateCameraBackground();
+  }
+
+  /**
+   * Whether the current performance's lyrics only exist in its video (a
+   * standalone music video or a YouTube playback).
+   * @returns {boolean}
+   */
+  isSongVideoRequired() {
+    if (!this.isSessionSinger()) return false;
+    const state = this.ctx.state;
+    return Boolean(
+      state.currentSongIsYouTube || state.currentSongIsStandaloneVideo,
+    );
   }
 
   /**

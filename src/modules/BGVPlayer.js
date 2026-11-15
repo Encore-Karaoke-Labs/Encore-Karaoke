@@ -17,6 +17,8 @@ export class BGVModule {
     this.videoElement = null;
     this.customCanvas = null;
     this.customCtx = null;
+    this.sessionCameraCanvas = null;
+    this.sessionCameraCtx = null;
     this.resizeObserver = null;
     this.canvasOnlyMode = false;
 
@@ -177,6 +179,23 @@ export class BGVModule {
 
     this.imageCtx = this.imageCanvas.getContext("2d", { alpha: false });
 
+    this.sessionCameraCanvas = new Html("canvas")
+      .styleJs({
+        position: "absolute",
+        top: "0",
+        left: "0",
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        display: "none",
+        zIndex: "6",
+      })
+      .appendTo(this.container).elm;
+
+    this.sessionCameraCtx = this.sessionCameraCanvas.getContext("2d", {
+      alpha: true,
+    });
+
     this.customCanvas = new Html("canvas")
       .styleJs({
         position: "absolute",
@@ -212,6 +231,13 @@ export class BGVModule {
           if (this.currentImage) {
             this._drawImageCover(this.currentImage);
           }
+        }
+
+        this.sessionCameraCanvas.width = width * dpr;
+        this.sessionCameraCanvas.height = height * dpr;
+        if (this.sessionCameraCtx) {
+          this.sessionCameraCtx.setTransform(1, 0, 0, 1, 0, 0);
+          this.sessionCameraCtx.scale(dpr, dpr);
         }
       }
     });
@@ -802,6 +828,46 @@ export class BGVModule {
    */
   getCustomCanvas() {
     return this.customCanvas;
+  }
+
+  /**
+   * Returns the 2D rendering context of the Session camera wall layer.
+   * @returns {CanvasRenderingContext2D}
+   */
+  getSessionCameraContext() {
+    return this.sessionCameraCtx;
+  }
+
+  /**
+   * Returns the Session camera wall canvas element.
+   * @returns {HTMLCanvasElement}
+   */
+  getSessionCameraCanvas() {
+    return this.sessionCameraCanvas;
+  }
+
+  /**
+   * Shows or hides the Session camera wall layer.
+   * @param {boolean} visible - Whether the camera wall should be visible.
+   */
+  setSessionCameraWallVisible(visible) {
+    if (!this.sessionCameraCanvas) return;
+    this.sessionCameraCanvas.style.display = visible ? "block" : "none";
+    if (!visible) this.clearSessionCameraWall();
+  }
+
+  /**
+   * Clears the Session camera wall layer.
+   */
+  clearSessionCameraWall() {
+    if (!this.sessionCameraCtx || !this.sessionCameraCanvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    this.sessionCameraCtx.clearRect(
+      0,
+      0,
+      this.sessionCameraCanvas.width / dpr,
+      this.sessionCameraCanvas.height / dpr,
+    );
   }
 
   /**
