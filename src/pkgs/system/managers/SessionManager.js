@@ -364,6 +364,9 @@ export default class SessionManager {
           root.lyrics?.stopRemoteLyrics();
           this.ctx.services.Forte.stopRemotePianoRoll?.();
 
+          if (state.currentSong) root.playback.endSessionPerformance();
+          else root.playback.dismissScoreScreen();
+
           if (sState.nowPlaying) {
             root.playback.startPlayer(sState.nowPlaying);
             setTimeout(() => {
@@ -374,7 +377,7 @@ export default class SessionManager {
         } else {
           if (this.ctx.modules.recorder)
             this.ctx.modules.recorder.stopSessionAudioStream();
-          root.playback.stopPlayer();
+          root.playback.endSessionPerformance();
           this.ctx.services.Forte.stopRemotePianoRoll?.();
           root.ui.setMode("player");
           state.isTransitioning = false;
@@ -440,10 +443,13 @@ export default class SessionManager {
         if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
       }
 
-      // Never leave a finished performance playing behind the Lounge UI.
+      // Never leave a finished performance or score screen behind the
+      // Lounge UI without letting it score locally.
       if (state.mode === "player" || state.currentSong) {
-        root.playback.stopPlayer();
+        root.playback.endSessionPerformance();
         root.ui.setMode("menu");
+      } else {
+        root.playback.dismissScoreScreen();
       }
       if (enteringLounge) {
         root.ui.setMode("menu");
@@ -1502,8 +1508,10 @@ export default class SessionManager {
 
     this.stopSongRecording();
 
-    if (this.ctx.state.mode === "player") {
-      this.ctx.root.playback.stopPlayer();
+    if (this.ctx.state.mode.startsWith("player")) {
+      // The host's next state update starts the following performance, so end
+      // the current one without showing the score screen here.
+      this.ctx.root.playback.endSessionPerformance();
       this.ctx.services.Forte.stopRemotePianoRoll?.();
       this.ctx.modules.scoreHud?.hide();
       this.ctx.modules.infoBar.showTemp(
@@ -1511,6 +1519,8 @@ export default class SessionManager {
         "The host skipped the current performance.",
         4000,
       );
+    } else {
+      this.ctx.root.playback.dismissScoreScreen();
     }
   }
 
@@ -3231,6 +3241,22 @@ export default class SessionManager {
         })
         .appendTo(mediaRow);
 
+      if (state.isSessionHost && SessionsSvc.state.mode === "performance") {
+        new Html("button")
+          .classOn("invite-action-btn", "primary")
+          .attr({
+            type: "button",
+            "aria-label": "Skip the current performance",
+            title: "Skip current song",
+          })
+          .html('<ion-icon name="play-skip-forward"></ion-icon>')
+          .on("click", () => {
+            SessionsSvc.skipCurrentSong();
+            this.toggleSessionModal(false);
+          })
+          .appendTo(mediaRow);
+      }
+
       const partList = new Html("div")
         .classOn("session-participants-list")
         .appendTo(leftCol);
@@ -3395,17 +3421,6 @@ export default class SessionManager {
         .classOn("session-btn-row")
         .styleJs({ marginTop: "auto", width: "100%" })
         .appendTo(leftCol);
-
-      if (state.isSessionHost && SessionsSvc.state.mode === "performance") {
-        new Html("button")
-          .classOn("session-btn", "primary")
-          .text("SKIP SONG")
-          .on("click", () => {
-            SessionsSvc.skipCurrentSong();
-            this.toggleSessionModal(false);
-          })
-          .appendTo(btnRow);
-      }
 
       new Html("button")
         .classOn("session-btn")
