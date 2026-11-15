@@ -415,7 +415,11 @@ export default class PlaybackManager {
       state.currentSongIsMultiplexed = pbState.isMultiplexed;
       state.currentSongIsMIDI = pbState.isMidi;
 
-      if (pbState.hasGuideNotes && root.input) {
+      if (
+        pbState.hasGuideNotes &&
+        root.input &&
+        root.input.persistGuideMelody
+      ) {
         const guideLevel =
           root.input.guideMelodyLevels?.[root.input.currentGuideMelodyIndex];
         if (guideLevel) Forte.setGuideTrackVolume(guideLevel.value);
@@ -710,7 +714,7 @@ export default class PlaybackManager {
       Forte.playTrack();
 
       const input = this.ctx.root.input;
-      if (input && pbState.hasGuideNotes) {
+      if (input && input.persistGuideMelody && pbState.hasGuideNotes) {
         const level = input.guideMelodyLevels?.[input.currentGuideMelodyIndex];
         if (level) {
           Forte.setGuideTrackVolume(level.value);
