@@ -98,6 +98,7 @@ class EncoreController {
       isScoreScreenActive: false,
       scoreSkipResolver: null,
       scoreSkipped: false,
+      suppressScoreScreen: false,
 
       showSongList: false,
 
