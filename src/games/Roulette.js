@@ -474,11 +474,7 @@ export default class RouletteGame {
         70,
         "#55ff55",
         () => {
-          if (this.ctx.state.isSessionActive) {
-            this.ctx.root.sessions.reserveSongInSession(this.rollTargetSong);
-          } else {
-            this.ctx.root.playback.startPlayer(this.rollTargetSong);
-          }
+          this.ctx.root.playback.requestSong(this.rollTargetSong);
           this.handleEscape();
         },
       );
