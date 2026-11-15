@@ -791,6 +791,31 @@ export default class PlaybackManager {
     if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
   }
 
+  /**
+   * Stops the local track.
+   */
+  endSessionPerformance() {
+    const state = this.ctx.state;
+
+    state.suppressScoreScreen = true;
+    this.stopPlayer();
+    state.suppressScoreScreen = false;
+
+    this.dismissScoreScreen();
+  }
+
+  /**
+   * Closes the post-song score screen if it is currently waiting to finish.
+   */
+  dismissScoreScreen() {
+    const state = this.ctx.state;
+    if (!state.isScoreScreenActive || !state.scoreSkipResolver) return;
+
+    this.ctx.services.Forte.stopSfx();
+    state.scoreSkipped = true;
+    state.scoreSkipResolver();
+  }
+
   cleanupPlayerEvents() {
     if (this.ctx.root.lyrics) this.ctx.root.lyrics.cleanupEvents();
 
@@ -837,6 +862,9 @@ export default class PlaybackManager {
       state.isTransitioning = true;
       this.ctx.services.Forte.togglePianoRollVisibility(false);
 
+      const suppressScore = Boolean(state.suppressScoreScreen);
+      state.suppressScoreScreen = false;
+
       const wasLocalAudio = !state.currentSongIsYouTube;
       const wasMV = state.currentSongIsMV;
       this.ctx.modules.scoreHud.hide();
@@ -849,7 +877,7 @@ export default class PlaybackManager {
           this.ctx.config.audioConfig?.enableScoring !== false ||
           state.isSessionActive;
 
-        if (isScoringEnabled) {
+        if (isScoringEnabled && !suppressScore) {
           const finalScore = this.ctx.services.Forte.getPlaybackState().score;
 
           if (
@@ -880,7 +908,11 @@ export default class PlaybackManager {
         recorder.clearSongInfo();
       }
 
-      this.transitionAfterSong();
+      if (suppressScore) {
+        state.isTransitioning = false;
+      } else {
+        this.transitionAfterSong();
+      }
     }
     state.lastPlaybackStatus = status;
   }
