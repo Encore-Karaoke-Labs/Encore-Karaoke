@@ -57,7 +57,7 @@
 }
 
 .mixer-content {
-  width: 715px;
+  width: 820px;
   height: 80vh;
   max-height: 800px;
   background: rgba(10, 10, 20, 0.85);
@@ -109,8 +109,8 @@
 /* -- Faders and Meters -- */
 .mixer-faders-section {
   display: flex;
-  gap: 3rem;
-  padding: 2rem 4rem;
+  gap: 2rem;
+  padding: 2rem 2.5rem;
   background: rgba(0, 0, 0, 0.6);
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
@@ -204,6 +204,10 @@
   box-shadow:
     0 4px 10px rgba(0, 0, 0, 0.6),
     inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+.channel-strip.deafened .fader-thumb {
+  background: rgba(255, 85, 85, 0.85);
 }
 /* -- Effects Chain -- */
 .mixer-chain-section {
