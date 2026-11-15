@@ -179,6 +179,17 @@ const pkg = {
       synthesizer.sendExternalMasterVolume(level);
     },
     setSfxVolume: (level) => audioCore.setSfxVolume(level),
+    setSessionVolume: (level) => audioCore.setSessionVolume(level),
+    setSessionDeafened: (deafened) => {
+      audioCore.setSessionDeafened(deafened);
+      document.dispatchEvent(
+        new CustomEvent("Encore.Sessions.DeafenStateUpdate", {
+          detail: { deafened: Boolean(deafened) },
+        }),
+      );
+    },
+    getSessionMonitorState: () => audioCore.getSessionMonitorState(),
+    getSessionLevel: () => audioCore.getSessionLevel(),
 
     setVerbose: (enabled) => {
       state.verbose = Boolean(enabled);
