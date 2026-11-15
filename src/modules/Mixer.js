@@ -24,6 +24,7 @@ export class MixerModule {
 
     this._micSaveTimeout = null;
     this._musicSaveTimeout = null;
+    this._sessionSaveTimeout = null;
 
     this.focusedPane = "faders";
     this.faderIndex = 0;
@@ -86,6 +87,14 @@ export class MixerModule {
     });
 
     this._setupGlobalMouseEvents();
+
+    this._deafenStateHandler = () => {
+      if (this.isVisible) this._updateFaderVisuals();
+    };
+    document.addEventListener(
+      "Encore.Sessions.DeafenStateUpdate",
+      this._deafenStateHandler,
+    );
   }
 
   /**
@@ -135,7 +144,7 @@ export class MixerModule {
 
   /**
    * Switches the effects chain being edited in the mixer.
-   * @param {"mic"|"music"} channel - Target channel
+   * @param {"mic"|"music"|"session"} channel - Target channel
    * @param {Object} [options] - Options
    * @param {boolean} [options.preserveFaderFocus] - Keep the currently focused fader
    */
@@ -143,7 +152,7 @@ export class MixerModule {
     const changed = this.activeChannel !== channel;
     this.activeChannel = channel;
 
-    if (!preserveFaderFocus) this.faderIndex = channel === "music" ? 1 : 0;
+    if (!preserveFaderFocus) this.faderIndex = this._faderIndexForType(channel);
     if (!changed) return;
 
     this.chainIndex = 0;
@@ -189,13 +198,42 @@ export class MixerModule {
     }, 300);
   }
 
+  _saveSessionVolume(val) {
+    if (this._sessionSaveTimeout) clearTimeout(this._sessionSaveTimeout);
+    this._sessionSaveTimeout = setTimeout(() => {
+      window.config?.setItem("audioConfig.sessionVolume", val);
+    }, 300);
+  }
+
   /**
-   * Renders the mic and music faders section of the mixer.
+   * Maps a fader type to its left-to-right index.
+   * @param {"mic"|"music"|"session"} type - Fader identifier
+   * @returns {number}
+   */
+  _faderIndexForType(type) {
+    if (type === "mic") return 0;
+    if (type === "music") return 1;
+    return 2;
+  }
+
+  /**
+   * Maps a fader index back to its type.
+   * @param {number} index - Fader index
+   * @returns {"mic"|"music"|"session"}
+   */
+  _faderTypeForIndex(index) {
+    if (index === 0) return "mic";
+    if (index === 1) return "music";
+    return "session";
+  }
+
+  /**
+   * Renders the mic, music and session faders section of the mixer.
    */
   _renderFaders() {
     this.fadersSection.clear();
 
-    const createFader = (label, maxVal, isMic) => {
+    const createFader = (label, maxVal, type) => {
       const strip = new Html("div")
         .classOn("channel-strip")
         .appendTo(this.fadersSection);
@@ -232,24 +270,26 @@ export class MixerModule {
 
       hitArea.on("mousedown", (e) => {
         this.isDraggingFader = true;
-        this.dragFaderType = isMic ? "mic" : "music";
-        this._handleFaderMouse(e, track.elm, isMic, maxVal);
+        this.dragFaderType = type;
+        this._handleFaderMouse(e, track.elm, type, maxVal);
       });
 
       strip.on("mousedown", () => {
-        this.faderIndex = isMic ? 0 : 1;
-        this._setActiveChannel(isMic ? "mic" : "music", {
+        this.faderIndex = this._faderIndexForType(type);
+        this._setActiveChannel(type, {
           preserveFaderFocus: true,
         });
         this.focusedPane = "faders";
         this._updateHighlights();
       });
 
-      return { strip, track, thumb, valDisplay, vuFill };
+      return { strip, track, thumb, valDisplay, vuFill, type, maxVal };
     };
 
-    this.micFader = createFader("MIC", 2.0, true);
-    this.musicFader = createFader("MUSIC", 1.0, false);
+    this.micFader = createFader("MIC", 2.0, "mic");
+    this.musicFader = createFader("MUSIC", 1.0, "music");
+    this.sessionFader = createFader("SESSION", 1.0, "session");
+
     this._updateFaderVisuals();
   }
 
@@ -257,7 +297,7 @@ export class MixerModule {
    * Updates the visual representation of faders based on current state.
    */
   _updateFaderVisuals() {
-    if (!this.micFader || !this.musicFader) return;
+    if (!this.micFader || !this.musicFader || !this.sessionFader) return;
 
     const micVal = this.state.micMonitorVolume ?? this.state.micGain ?? 1.0;
     const micPercent = (micVal / 2.0) * 100;
@@ -272,6 +312,20 @@ export class MixerModule {
     const musPercent = (musVal / 1.0) * 100;
     this.musicFader.thumb.styleJs({ bottom: `calc(${musPercent}% - 8px)` });
     this.musicFader.valDisplay.text(`${(musVal * 100).toFixed(0)} %`);
+
+    const sessionState = this.Forte.getSessionMonitorState?.() || {
+      volume: this.appState?.sessionVolume ?? 1.0,
+      deafened: false,
+    };
+    const sesVal = sessionState.volume ?? 1.0;
+    const sesPercent = (sesVal / 1.0) * 100;
+    this.sessionFader.thumb.styleJs({ bottom: `calc(${sesPercent}% - 8px)` });
+    this.sessionFader.valDisplay
+      .text(`${(sesVal * 100).toFixed(0)} %`)
+      .styleJs({ color: sessionState.deafened ? "#ff5555" : "#89cff0" });
+
+    this.sessionFader.strip.classOff("deafened");
+    if (sessionState.deafened) this.sessionFader.strip.classOn("deafened");
   }
 
   /**
@@ -287,7 +341,7 @@ export class MixerModule {
       this.state.micGain = val;
       this.state.micMonitorVolume = val;
       this._saveMicVolume(val);
-    } else {
+    } else if (this.faderIndex === 1) {
       let currentVal =
         this.Forte.getPlaybackState?.()?.volume ??
         this.appState?.volume ??
@@ -299,6 +353,15 @@ export class MixerModule {
       this.state.musicGain = val;
       if (this.appState) this.appState.volume = val;
       this._saveMusicVolume(val);
+    } else {
+      const sessionState = this.Forte.getSessionMonitorState?.() || {
+        volume: 1.0,
+      };
+      const currentVal = sessionState.volume ?? 1.0;
+      const val = Math.max(0, Math.min(1.0, currentVal + delta));
+      this.Forte.setSessionVolume?.(val);
+      if (this.appState) this.appState.sessionVolume = val;
+      this._saveSessionVolume(val);
     }
     this._updateFaderVisuals();
   }
@@ -316,6 +379,20 @@ export class MixerModule {
       rawConfig: [],
     };
     const activeChain = activeState.chain || [];
+
+    if (this.activeChannel === "session") {
+      new Html("h3")
+        .classOn("chain-header")
+        .text("SESSION VOICES")
+        .appendTo(this.chainSection);
+      new Html("p")
+        .classOn("chain-subtitle")
+        .text(
+          "Incoming Lounge and Everyone Audible voice streams. These bypass the music chain and are controlled only by the SESSION fader or DEAFEN.",
+        )
+        .appendTo(this.chainSection);
+      return;
+    }
 
     new Html("h3")
       .classOn("chain-header")
@@ -552,12 +629,19 @@ export class MixerModule {
   _setupGlobalMouseEvents() {
     this._mouseMoveHandler = (e) => {
       if (!this.isDraggingFader) return;
-      const trackEl =
+      const fader =
         this.dragFaderType === "mic"
-          ? this.micFader.track.elm
-          : this.musicFader.track.elm;
-      const maxVal = this.dragFaderType === "mic" ? 2.0 : 1.0;
-      this._handleFaderMouse(e, trackEl, this.dragFaderType === "mic", maxVal);
+          ? this.micFader
+          : this.dragFaderType === "music"
+            ? this.musicFader
+            : this.sessionFader;
+      if (!fader) return;
+      this._handleFaderMouse(
+        e,
+        fader.track.elm,
+        this.dragFaderType,
+        fader.maxVal,
+      );
     };
     this._mouseUpHandler = () => {
       this.isDraggingFader = false;
@@ -571,27 +655,31 @@ export class MixerModule {
    * Handles mouse movement events for fader dragging.
    * @param {MouseEvent} e - The mouse event
    * @param {HTMLElement} trackEl - The fader track element
-   * @param {boolean} isMic - Whether this is the mic fader (true) or music fader (false)
+   * @param {"mic"|"music"|"session"} type - Which fader is being dragged
    * @param {number} maxVal - The maximum value for the fader
    */
-  _handleFaderMouse(e, trackEl, isMic, maxVal) {
+  _handleFaderMouse(e, trackEl, type, maxVal) {
     const rect = trackEl.getBoundingClientRect();
     let y = e.clientY - rect.top;
     y = Math.max(0, Math.min(rect.height, y));
     const percent = 1 - y / rect.height;
     const val = percent * maxVal;
-    if (isMic) {
+    if (type === "mic") {
       this.Forte.setMicRecordingVolume(val);
       this.Forte.setMicMonitorVolume?.(val);
       this.state.micGain = val;
       this.state.micMonitorVolume = val;
       this._saveMicVolume(val);
-    } else {
+    } else if (type === "music") {
       this.Forte.setTrackVolume?.(val);
       this.Forte.setMusicRecordingVolume(val);
       this.state.musicGain = val;
       if (this.appState) this.appState.volume = val;
       this._saveMusicVolume(val);
+    } else {
+      this.Forte.setSessionVolume?.(val);
+      if (this.appState) this.appState.sessionVolume = val;
+      this._saveSessionVolume(val);
     }
     this._updateFaderVisuals();
   }
@@ -610,6 +698,7 @@ export class MixerModule {
       this.musicAnalyser.smoothingTimeConstant = 0.5;
       this.micMeterLevel = 0;
       this.musicMeterLevel = 0;
+      this.sessionMeterLevel = 0;
       try {
         const micStream = this.Forte.getMicAudioStream();
         if (micStream && micStream.active)
@@ -660,6 +749,16 @@ export class MixerModule {
           clipPath: `inset(${100 - this.musicMeterLevel}% 0 0 0)`,
         });
 
+      const newSessionLevel = this.Forte.getSessionLevel?.() ?? 0;
+      this.sessionMeterLevel =
+        newSessionLevel >= this.sessionMeterLevel
+          ? newSessionLevel
+          : Math.max(newSessionLevel, this.sessionMeterLevel * DECAY_RATE);
+      if (this.sessionFader && this.sessionFader.vuFill)
+        this.sessionFader.vuFill.styleJs({
+          clipPath: `inset(${100 - this.sessionMeterLevel}% 0 0 0)`,
+        });
+
       this.meterFrame = requestAnimationFrame(updateMeters);
     };
     updateMeters();
@@ -676,15 +775,25 @@ export class MixerModule {
    * Updates UI highlights to reflect the current focused pane and selection.
    */
   _updateHighlights() {
-    if (this.micFader && this.musicFader) {
-      this.micFader.strip.classOff("focused", "active-channel");
-      this.musicFader.strip.classOff("focused", "active-channel");
-      if (this.activeChannel === "mic")
-        this.micFader.strip.classOn("active-channel");
-      else this.musicFader.strip.classOn("active-channel");
+    if (this.micFader && this.musicFader && this.sessionFader) {
+      for (const fader of [this.micFader, this.musicFader, this.sessionFader]) {
+        fader.strip.classOff("focused", "active-channel");
+      }
+      const activeFader =
+        this.activeChannel === "mic"
+          ? this.micFader
+          : this.activeChannel === "music"
+            ? this.musicFader
+            : this.sessionFader;
+      activeFader.strip.classOn("active-channel");
       if (this.focusedPane === "faders") {
-        if (this.faderIndex === 0) this.micFader.strip.classOn("focused");
-        else this.musicFader.strip.classOn("focused");
+        const focusedFader =
+          this.faderIndex === 0
+            ? this.micFader
+            : this.faderIndex === 1
+              ? this.musicFader
+              : this.sessionFader;
+        focusedFader.strip.classOn("focused");
       }
     }
     this.chainItems.forEach((item, idx) => {
@@ -831,9 +940,11 @@ export class MixerModule {
         break;
       case "ArrowRight":
         if (this.focusedPane === "faders") {
-          if (this.faderIndex === 0) {
-            this.faderIndex = 1;
-            this._setActiveChannel("music", { preserveFaderFocus: true });
+          if (this.faderIndex < 2) {
+            this.faderIndex += 1;
+            this._setActiveChannel(this._faderTypeForIndex(this.faderIndex), {
+              preserveFaderFocus: true,
+            });
           } else this.focusedPane = "chain";
         } else if (this.focusedPane === "chain") {
           if (isPluginNode) this._openPluginEditor();
@@ -867,13 +978,15 @@ export class MixerModule {
               this._closePluginEditor();
             }
           }
-        } else if (this.focusedPane === "faders" && this.faderIndex === 1) {
-          this.faderIndex = 0;
-          this._setActiveChannel("mic", { preserveFaderFocus: true });
+        } else if (this.focusedPane === "faders" && this.faderIndex > 0) {
+          this.faderIndex -= 1;
+          this._setActiveChannel(this._faderTypeForIndex(this.faderIndex), {
+            preserveFaderFocus: true,
+          });
         }
         break;
       case "Enter":
-        if (this.focusedPane === "chain") {
+        if (this.focusedPane === "chain" && currentChainItem) {
           if (currentChainItem.type === "plugin") this._openPluginEditor();
           else if (currentChainItem.type === "add")
             this._applyAndSaveChain([
@@ -886,9 +999,10 @@ export class MixerModule {
         break;
       case "Tab":
         if (e.shiftKey) {
-          this._setActiveChannel(
-            this.activeChannel === "music" ? "mic" : "music",
-          );
+          const order = ["mic", "music", "session"];
+          const nextIndex =
+            (order.indexOf(this.activeChannel) + 1) % order.length;
+          this._setActiveChannel(order[nextIndex]);
           break;
         }
         if (this.focusedPane === "faders") this.focusedPane = "chain";
