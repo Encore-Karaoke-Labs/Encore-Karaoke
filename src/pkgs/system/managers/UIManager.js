@@ -1855,15 +1855,19 @@ export default class UIManager {
           this.menuTransitionSource = "list";
           state.songNumber = "";
           state.isTypingNumber = false;
-          if (state.isSessionActive) {
-            this.ctx.root.sessions.reserveSongInSession(song);
-            if (state.numberEntryInInfoBar) {
-              this.ctx.modules.infoBar.showDefault();
-            }
-          } else if (this.ctx.root.retail?.authorizeAndConsume("HOST")) {
-            this.ctx.root.playback.startPlayer(song);
-          } else {
+
+          if (
+            !state.isSessionActive &&
+            !this.ctx.root.retail?.authorizeAndConsume("HOST")
+          ) {
             this.ctx.root.retail?.showInsufficient("play song");
+            return;
+          }
+
+          this.ctx.root.playback.requestSong(song);
+
+          if (state.isSessionActive && state.numberEntryInInfoBar) {
+            this.ctx.modules.infoBar.showDefault();
           }
         });
         if (i === state.highlightedIndex) item.classOn("highlighted");
