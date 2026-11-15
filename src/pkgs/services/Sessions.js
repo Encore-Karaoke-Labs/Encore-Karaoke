@@ -343,6 +343,7 @@ const pkg = {
         isHost: true,
         isRecording: false,
         isMuted: false,
+        isDeafened: false,
         cameraEnabled: false,
         cameraSources: [],
         supportedGames: profile.supportedGames || [],
@@ -406,6 +407,7 @@ const pkg = {
             isHost: false,
             isRecording: false,
             isMuted: false,
+            isDeafened: false,
             cameraEnabled: false,
             cameraSources: [],
             supportedGames: incomingProfile.supportedGames || [],
@@ -485,6 +487,8 @@ const pkg = {
           this.setParticipantCamera(conn.peer, data.camera);
         } else if (data.type === "mute_status" && this.isHost) {
           this.setParticipantMuted(conn.peer, data.muted);
+        } else if (data.type === "deafen_status" && this.isHost) {
+          this.setParticipantDeafened(conn.peer, data.deafened);
         } else if (data.type === "reserve_song" && this.isHost) {
           const requesterNickname = conn.metadata.profile
             ? conn.metadata.profile.nickname
@@ -1301,6 +1305,7 @@ const pkg = {
       if (!next && this.isDeafened) {
         this.isDeafened = false;
         this.applySessionDeafened(false);
+        this.publishLocalDeafenState();
       }
 
       const myId = this.peer?.id;
@@ -1340,9 +1345,31 @@ const pkg = {
       const next = Boolean(deafened);
       this.isDeafened = next;
       this.applySessionDeafened(next);
+      this.publishLocalDeafenState();
 
       if (next && !this.isMuted) {
         this.setMuted(true);
+      }
+    },
+
+    /**
+     * Mirrors the local deafen state onto this participant and informs the room.
+     */
+    publishLocalDeafenState: function () {
+      const myId = this.peer?.id;
+      const self = this.state.participants.find((p) => p.id === myId);
+      if (self) self.isDeafened = Boolean(this.isDeafened);
+
+      if (this.isHost) {
+        this.broadcastState();
+      } else {
+        const hostConn = this.connections.get(this.roomId);
+        if (hostConn && hostConn.open) {
+          hostConn.send({
+            type: "deafen_status",
+            deafened: Boolean(this.isDeafened),
+          });
+        }
       }
     },
 
@@ -1427,6 +1454,24 @@ const pkg = {
       if (Boolean(participant.isMuted) === next) return;
 
       participant.isMuted = next;
+      this.broadcastState();
+    },
+
+    /**
+     * Host-side update of a participant's deafen indicator.
+     * @param {string} peerId - Participant peer id.
+     * @param {boolean} deafened - Whether they have deafened Session voices.
+     */
+    setParticipantDeafened: function (peerId, deafened) {
+      if (!this.isHost) return;
+
+      const participant = this.state.participants.find((p) => p.id === peerId);
+      if (!participant) return;
+
+      const next = Boolean(deafened);
+      if (Boolean(participant.isDeafened) === next) return;
+
+      participant.isDeafened = next;
       this.broadcastState();
     },
 
