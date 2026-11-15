@@ -254,6 +254,10 @@ export default class SessionManager {
       this.handleSessionMediaStateUpdate,
     );
     document.addEventListener(
+      "Encore.Sessions.DeafenStateUpdate",
+      this.handleSessionMediaStateUpdate,
+    );
+    document.addEventListener(
       "Encore.Camera.StreamReceived",
       this.handleCameraServiceUpdate,
     );
@@ -352,6 +356,8 @@ export default class SessionManager {
       if (sState.playTrigger !== state.lastPlayTrigger) {
         state.lastPlayTrigger = sState.playTrigger;
 
+        this.stopSongRecording();
+
         if (sState.singerId === myId) {
           dom.sessionRemoteContainer.classOn("hidden");
           dom.sessionRemoteVideo.elm.srcObject = null;
@@ -427,6 +433,8 @@ export default class SessionManager {
         if (this.ctx.modules.recorder)
           this.ctx.modules.recorder.stopSessionAudioStream();
 
+        this.stopSongRecording();
+
         state.isTransitioning = false;
         this.syncSessionRecorderInfo(null);
         if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
@@ -479,6 +487,8 @@ export default class SessionManager {
       this.ctx.services.Forte.stopRemotePianoRoll?.();
       this.ctx.modules.scoreHud?.hide();
 
+      this.stopSongRecording();
+
       await this.ctx.root.playback.showPostSongScreen(mockScoreData);
 
       state.remoteScoreEntry = null;
@@ -513,8 +523,11 @@ export default class SessionManager {
   }
 
   handleLoungeStream(e) {
-    this.ctx.services.Forte.playRemoteStream(e.detail.id, e.detail.stream, {
+    const { id, stream } = e.detail || {};
+    if (!id || !stream) return;
+    this.ctx.services.Forte.playRemoteStream(id, stream, {
       session: true,
+      voice: true,
     });
   }
 
@@ -1412,6 +1425,19 @@ export default class SessionManager {
     }
   }
 
+  /**
+   * Stops a single-song recording that is in progress.
+   */
+  stopSongRecording() {
+    const recorder = this.ctx.modules.recorder;
+    if (!recorder || !recorder.isRecording || recorder.isSessionRecording) {
+      return;
+    }
+
+    recorder.stop();
+    recorder.clearSongInfo();
+  }
+
   applySessionTrackInfo(info) {
     const dom = this.ctx.dom;
     if (!dom.introBpmBadge || !dom.introKeyBadge) return;
@@ -1473,6 +1499,8 @@ export default class SessionManager {
   handleForceStop() {
     if (this.ctx.modules.recorder)
       this.ctx.modules.recorder.stopSessionAudioStream();
+
+    this.stopSongRecording();
 
     if (this.ctx.state.mode === "player") {
       this.ctx.root.playback.stopPlayer();
@@ -1538,6 +1566,7 @@ export default class SessionManager {
     const sessionsSvc = this.ctx.services.SessionsSvc;
     sessionsSvc?.stopCamera?.(false);
     sessionsSvc?.applySessionMute?.(false);
+    sessionsSvc?.applySessionDeafened?.(false);
     this._releaseSessionCameraPreview();
 
     this.clearCameraStreams();
@@ -1550,6 +1579,7 @@ export default class SessionManager {
     if (recorder) {
       recorder.stopSessionAudioStream();
       if (recorder.isSessionRecording) recorder.stop();
+      this.stopSongRecording();
     }
 
     root.playback.stopPlayer();
@@ -3180,6 +3210,27 @@ export default class SessionManager {
         })
         .appendTo(mediaRow);
 
+      const deafenState =
+        this.ctx.services.Forte.getSessionMonitorState?.() || {};
+      const deafened = Boolean(deafenState.deafened);
+      const deafenBtn = new Html("button")
+        .classOn("invite-action-btn", deafened ? "danger" : "secondary")
+        .attr({
+          type: "button",
+          "aria-pressed": String(deafened),
+          "aria-label": deafened
+            ? "Undeafen Session voices"
+            : "Deafen Session voices",
+          title: deafened ? "Undeafen Session voices" : "Deafen Session voices",
+        })
+        .html(
+          `<ion-icon name="${deafened ? "volume-mute-outline" : "volume-high-outline"}"></ion-icon>`,
+        )
+        .on("click", () => {
+          SessionsSvc.setDeafened(!deafened);
+        })
+        .appendTo(mediaRow);
+
       const cameraOn = Boolean(SessionsSvc.cameraEnabled);
       const cameraBtn = new Html("button")
         .classOn("invite-action-btn", cameraOn ? "secondary" : "danger")
@@ -3241,6 +3292,36 @@ export default class SessionManager {
                 .classOn("pulse-status")
                 .attr({ name: "radio-button-on" }),
             )
+            .appendTo(infoWrapper);
+        }
+
+        if (p.isMuted) {
+          new Html("span")
+            .classOn(
+              "session-voice-indicator",
+              "session-voice-indicator--muted",
+            )
+            .attr({
+              role: "img",
+              title: "Muted",
+              "aria-label": "Muted",
+            })
+            .append(new Html("ion-icon").attr({ name: "mic-off-outline" }))
+            .appendTo(infoWrapper);
+        }
+
+        if (p.isDeafened) {
+          new Html("span")
+            .classOn(
+              "session-voice-indicator",
+              "session-voice-indicator--deafened",
+            )
+            .attr({
+              role: "img",
+              title: "Deafened",
+              "aria-label": "Deafened",
+            })
+            .append(new Html("ion-icon").attr({ name: "headset-outline" }))
             .appendTo(infoWrapper);
         }
 
@@ -4023,6 +4104,10 @@ export default class SessionManager {
     );
     document.removeEventListener(
       "Encore.Sessions.CameraStateUpdate",
+      this.handleSessionMediaStateUpdate,
+    );
+    document.removeEventListener(
+      "Encore.Sessions.DeafenStateUpdate",
       this.handleSessionMediaStateUpdate,
     );
     document.removeEventListener(
