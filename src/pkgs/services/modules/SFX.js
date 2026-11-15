@@ -436,6 +436,8 @@ export class ForteSFX {
    * @param {Object} [options] - Optional routing settings
    * @param {boolean} [options.session] - Route through the Session bus so the
    * stream is monitored and included in recordings/broadcasts
+   * @param {boolean} [options.voice] - Route through the dedicated Session
+   * voice bus (Lounge / "everyone audible").
    * @param {boolean} [options.monitorOnly] - Legacy alias for `session`; the
    * stream is monitored and recorded, but not relayed back to the room
    */
@@ -449,9 +451,12 @@ export class ForteSFX {
       this.state.playback.remoteAudioElements = new Map();
 
     const useSessionBus = Boolean(options.session || options.monitorOnly);
-    const destination = useSessionBus
-      ? this.state.effects.sessionMonitorGain
-      : this.state.effects.musicChainInput;
+    const useVoiceBus = Boolean(options.voice);
+    const destination = useVoiceBus
+      ? this.state.effects.sessionVoiceInput
+      : useSessionBus
+        ? this.state.effects.sessionMonitorGain
+        : this.state.effects.musicChainInput;
 
     if (!destination) {
       console.warn(
