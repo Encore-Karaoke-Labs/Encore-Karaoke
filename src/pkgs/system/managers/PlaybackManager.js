@@ -147,6 +147,36 @@ export default class PlaybackManager {
   }
 
   /**
+   * Play or reserve song.
+   *
+   * @param {Object} song - The song metadata to play or reserve.
+   * @param {Object} [options]
+   * @param {boolean} [options.notify=true] - Show the RESERVED toast when the
+   *   song is queued instead of started.
+   * @returns {"playing"|"queued"|"reserved"|null} How the request was handled.
+   */
+  requestSong(song, { notify = true } = {}) {
+    if (!song) return null;
+
+    const state = this.ctx.state;
+    const root = this.ctx.root;
+
+    if (state.isSessionActive) {
+      root.sessions.reserveSongInSession(song);
+      return "reserved";
+    }
+
+    if (state.mode === "menu" || state.mode === "yt-search") {
+      this.startPlayer(song);
+      return "playing";
+    }
+
+    state.reservationQueue.push(song);
+    if (notify) root.sessions.showReservationNotification(song);
+    return "queued";
+  }
+
+  /**
    * Begins loading and processing of a track object, transitioning into playback mode.
    *
    * @param {Object} song - The target metadata object describing the media track.
