@@ -194,11 +194,19 @@ export default class InputManager {
     }
 
     if (e.key.toLowerCase() === "s") {
-      if (
+      const canOpenFromMenu =
         state.mode === "menu" &&
         !state.isTypingNumber &&
-        !state.isSearchOverlayVisible
-      ) {
+        !state.isSearchOverlayVisible;
+
+      const canOpenDuringPlayback =
+        state.mode === "player" &&
+        state.isSessionActive &&
+        !state.reservationNumber &&
+        !state.isSearchOverlayVisible &&
+        !state.isLyricCustomizerVisible;
+
+      if (canOpenFromMenu || canOpenDuringPlayback) {
         e.preventDefault();
         sessions.toggleSessionModal();
         return;
@@ -1032,7 +1040,10 @@ export default class InputManager {
           if (state.isSearchOverlayVisible) root.ui.toggleSearchOverlay(false);
           if (state.mode === "yt-search") root.ui.setMode("menu");
 
-          if (state.isSessionActive || root.retail?.authorizeAndConsume("HOST")) {
+          if (
+            state.isSessionActive ||
+            root.retail?.authorizeAndConsume("HOST")
+          ) {
             root.playback.requestSong(song);
           } else {
             root.retail?.showInsufficient("play song");
@@ -1058,9 +1069,7 @@ export default class InputManager {
 
         if (state.songNumber && state.songNumber.length > 0) {
           if (state.numberEntryInInfoBar) {
-            root.ui.menuTransitionSource = state.showSongList
-              ? "list"
-              : "none";
+            root.ui.menuTransitionSource = state.showSongList ? "list" : "none";
           } else {
             root.ui.menuTransitionSource = "number";
           }
@@ -1098,7 +1107,10 @@ export default class InputManager {
                   isLive: res.isLive,
                 };
 
-          if (state.isSessionActive || root.retail?.authorizeAndConsume("HOST")) {
+          if (
+            state.isSessionActive ||
+            root.retail?.authorizeAndConsume("HOST")
+          ) {
             root.playback.requestSong(song);
           } else {
             root.retail?.showInsufficient("reserve song");
