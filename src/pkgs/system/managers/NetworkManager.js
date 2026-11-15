@@ -578,10 +578,7 @@ export default class NetworkManager {
               break;
             }
 
-            state.mode === "menu"
-              ? root.playback.startPlayer(s)
-              : (state.reservationQueue.push(s),
-                this.ctx.modules.infoBar.showDefault());
+            root.playback.requestSong(s);
             this.socket.emit("sendData", {
               identity: cmd.identity,
               data: {
@@ -660,11 +657,7 @@ export default class NetworkManager {
             isLive: d.value.isLive,
             code: "YT",
           };
-          if (state.mode === "menu") root.playback.startPlayer(ytSong);
-          else {
-            state.reservationQueue.push(ytSong);
-            this.ctx.modules.infoBar.showDefault();
-          }
+          root.playback.requestSong(ytSong);
           this.socket.emit("sendData", {
             identity: cmd.identity,
             data: { type: "reserve_response", success: true, song: ytSong },
