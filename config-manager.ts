@@ -22,6 +22,7 @@ export interface AudioConfig {
   micMonitorVolume?: number;
   micRecordingVolume?: number;
   musicRecordingVolume?: number;
+  sessionVolume?: number;
   enableMicMonitor?: boolean;
   guideMelodyPersistent?: boolean;
   guideMelodyIndex?: number;
