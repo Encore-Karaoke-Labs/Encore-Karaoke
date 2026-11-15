@@ -563,9 +563,13 @@ export default class InputManager {
           }
           state.songNumber = "";
           state.isTypingNumber = false;
-          playback.startPlayer(song).then(() => {
-            modules.recorder.start();
-          });
+          if (state.isSessionActive) {
+            playback.requestSong(song);
+          } else {
+            playback.startPlayer(song).then(() => {
+              modules.recorder.start();
+            });
+          }
         }
         return;
       }
@@ -1028,9 +1032,8 @@ export default class InputManager {
           if (state.isSearchOverlayVisible) root.ui.toggleSearchOverlay(false);
           if (state.mode === "yt-search") root.ui.setMode("menu");
 
-          if (state.isSessionActive) root.sessions.reserveSongInSession(song);
-          else if (root.retail?.authorizeAndConsume("HOST")) {
-            root.playback.startPlayer(song);
+          if (state.isSessionActive || root.retail?.authorizeAndConsume("HOST")) {
+            root.playback.requestSong(song);
           } else {
             root.retail?.showInsufficient("play song");
           }
@@ -1038,57 +1041,45 @@ export default class InputManager {
         return;
       }
 
-      if (state.isSessionActive) {
-        let song = state.songNumber
-          ? findSongByCode(state.songMap, state.songNumber)
-          : state.highlightedIndex >= 0
-            ? state.songList[state.highlightedIndex]
-            : null;
+      let song = state.songNumber
+        ? findSongByCode(state.songMap, state.songNumber)
+        : state.highlightedIndex >= 0
+          ? state.songList[state.highlightedIndex]
+          : null;
 
-        if (song) {
-          root.sessions.reserveSongInSession(song);
-          state.songNumber = "";
-          state.highlightedIndex = -1;
-          state.isTypingNumber = false;
+      if (song) {
+        if (
+          !state.isSessionActive &&
+          !root.retail?.authorizeAndConsume("HOST")
+        ) {
+          root.retail?.showInsufficient("play song");
+          return;
+        }
+
+        if (state.songNumber && state.songNumber.length > 0) {
+          if (state.numberEntryInInfoBar) {
+            root.ui.menuTransitionSource = state.showSongList
+              ? "list"
+              : "none";
+          } else {
+            root.ui.menuTransitionSource = "number";
+          }
+        } else if (state.showSongList) {
+          root.ui.menuTransitionSource = "list";
+        } else {
+          root.ui.menuTransitionSource = "none";
+        }
+
+        state.songNumber = "";
+        state.highlightedIndex = -1;
+        state.isTypingNumber = false;
+
+        root.playback.requestSong(song);
+
+        if (state.isSessionActive) {
           root.ui.updateMenuUI();
           if (state.numberEntryInInfoBar) {
             this.ctx.modules.infoBar.showDefault();
-          }
-        }
-      } else {
-        if (state.reservationQueue.length) {
-          root.ui.menuTransitionSource = "none";
-          root.playback.startPlayer(state.reservationQueue.shift());
-        } else {
-          let song = state.songNumber
-            ? findSongByCode(state.songMap, state.songNumber)
-            : state.highlightedIndex >= 0
-              ? state.songList[state.highlightedIndex]
-              : null;
-          if (song) {
-            if (state.songNumber && state.songNumber.length > 0) {
-              if (state.numberEntryInInfoBar) {
-                root.ui.menuTransitionSource = state.showSongList
-                  ? "list"
-                  : "none";
-              } else {
-                root.ui.menuTransitionSource = "number";
-              }
-            } else if (state.showSongList) {
-              root.ui.menuTransitionSource = "list";
-            } else {
-              root.ui.menuTransitionSource = "none";
-            }
-
-            if (!root.retail?.authorizeAndConsume("HOST")) {
-              root.retail?.showInsufficient("play song");
-              return;
-            }
-
-            state.songNumber = "";
-            state.highlightedIndex = -1;
-            state.isTypingNumber = false;
-            root.playback.startPlayer(song);
           }
         }
       }
@@ -1107,10 +1098,8 @@ export default class InputManager {
                   isLive: res.isLive,
                 };
 
-          if (state.isSessionActive) root.sessions.reserveSongInSession(song);
-          else if (root.retail?.authorizeAndConsume("HOST")) {
-            state.reservationQueue.push(song);
-            root.sessions.showReservationNotification(song);
+          if (state.isSessionActive || root.retail?.authorizeAndConsume("HOST")) {
+            root.playback.requestSong(song);
           } else {
             root.retail?.showInsufficient("reserve song");
             return;
@@ -1126,9 +1115,10 @@ export default class InputManager {
       } else if (state.reservationNumber) {
         const song = findSongByCode(state.songMap, state.reservationNumber);
         if (song) {
-          if (state.isSessionActive) root.sessions.reserveSongInSession(song);
-          else if (root.retail?.authorizeAndConsume("HOST")) {
-            state.reservationQueue.push(song);
+          if (state.isSessionActive) {
+            root.playback.requestSong(song);
+          } else if (root.retail?.authorizeAndConsume("HOST")) {
+            root.playback.requestSong(song);
             this._restoreInfoBar();
           } else {
             root.retail?.showInsufficient("reserve song");
@@ -1158,9 +1148,8 @@ export default class InputManager {
       state.searchResults = [];
       root.ui.renderSearchResults();
 
-      if (state.isSessionActive) root.sessions.reserveSongInSession(song);
-      else if (root.retail?.authorizeAndConsume("HOST")) {
-        root.playback.startPlayer(song);
+      if (state.isSessionActive || root.retail?.authorizeAndConsume("HOST")) {
+        root.playback.requestSong(song);
       } else {
         root.retail?.showInsufficient("play song");
       }
