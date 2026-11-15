@@ -6,5 +6,9 @@
   {
     "LOOP_NAME": "Dance",
     "PATH": "dance.mid"
+  },
+  {
+    "LOOP_NAME": "Disco",
+    "PATH": "disco.mid"
   }
 ]
