@@ -1346,6 +1346,8 @@ export class FortePlayback {
     this.state.playback.isPlatinum = false;
     this.state.playback.multiplexPan = -1;
     this.state.playback.guideNotes = [];
+    this.state.playback.guideVolume = undefined;
+    this.state.playback.guideChannels = [];
     this.state.playback.guideRange = { min: 42, max: 90 };
     this.state.playback.isAnalyzing = false;
     this.state.scoring.activeMidiNotes.clear();
