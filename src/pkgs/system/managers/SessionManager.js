@@ -3089,32 +3089,6 @@ export default class SessionManager {
         .classOn("session-invite-card")
         .appendTo(leftCol);
 
-      const inviteHeader = new Html("div")
-        .classOn("invite-header")
-        .appendTo(inviteCard);
-
-      const iconWrapper = new Html("div")
-        .classOn("invite-icon-wrapper")
-        .appendTo(inviteHeader);
-
-      new Html("ion-icon")
-        .attr({ name: "share-social-outline" })
-        .appendTo(iconWrapper);
-
-      const textGroup = new Html("div")
-        .classOn("invite-text-group")
-        .appendTo(inviteHeader);
-
-      new Html("span")
-        .classOn("invite-title")
-        .text("SHARE THIS SESSION")
-        .appendTo(textGroup);
-
-      new Html("span")
-        .classOn("invite-subtitle")
-        .text("Share link or code to invite singers")
-        .appendTo(textGroup);
-
       const actionsRow = new Html("div")
         .classOn("invite-actions-row")
         .appendTo(inviteCard);

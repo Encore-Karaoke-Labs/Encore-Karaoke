@@ -638,52 +638,6 @@
   flex-shrink: 0;
 }
 
-.session-invite-card .invite-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  width: 100%;
-}
-
-.session-invite-card .invite-icon-wrapper {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  background: rgba(137, 207, 240, 0.12);
-  border: 1px solid rgba(137, 207, 240, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #89cff0;
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
-
-.session-invite-card .invite-text-group {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-
-.session-invite-card .invite-title {
-  font-family: "Rajdhani", sans-serif;
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #89cff0;
-  letter-spacing: 0.1em;
-  line-height: 1.2;
-}
-
-.session-invite-card .invite-subtitle {
-  font-family: "Radio Canada", sans-serif;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.6);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .session-invite-card .invite-actions-row {
   display: flex;
   gap: 0.75rem;
@@ -761,12 +715,12 @@
   gap: 0;
 }
 
-.session-media-card .session-media-btn {
-  height: 64px;
+.session-media-card .invite-action-btn {
+  height: 60px;
   padding: 0;
 }
 
-.session-media-card .session-media-btn ion-icon {
+.session-media-card .invite-action-btn ion-icon {
   font-size: 2.25rem;
 }
 
@@ -948,12 +902,16 @@
 /* -- Session Quick Actions -- */
 .session-action-col {
   gap: 1.25rem;
+  min-height: 0;
 }
 
 .session-action-tile {
   padding: 1.5rem 1rem;
   justify-content: center;
   background: rgba(10, 10, 20, 0.6);
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .session-action-tile .session-tile-icon {
@@ -966,6 +924,59 @@
 
 .session-action-tile .session-tile-desc {
   font-size: 1rem;
+}
+
+/* Keep all quick actions visible in shorter (windowed) viewports. */
+@media (max-height: 900px) {
+  .session-action-col {
+    gap: 0.85rem;
+  }
+
+  .session-action-tile {
+    padding: 0.9rem 0.75rem;
+  }
+
+  .session-action-tile .session-tile-icon {
+    margin-bottom: 0.35rem;
+  }
+
+  .session-action-tile .session-tile-icon ion-icon {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .session-action-tile .session-tile-title {
+    font-size: 1.35rem;
+    margin-bottom: 0.2rem;
+  }
+
+  .session-action-tile .session-tile-desc {
+    font-size: 0.9rem;
+    line-height: 1.25;
+  }
+}
+
+@media (max-height: 720px) {
+  .session-action-col {
+    gap: 0.6rem;
+  }
+
+  .session-action-tile {
+    padding: 0.65rem 0.6rem;
+  }
+
+  .session-action-tile .session-tile-icon ion-icon {
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  .session-action-tile .session-tile-title {
+    font-size: 1.15rem;
+  }
+
+  .session-action-tile .session-tile-desc {
+    display: none;
+  }
 }
 
 .session-action-tile--settings {
