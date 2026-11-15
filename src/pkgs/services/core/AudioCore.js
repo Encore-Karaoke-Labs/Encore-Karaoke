@@ -117,6 +117,31 @@ export class ForteAudioCore {
         this.state.recording.destinationNode,
       );
 
+      this.state.effects.sessionVoiceInput = this.context.createGain();
+      this.state.effects.sessionVoiceGain = this.context.createGain();
+      this.state.effects.sessionVoiceAnalyser = this.context.createAnalyser();
+      this.state.effects.sessionVoiceAnalyser.fftSize = 256;
+      this.state.effects.sessionVoiceAnalyser.smoothingTimeConstant = 0.5;
+
+      this.state.effects.sessionVolume = Math.max(
+        0,
+        Math.min(1, this.config.audioConfig?.sessionVolume ?? 1.0),
+      );
+      this.state.effects.sessionDeafened = false;
+      this.state.effects.sessionVoiceGain.gain.value =
+        this.state.effects.sessionVolume;
+
+      this.state.effects.sessionVoiceInput.connect(
+        this.state.effects.sessionVoiceGain,
+      );
+      this.state.effects.sessionVoiceGain.connect(this.masterCompressor);
+      this.state.effects.sessionVoiceGain.connect(
+        this.state.effects.sessionVoiceAnalyser,
+      );
+      this.state.effects.sessionVoiceInput.connect(
+        this.state.recording.destinationNode,
+      );
+
       this.state.effects.chorusPitchNode = new AudioWorkletNode(
         this.context,
         "pitch-shifter-processor",
@@ -257,6 +282,79 @@ export class ForteAudioCore {
   }
 
   /**
+   * Sets the monitor level for Lounge / "everyone audible" voice streams.
+   * This is independent of the MUSIC fader, which controls masterGain.
+   *
+   * @param {number} level - Gain volume factor from 0.0 to 1.0.
+   */
+  setSessionVolume(level) {
+    const clampedLevel = Math.max(0, Math.min(1, level));
+    this.state.effects.sessionVolume = clampedLevel;
+    this.applySessionVoiceGain();
+    logVerbose("Session voice volume set", clampedLevel);
+  }
+
+  /**
+   * Silences incoming Session voice streams without touching the MUSIC bus.
+   *
+   * @param {boolean} deafened - Whether Session voices should be muted.
+   */
+  setSessionDeafened(deafened) {
+    this.state.effects.sessionDeafened = Boolean(deafened);
+    this.applySessionVoiceGain();
+    logVerbose("Session deafen set", this.state.effects.sessionDeafened);
+  }
+
+  /**
+   * Applies the effective Session voice monitor gain (0 when deafened).
+   */
+  applySessionVoiceGain() {
+    const node = this.state.effects.sessionVoiceGain;
+    if (!node || !this.context) return;
+
+    const target = this.state.effects.sessionDeafened
+      ? 0
+      : this.state.effects.sessionVolume;
+    const now = this.context.currentTime;
+    node.gain.cancelScheduledValues(now);
+    node.gain.setTargetAtTime(target, now, 0.015);
+  }
+
+  /**
+   * Returns the current Session voice monitor state.
+   * @returns {{volume: number, deafened: boolean}}
+   */
+  getSessionMonitorState() {
+    return {
+      volume: this.state.effects.sessionVolume,
+      deafened: this.state.effects.sessionDeafened,
+    };
+  }
+
+  /**
+   * Samples the Session voice bus and returns a 0-100 metering level.
+   * @returns {number}
+   */
+  getSessionLevel() {
+    const analyser = this.state.effects.sessionVoiceAnalyser;
+    if (!analyser) return 0;
+
+    if (
+      !this._sessionMeterData ||
+      this._sessionMeterData.length !== analyser.fftSize
+    ) {
+      this._sessionMeterData = new Float32Array(analyser.fftSize);
+    }
+    const data = this._sessionMeterData;
+    analyser.getFloatTimeDomainData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+    const rms = Math.sqrt(sum / data.length);
+    const db = 20 * Math.log10(rms || 0.0001);
+    return Math.max(0, (db + 60) / 60) * 100;
+  }
+
+  /**
    * Shuts down context and disconnects master graphs.
    */
   cleanup() {
@@ -269,6 +367,12 @@ export class ForteAudioCore {
         this.state.effects.micMonitorNode.disconnect();
       if (this.state.effects.sessionMonitorGain)
         this.state.effects.sessionMonitorGain.disconnect();
+      if (this.state.effects.sessionVoiceInput)
+        this.state.effects.sessionVoiceInput.disconnect();
+      if (this.state.effects.sessionVoiceGain)
+        this.state.effects.sessionVoiceGain.disconnect();
+      if (this.state.effects.sessionVoiceAnalyser)
+        this.state.effects.sessionVoiceAnalyser.disconnect();
       if (this.state.effects.musicChainInput)
         this.state.effects.musicChainInput.disconnect();
       if (this.state.effects.musicChainOutput)
