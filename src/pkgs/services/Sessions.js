@@ -7,6 +7,9 @@ const pkg = {
   privs: 0,
   start: async function (Root) {
     this.root = Root;
+    document.addEventListener("Encore.Sessions.DeafenStateUpdate", (e) => {
+      pkg.data.isDeafened = Boolean(e.detail?.deafened);
+    });
     console.log("[SESSIONS] Sessions Service started.");
   },
   end: async function () {
@@ -41,8 +44,13 @@ const pkg = {
     _cameraStreamEndedListener: null,
     _cameraStopping: false,
     isMuted: false,
+    isDeafened: false,
     _lastRoutedMode: null,
+    _lastPlayTrigger: null,
     _lastRoutedEveryoneAudible: null,
+    _routing: false,
+    _loungeRetryTimers: new Map(),
+    _loungeRetryCounts: new Map(),
 
     state: {
       mode: "lounge",
@@ -297,23 +305,18 @@ const pkg = {
               );
             });
             this.mediaCalls.set(call.peer, call);
+            this.trackCallClose(call.peer, call);
           } else if (isMicCall) {
-            if (this.peer.id === this.state.singerId) {
-              call.answer(undefined);
-            } else {
-              call.answer(this.getSessionMicStream());
-            }
-            this.attachMicCall(call.peer, call);
-          } else if (this.state.mode === "lounge") {
-            call.answer(this.getSessionMicStream());
-            call.on("stream", (remoteStream) => {
-              document.dispatchEvent(
-                new CustomEvent("Encore.Sessions.LoungeStream", {
-                  detail: { id: call.peer, stream: remoteStream },
-                }),
-              );
-            });
-            this.mediaCalls.set(call.peer, call);
+            const micStream =
+              this.peer.id === this.state.singerId
+                ? null
+                : this.createSessionCallStream();
+            call.answer(micStream || undefined);
+            this.attachMicCall(call.peer, call, micStream);
+          } else {
+            const micStream = this.createSessionCallStream();
+            call.answer(micStream || undefined);
+            this.attachLoungeCall(call.peer, call, micStream);
           }
         });
       });
@@ -327,6 +330,8 @@ const pkg = {
       this.cameraStreams = {};
       this.cameraOwnsLocal = false;
       this.applySessionMute(false);
+      this.isDeafened = false;
+      this.applySessionDeafened(false);
 
       const { code } = await this.createSessionCode(profile.nickname);
       const myId = await this.initPeer(profile.nickname, code);
@@ -354,6 +359,8 @@ const pkg = {
       this.cameraStreams = {};
       this.cameraOwnsLocal = false;
       this.applySessionMute(false);
+      this.isDeafened = false;
+      this.applySessionDeafened(false);
       const myId = await this.initPeer(profile.nickname);
       this.roomId = roomId;
 
@@ -708,12 +715,272 @@ const pkg = {
     },
 
     /**
+     * Creates an isolated audio stream for a single media call by cloning the
+     * Session microphone track
+     *
+     * @returns {MediaStream|null}
+     */
+    createSessionCallStream: function () {
+      const source = this.getSessionMicStream();
+      const sourceTrack = source?.getAudioTracks?.()[0];
+      if (!sourceTrack) return null;
+
+      if (sourceTrack.readyState === "ended") {
+        console.warn(
+          "[SESSIONS] Session microphone track has ended; outgoing voice will be silent.",
+        );
+        return null;
+      }
+
+      const track = sourceTrack.clone();
+      if ("contentHint" in track) track.contentHint = "speech";
+      return new MediaStream([track]);
+    },
+
+    /**
+     * Stops every track in a stream this service created for a call.
+     *
+     * @param {MediaStream|null} stream - Stream to release.
+     */
+    stopCallStream: function (stream) {
+      if (!stream) return;
+
+      for (const track of stream.getTracks()) {
+        try {
+          track.stop();
+        } catch (error) {
+          console.warn("[SESSIONS] Could not stop a call track:", error);
+        }
+      }
+    },
+
+    /**
+     * Stops the track this service cloned for a media call, if any. Streams
+     * owned by other services (for example the performance stream) are left
+     * untouched.
+     *
+     * @param {Object|null} call - PeerJS media connection.
+     */
+    releaseCallStream: function (call) {
+      if (!call) return;
+
+      clearTimeout(call._encoreStreamTimer);
+
+      const stream = call._encoreOwnedStream;
+      if (!stream) return;
+
+      call._encoreOwnedStream = null;
+      this.stopCallStream(stream);
+    },
+
+    /**
+     * Returns whether a media call can no longer carry audio.
+     *
+     * @param {Object|null} call - PeerJS media connection.
+     * @returns {boolean}
+     */
+    isMediaCallDead: function (call) {
+      if (!call) return true;
+
+      const pc = call.peerConnection;
+      if (!pc) return false;
+
+      const createdAt = Number(call._encoreCreatedAt) || 0;
+      const age = createdAt > 0 ? Date.now() - createdAt : 0;
+      const connection = pc.connectionState;
+
+      if (connection === "connected") {
+        return call._encoreGotStream === false && age > 10000;
+      }
+      if (connection === "failed" || connection === "closed") return true;
+
+      const ice = pc.iceConnectionState;
+      if (ice === "failed" || ice === "closed") return true;
+
+      return age > 12000;
+    },
+
+    /**
+     * Closes a tracked media call on purpose, releasing its cloned track. An
+     * intentional close never schedules a reconnect.
+     *
+     * @param {Object|null} call - PeerJS media connection.
+     */
+    shutdownMediaCall: function (call) {
+      if (!call) return;
+
+      call._encoreIntentionalClose = true;
+      this.releaseCallStream(call);
+      try {
+        call.close();
+      } catch (error) {
+        console.warn("[SESSIONS] Could not close media call:", error);
+      }
+    },
+
+    /**
+     * Forgets and closes a tracked outgoing media call.
+     *
+     * @param {string} peerId - Participant peer id.
+     */
+    dropMediaCall: function (peerId) {
+      const call = this.mediaCalls.get(peerId);
+      if (!call) return;
+
+      this.mediaCalls.delete(peerId);
+      this.shutdownMediaCall(call);
+    },
+
+    /**
+     * Removes a performance call from the routing map when it closes so a
+     * later routing pass can recreate it.
+     *
+     * @param {string} peerId - Participant peer id.
+     * @param {Object} call - PeerJS media connection.
+     */
+    trackCallClose: function (peerId, call) {
+      if (!call) return;
+
+      call._encoreCreatedAt = call._encoreCreatedAt || Date.now();
+
+      const cleanup = () => {
+        if (this.mediaCalls.get(peerId) !== call) return;
+        this.mediaCalls.delete(peerId);
+      };
+
+      call.on("close", cleanup);
+      call.on("error", cleanup);
+    },
+
+    /**
+     * Tracks a Lounge (or fallback) voice call and re-routes when it fails.
+     *
+     * @param {string} peerId - Unique ID of the peer on the call.
+     * @param {Object} call - PeerJS media connection.
+     * @param {MediaStream|null} [ownedStream] - Stream cloned for this call.
+     */
+    attachLoungeCall: function (peerId, call, ownedStream = null) {
+      if (!call) return;
+
+      call._encoreOwnedStream = ownedStream || null;
+      call._encoreCreatedAt = call._encoreCreatedAt || Date.now();
+      call._encoreGotStream = false;
+      this.mediaCalls.set(peerId, call);
+
+      const markConnected = () => {
+        this._loungeRetryCounts.delete(peerId);
+      };
+
+      call.on("stream", (remoteStream) => {
+        call._encoreGotStream = true;
+        markConnected();
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.LoungeStream", {
+            detail: { id: peerId, stream: remoteStream },
+          }),
+        );
+      });
+
+      call._encoreStreamTimer = setTimeout(() => {
+        if (this.mediaCalls.get(peerId) !== call) return;
+        if (call._encoreGotStream) return;
+
+        const attempts = this._loungeRetryCounts.get(peerId) || 0;
+        if (attempts >= 5) {
+          console.warn(
+            `[SESSIONS] Lounge call with ${peerId} stayed silent; giving up reconnecting.`,
+          );
+          return;
+        }
+
+        console.warn(
+          `[SESSIONS] Lounge call with ${peerId} never delivered audio; recreating.`,
+        );
+        this.dropMediaCall(peerId);
+        this.scheduleLoungeRetry(peerId);
+      }, 10000);
+
+      const cleanup = () => {
+        if (this.mediaCalls.get(peerId) !== call) return;
+        this.mediaCalls.delete(peerId);
+        clearTimeout(call._encoreStreamTimer);
+        this.releaseCallStream(call);
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.PeerDisconnected", {
+            detail: peerId,
+          }),
+        );
+        if (!call._encoreIntentionalClose) this.scheduleLoungeRetry(peerId);
+      };
+
+      call.on("close", cleanup);
+      call.on("error", cleanup);
+
+      const pc = call.peerConnection;
+      if (pc && typeof pc.addEventListener === "function") {
+        pc.addEventListener("connectionstatechange", () => {
+          if (pc.connectionState === "connected") {
+            markConnected();
+          } else if (
+            pc.connectionState === "failed" ||
+            pc.connectionState === "closed"
+          ) {
+            cleanup();
+          }
+        });
+      }
+    },
+
+    /**
+     * Rebuilds a dead Lounge call after a short, growing delay.
+     *
+     * @param {string} peerId - Unique ID of the peer to reconnect to.
+     */
+    scheduleLoungeRetry: function (peerId) {
+      if (this.isDisconnecting) return;
+      if (this.state.mode !== "lounge") return;
+      if (!this.state.participants.some((p) => p.id === peerId)) return;
+      if (this._loungeRetryTimers.has(peerId)) return;
+
+      const attempt = this._loungeRetryCounts.get(peerId) || 0;
+      this._loungeRetryCounts.set(peerId, attempt + 1);
+      const delay = Math.min(1500 * Math.pow(2, Math.min(attempt, 4)), 20000);
+
+      const timer = setTimeout(() => {
+        this._loungeRetryTimers.delete(peerId);
+        if (this.isDisconnecting) return;
+        if (this.state.mode !== "lounge") return;
+        if (!this.state.participants.some((p) => p.id === peerId)) return;
+        this.handleMediaRouting();
+      }, delay);
+
+      this._loungeRetryTimers.set(peerId, timer);
+    },
+
+    /**
+     * Cancels any pending Lounge reconnect for a peer.
+     *
+     * @param {string} peerId - Unique ID of the peer.
+     */
+    clearLoungeRetry: function (peerId) {
+      const timer = this._loungeRetryTimers.get(peerId);
+      if (timer) clearTimeout(timer);
+      this._loungeRetryTimers.delete(peerId);
+      this._loungeRetryCounts.delete(peerId);
+    },
+
+    /**
      * Tracks an audience microphone call and routes its remote stream to the
      * local audio output.
      * @param {string} peerId - Unique ID of the peer sending the microphone.
      * @param {Object} call - PeerJS media connection.
+     * @param {MediaStream|null} [ownedStream] - Stream cloned for this call.
      */
-    attachMicCall: function (peerId, call) {
+    attachMicCall: function (peerId, call, ownedStream = null) {
+      if (!call) return;
+
+      call._encoreOwnedStream = ownedStream || null;
+      call._encoreCreatedAt = call._encoreCreatedAt || Date.now();
       this.micCalls.set(peerId, call);
 
       call.on("stream", (remoteStream) => {
@@ -727,6 +994,7 @@ const pkg = {
       const cleanup = () => {
         if (this.micCalls.get(peerId) !== call) return;
         this.micCalls.delete(peerId);
+        this.releaseCallStream(call);
         document.dispatchEvent(
           new CustomEvent("Encore.Sessions.PeerDisconnected", {
             detail: peerId,
@@ -1030,6 +1298,11 @@ const pkg = {
       this.isMuted = next;
       this.applySessionMute(next);
 
+      if (!next && this.isDeafened) {
+        this.isDeafened = false;
+        this.applySessionDeafened(false);
+      }
+
       const myId = this.peer?.id;
       const self = this.state.participants.find((p) => p.id === myId);
       if (self) self.isMuted = next;
@@ -1057,6 +1330,25 @@ const pkg = {
     applySessionMute: function (muted) {
       const forte = pkg.root?.Processes?.getService("ForteSvc")?.data;
       forte?.setSessionMicMuted?.(Boolean(muted));
+    },
+
+    /**
+     * Silences incoming Lounge / "everyone audible" voice streams locally.
+     * @param {boolean} deafened - Whether Session voices should be muted.
+     */
+    setDeafened: function (deafened) {
+      const next = Boolean(deafened);
+      this.isDeafened = next;
+      this.applySessionDeafened(next);
+
+      if (next && !this.isMuted) {
+        this.setMuted(true);
+      }
+    },
+
+    applySessionDeafened: function (deafened) {
+      const forte = pkg.root?.Processes?.getService("ForteSvc")?.data;
+      forte?.setSessionDeafened?.(Boolean(deafened));
     },
 
     publishCameraStatus: function () {
@@ -1149,14 +1441,18 @@ const pkg = {
       this.connections.delete(peerId);
 
       if (this.mediaCalls.has(peerId)) {
-        this.mediaCalls.get(peerId).close();
+        const call = this.mediaCalls.get(peerId);
         this.mediaCalls.delete(peerId);
+        this.shutdownMediaCall(call);
       }
 
       if (this.micCalls.has(peerId)) {
-        this.micCalls.get(peerId).close();
+        const call = this.micCalls.get(peerId);
         this.micCalls.delete(peerId);
+        this.shutdownMediaCall(call);
       }
+
+      this.clearLoungeRetry(peerId);
 
       this.closeOutgoingCameraCallsForPeer(peerId);
 
@@ -1665,10 +1961,27 @@ const pkg = {
     },
 
     handleMediaRouting: function () {
-      const modeChanged = this._lastRoutedMode !== this.state.mode;
+      if (this._routing || !this.peer) return;
+
+      this._routing = true;
+      try {
+        this.routeMedia();
+      } finally {
+        this._routing = false;
+      }
+    },
+
+    /**
+     * Reconciles every media call with the current Session state.
+     */
+    routeMedia: function () {
+      const hasBaseline = this._lastRoutedMode !== null;
+      const modeChanged =
+        hasBaseline && this._lastRoutedMode !== this.state.mode;
       const playTriggerChanged =
-        this._lastPlayTrigger !== this.state.playTrigger;
+        hasBaseline && this._lastPlayTrigger !== this.state.playTrigger;
       const audibleChanged =
+        hasBaseline &&
         this._lastRoutedEveryoneAudible !== this.state.everyoneAudible;
 
       this._lastRoutedMode = this.state.mode;
@@ -1676,9 +1989,13 @@ const pkg = {
       this._lastRoutedEveryoneAudible = this.state.everyoneAudible;
 
       if (modeChanged || playTriggerChanged) {
-        for (let call of this.mediaCalls.values()) call.close();
+        for (let call of this.mediaCalls.values()) {
+          this.shutdownMediaCall(call);
+        }
         this.mediaCalls.clear();
-        for (let call of this.micCalls.values()) call.close();
+        for (let call of this.micCalls.values()) {
+          this.shutdownMediaCall(call);
+        }
         this.micCalls.clear();
         document.dispatchEvent(new CustomEvent("Encore.Sessions.ClearStreams"));
         document.dispatchEvent(
@@ -1690,7 +2007,7 @@ const pkg = {
         this.currentPerformanceStream = null;
       } else if (audibleChanged) {
         for (let [peerId, call] of this.micCalls) {
-          call.close();
+          this.shutdownMediaCall(call);
           document.dispatchEvent(
             new CustomEvent("Encore.Sessions.PeerDisconnected", {
               detail: peerId,
@@ -1701,22 +2018,25 @@ const pkg = {
       }
 
       if (this.state.mode === "lounge") {
-        const micStream = this.getSessionMicStream();
-        if (micStream) {
+        if (this.getSessionMicStream()) {
           for (let p of this.state.participants) {
-            if (p.id !== this.peer.id && this.peer.id > p.id) {
-              if (!this.mediaCalls.has(p.id)) {
-                const call = this.peer.call(p.id, micStream);
-                this.mediaCalls.set(p.id, call);
-                call.on("stream", (stream) => {
-                  document.dispatchEvent(
-                    new CustomEvent("Encore.Sessions.LoungeStream", {
-                      detail: { id: p.id, stream },
-                    }),
-                  );
-                });
-              }
+            if (p.id === this.peer.id) continue;
+
+            const existing = this.mediaCalls.get(p.id);
+            if (existing && !this.isMediaCallDead(existing)) continue;
+            if (existing) this.dropMediaCall(p.id);
+
+            if (!(this.peer.id > p.id)) continue;
+
+            const callStream = this.createSessionCallStream();
+            if (!callStream) continue;
+
+            const call = this.peer.call(p.id, callStream);
+            if (!call) {
+              this.stopCallStream(callStream);
+              continue;
             }
+            this.attachLoungeCall(p.id, call, callStream);
           }
         }
       } else if (this.state.mode === "performance") {
@@ -1725,13 +2045,20 @@ const pkg = {
           this.currentPerformanceStream
         ) {
           for (let p of this.state.participants) {
-            if (p.id !== this.peer.id && !this.mediaCalls.has(p.id)) {
-              const call = this.peer.call(p.id, this.currentPerformanceStream, {
-                sdpTransform: (sdp) => this.enhanceSDP(sdp),
-                metadata: { kind: "performance" },
-              });
-              this.mediaCalls.set(p.id, call);
-            }
+            if (p.id === this.peer.id) continue;
+
+            const existing = this.mediaCalls.get(p.id);
+            if (existing && !this.isMediaCallDead(existing)) continue;
+            if (existing) this.dropMediaCall(p.id);
+
+            const call = this.peer.call(p.id, this.currentPerformanceStream, {
+              sdpTransform: (sdp) => this.enhanceSDP(sdp),
+              metadata: { kind: "performance" },
+            });
+            if (!call) continue;
+
+            this.mediaCalls.set(p.id, call);
+            this.trackCallClose(p.id, call);
           }
         }
 
@@ -1742,15 +2069,15 @@ const pkg = {
 
       for (let peerId of this.mediaCalls.keys()) {
         if (!this.state.participants.find((p) => p.id === peerId)) {
-          this.mediaCalls.get(peerId).close();
-          this.mediaCalls.delete(peerId);
+          this.dropMediaCall(peerId);
         }
       }
 
       for (let peerId of this.micCalls.keys()) {
         if (!this.state.participants.find((p) => p.id === peerId)) {
-          this.micCalls.get(peerId).close();
+          const call = this.micCalls.get(peerId);
           this.micCalls.delete(peerId);
+          this.shutdownMediaCall(call);
         }
       }
 
@@ -1767,20 +2094,33 @@ const pkg = {
       }
       if (!this.peer || this.peer.id === this.state.singerId) return;
 
-      const micStream = this.getSessionMicStream();
-      if (!micStream) return;
+      if (!this.getSessionMicStream()) return;
 
       for (let p of this.state.participants) {
         if (p.id === this.peer.id) continue;
 
         const shouldInitiate =
           p.id === this.state.singerId || this.peer.id > p.id;
-        if (!shouldInitiate || this.micCalls.has(p.id)) continue;
+        if (!shouldInitiate) continue;
 
-        const call = this.peer.call(p.id, micStream, {
+        const existing = this.micCalls.get(p.id);
+        if (existing && !this.isMediaCallDead(existing)) continue;
+        if (existing) {
+          this.micCalls.delete(p.id);
+          this.shutdownMediaCall(existing);
+        }
+
+        const callStream = this.createSessionCallStream();
+        if (!callStream) continue;
+
+        const call = this.peer.call(p.id, callStream, {
           metadata: { kind: "mic" },
         });
-        this.attachMicCall(p.id, call);
+        if (!call) {
+          this.stopCallStream(callStream);
+          continue;
+        }
+        this.attachMicCall(p.id, call, callStream);
       }
     },
 
@@ -1793,12 +2133,18 @@ const pkg = {
       this.roomId = null;
       this.isHost = false;
       this.connections.clear();
+      for (const call of this.mediaCalls.values()) this.releaseCallStream(call);
       this.mediaCalls.clear();
+      for (const call of this.micCalls.values()) this.releaseCallStream(call);
       this.micCalls.clear();
+      for (const timer of this._loungeRetryTimers.values()) clearTimeout(timer);
+      this._loungeRetryTimers.clear();
+      this._loungeRetryCounts.clear();
       this.currentPerformanceStream = null;
       this._lastRoutedMode = null;
       this._lastPlayTrigger = null;
       this._lastRoutedEveryoneAudible = null;
+      this._routing = false;
       this.isDisconnecting = false;
       this.collisionResolver = null;
 
@@ -1821,6 +2167,8 @@ const pkg = {
       this.incomingCameraCalls.clear();
       this.isMuted = false;
       this.applySessionMute(false);
+      this.isDeafened = false;
+      this.applySessionDeafened(false);
 
       if (this._lyricsChunkBuffers) this._lyricsChunkBuffers.clear();
       if (this._pianoRollChunkBuffers) this._pianoRollChunkBuffers.clear();
