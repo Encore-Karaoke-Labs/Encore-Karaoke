@@ -71,6 +71,9 @@
   - Comes with a lyric overlay, so your viewers can sing along with you!
 - **OBS Scene Automation**
   - Switch to different OBS scenes automatically as you go through your karaoke sessions.
+- **Twitch Integration**
+  - Link your Twitch channel to Encore and see chat messages!
+  - Live stream to Twitch directly inside of Encore.
 
 ---
 
