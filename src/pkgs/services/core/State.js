@@ -102,6 +102,7 @@ export const state = {
     sessionMicGainNode: null,
     trackDelayNode: null,
     musicRecordingGainNode: null,
+    bgmRecordingGainNode: null,
   },
   effects: {
     micChainInput: null,

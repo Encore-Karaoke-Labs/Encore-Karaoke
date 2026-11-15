@@ -75,6 +75,7 @@ export default class SessionManager {
     this._sessionPianoRollNoteCount = 0;
     this._lastRenderedEveryoneAudible = null;
     this._sessionViewTimer = null;
+    this._knownRecordingStates = new Map();
 
     // Session camera background state
     this._cameraStreams = new Map();
@@ -330,6 +331,26 @@ export default class SessionManager {
         4000,
       );
     });
+
+    // Announce when another participant starts recording the session. The
+    // local user already gets the persistent RECORDING bar from the Recorder.
+    newParticipants.forEach((p) => {
+      if (p.id === myId) return;
+      if (joined.some((j) => j.id === p.id)) return;
+      if (!p.isRecording || this._knownRecordingStates.get(p.id)) return;
+
+      const avatarHtml = p.avatar
+        ? `<img src="${p.avatar}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 8px; border: 1px solid rgba(255,255,255,0.3);">`
+        : `<div style="width: 28px; height: 28px; border-radius: 50%; background: #444; display: inline-block; vertical-align: middle; margin-right: 8px; border: 1px solid rgba(255,255,255,0.3);"></div>`;
+      infoBar.showTemp(
+        "RECORDING",
+        `${avatarHtml} <span style="font-weight: 700; color: #ffd700;">${p.nickname}</span> started recording.`,
+        4000,
+      );
+    });
+    this._knownRecordingStates = new Map(
+      newParticipants.map((p) => [p.id, Boolean(p.isRecording)]),
+    );
 
     state.knownParticipants = [...newParticipants];
     this.updateDiscordSessionRPC();
@@ -1566,6 +1587,7 @@ export default class SessionManager {
     state.isSessionActive = false;
     state.sessionRoomId = null;
     state.knownParticipants = [];
+    this._knownRecordingStates.clear();
     this._lastRenderedEveryoneAudible = null;
     this.updateDiscordSessionRPC();
 

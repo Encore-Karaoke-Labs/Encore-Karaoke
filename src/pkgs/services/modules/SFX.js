@@ -26,6 +26,7 @@ export class ForteSFX {
     this.bgmCache = new Map();
     this.bgmSourceNode = null;
     this.bgmGainNode = null;
+    this.bgmRecordingGainNode = null;
     this.bgmGeneration = 0;
   }
 
@@ -131,10 +132,26 @@ export class ForteSFX {
 
     source.connect(gain);
     gain.connect(this.state.effects.musicChainInput);
+
+    const recordingGain = context.createGain();
+    recordingGain.gain.value = this.state.effects.musicGainInRecording;
+    gain.connect(recordingGain);
+
+    const recordingDestinations = [
+      this.state.recording.destinationNode,
+      this.state.recording.musicDestinationNode,
+      this.state.recording.sessionDestinationNode,
+    ];
+    recordingDestinations.forEach((destination) => {
+      if (destination) recordingGain.connect(destination);
+    });
+
     source.start();
 
     this.bgmSourceNode = source;
     this.bgmGainNode = gain;
+    this.bgmRecordingGainNode = recordingGain;
+    this.state.recording.bgmRecordingGainNode = recordingGain;
     return true;
   }
 
@@ -147,8 +164,11 @@ export class ForteSFX {
     this.bgmGeneration++;
     const source = this.bgmSourceNode;
     const gain = this.bgmGainNode;
+    const recordingGain = this.bgmRecordingGainNode;
     this.bgmSourceNode = null;
     this.bgmGainNode = null;
+    this.bgmRecordingGainNode = null;
+    this.state.recording.bgmRecordingGainNode = null;
     if (!source || !gain || !this.audioCore.context) return;
 
     const now = this.audioCore.context.currentTime;
@@ -167,6 +187,7 @@ export class ForteSFX {
       try {
         source.disconnect();
         gain.disconnect();
+        if (recordingGain) recordingGain.disconnect();
       } catch (e) {}
     };
     try {

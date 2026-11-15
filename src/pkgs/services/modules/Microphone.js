@@ -362,6 +362,14 @@ export class ForteMicrophone {
       );
     }
 
+    if (this.state.recording.bgmRecordingGainNode) {
+      this.state.recording.bgmRecordingGainNode.gain.setTargetAtTime(
+        clamped,
+        this.audioCore.context.currentTime,
+        0.01,
+      );
+    }
+
     if (this.saveVolumesTimeout) clearTimeout(this.saveVolumesTimeout);
     this.saveVolumesTimeout = setTimeout(() => {
       if (window.config && typeof window.config.setItem === "function") {
