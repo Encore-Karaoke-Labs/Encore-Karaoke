@@ -450,39 +450,28 @@ class EncoreController {
           return { success: false, reason: "Song not found." };
         }
 
+        const canRequest =
+          this.state.isSessionActive ||
+          this.state.mode === "menu" ||
+          this.state.mode === "yt-search" ||
+          this.state.mode.startsWith("player");
+
+        if (!canRequest) {
+          return { success: false, reason: "Invalid app state." };
+        }
+
+        if (!this.retail.authorizeAndConsume("HOST")) {
+          return { success: false, reason: "Insufficient credits." };
+        }
+
         if (this.state.mode === "menu") {
-          if (!this.retail.authorizeAndConsume("HOST")) {
-            return { success: false, reason: "Insufficient credits." };
-          }
-
           this.ui.menuTransitionSource = "list";
-          this.state.songNumber = "";
-          this.state.isTypingNumber = false;
-          this.playback.startPlayer(song);
-          return { success: true, action: "playing", song };
         }
+        this.state.songNumber = "";
+        this.state.isTypingNumber = false;
 
-        if (this.state.mode.startsWith("player")) {
-          if (!this.retail.authorizeAndConsume("HOST")) {
-            return { success: false, reason: "Insufficient credits." };
-          }
-
-          if (this.state.isSessionActive) {
-            this.sessions.reserveSongInSession(song);
-          } else {
-            this.state.reservationQueue.push(song);
-
-            const fmt = this.library.getFormatInfo(song);
-            const codeDisplay = song.code
-              ? String(song.code).padStart(6, "0")
-              : "YT";
-            const html = `<span class="info-bar-code">${codeDisplay}</span> <span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span> <span class="info-bar-title">${song.title}</span><span class="info-bar-artist">- ${song.artist}</span>`;
-            this.infoBar.showTemp("RESERVED", html, 3000);
-          }
-          return { success: true, action: "queued", song };
-        }
-
-        return { success: false, reason: "Invalid app state." };
+        const action = this.playback.requestSong(song);
+        return { success: true, action, song };
       }
 
       case "get-playback-info": {
