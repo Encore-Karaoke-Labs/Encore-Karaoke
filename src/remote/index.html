@@ -17,7 +17,7 @@
   </head>
   <body>
     <div id="loading-overlay" class="active">
-      <div class="spinner"></div>
+      <img class="spinner" src="loading-spinner.svg" alt="" draggable="false" />
       <div
         style="
           color: var(--primary);
@@ -163,6 +163,10 @@
                     VOL &darr;
                   </button>
                 </div>
+                <div class="control-column">
+                  <button data-type="tempo_up">TEMPO &uarr;</button>
+                  <button data-type="tempo_down">TEMPO &darr;</button>
+                </div>
               </div>
 
               <div class="playback-features-grid span-4">
@@ -238,7 +242,7 @@
                 id="close-chat-btn"
                 style="width: 50px; font-size: 1.5rem; padding: 0"
               >
-                &larr;
+                <ion-icon name="arrow-back"></ion-icon>
               </button>
               <div
                 style="
@@ -371,7 +375,7 @@
                 id="unified-back-btn"
                 style="width: 50px; font-size: 1.5rem; padding: 0"
               >
-                &larr;
+                <ion-icon name="arrow-back"></ion-icon>
               </button>
               <input
                 type="text"
@@ -382,16 +386,22 @@
               <button
                 id="yt-search-btn"
                 class="btn-primary"
-                style="width: 80px; font-size: 1rem; display: none"
+                style="width: 56px; font-size: 1.6rem; display: none"
+                aria-label="Search YouTube"
               >
-                SEARCH
+                <ion-icon name="search"></ion-icon>
               </button>
             </div>
           </div>
 
           <div class="library-content">
             <div id="yt-loader">
-              <div class="spinner"></div>
+              <img
+                class="spinner"
+                src="/assets/img/loading-spinner.svg"
+                alt=""
+                draggable="false"
+              />
               <div
                 style="
                   color: var(--primary);
@@ -425,7 +435,7 @@
                 id="close-camera-btn"
                 style="width: 50px; font-size: 1.5rem; padding: 0"
               >
-                &larr;
+                <ion-icon name="arrow-back"></ion-icon>
               </button>
               <div
                 style="
