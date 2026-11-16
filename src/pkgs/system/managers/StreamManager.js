@@ -67,26 +67,24 @@ export default class StreamManager {
     this.isStreaming = false;
     this.streamRecorder = null;
     this.streamStartTime = null;
-    this.modalView = "selection"; // "selection" | "obs" | "direct" | "twitch" | "twitchLive"
+    this.modalView = "selection"; // "selection" | "obs" | "twitch" | "goLivePlatform" | "goLiveDirect" | "goLiveTwitch" | "goLiveBitrate" | "live"
     this._renderedModalView = null;
     this._streamViewTimer = null;
 
-    // Collapsible section state for the OBS, Direct, and Twitch pages.
+    // Go Live wizard state.
+    this.goLivePlatform = "direct"; // "direct" | "twitch"
+    this._startingStream = false;
+
+    // Collapsible section state for the OBS and Twitch Integration pages.
     this.sectionState = {
       obsConfig: true,
       obsScenes: false,
       obsOverlays: false,
-      directIngest: true,
-      directBitrate: false,
-      directInfo: false,
       twitchAccount: true,
       twitchChat: false,
       twitchInfo: false,
-      twitchDetails: true,
-      twitchTags: false,
-      twitchContent: false,
     };
-    this._sectionGroups = { obs: [], direct: [], twitch: [], twitchLive: [] };
+    this._sectionGroups = { obs: [], twitch: [] };
 
     // Direct RTMP Configuration
     const cfg = this.ctx.config?.streamConfig || {};
@@ -123,6 +121,17 @@ export default class StreamManager {
     this.totalBytesSent = 0;
     this.currentBitrateKbps = 0;
     this.lastChunkTime = null;
+
+    this.bitrateHistory = [];
+    this._lastBitrateSampleAt = 0;
+    this._bitrateCanvas = null;
+    this._bitrateChartValueEl = null;
+    this._handleStreamResize = () => this.drawBitrateChart();
+    this._bitrateResizeObserver =
+      typeof ResizeObserver === "function"
+        ? new ResizeObserver(() => this.drawBitrateChart())
+        : null;
+    window.addEventListener("resize", this._handleStreamResize);
 
     // Direct RTMP Telemetry Listeners
     window.desktopIntegration?.ipc?.on?.("stream-stats", (_e, stats) => {
@@ -189,10 +198,9 @@ export default class StreamManager {
         this.renderTwitchView();
       } else if (
         this.ctx.state.isStreamModalOpen &&
-        this.modalView === "twitchLive" &&
-        !status.authenticated
+        this.modalView === "goLiveTwitch"
       ) {
-        this.renderTwitchLiveView();
+        this.renderGoLiveTwitchView();
       }
     });
 
@@ -239,11 +247,7 @@ export default class StreamManager {
 
     if (shouldOpen) {
       this.ctx.dom.streamModal.classOff("hidden");
-      this.modalView = this.isStreaming
-        ? this.activeStreamDestination === "twitch"
-          ? "twitchLive"
-          : "direct"
-        : "selection";
+      this.modalView = this.isStreaming ? "live" : "selection";
       this.render();
     } else {
       if (this._streamViewTimer) {
@@ -268,9 +272,12 @@ export default class StreamManager {
     const order = {
       selection: 0,
       obs: 1,
-      direct: 1,
       twitch: 1,
-      twitchLive: 2,
+      goLivePlatform: 1,
+      goLiveDirect: 2,
+      goLiveTwitch: 2,
+      goLiveBitrate: 3,
+      live: 4,
     };
     return (order[toView] ?? 0) >= (order[fromView] ?? 0) ? 1 : -1;
   }
@@ -348,16 +355,18 @@ export default class StreamManager {
     let renderedView = this.modalView;
     if (this.modalView === "obs") {
       this.renderObsView();
-    } else if (this.modalView === "direct") {
-      if (this.renderDirectView() === false) {
-        renderedView = this._renderedModalView;
-      }
     } else if (this.modalView === "twitch") {
       this.renderTwitchView();
-    } else if (this.modalView === "twitchLive") {
-      if (this.renderTwitchLiveView() === false) {
-        renderedView = this._renderedModalView;
-      }
+    } else if (this.modalView === "goLivePlatform") {
+      this.renderGoLivePlatformView();
+    } else if (this.modalView === "goLiveDirect") {
+      this.renderGoLiveDirectView();
+    } else if (this.modalView === "goLiveTwitch") {
+      this.renderGoLiveTwitchView();
+    } else if (this.modalView === "goLiveBitrate") {
+      this.renderGoLiveBitrateView();
+    } else if (this.modalView === "live") {
+      this.renderLiveView();
     } else {
       this.renderSelectionView();
     }
@@ -447,6 +456,77 @@ export default class StreamManager {
   }
 
   /**
+   * Renders the Go Live step indicator.
+   * @param {Html} container - Element to render the stepper into.
+   * @param {number} activeIndex - Zero-based step index. Steps before it are complete.
+   */
+  buildStreamStepper(container, activeIndex) {
+    const steps =
+      this.goLivePlatform === "twitch"
+        ? ["PLATFORM", "TWITCH", "BITRATE"]
+        : ["PLATFORM", "INGEST", "BITRATE"];
+
+    const stepper = new Html("div")
+      .classOn("session-stepper", "stream-stepper")
+      .attr({
+        role: "list",
+        "aria-label":
+          activeIndex >= steps.length
+            ? "Setup complete"
+            : `Step ${activeIndex + 1} of ${steps.length}`,
+      })
+      .appendTo(container);
+
+    steps.forEach((label, index) => {
+      const step = new Html("div")
+        .classOn("session-step")
+        .attr({
+          role: "listitem",
+          "aria-current": index === activeIndex ? "step" : null,
+        })
+        .appendTo(stepper);
+
+      if (index === activeIndex) step.classOn("is-active");
+      else if (index < activeIndex || activeIndex >= steps.length) {
+        step.classOn("is-complete");
+      }
+
+      new Html("span")
+        .classOn("session-step-index")
+        .text(String(index + 1))
+        .appendTo(step);
+
+      new Html("span").classOn("session-step-label").text(label).appendTo(step);
+
+      if (index < steps.length - 1) {
+        new Html("span")
+          .classOn("session-step-line")
+          .attr({ "aria-hidden": "true" })
+          .appendTo(stepper);
+      }
+    });
+  }
+
+  /**
+   * Builds a non-collapsible titled section for the Go Live wizard.
+   * @param {Html} parent
+   * @param {string} title
+   * @returns {Html} Content container
+   */
+  buildStreamSection(parent, title) {
+    const section = new Html("div")
+      .classOn("stream-live-section")
+      .appendTo(parent);
+
+    new Html("div")
+      .classOn("stream-section-title")
+      .text(title)
+      .appendTo(section);
+
+    return new Html("div").classOn("stream-section-block").appendTo(section);
+  }
+
+  /**
    * Mode Selection Screen
    */
   renderSelectionView() {
@@ -499,7 +579,7 @@ export default class StreamManager {
       this.render();
     });
 
-    const directTile = new Html("div")
+    const goLiveTile = new Html("div")
       .classOn("session-tile")
       .attr({ tabindex: "0" })
       .appendTo(tileContainer);
@@ -509,20 +589,20 @@ export default class StreamManager {
       .html(
         '<ion-icon name="radio-outline" style="font-size: 3rem;"></ion-icon>',
       )
-      .appendTo(directTile);
+      .appendTo(goLiveTile);
 
     new Html("div")
       .classOn("session-tile-title")
-      .text("DIRECT BROADCAST")
-      .appendTo(directTile);
+      .text("GO LIVE")
+      .appendTo(goLiveTile);
 
     new Html("div")
       .classOn("session-tile-desc")
-      .text("Stream your Encore session directly.")
-      .appendTo(directTile);
+      .text("Stream your Encore session to Twitch or any RTMP destination.")
+      .appendTo(goLiveTile);
 
-    directTile.on("click", () => {
-      this.modalView = "direct";
+    goLiveTile.on("click", () => {
+      this.modalView = "goLivePlatform";
       this.render();
     });
 
@@ -955,7 +1035,14 @@ export default class StreamManager {
         new Html("button")
           .classOn("session-btn", "primary", "twitch-live-cta-btn")
           .text(broadcastActive ? "VIEW LIVE DASHBOARD" : "GO LIVE ON TWITCH")
-          .on("click", () => this.openTwitchLiveView())
+          .on("click", () => {
+            if (broadcastActive) {
+              this.modalView = "live";
+              this.render();
+            } else {
+              this.startGoLiveFlow("twitch");
+            }
+          })
           .appendTo(liveCta);
       }
     }
@@ -1306,17 +1393,21 @@ export default class StreamManager {
   }
 
   /**
-   * Opens the Twitch Go Live view and refreshes the channel information.
-   * Reopening while a Twitch broadcast is running keeps the current draft.
+   * Starts the Go Live wizard for a platform. Reopening a running Twitch
+   * broadcast keeps the existing draft and goes straight to the dashboard.
+   * @param {"direct"|"twitch"} platform
    */
-  openTwitchLiveView() {
-    this.modalView = "twitchLive";
+  startGoLiveFlow(platform = "direct") {
+    this.goLivePlatform = platform === "twitch" ? "twitch" : "direct";
 
-    if (
-      this.isStreaming &&
-      this.activeStreamDestination === "twitch" &&
-      this.twitchBroadcast
-    ) {
+    if (this.isStreaming) {
+      this.modalView = "live";
+      this.render();
+      return;
+    }
+
+    if (this.goLivePlatform === "direct") {
+      this.modalView = "goLiveDirect";
       this.render();
       return;
     }
@@ -1342,10 +1433,8 @@ export default class StreamManager {
       clearTimeout(this._twitchCategoryTimer);
       this._twitchCategoryTimer = null;
     }
-    this.sectionState.twitchDetails = true;
-    this.sectionState.twitchTags = false;
-    this.sectionState.twitchContent = false;
 
+    this.modalView = "goLiveTwitch";
     this.render();
     void this.loadTwitchBroadcastInfo();
   }
@@ -1359,7 +1448,7 @@ export default class StreamManager {
     details.loading = true;
     details.error = null;
     details.notice = null;
-    this._renderTwitchLiveIfActive();
+    this._renderGoLiveTwitchIfActive();
 
     let res = null;
     try {
@@ -1376,7 +1465,7 @@ export default class StreamManager {
       details.error =
         res?.error || "Could not load your Twitch channel information.";
       if (res?.reloginRequired) this.twitchStatus.reloginRequired = true;
-      this._renderTwitchLiveIfActive();
+      this._renderGoLiveTwitchIfActive();
       return;
     }
 
@@ -1392,7 +1481,7 @@ export default class StreamManager {
     this.twitchLiveInfo = res.live || null;
     this.twitchDraft = this.createTwitchDraft(res.channel);
     this.twitchDirty = false;
-    this._renderTwitchLiveIfActive();
+    this._renderGoLiveTwitchIfActive();
   }
 
   /**
@@ -1421,40 +1510,130 @@ export default class StreamManager {
     this.twitchDirty = true;
   }
 
-  _renderTwitchLiveIfActive() {
+  _renderGoLiveTwitchIfActive() {
     if (
       this.ctx.state.isStreamModalOpen &&
-      this.modalView === "twitchLive" &&
+      this.modalView === "goLiveTwitch" &&
       !this._streamViewTimer
     ) {
-      this.renderTwitchLiveView();
+      this.renderGoLiveTwitchView();
     }
   }
 
   /**
-   * Twitch Go Live View.
-   * @returns {boolean|void}
+   * Go Live step 1: platform selection.
+   * @returns {boolean}
    */
-  renderTwitchLiveView() {
-    if (this._streamViewTimer) return;
-
+  renderGoLivePlatformView() {
     const dom = this.ctx.dom;
-    if (!dom.streamHeader || !dom.streamContentArea) return;
+    if (!dom.streamHeader || !dom.streamContentArea) return false;
 
     dom.streamHeader.clear();
     dom.streamContentArea.clear();
     dom.streamFooter.classOff("hidden");
     dom.streamFooter.clear();
 
-    new Html("h1").text("TWITCH GO LIVE").appendTo(dom.streamHeader);
+    new Html("h1").text("GO LIVE").appendTo(dom.streamHeader);
     new Html("p")
-      .text("Review your stream details, then broadcast live to Twitch.")
+      .text("Choose where your Encore session will be broadcast.")
       .appendTo(dom.streamHeader);
+    this.buildStreamStepper(dom.streamHeader, 0);
+
+    const selectionArea = new Html("div")
+      .classOn("stream-selection-area")
+      .appendTo(dom.streamContentArea);
+
+    const tileContainer = new Html("div")
+      .classOn("session-tile-container", "stream-tile-container")
+      .appendTo(selectionArea);
+
+    const twitchTile = new Html("div")
+      .classOn("session-tile", "twitch-tile")
+      .attr({ tabindex: "0" })
+      .on("click", () => this.startGoLiveFlow("twitch"))
+      .appendTo(tileContainer);
+
+    new Html("div")
+      .classOn("session-tile-icon")
+      .html('<ion-icon name="logo-twitch" style="font-size: 3rem;"></ion-icon>')
+      .appendTo(twitchTile);
+    new Html("div")
+      .classOn("session-tile-title")
+      .text("TWITCH")
+      .appendTo(twitchTile);
+    new Html("div")
+      .classOn("session-tile-desc")
+      .text("Set your stream details and go live on your Twitch channel.")
+      .appendTo(twitchTile);
+
+    const directTile = new Html("div")
+      .classOn("session-tile")
+      .attr({ tabindex: "0" })
+      .on("click", () => this.startGoLiveFlow("direct"))
+      .appendTo(tileContainer);
+
+    new Html("div")
+      .classOn("session-tile-icon")
+      .html(
+        '<ion-icon name="radio-outline" style="font-size: 3rem;"></ion-icon>',
+      )
+      .appendTo(directTile);
+    new Html("div")
+      .classOn("session-tile-title")
+      .text("DIRECT")
+      .appendTo(directTile);
+    new Html("div")
+      .classOn("session-tile-desc")
+      .text("Broadcast to any RTMP server using your own ingest details.")
+      .appendTo(directTile);
+
+    const btnRow = new Html("div")
+      .classOn("session-btn-row")
+      .appendTo(dom.streamFooter);
+
+    new Html("button")
+      .classOn("session-btn", "danger")
+      .text("BACK")
+      .on("click", () => {
+        this.modalView = "selection";
+        this.render();
+      })
+      .appendTo(btnRow);
+
+    setTimeout(() => {
+      if (this.modalView !== "goLivePlatform") return;
+      const firstTile =
+        dom.streamContentArea.elm.querySelector(".session-tile");
+      if (firstTile) firstTile.focus();
+    }, 100);
+
+    return true;
+  }
+
+  /**
+   * Go Live step 2a: Twitch stream information.
+   * @returns {boolean}
+   */
+  renderGoLiveTwitchView() {
+    if (this._streamViewTimer) return false;
+
+    const dom = this.ctx.dom;
+    if (!dom.streamHeader || !dom.streamContentArea) return false;
+
+    dom.streamHeader.clear();
+    dom.streamContentArea.clear();
+    dom.streamFooter.classOff("hidden");
+    dom.streamFooter.clear();
+
+    new Html("h1").text("GO LIVE").appendTo(dom.streamHeader);
+    new Html("p")
+      .text("Set the information viewers will see on Twitch.")
+      .appendTo(dom.streamHeader);
+    this.buildStreamStepper(dom.streamHeader, 1);
 
     const page = new Html("div")
-      .classOn("stream-page", "twitch-live-page")
+      .classOn("stream-page")
       .appendTo(dom.streamContentArea);
-    this._sectionGroups.twitchLive = [];
 
     const status = this.twitchStatus;
     const details = this.twitchDetailsState;
@@ -1465,20 +1644,22 @@ export default class StreamManager {
       .classOn("stream-btn-row")
       .appendTo(dom.streamFooter);
 
-    new Html("button")
-      .classOn("session-btn")
-      .text(this.isStreaming ? "CLOSE" : "BACK")
-      .on("click", () => {
-        if (this.isStreaming) {
-          this.toggleStreamModal(false);
-          return;
-        }
-        this.modalView = "twitch";
-        this.render();
-      })
-      .appendTo(btnRow);
+    const addBackButton = () => {
+      new Html("button")
+        .classOn("session-btn")
+        .html(
+          '<ion-icon name="arrow-back-outline" style="font-size: 1.2rem; vertical-align: middle; margin-right: 0.5rem;"></ion-icon><span>BACK</span>',
+        )
+        .on("click", () => {
+          this.modalView = "goLivePlatform";
+          this.render();
+        })
+        .appendTo(btnRow);
+    };
 
     if (!canManage) {
+      addBackButton();
+
       if (status.login) {
         const waiting = new Html("div")
           .classOn("twitch-login-waiting")
@@ -1510,6 +1691,14 @@ export default class StreamManager {
             `Approve access in your browser. This request expires in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
           )
           .appendTo(waiting);
+
+        new Html("button")
+          .classOn("session-btn", "danger")
+          .text("CANCEL LOGIN")
+          .on("click", async () => {
+            await window.twitch?.cancelLogin?.();
+          })
+          .appendTo(btnRow);
         return true;
       }
 
@@ -1527,15 +1716,15 @@ export default class StreamManager {
         .classOn("twitch-signin-desc")
         .text(
           status.reloginRequired
-            ? "Log in again to manage your channel and start your broadcast."
-            : "Sign in with Twitch to manage your channel and start your broadcast.",
+            ? "Log in again to manage your channel and start your broadcast. You can also use a Direct RTMP broadcast instead."
+            : "Sign in with Twitch to manage your channel and start your broadcast. You can also use a Direct RTMP broadcast instead.",
         )
         .appendTo(card);
 
       new Html("button")
         .classOn("session-btn", "primary")
         .text(
-          status.reloginRequired ? "RENEW PERMISSIONS" : "OPEN TWITCH SETTINGS",
+          status.reloginRequired ? "RENEW PERMISSIONS" : "OPEN TWITCH SETUP",
         )
         .on("click", async () => {
           if (status.reloginRequired) {
@@ -1549,6 +1738,8 @@ export default class StreamManager {
 
       return true;
     }
+
+    addBackButton();
 
     if (!broadcast || !this.twitchDraft) {
       if (details.loading) {
@@ -1595,61 +1786,335 @@ export default class StreamManager {
           .on("click", () => {
             void this.loadTwitchBroadcastInfo();
           })
-          .appendTo(card);
+          .appendTo(btnRow);
       }
 
       return true;
     }
 
+    const channelLiveElsewhere = Boolean(
+      (this.twitchLiveInfo || this.twitchBroadcast?.live)?.isLive,
+    );
+
+    if (channelLiveElsewhere) {
+      new Html("div")
+        .classOn("stream-info-card")
+        .html(
+          "<strong>Your channel is already live.</strong><br>Stop the other broadcast before going live from Encore.",
+        )
+        .appendTo(page);
+    }
+
     this.buildTwitchDetailsSection(page);
     this.buildTwitchTagsSection(page);
     this.buildTwitchContentSection(page);
-    this.buildStreamStatsGrid(page, { includeViewers: true });
 
-    const streamingThis =
-      this.isStreaming && this.activeStreamDestination === "twitch";
-    const streamingOther =
-      this.isStreaming && this.activeStreamDestination !== "twitch";
-    const channelLiveElsewhere =
-      !streamingThis &&
-      Boolean((this.twitchLiveInfo || this.twitchBroadcast?.live)?.isLive);
+    new Html("button")
+      .classOn("session-btn", "primary")
+      .html(
+        '<span>NEXT</span><ion-icon name="arrow-forward-outline" style="font-size: 1.2rem; vertical-align: middle; margin-left: 0.5rem;"></ion-icon>',
+      )
+      .on("click", async (e) => {
+        const btn = e.currentTarget;
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "SAVING...";
+        }
 
-    const saveBtn = new Html("button")
-      .classOn("session-btn")
-      .text(details.saving ? "SAVING..." : "SAVE DETAILS")
-      .on("click", () => {
-        void this.saveTwitchDetails();
+        if (this.twitchDirty) {
+          const saved = await this.saveTwitchDetails({ silent: true });
+          if (!saved) {
+            if (this.modalView === "goLiveTwitch") {
+              this.renderGoLiveTwitchView();
+            }
+            return;
+          }
+        }
+
+        this.modalView = "goLiveBitrate";
+        this.render();
       })
       .appendTo(btnRow);
 
-    if (details.saving || details.loading) saveBtn.elm.disabled = true;
+    setTimeout(() => {
+      if (this.modalView !== "goLiveTwitch") return;
+      const titleInput = dom.streamContentArea.elm.querySelector(
+        'input[placeholder="Give your stream a title"]',
+      );
+      if (titleInput) titleInput.focus();
+    }, 100);
 
-    const liveBtn = new Html("button")
-      .classOn("session-btn", streamingThis ? "danger" : "primary")
+    return true;
+  }
+
+  /**
+   * Go Live step 3: encoder bitrate selection.
+   * @returns {boolean}
+   */
+  renderGoLiveBitrateView() {
+    const dom = this.ctx.dom;
+    if (!dom.streamHeader || !dom.streamContentArea) return false;
+
+    dom.streamHeader.clear();
+    dom.streamContentArea.clear();
+    dom.streamFooter.classOff("hidden");
+    dom.streamFooter.clear();
+
+    new Html("h1").text("GO LIVE").appendTo(dom.streamHeader);
+    new Html("p")
+      .text("Choose a bitrate before you start broadcasting.")
+      .appendTo(dom.streamHeader);
+    this.buildStreamStepper(dom.streamHeader, 2);
+
+    const page = new Html("div")
+      .classOn("stream-page")
+      .appendTo(dom.streamContentArea);
+    const bitrateContent = this.buildStreamSection(page, "BITRATE");
+
+    const bitrateRow = new Html("div")
+      .classOn("stream-bitrate-row")
+      .appendTo(bitrateContent);
+
+    const bitrates = [
+      {
+        label: "2.5 Mbps",
+        value: 2500000,
+        hint: "Lower bandwidth",
+      },
+      {
+        label: "3.5 Mbps",
+        value: 3500000,
+        hint: "Recommended",
+      },
+      {
+        label: "6.0 Mbps",
+        value: 6000000,
+        hint: "Higher quality",
+      },
+    ];
+
+    bitrates.forEach((bitrate) => {
+      const chip = new Html("div")
+        .classOn("stream-bitrate-chip")
+        .attr({ tabindex: "0" })
+        .appendTo(bitrateRow);
+
+      new Html("span")
+        .classOn("stream-bitrate-label")
+        .text(bitrate.label)
+        .appendTo(chip);
+      new Html("span")
+        .classOn("stream-bitrate-hint")
+        .text(bitrate.hint)
+        .appendTo(chip);
+
+      if (Number(this.videoBitrate) === bitrate.value) chip.classOn("active");
+
+      chip.on("click", () => {
+        if (this.isStreaming) return;
+        this.videoBitrate = bitrate.value;
+        this.saveConfig();
+        this.renderGoLiveBitrateView();
+      });
+    });
+
+    const summary = new Html("div").classOn("stream-info-card").appendTo(page);
+
+    const platformLabel =
+      this.goLivePlatform === "twitch" ? "Twitch" : "Direct RTMP";
+    const destinationLabel =
+      this.goLivePlatform === "twitch"
+        ? this.twitchDraft?.title || "Your Twitch channel"
+        : this.rtmpUrl || "No RTMP server configured";
+
+    new Html("strong").text("Ready to go live:").appendTo(summary);
+    new Html("div").text(`Platform: ${platformLabel}`).appendTo(summary);
+    new Html("div").text(`Destination: ${destinationLabel}`).appendTo(summary);
+    new Html("div")
+      .text(`Bitrate: ${Math.round(this.videoBitrate / 100000) / 10} Mbps`)
+      .appendTo(summary);
+
+    const btnRow = new Html("div")
+      .classOn("stream-btn-row")
+      .appendTo(dom.streamFooter);
+
+    new Html("button")
+      .classOn("session-btn")
+      .html(
+        '<ion-icon name="arrow-back-outline" style="font-size: 1.2rem; vertical-align: middle; margin-right: 0.5rem;"></ion-icon><span>BACK</span>',
+      )
+      .on("click", () => {
+        this.modalView =
+          this.goLivePlatform === "twitch" ? "goLiveTwitch" : "goLiveDirect";
+        this.render();
+      })
+      .appendTo(btnRow);
+
+    const startBtn = new Html("button")
+      .classOn("session-btn", "primary")
       .text(
-        streamingThis
-          ? "STOP STREAM"
-          : streamingOther
-            ? "STREAM ALREADY RUNNING"
-            : channelLiveElsewhere
-              ? "CHANNEL ALREADY LIVE"
-              : "GO LIVE ON TWITCH",
+        this.goLivePlatform === "twitch" ? "GO LIVE ON TWITCH" : "START STREAM",
       )
       .appendTo(btnRow);
 
-    if (streamingOther || channelLiveElsewhere) liveBtn.elm.disabled = true;
+    if (this._startingStream) {
+      startBtn.elm.disabled = true;
+      startBtn.text("STARTING...");
+    }
+
+    startBtn.on("click", async () => {
+      if (this._startingStream || this.isStreaming) return;
+      this._startingStream = true;
+      startBtn.elm.disabled = true;
+      startBtn.text("STARTING...");
+
+      let started = false;
+      if (this.goLivePlatform === "twitch") {
+        started = await this.goLiveOnTwitch();
+      } else {
+        this.saveConfig();
+        started = await this.startStream();
+      }
+
+      this._startingStream = false;
+
+      if (started) {
+        this.modalView = "live";
+        this.render();
+      } else if (this.modalView === "goLiveBitrate") {
+        this.renderGoLiveBitrateView();
+      }
+    });
+
+    return true;
+  }
+
+  /**
+   * Final Go Live step: live broadcast information and bitrate graph.
+   * @returns {boolean}
+   */
+  renderLiveView() {
+    const dom = this.ctx.dom;
+    if (!dom.streamHeader || !dom.streamContentArea) return false;
+
+    dom.streamHeader.clear();
+    dom.streamContentArea.clear();
+    dom.streamFooter.classOff("hidden");
+    dom.streamFooter.clear();
+
+    const isTwitch = this.goLivePlatform === "twitch";
+
+    new Html("h1")
+      .text(this.isStreaming ? "LIVE BROADCAST" : "STREAM DASHBOARD")
+      .appendTo(dom.streamHeader);
+    new Html("p")
+      .text(
+        this.isStreaming
+          ? isTwitch
+            ? "Your Encore session is live on Twitch."
+            : "Your Encore session is broadcasting to your RTMP server."
+          : "Review your broadcast and go live when you are ready.",
+      )
+      .appendTo(dom.streamHeader);
+    this.buildStreamStepper(dom.streamHeader, 3);
+
+    const page = new Html("div")
+      .classOn("stream-page", "stream-live-page")
+      .appendTo(dom.streamContentArea);
+
+    this.buildStreamStatsGrid(page, { includeViewers: isTwitch });
+
+    const chartCard = new Html("div")
+      .classOn("stream-chart-card")
+      .appendTo(page);
+    const chartHeader = new Html("div")
+      .classOn("stream-chart-header")
+      .appendTo(chartCard);
+
+    new Html("span")
+      .classOn("stream-chart-title")
+      .text("BITRATE")
+      .appendTo(chartHeader);
+
+    this._bitrateChartValueEl = new Html("span")
+      .classOn("stream-chart-value")
+      .text("0 kbps")
+      .appendTo(chartHeader);
+
+    const chartWrap = new Html("div")
+      .classOn("stream-chart-canvas-wrap")
+      .appendTo(chartCard);
+
+    if (this._bitrateResizeObserver) {
+      this._bitrateResizeObserver.disconnect();
+      this._bitrateResizeObserver.observe(chartWrap.elm);
+    }
+
+    this._bitrateCanvas = new Html("canvas")
+      .classOn("stream-chart-canvas")
+      .attr({ "aria-label": "Bitrate over time" })
+      .appendTo(chartWrap).elm;
+
+    const btnRow = new Html("div")
+      .classOn("stream-btn-row")
+      .appendTo(dom.streamFooter);
+
+    if (!this.isStreaming) {
+      new Html("button")
+        .classOn("session-btn")
+        .html(
+          '<ion-icon name="arrow-back-outline" style="font-size: 1.2rem; vertical-align: middle; margin-right: 0.5rem;"></ion-icon><span>BACK</span>',
+        )
+        .on("click", () => {
+          this.modalView = "goLiveBitrate";
+          this.render();
+        })
+        .appendTo(btnRow);
+    }
+
+    new Html("button")
+      .classOn("session-btn")
+      .text("CLOSE")
+      .on("click", () => this.toggleStreamModal(false))
+      .appendTo(btnRow);
+
+    const liveBtn = new Html("button")
+      .classOn("session-btn", this.isStreaming ? "danger" : "primary")
+      .text(this.isStreaming ? "STOP STREAM" : "START STREAM")
+      .appendTo(btnRow);
+
+    if (this._startingStream) {
+      liveBtn.elm.disabled = true;
+      liveBtn.text("STARTING...");
+    }
 
     liveBtn.on("click", async () => {
-      if (streamingThis) {
+      if (this._startingStream) return;
+
+      if (this.isStreaming) {
         await this.stopStream();
-        this.renderTwitchLiveView();
         return;
       }
-      if (this.isStreaming) return;
-      await this.goLiveOnTwitch();
+
+      this._startingStream = true;
+      liveBtn.elm.disabled = true;
+      liveBtn.text("STARTING...");
+
+      let started = false;
+      if (isTwitch) {
+        started = await this.goLiveOnTwitch();
+      } else {
+        this.saveConfig();
+        started = await this.startStream();
+      }
+
+      this._startingStream = false;
+      if (started) this.modalView = "live";
+      if (this.modalView === "live") this.renderLiveView();
     });
 
     this.updateStatsUI();
+    requestAnimationFrame(() => this.drawBitrateChart());
     return true;
   }
 
@@ -1658,17 +2123,12 @@ export default class StreamManager {
    * @param {Html} parent
    */
   buildTwitchDetailsSection(parent) {
-    const section = this.buildSectionAccordion(
-      parent,
-      "twitchDetails",
-      "STREAM DETAILS",
-      "twitchLive",
-    );
+    const sectionContent = this.buildStreamSection(parent, "STREAM DETAILS");
     const draft = this.twitchDraft;
 
     const titleGroup = new Html("div")
       .classOn("stream-form-group")
-      .appendTo(section.content);
+      .appendTo(sectionContent);
 
     new Html("label")
       .classOn("stream-form-label")
@@ -1706,7 +2166,7 @@ export default class StreamManager {
 
     const categoryGroup = new Html("div")
       .classOn("stream-form-group")
-      .appendTo(section.content);
+      .appendTo(sectionContent);
 
     new Html("label")
       .classOn("stream-form-label")
@@ -1757,7 +2217,7 @@ export default class StreamManager {
 
     const languageGroup = new Html("div")
       .classOn("stream-form-group")
-      .appendTo(section.content);
+      .appendTo(sectionContent);
 
     new Html("label")
       .classOn("stream-form-label")
@@ -1990,16 +2450,11 @@ export default class StreamManager {
    * @param {Html} parent
    */
   buildTwitchTagsSection(parent) {
-    const section = this.buildSectionAccordion(
-      parent,
-      "twitchTags",
-      "TAGS",
-      "twitchLive",
-    );
+    const sectionContent = this.buildStreamSection(parent, "TAGS");
 
     const editor = new Html("div")
       .classOn("twitch-tag-editor")
-      .appendTo(section.content);
+      .appendTo(sectionContent);
 
     this._twitchTagChipsEl = new Html("div")
       .classOn("twitch-tag-chips")
@@ -2127,11 +2582,9 @@ export default class StreamManager {
    * @param {Html} parent
    */
   buildTwitchContentSection(parent) {
-    const section = this.buildSectionAccordion(
+    const sectionContent = this.buildStreamSection(
       parent,
-      "twitchContent",
       "CONTENT CLASSIFICATIONS",
-      "twitchLive",
     );
     const draft = this.twitchDraft;
     const labels = Array.isArray(
@@ -2144,7 +2597,7 @@ export default class StreamManager {
       new Html("div")
         .classOn("stream-info-card")
         .text("Twitch did not return any content classification labels.")
-        .appendTo(section.content);
+        .appendTo(sectionContent);
     }
 
     labels.forEach((label) => {
@@ -2190,12 +2643,12 @@ export default class StreamManager {
         this.markTwitchDirty();
       });
 
-      row.appendTo(section.content);
+      row.appendTo(sectionContent);
     });
 
     const brandedRow = new Html("div")
       .classOn("twitch-ccl-row")
-      .appendTo(section.content);
+      .appendTo(sectionContent);
 
     const brandedToggle = new Html("button")
       .classOn("switch")
@@ -2338,7 +2791,7 @@ export default class StreamManager {
     details.saving = true;
     details.error = null;
     details.notice = null;
-    this._renderTwitchLiveIfActive();
+    this._renderGoLiveTwitchIfActive();
 
     let res = null;
     try {
@@ -2356,7 +2809,7 @@ export default class StreamManager {
       details.error =
         res?.error || "Twitch could not save your stream details.";
       if (res?.reloginRequired) this.twitchStatus.reloginRequired = true;
-      this._renderTwitchLiveIfActive();
+      this._renderGoLiveTwitchIfActive();
       this.ctx.modules.infoBar.showTemp("TWITCH", details.error, 5000);
       return false;
     }
@@ -2378,7 +2831,7 @@ export default class StreamManager {
     if (res.live) this.twitchLiveInfo = res.live;
 
     details.notice = "Stream details saved to Twitch.";
-    this._renderTwitchLiveIfActive();
+    this._renderGoLiveTwitchIfActive();
 
     if (!options.silent) {
       this.ctx.modules.infoBar.showTemp(
@@ -2446,7 +2899,7 @@ export default class StreamManager {
         keyRes?.error || "Twitch could not provide your stream key.";
       this.twitchDetailsState.error = error;
       if (keyRes?.reloginRequired) this.twitchStatus.reloginRequired = true;
-      this._renderTwitchLiveIfActive();
+      this._renderGoLiveTwitchIfActive();
       this.ctx.modules.infoBar.showTemp("TWITCH", error, 6000);
       return false;
     }
@@ -2465,7 +2918,6 @@ export default class StreamManager {
       viewerCount: this.twitchLiveInfo?.viewerCount ?? null,
     };
     this.startTwitchLivePoll();
-    this.renderTwitchLiveView();
     return true;
   }
 
@@ -2504,37 +2956,33 @@ export default class StreamManager {
   }
 
   /**
-   * Direct RTMP Broadcast View.
+   * Go Live step 2b: direct RTMP ingest information.
+   * @returns {boolean}
    */
-  renderDirectView() {
+  renderGoLiveDirectView() {
     const dom = this.ctx.dom;
-    if (!dom.streamHeader || !dom.streamContentArea) return;
+    if (!dom.streamHeader || !dom.streamContentArea) return false;
 
     dom.streamHeader.clear();
     dom.streamContentArea.clear();
     dom.streamFooter.classOff("hidden");
     dom.streamFooter.clear();
 
-    new Html("h1").text("DIRECT RTMP BROADCAST").appendTo(dom.streamHeader);
+    new Html("h1").text("GO LIVE").appendTo(dom.streamHeader);
     new Html("p")
-      .text("Stream live karaoke performances.")
+      .text("Enter the ingest details for your RTMP destination.")
       .appendTo(dom.streamHeader);
+    this.buildStreamStepper(dom.streamHeader, 1);
 
     const page = new Html("div")
       .classOn("stream-page")
       .appendTo(dom.streamContentArea);
-    this._sectionGroups.direct = [];
 
-    const ingestSection = this.buildSectionAccordion(
-      page,
-      "directIngest",
-      "INGEST CONFIGURATION",
-      "direct",
-    );
+    const ingestContent = this.buildStreamSection(page, "INGEST CONFIGURATION");
 
     const urlGroup = new Html("div")
       .classOn("stream-form-group")
-      .appendTo(ingestSection.content);
+      .appendTo(ingestContent);
 
     new Html("label")
       .classOn("stream-form-label")
@@ -2550,15 +2998,13 @@ export default class StreamManager {
       })
       .appendTo(urlGroup);
 
-    if (this.isStreaming) urlInput.elm.disabled = true;
-
     urlInput.on("input", () => {
       this.rtmpUrl = urlInput.getValue().trim();
     });
 
     const keyGroup = new Html("div")
       .classOn("stream-form-group")
-      .appendTo(ingestSection.content);
+      .appendTo(ingestContent);
 
     new Html("label")
       .classOn("stream-form-label")
@@ -2583,8 +3029,6 @@ export default class StreamManager {
         value: this.streamKey,
       })
       .appendTo(keyWrapper);
-
-    if (this.isStreaming) keyInput.elm.disabled = true;
 
     keyInput.on("input", () => {
       this.streamKey = keyInput.getValue().trim();
@@ -2629,49 +3073,7 @@ export default class StreamManager {
       toggleKeyBtn.text(this.isKeyVisible ? "HIDE" : "SHOW");
     });
 
-    const bitrateSection = this.buildSectionAccordion(
-      page,
-      "directBitrate",
-      "BITRATE",
-      "direct",
-    );
-
-    const bitrateRow = new Html("div")
-      .classOn("stream-bitrate-row")
-      .appendTo(bitrateSection.content);
-
-    const bitrates = [
-      { label: "2.5 Mbps", value: 2500000 },
-      { label: "3.5 Mbps", value: 3500000 },
-      { label: "6.0 Mbps", value: 6000000 },
-    ];
-
-    bitrates.forEach((b) => {
-      const bChip = new Html("div")
-        .classOn("stream-bitrate-chip")
-        .attr({ tabindex: "0" })
-        .text(b.label)
-        .appendTo(bitrateRow);
-
-      if (this.videoBitrate === b.value) bChip.classOn("active");
-
-      bChip.on("click", () => {
-        if (this.isStreaming) return;
-        this.videoBitrate = b.value;
-        this.renderDirectView();
-      });
-    });
-
-    const infoSection = this.buildSectionAccordion(
-      page,
-      "directInfo",
-      "BROADCAST INFORMATION",
-      "direct",
-    );
-
-    const infoCard = new Html("div")
-      .classOn("stream-info-card")
-      .appendTo(infoSection.content);
+    const infoCard = new Html("div").classOn("stream-info-card").appendTo(page);
 
     infoCard.html(`
       <strong>Broadcasting Notes:</strong><br>
@@ -2680,41 +3082,48 @@ export default class StreamManager {
       • <strong>Be sure to take the Mic Latency test in the Setup!</strong>
     `);
 
-    this.buildStreamStatsGrid(page);
-
     const btnRow = new Html("div")
       .classOn("stream-btn-row")
       .appendTo(dom.streamFooter);
 
     new Html("button")
       .classOn("session-btn")
-      .text("CLOSE")
+      .html(
+        '<ion-icon name="arrow-back-outline" style="font-size: 1.2rem; vertical-align: middle; margin-right: 0.5rem;"></ion-icon><span>BACK</span>',
+      )
       .on("click", () => {
-        if (this.isStreaming) {
-          this.toggleStreamModal(false);
-        } else {
-          this.modalView = "selection";
-          this.render();
-        }
+        this.modalView = "goLivePlatform";
+        this.render();
       })
       .appendTo(btnRow);
 
     new Html("button")
-      .classOn("session-btn", this.isStreaming ? "danger" : "primary")
-      .text(this.isStreaming ? "STOP STREAM" : "START STREAM")
-      .on("click", async () => {
-        if (this.isStreaming) {
-          await this.stopStream();
-          this.renderDirectView();
-        } else {
-          this.saveConfig();
-          const ok = await this.startStream();
-          if (ok) this.renderDirectView();
+      .classOn("session-btn", "primary")
+      .html(
+        '<span>NEXT</span><ion-icon name="arrow-forward-outline" style="font-size: 1.2rem; vertical-align: middle; margin-left: 0.5rem;"></ion-icon>',
+      )
+      .on("click", () => {
+        if (!this.rtmpUrl.trim()) {
+          this.ctx.modules.infoBar.showTemp(
+            "STREAM",
+            "Please provide a valid RTMP server URL.",
+            3000,
+          );
+          urlInput.elm.focus();
+          return;
         }
+
+        this.saveConfig();
+        this.modalView = "goLiveBitrate";
+        this.render();
       })
       .appendTo(btnRow);
 
-    this.updateStatsUI();
+    setTimeout(() => {
+      if (this.modalView !== "goLiveDirect") return;
+      if (!this.rtmpUrl) urlInput.elm.focus();
+    }, 100);
+
     return true;
   }
 
@@ -2836,6 +3245,8 @@ export default class StreamManager {
       this.isStreaming = true;
       this.activeStreamDestination = destination;
       this.streamStartTime = Date.now();
+      this.bitrateHistory = [];
+      this._lastBitrateSampleAt = 0;
 
       if (this.statsTimer) clearInterval(this.statsTimer);
       this.statsTimer = setInterval(() => this.updateStatsUI(), 1000);
@@ -2862,10 +3273,169 @@ export default class StreamManager {
   }
 
   /**
+   * Returns the best available current bitrate in kbps.
+   * @returns {number}
+   */
+  getCurrentBitrateKbps() {
+    const stats = this.latestStats;
+    const parsed = stats?.bitrate ? parseFloat(stats.bitrate) : NaN;
+    if (Number.isFinite(parsed) && parsed > 0) return Math.round(parsed);
+    if (this.currentBitrateKbps > 0) return this.currentBitrateKbps;
+    return Math.round(this.videoBitrate / 1000);
+  }
+
+  /**
+   * Stores one bitrate sample per second for the live graph.
+   */
+  recordBitrateSample() {
+    if (!this.isStreaming) {
+      this._lastBitrateSampleAt = 0;
+      return;
+    }
+
+    const now = Date.now();
+    if (now - this._lastBitrateSampleAt < 900) return;
+    this._lastBitrateSampleAt = now;
+
+    this.bitrateHistory.push(this.getCurrentBitrateKbps());
+    if (this.bitrateHistory.length > 180) this.bitrateHistory.shift();
+  }
+
+  /**
+   * Paints the bitrate graph and current readout.
+   */
+  updateBitrateChartUI() {
+    const kbps = this.isStreaming ? this.getCurrentBitrateKbps() : 0;
+    if (this._bitrateChartValueEl?.elm.isConnected) {
+      this._bitrateChartValueEl.text(`${kbps} kbps`);
+    }
+    this.drawBitrateChart();
+  }
+
+  /**
+   * Draws the bitrate history line graph on the live dashboard.
+   */
+  drawBitrateChart() {
+    const canvas = this._bitrateCanvas;
+    if (!canvas || !canvas.isConnected) return;
+
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+    const pixelWidth = Math.round(width * dpr);
+    const pixelHeight = Math.round(height * dpr);
+
+    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+      canvas.width = pixelWidth;
+      canvas.height = pixelHeight;
+    }
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    const pad = { top: 12, right: 12, bottom: 22, left: 48 };
+    const plotWidth = Math.max(1, width - pad.left - pad.right);
+    const plotHeight = Math.max(1, height - pad.top - pad.bottom);
+    const history = this.bitrateHistory;
+    const configured = Math.round(this.videoBitrate / 1000);
+    const peak = Math.max(configured, ...history, 1);
+    const maxY = Math.max(1000, Math.ceil((peak * 1.2) / 500) * 500);
+
+    ctx.font = '10px "Radio Canada", sans-serif';
+    ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+    ctx.strokeStyle = "rgba(137, 207, 240, 0.12)";
+    ctx.lineWidth = 1;
+
+    const gridLines = 4;
+    for (let i = 0; i <= gridLines; i++) {
+      const y = pad.top + plotHeight * (i / gridLines);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(width - pad.right, y);
+      ctx.stroke();
+
+      const value = Math.round(maxY * (1 - i / gridLines));
+      ctx.textAlign = "left";
+      ctx.fillText(String(value), 4, y + 3);
+    }
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+    ctx.textAlign = "left";
+    ctx.fillText("3m ago", pad.left, height - 6);
+    ctx.textAlign = "right";
+    ctx.fillText("now", width - pad.right, height - 6);
+    ctx.textAlign = "left";
+
+    if (!history.length) {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+      ctx.textAlign = "center";
+      ctx.fillText(
+        "Waiting for stream data...",
+        pad.left + plotWidth / 2,
+        pad.top + plotHeight / 2,
+      );
+      ctx.textAlign = "left";
+      return;
+    }
+
+    const points = history.map((value, index) => {
+      const x =
+        history.length === 1
+          ? pad.left + plotWidth
+          : pad.left + plotWidth * (index / (history.length - 1));
+      const clamped = Math.max(0, Math.min(value, maxY));
+      return {
+        x,
+        y: pad.top + plotHeight - (clamped / maxY) * plotHeight,
+      };
+    });
+
+    const baseline = pad.top + plotHeight;
+    const gradient = ctx.createLinearGradient(0, pad.top, 0, baseline);
+    gradient.addColorStop(0, "rgba(137, 207, 240, 0.28)");
+    gradient.addColorStop(1, "rgba(137, 207, 240, 0)");
+
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, baseline);
+    points.forEach((point) => ctx.lineTo(point.x, point.y));
+    ctx.lineTo(points[points.length - 1].x, baseline);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    ctx.beginPath();
+    points.forEach((point, index) => {
+      if (index === 0) ctx.moveTo(point.x, point.y);
+      else ctx.lineTo(point.x, point.y);
+    });
+    ctx.strokeStyle = "#89cff0";
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    const last = points[points.length - 1];
+    ctx.beginPath();
+    ctx.arc(last.x, last.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffd700";
+    ctx.fill();
+  }
+
+  /**
    * Updates telemetry labels.
    */
   updateStatsUI() {
-    if (!this.statEls.health) return;
+    this.recordBitrateSample();
+
+    if (!this.statEls.health) {
+      this.updateBitrateChartUI();
+      return;
+    }
 
     if (!this.isStreaming) {
       this.statEls.health.text("Offline").elm.className = "stream-stat-value";
@@ -2876,6 +3446,7 @@ export default class StreamManager {
       this.statEls.data.text("0.0 MB");
       if (this.statEls.viewers) this.statEls.viewers.text("—");
       this.statEls.healthBar.styleJs({ width: "0%", backgroundColor: "#444" });
+      this.updateBitrateChartUI();
       return;
     }
 
@@ -2940,6 +3511,8 @@ export default class StreamManager {
       width: healthConfig.width,
       backgroundColor: healthConfig.color,
     });
+
+    this.updateBitrateChartUI();
   }
 
   /**
@@ -2985,12 +3558,8 @@ export default class StreamManager {
       3000,
     );
 
-    if (this.ctx.state.isStreamModalOpen) {
-      if (this.modalView === "twitchLive") {
-        this.renderTwitchLiveView();
-      } else if (this.modalView === "direct") {
-        this.renderDirectView();
-      }
+    if (this.ctx.state.isStreamModalOpen && this.modalView === "live") {
+      this.renderLiveView();
     }
   }
 
@@ -3000,8 +3569,18 @@ export default class StreamManager {
 
     if (e.key === "Escape") {
       e.preventDefault();
-      if (this.modalView === "twitchLive" && !this.isStreaming) {
-        this.modalView = "twitch";
+      if (this.modalView === "live" && !this.isStreaming) {
+        this.modalView = "goLiveBitrate";
+        this.render();
+      } else if (this.modalView === "goLiveBitrate") {
+        this.modalView =
+          this.goLivePlatform === "twitch" ? "goLiveTwitch" : "goLiveDirect";
+        this.render();
+      } else if (
+        this.modalView === "goLiveTwitch" ||
+        this.modalView === "goLiveDirect"
+      ) {
+        this.modalView = "goLivePlatform";
         this.render();
       } else if (this.modalView !== "selection" && !this.isStreaming) {
         this.modalView = "selection";
@@ -3086,6 +3665,8 @@ export default class StreamManager {
       clearTimeout(this._twitchCategoryTimer);
       this._twitchCategoryTimer = null;
     }
+    window.removeEventListener("resize", this._handleStreamResize);
+    this._bitrateResizeObserver?.disconnect();
     this.stopTwitchLivePoll();
     if (this.isStreaming) {
       this.stopStream();
