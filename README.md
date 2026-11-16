@@ -72,7 +72,7 @@
 - **OBS Scene Automation**
   - Switch to different OBS scenes automatically as you go through your karaoke sessions.
 - **Twitch Integration**
-  - Link your Twitch channel to Encore and see chat messages!
+  - Link your Twitch channel to Encore and see chat messages fly through!
   - Live stream to Twitch directly inside of Encore.
 
 ---
