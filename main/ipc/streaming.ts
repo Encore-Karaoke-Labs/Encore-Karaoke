@@ -3,15 +3,138 @@ import {
   ipcMain,
   type IpcMainEvent,
   type IpcMainInvokeEvent,
+  type WebContents,
 } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { appState } from "../state";
 import { logger } from "../logger";
+import { appState } from "../state";
 
 let ffmpegStreamProcess: ChildProcess | null = null;
 let streamHeaderChunk: Buffer | null = null;
+
+/**
+ * The renderer that started the stream. If it goes away (reload, crash, window
+ * close) the FFmpeg process must not keep pushing video anywhere.
+ */
+let streamOwnerWebContents: WebContents | null = null;
+let streamOwnerListeners: (() => void) | null = null;
+let streamStopTimer: NodeJS.Timeout | null = null;
+let streamKillTimer: NodeJS.Timeout | null = null;
+
+function clearStopTimers(): void {
+  if (streamStopTimer) {
+    clearTimeout(streamStopTimer);
+    streamStopTimer = null;
+  }
+  if (streamKillTimer) {
+    clearTimeout(streamKillTimer);
+    streamKillTimer = null;
+  }
+}
+
+function detachStreamOwner(): void {
+  if (streamOwnerListeners) {
+    streamOwnerListeners();
+    streamOwnerListeners = null;
+  }
+  streamOwnerWebContents = null;
+}
+
+function attachStreamOwner(sender: WebContents): void {
+  detachStreamOwner();
+  streamOwnerWebContents = sender;
+
+  const onRendererLost = (reason: string) => {
+    if (streamOwnerWebContents !== sender) return;
+    stopStreamingProcess(reason);
+  };
+
+  const onProcessGone = () => onRendererLost("renderer process gone");
+  const onDestroyed = () => onRendererLost("renderer destroyed");
+  const onNavigation = (
+    details: Electron.Event<Electron.WebContentsDidStartNavigationEventParams>,
+  ) => {
+    if (!details.isMainFrame || details.isSameDocument) return;
+    onRendererLost("renderer navigated");
+  };
+
+  sender.once("render-process-gone", onProcessGone);
+  sender.once("destroyed", onDestroyed);
+  sender.on("did-start-navigation", onNavigation);
+
+  streamOwnerListeners = () => {
+    sender.removeListener("render-process-gone", onProcessGone);
+    sender.removeListener("destroyed", onDestroyed);
+    sender.removeListener("did-start-navigation", onNavigation);
+  };
+}
+
+function sendStreamStatus(running: boolean, extra?: WebContents): void {
+  const targets = new Set<WebContents>();
+  if (extra) targets.add(extra);
+  if (streamOwnerWebContents) targets.add(streamOwnerWebContents);
+  if (appState.appViewWebContents) targets.add(appState.appViewWebContents);
+
+  for (const target of targets) {
+    if (!target.isDestroyed()) {
+      target.send("stream-status-changed", running);
+    }
+  }
+}
+
+/**
+ * Tears down the FFmpeg process in escalating stages so a wedged encoder still
+ * dies: close stdin, then SIGINT, then SIGKILL.
+ */
+export function stopStreamingProcess(reason = "requested"): void {
+  const processToStop = ffmpegStreamProcess;
+
+  clearStopTimers();
+  detachStreamOwner();
+  streamHeaderChunk = null;
+
+  if (!processToStop) return;
+
+  ffmpegStreamProcess = null;
+  logger.info("STREAM", `Stopping streaming pipe (${reason})...`);
+
+  if (processToStop.exitCode !== null || processToStop.signalCode !== null) {
+    return;
+  }
+
+  try {
+    processToStop.stdin?.end();
+  } catch {
+    // Ignored
+  }
+
+  streamStopTimer = setTimeout(() => {
+    streamStopTimer = null;
+    if (processToStop.exitCode !== null || processToStop.signalCode !== null)
+      return;
+
+    try {
+      processToStop.kill("SIGINT");
+    } catch {
+      // Ignored
+    }
+
+    streamKillTimer = setTimeout(() => {
+      streamKillTimer = null;
+      if (processToStop.exitCode !== null || processToStop.signalCode !== null)
+        return;
+
+      logger.warn("STREAM", "FFmpeg did not exit; sending SIGKILL.");
+      try {
+        processToStop.kill("SIGKILL");
+      } catch {
+        // Ignored
+      }
+    }, 1500);
+  }, 500);
+}
 
 function getFfmpegPath(): string {
   const binaryName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
@@ -117,10 +240,14 @@ export function registerStreamingIpc(): void {
 
         streamHeaderChunk = null;
         const streamSender = event.sender;
+        attachStreamOwner(streamSender);
+        const startedProcess = ffmpegStreamProcess;
         let stdoutBuffer = "";
         const currentStats: Record<string, string> = {};
 
-        ffmpegStreamProcess.stdout?.on("data", (chunk: Buffer) => {
+        startedProcess.stdout?.on("data", (chunk: Buffer) => {
+          if (ffmpegStreamProcess !== startedProcess) return;
+
           stdoutBuffer += chunk.toString("utf8");
           const lines = stdoutBuffer.split(/\r?\n/);
           stdoutBuffer = lines.pop() ?? "";
@@ -168,31 +295,37 @@ export function registerStreamingIpc(): void {
           }
         });
 
-        ffmpegStreamProcess.on("close", (code) => {
+        startedProcess.on("close", (code) => {
           logger.info("STREAM", `FFmpeg process exited with code ${code}`);
-          ffmpegStreamProcess = null;
-          streamHeaderChunk = null;
-          if (
-            appState.appViewWebContents &&
-            !appState.appViewWebContents.isDestroyed()
-          ) {
-            appState.appViewWebContents.send("stream-status-changed", false);
+
+          if (ffmpegStreamProcess === startedProcess) {
+            ffmpegStreamProcess = null;
+            streamHeaderChunk = null;
+            detachStreamOwner();
+            clearStopTimers();
           }
+
+          sendStreamStatus(false, streamSender);
         });
 
-        ffmpegStreamProcess.on("error", (err) => {
+        startedProcess.on("error", (err) => {
           logger.error("STREAM", `FFmpeg spawn error: ${err.message}`);
-          ffmpegStreamProcess = null;
+
+          if (ffmpegStreamProcess === startedProcess) {
+            ffmpegStreamProcess = null;
+            streamHeaderChunk = null;
+            detachStreamOwner();
+            clearStopTimers();
+          }
+
+          sendStreamStatus(false, streamSender);
         });
 
         const loggedDestination = targetDestination
           .replace(/^(rtmp:\/\/live\.twitch\.tv\/app\/).+$/i, "$1******")
           .replace(/(live2?\/)[^/]+/, "$1******");
 
-        logger.info(
-          "STREAM",
-          `Streaming pipe opened to ${loggedDestination}`,
-        );
+        logger.info("STREAM", `Streaming pipe opened to ${loggedDestination}`);
         return { success: true };
       } catch (error) {
         const err = error as Error;
@@ -225,21 +358,7 @@ export function registerStreamingIpc(): void {
   });
 
   ipcMain.handle("stream-stop", async () => {
-    if (!ffmpegStreamProcess) return { success: true };
-
-    logger.info("STREAM", "Stopping streaming pipe...");
-    return new Promise((resolve) => {
-      if (ffmpegStreamProcess && ffmpegStreamProcess.stdin) {
-        ffmpegStreamProcess.stdin.end();
-      }
-      setTimeout(() => {
-        if (ffmpegStreamProcess) {
-          ffmpegStreamProcess.kill("SIGINT");
-          ffmpegStreamProcess = null;
-        }
-        streamHeaderChunk = null;
-        resolve({ success: true });
-      }, 500);
-    });
+    stopStreamingProcess("renderer request");
+    return { success: true };
   });
 }
