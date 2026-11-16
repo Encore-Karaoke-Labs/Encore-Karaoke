@@ -454,6 +454,32 @@ export default class NetworkManager {
         case "key_down":
           input.handleNav("down");
           break;
+        case "tempo_up":
+        case "tempo_down": {
+          if (state.mode !== "player") break;
+
+          if (
+            state.currentSongIsYouTube ||
+            state.currentSongIsStandaloneVideo
+          ) {
+            this.ctx.modules.infoBar.showTemp(
+              "TEMPO",
+              "Not available for this format.",
+              3000,
+            );
+            break;
+          }
+
+          const change = d.type === "tempo_up" ? 0.1 : -0.1;
+          const cur = this.ctx.services.Forte.getPlaybackState().tempo || 1;
+          const next = Math.max(
+            0.5,
+            Math.min(2, Number((cur + change).toFixed(1))),
+          );
+          this.ctx.services.Forte.setTempo(next);
+          this.ctx.modules.infoBar.showTempo(next);
+          break;
+        }
         case "toggle_melody":
           input.cycleGuideMelody();
           break;

@@ -130,7 +130,8 @@ Encore can be fully controlled via a standard keyboard or through EnMoku.
 | `Shift + - / =` | Adjust mic monitoring volume                               |
 | `Up / Down`     | Tranpose up/down (Playback) / Scroll song list (Main menu) |
 | `Left / Right`  | Multiplex pan (Toggle guide vocal on/off)                  |
-| `' / "`         | Change drum presets                                        |
+| `' / "`         | Change rhythm                                              |
+| `Shift + ' / "` | Change drum kit                                            |
 | `[ / ]`         | Cycle background videos (BGVs) / Video sync offset         |
 | `F2`            | Enter Setup Mode (in main menu)                            |
 
