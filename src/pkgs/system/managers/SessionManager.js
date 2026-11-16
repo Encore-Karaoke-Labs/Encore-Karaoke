@@ -401,6 +401,7 @@ export default class SessionManager {
           root.playback.endSessionPerformance();
           this.ctx.services.Forte.stopRemotePianoRoll?.();
           root.ui.setMode("player");
+          window.obs?.triggerState?.("singing");
           state.isTransitioning = false;
 
           dom.bgvContainer.classOff("hidden");
