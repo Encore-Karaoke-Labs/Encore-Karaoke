@@ -1079,7 +1079,19 @@ export class ForteRhythm {
    */
   handleMidiOutputChanged() {
     if (!this.isActive) return;
+
+    this.refreshPatternState();
     this.scheduleExternalRefresh();
+  }
+
+  /**
+   * Returns true when rhythm notes should be rendered by the internal synth.
+   * External MIDI playback bypasses the internal synth entirely.
+   *
+   * @returns {boolean}
+   */
+  shouldUseInternalSynth() {
+    return !this.synthesizer.hasExternalMidiDevice();
   }
 
   /**
@@ -1145,13 +1157,15 @@ export class ForteRhythm {
         this.patterns.find((p) => p.rhythmIndex === this.currentIndex)
           ?.channel ?? null;
 
+      const useInternalSynth = this.shouldUseInternalSynth();
+
       for (const pattern of this.patterns) {
         const isCurrent = pattern.rhythmIndex === this.currentIndex;
         this.sendChannelVolume(
           pattern.channel,
-          isCurrent ? RHYTHM_CHANNEL_VOLUME : 0,
+          useInternalSynth && isCurrent ? RHYTHM_CHANNEL_VOLUME : 0,
         );
-        this.setChannelMuted(pattern.channel, !isCurrent);
+        this.setChannelMuted(pattern.channel, !useInternalSynth || !isCurrent);
       }
 
       this.setSongDrumsMuted(true);
