@@ -23,7 +23,10 @@ import { initZoom } from "./main/zoom";
 import { registerAppIpc } from "./main/ipc/app";
 import { registerPlaybackIpc } from "./main/ipc/playback";
 import { registerRecordingsIpc } from "./main/ipc/recordings";
-import { registerStreamingIpc } from "./main/ipc/streaming";
+import {
+  registerStreamingIpc,
+  stopStreamingProcess,
+} from "./main/ipc/streaming";
 import { registerSyncIpc } from "./main/ipc/sync";
 import { registerSongbookIpc } from "./main/songbook";
 import { registerLibraryManagerIpc } from "./main/library-manager";
@@ -195,6 +198,7 @@ app.on("before-quit", () => {
 });
 
 app.on("will-quit", () => {
+  stopStreamingProcess("application quitting");
   killAllProcesses();
 
   if (
