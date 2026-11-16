@@ -981,6 +981,7 @@ export default class LyricsEngine {
     this.resizeLyricsCanvas();
     this.calculateLyricLayout();
     this.requestCanvasCacheUpdate = true;
+    this.broadcastOverlayLyrics();
     this.setupTimeUpdate(null, false);
     this._ensureDrawLoop();
 
