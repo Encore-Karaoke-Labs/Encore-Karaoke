@@ -37,7 +37,7 @@
 
 - **Encore Sessions (Virtual Karaoke Rooms)**
   - Sing with friends and family across the world with Encore Sessions!
-  - Perfect for OFWs, LDRs, or remote karaoke hangouts with friends!
+  - Perfect for OFWs, LDRs, or remote karaoke hangouts with friends! See each other as if you're right next to them!
   - Queue, Cheer, and Chat in the room just like a real karaoke box.
   - Have fun with a sprinkle of competition with a score leaderboard!
   - Invite your friends without even having to send a link with Discord Game Invite support.
