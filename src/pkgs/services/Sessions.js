@@ -1591,7 +1591,7 @@ const pkg = {
     },
 
     /**
-     * Publishes whether this participant is currently recording the session.
+     * Publishes whether this participant is currently recording.
      *
      * @param {boolean} recording - Whether this participant is recording.
      */

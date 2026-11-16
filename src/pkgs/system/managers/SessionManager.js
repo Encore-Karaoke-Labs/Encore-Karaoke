@@ -45,8 +45,8 @@ export default class SessionManager {
     this.handleHostDisconnected = this.handleHostDisconnected.bind(this);
     this.handleKicked = this.handleKicked.bind(this);
     this.handleForceStop = this.handleForceStop.bind(this);
-    this.handleSessionRecordingStateChange =
-      this.handleSessionRecordingStateChange.bind(this);
+    this.handleRecordingStateChange =
+      this.handleRecordingStateChange.bind(this);
     this.handleChatHistorySync = this.handleChatHistorySync.bind(this);
     this.handleChat = this.handleChat.bind(this);
     this.handleCheer = this.handleCheer.bind(this);
@@ -233,8 +233,8 @@ export default class SessionManager {
       this.handleForceStop,
     );
     document.addEventListener(
-      "Encore.Recorder.SessionStateChange",
-      this.handleSessionRecordingStateChange,
+      "Encore.Recorder.RecordingStateChange",
+      this.handleRecordingStateChange,
     );
     document.addEventListener(
       "Encore.Sessions.ChatHistorySync",
@@ -332,8 +332,6 @@ export default class SessionManager {
       );
     });
 
-    // Announce when another participant starts recording the session. The
-    // local user already gets the persistent RECORDING bar from the Recorder.
     newParticipants.forEach((p) => {
       if (p.id === myId) return;
       if (joined.some((j) => j.id === p.id)) return;
@@ -1547,11 +1545,11 @@ export default class SessionManager {
   }
 
   /**
-   * Shares this participant's whole-session recording state with the room.
+   * Shares this participant's recording state with the room.
    *
-   * @param {CustomEvent} e - Recorder session state change event.
+   * @param {CustomEvent} e - Recorder recording state change event.
    */
-  handleSessionRecordingStateChange(e) {
+  handleRecordingStateChange(e) {
     if (!this.ctx.state.isSessionActive) return;
     this.ctx.services.SessionsSvc?.setRecordingStatus?.(
       Boolean(e.detail?.recording),
@@ -4097,8 +4095,8 @@ export default class SessionManager {
       this.handleForceStop,
     );
     document.removeEventListener(
-      "Encore.Recorder.SessionStateChange",
-      this.handleSessionRecordingStateChange,
+      "Encore.Recorder.RecordingStateChange",
+      this.handleRecordingStateChange,
     );
     document.removeEventListener(
       "Encore.Sessions.ChatHistorySync",

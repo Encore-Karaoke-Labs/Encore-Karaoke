@@ -294,14 +294,16 @@ export class RecorderModule {
   }
 
   /**
-   * Broadcasts whether a whole-session recording is currently running.
+   * Broadcasts whether this participant is currently recording.
    * @private
-   * @param {boolean} recording - Whether the session is being recorded.
    */
-  _emitSessionRecordingState(recording) {
+  _emitRecordingState() {
     document.dispatchEvent(
-      new CustomEvent("Encore.Recorder.SessionStateChange", {
-        detail: { recording: Boolean(recording) },
+      new CustomEvent("Encore.Recorder.RecordingStateChange", {
+        detail: {
+          recording: Boolean(this.isRecording),
+          session: Boolean(this.isSessionRecording),
+        },
       }),
     );
   }
@@ -501,7 +503,7 @@ export class RecorderModule {
 
     this.isRecording = true;
 
-    if (this.isSessionRecording) this._emitSessionRecordingState(true);
+    this._emitRecordingState();
 
     if (!this.animationFrameId) {
       this.drawFrame();
@@ -515,8 +517,6 @@ export class RecorderModule {
    */
   stop() {
     if (!this.isRecording || !this.mediaRecorder) return;
-
-    const wasSessionRecording = this.isSessionRecording;
 
     this.mediaRecorder.stop();
     if (this.micRecorder && this.micRecorder.state !== "inactive")
@@ -543,7 +543,7 @@ export class RecorderModule {
     this.micRecorder = null;
     this.musicRecorder = null;
 
-    if (wasSessionRecording) this._emitSessionRecordingState(false);
+    this._emitRecordingState();
 
     this.infoBar.showDefault();
   }
