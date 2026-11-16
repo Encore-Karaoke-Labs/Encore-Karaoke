@@ -1,26 +1,26 @@
 import type { Bonjour } from "bonjour-service";
 import cors from "cors";
 import express, { type Express, type Request, type Response } from "express";
+import mime from "mime-types";
 import crypto from "node:crypto";
 import dgram from "node:dgram";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import mime from "mime-types";
 import qrcode from "qrcode";
 import { Server as SocketIOServer, type Socket } from "socket.io";
 import { io as ioClient, type Socket as ClientSocket } from "socket.io-client";
 import si from "systeminformation";
 import youtubesearchapi from "youtube-search-api";
-import { appState } from "./state";
 import { logger } from "./logger";
-import { versionInformation } from "./runtime";
 import type { OverlayHub } from "./overlays";
+import { versionInformation } from "./runtime";
+import { appState } from "./state";
 import type { RemoteInfo } from "./types";
 
 const CLOUD_URL = "https://olive.nxw.pw:8443";
-const RELAY_URL = "https://enmoku.encorekaraoke.org/1.11.0/";
+const RELAY_URL = "https://enmoku.encorekaraoke.org/1.16.0/";
 
 export class WebServer {
   private readonly server: Express = express();
