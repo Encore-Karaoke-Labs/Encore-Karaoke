@@ -136,6 +136,7 @@ export class RecorderModule {
     this.metaCanvas = null;
     this.bgvCanvas = null;
     this.bgvCtx = null;
+    this.minigameContainer = null;
 
     this.lyricGradient = null;
     this.countdownGradient = null;
@@ -727,6 +728,45 @@ export class RecorderModule {
   }
 
   /**
+   * Resolves the Session minigame canvas that is currently on screen, if any.
+   *
+   * @private
+   * @returns {HTMLCanvasElement|null}
+   */
+  _getActiveMinigameCanvas() {
+    if (!this.minigameContainer || !this.minigameContainer.isConnected) {
+      this.minigameContainer = document.querySelector(".games-api-container");
+    }
+
+    const container = this.minigameContainer;
+    if (!container || container.classList.contains("hidden")) return null;
+
+    const canvas = container.querySelector("canvas");
+    if (!canvas || canvas.width <= 0 || canvas.height <= 0) return null;
+
+    return canvas;
+  }
+
+  /**
+   * Composites the active Session minigame over the recording frame.
+   *
+   * @param {CanvasRenderingContext2D} ctx - The offscreen rendering context.
+   * @param {number} w - Output canvas width.
+   * @param {number} h - Output canvas height.
+   * @private
+   */
+  _drawMinigame(ctx, w, h) {
+    const canvas = this._getActiveMinigameCanvas();
+    if (!canvas) return;
+
+    ctx.save();
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, w, h);
+    this._drawContain(ctx, canvas, canvas.width, canvas.height, w, h);
+    ctx.restore();
+  }
+
+  /**
    * Renders a single frame to the recording canvas.
    * Handles background video, lyrics, countdown, score, and interlude overlays.
    */
@@ -1004,6 +1044,8 @@ export class RecorderModule {
     if (this.scoreScreenOpacity > 0.01) {
       this._drawPostSongScreen(ctx, w, h);
     }
+
+    this._drawMinigame(ctx, w, h);
 
     this.ctx.drawImage(this.offscreenCanvas || this.canvas, 0, 0);
 
