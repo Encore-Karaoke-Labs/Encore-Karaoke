@@ -3,7 +3,7 @@
 
 # Encore Karaoke Player
 
-**Be the star that shines bright and experience ultimate Filipino-style videoke right on your PC!**
+**Be the star that shines bright and experience ultimate Filipino-style videoke right on your PC and Mac!**
 
 ![Version badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fversioning.encorekaraoke.org%2FversionInfo&query=%24.number&prefix=v&label=version&color=%2389CFF0)
 ![Channel badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fversioning.encorekaraoke.org%2FversionInfo&query=%24.channel&label=channel&color=%23FFD700)
@@ -25,7 +25,9 @@
   - Features live pitch tracking, real-time key-modulation detection, and a visual pitch guide overlay so you know exactly when to hit those high notes (only in Multiplex & MIDI tracks).
   - Scores your performance not just by pitch accuracy, but also rewards your expression and interpretation too!
 - **Perfect Your Sound**
-  - Encore features audio plugins that help you tune your microphone's sound to your liking.
+  - Encore features audio plugins that help you tune your sound.
+- **Rhythm Switch**
+  - Switch up the vibe of the whole song with Rhythm Switch!
 - **Pitch & Latency Control**
   - Adjust pitch (transpose) and tempo on the fly.
   - Calibrate your microphone and signal chain's latency quickly.
