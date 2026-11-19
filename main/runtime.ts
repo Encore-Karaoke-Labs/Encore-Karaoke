@@ -13,7 +13,7 @@ export const DISCORD_PROTOCOL_PREFIX = `discord-${DISCORD_CLIENT_ID}`;
 export const platformHints = parsePlatformHints(process.argv);
 
 export const versionInformation: VersionInformation = {
-  number: "1.17.0",
+  number: "1.16.1",
   channel: platformHints.embedded ? "EMBEDDED" : "BETA",
   codename: "Pisces",
 };
