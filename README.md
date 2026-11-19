@@ -222,6 +222,8 @@ For the best experience contributing towards Encore, we recommend using [Visual 
   - Creator and designer behind Encore's mascots, Akiyama Hoshi & Kurayami Kai
 - **[RJ Son](https://web.facebook.com/profile.php?id=100077032535557)**
   - Creation of the Hip-Hop and Dance rhythms in Encore's Rhythm Switch feature
+- **[No Kia](https://web.facebook.com/no.kia.677590)**
+  - Remaster of Encore Sessions sound effects
 - **[MTSyntho](https://github.com/MTSyntho)**
   - Provided resources for Linux support
 - **[prjoni99](https://github.com/prjoni99)**:
