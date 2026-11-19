@@ -113,11 +113,20 @@ export interface RemoteInfo {
   type: "cloud" | "local";
 }
 
-export interface SaveRecordingPayload {
-  videoBuffer?: ArrayBuffer | Uint8Array;
-  micBuffer?: ArrayBuffer | Uint8Array;
-  musicBuffer?: ArrayBuffer | Uint8Array;
+export type RecordingTrack = "video" | "mic" | "music";
+
+export interface StartRecordingPayload {
   songTitle?: string;
+}
+
+export interface RecordingChunkPayload {
+  id: string;
+  track: RecordingTrack;
+  chunk: ArrayBuffer | Uint8Array;
+}
+
+export interface FinishRecordingPayload {
+  id: string;
 }
 
 export interface SaveCachePayload {
