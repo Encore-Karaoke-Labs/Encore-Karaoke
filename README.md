@@ -220,6 +220,8 @@ For the best experience contributing towards Encore, we recommend using [Visual 
   - 3D BGV development
   - Voice provider for Encore's score sounds
   - Creator and designer behind Encore's mascots, Akiyama Hoshi & Kurayami Kai
+- **[RJ Son](https://web.facebook.com/profile.php?id=100077032535557)**
+  - Creation of the Hip-Hop and Dance rhythms in Encore's Rhythm Switch feature
 - **[MTSyntho](https://github.com/MTSyntho)**
   - Provided resources for Linux support
 - **[prjoni99](https://github.com/prjoni99)**:
