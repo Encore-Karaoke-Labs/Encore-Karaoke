@@ -1,5 +1,4 @@
 import {
-  app,
   ipcMain,
   type IpcMainEvent,
   type IpcMainInvokeEvent,
@@ -7,9 +6,9 @@ import {
 } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
-import path from "node:path";
 import { logger } from "../logger";
 import { appState } from "../state";
+import { getFfmpegPath } from "../ffmpeg";
 
 let ffmpegStreamProcess: ChildProcess | null = null;
 let streamHeaderChunk: Buffer | null = null;
@@ -134,30 +133,6 @@ export function stopStreamingProcess(reason = "requested"): void {
       }
     }, 1500);
   }, 500);
-}
-
-function getFfmpegPath(): string {
-  const binaryName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
-
-  let ffmpegExecutable: string;
-  if (app.isPackaged) {
-    ffmpegExecutable = path.join(process.resourcesPath, "bin", binaryName);
-  } else {
-    ffmpegExecutable = path.join(
-      appState.appRoot,
-      "resources",
-      "bin",
-      binaryName,
-    );
-  }
-
-  if (process.platform !== "win32" && fs.existsSync(ffmpegExecutable)) {
-    try {
-      fs.chmodSync(ffmpegExecutable, 0o755);
-    } catch {}
-  }
-
-  return ffmpegExecutable;
 }
 
 export function registerStreamingIpc(): void {
