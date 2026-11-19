@@ -1,94 +1,6 @@
 import Html from "../libs/html.js";
 
 /**
- * Utility function to encode an AudioBuffer into a standard 16-bit PCM WAV ArrayBuffer.
- *
- * @param {AudioBuffer} audioBuffer - The decoded audio data.
- * @returns {Promise<ArrayBuffer>} The formatted WAV file as an ArrayBuffer.
- */
-async function audioBufferToWavBuffer(audioBuffer) {
-  const numChannels = audioBuffer.numberOfChannels;
-  const sampleRate = audioBuffer.sampleRate;
-  const format = 1; // PCM
-  const bitDepth = 16;
-  const bytesPerSample = bitDepth / 8;
-  const blockAlign = numChannels * bytesPerSample;
-  const byteRate = sampleRate * blockAlign;
-  const dataSize = audioBuffer.length * blockAlign;
-
-  const arrayBuffer = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(arrayBuffer);
-
-  const writeString = (view, offset, string) => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  };
-
-  // Write standard WAV Header
-  writeString(view, 0, "RIFF");
-  view.setUint32(4, 36 + dataSize, true);
-  writeString(view, 8, "WAVE");
-  writeString(view, 12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, format, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitDepth, true);
-  writeString(view, 36, "data");
-  view.setUint32(40, dataSize, true);
-
-  // Fast write for PCM Data mapping using Int16Array (Native Little Endian)
-  const offset = 44;
-  const int16View = new Int16Array(arrayBuffer, offset);
-
-  if (numChannels === 2) {
-    const left = audioBuffer.getChannelData(0);
-    const right = audioBuffer.getChannelData(1);
-    for (let i = 0, j = 0; i < audioBuffer.length; i++, j += 2) {
-      let sL = Math.max(-1, Math.min(1, left[i]));
-      let sR = Math.max(-1, Math.min(1, right[i]));
-      int16View[j] = sL < 0 ? sL * 0x8000 : sL * 0x7fff;
-      int16View[j + 1] = sR < 0 ? sR * 0x8000 : sR * 0x7fff;
-    }
-  } else {
-    const channel = audioBuffer.getChannelData(0);
-    for (let i = 0, j = 0; i < audioBuffer.length; i++, j++) {
-      let sample = Math.max(-1, Math.min(1, channel[i]));
-      int16View[j] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-    }
-  }
-
-  return arrayBuffer;
-}
-
-/**
- * Helper to process a recorded Blob (e.g., webm/opus) into a standard WAV array buffer.
- * It uses the browser's native AudioContext to decode the compressed audio.
- *
- * @param {Blob} blob - The recorded compressed audio blob.
- * @returns {Promise<ArrayBuffer|null>} The WAV ArrayBuffer, or null if empty/failed.
- */
-async function processAudioBlobToWav(blob) {
-  try {
-    const arrayBuffer = await blob.arrayBuffer();
-    if (arrayBuffer.byteLength === 0) return null;
-
-    const actx = new (window.AudioContext || window.webkitAudioContext)();
-    const audioBuffer = await actx.decodeAudioData(arrayBuffer);
-    const wavBuffer = await audioBufferToWavBuffer(audioBuffer);
-    await actx.close();
-
-    return wavBuffer;
-  } catch (e) {
-    console.warn("[RECORDER] Audio decoding skipped for empty/invalid stem", e);
-    return null;
-  }
-}
-
-/**
  * RecorderModule - Handles video recording of karaoke performances inside Encore
  * with real-time UI overlay and multi-track audio stem exporting.
  * @class
@@ -112,9 +24,7 @@ export class RecorderModule {
     this.micRecorder = null;
     this.musicRecorder = null;
 
-    this.recordedChunks = [];
-    this.micChunks = [];
-    this.musicChunks = [];
+    this.recordingTask = null;
 
     this.recordingStartTime = 0;
     this.animationFrameId = null;
@@ -330,6 +240,140 @@ export class RecorderModule {
   }
 
   /**
+   * Creates the renderer-side bookkeeping for a recording.
+   *
+   * @param {string} title - Title used for the saved recording.
+   * @returns {Object} Recording task.
+   * @private
+   */
+  _createRecordingTask(title) {
+    return {
+      title,
+      sessionPromise: Promise.resolve()
+        .then(() =>
+          window.desktopIntegration.ipc.invoke("recording-start", {
+            songTitle: title,
+          }),
+        )
+        .catch((error) => ({
+          success: false,
+          error: error?.message || String(error),
+        })),
+      queues: {
+        video: Promise.resolve(),
+        mic: Promise.resolve(),
+        music: Promise.resolve(),
+      },
+      stopped: Promise.resolve(),
+      error: null,
+    };
+  }
+
+  /**
+   * Streams a single MediaRecorder slice to its on-disk track file.
+   *
+   * @param {Object} task - Recording task that owns the chunk.
+   * @param {"video"|"mic"|"music"} track - Destination track.
+   * @param {Blob} blob - Recorded slice.
+   * @private
+   */
+  _enqueueChunk(task, track, blob) {
+    if (!blob || blob.size === 0) return;
+
+    task.queues[track] = task.queues[track]
+      .then(async () => {
+        if (task.error) return;
+
+        const session = await task.sessionPromise;
+        if (!session?.success || !session.id) {
+          throw new Error(session?.error || "Could not start recording.");
+        }
+
+        const chunk = new Uint8Array(await blob.arrayBuffer());
+        const result = await window.desktopIntegration.ipc.invoke(
+          "recording-append",
+          { id: session.id, track, chunk },
+        );
+
+        if (!result?.success) {
+          throw new Error(result?.error || `Could not save ${track} track.`);
+        }
+      })
+      .catch((error) => {
+        if (task.error) return;
+        task.error = error?.message || String(error);
+        console.error(`[RECORDER] Failed to save ${track} track:`, error);
+      });
+  }
+
+  /**
+   * Deletes a recording that could not be started.
+   *
+   * @param {Object} task - Recording task to discard.
+   * @private
+   */
+  _cancelRecordingTask(task) {
+    task.sessionPromise.then((session) => {
+      if (!session?.success || !session.id) return;
+      window.desktopIntegration.ipc
+        .invoke("recording-cancel", { id: session.id })
+        .catch(() => {});
+    });
+  }
+
+  /**
+   * Waits for the final slices to reach disk and closes the recording.
+   *
+   * @param {Object} task - Recording task that just stopped.
+   * @returns {Promise<boolean>} Whether the recording was saved.
+   * @private
+   */
+  async _finalizeRecording(task) {
+    this.infoBar.showTemp("RECORDING", "Saving recording...", 600000);
+
+    try {
+      await task.stopped;
+      await Promise.all([
+        task.queues.video,
+        task.queues.mic,
+        task.queues.music,
+      ]);
+
+      const session = await task.sessionPromise;
+      if (!session?.success || !session.id) {
+        throw new Error(session?.error || "Could not start recording.");
+      }
+
+      const result = await window.desktopIntegration.ipc.invoke(
+        "recording-finish",
+        { id: session.id },
+      );
+
+      if (task.error) throw new Error(task.error);
+      if (!result?.success) {
+        throw new Error(result?.error || "Failed to save recording.");
+      }
+
+      this.infoBar.showTemp(
+        "RECORDING",
+        "Recording saved! See it on the Recordings menu.",
+        5000,
+      );
+      return true;
+    } catch (e) {
+      console.error("[RECORDER] Save error:", e);
+      this.infoBar.showTemp(
+        "RECORDING",
+        `Failed to save recording${e?.message ? `: ${e.message}` : "."}`,
+        6000,
+      );
+      return false;
+    } finally {
+      if (this.recordingTask === task) this.recordingTask = null;
+    }
+  }
+
+  /**
    * Starts video recording along with multi-track audio mapping.
    * Initializes canvas, media recorders, and begins frame rendering.
    *
@@ -372,10 +416,6 @@ export class RecorderModule {
       mixAudioStream.getAudioTracks()[0],
     ]);
 
-    this.recordedChunks = [];
-    this.micChunks = [];
-    this.musicChunks = [];
-
     try {
       const videoMimes = [
         "video/webm; codecs=h264,opus",
@@ -417,89 +457,65 @@ export class RecorderModule {
       return;
     }
 
+    const recordedSongTitle = title || this.currentSongInfo?.title || "Unknown";
+    const task = this._createRecordingTask(recordedSongTitle);
+    this.recordingTask = task;
+
     this.mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) this.recordedChunks.push(e.data);
+      this._enqueueChunk(task, "video", e.data);
     };
     this.micRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) this.micChunks.push(e.data);
+      this._enqueueChunk(task, "mic", e.data);
     };
     this.musicRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) this.musicChunks.push(e.data);
+      this._enqueueChunk(task, "music", e.data);
     };
 
-    const mixMime = this.mediaRecorder.mimeType;
-    const micMime = this.micRecorder.mimeType;
-    const musicMime = this.musicRecorder.mimeType;
-
-    const mixPromise = new Promise((resolve) => {
-      this.mediaRecorder.onstop = () =>
-        resolve(new Blob(this.recordedChunks, { type: mixMime }));
-    });
-    const micPromise = new Promise((resolve) => {
-      this.micRecorder.onstop = () =>
-        resolve(new Blob(this.micChunks, { type: micMime }));
-    });
-    const musicPromise = new Promise((resolve) => {
-      this.musicRecorder.onstop = () =>
-        resolve(new Blob(this.musicChunks, { type: musicMime }));
-    });
-
-    const recordedSongTitle = title || this.currentSongInfo?.title || "Unknown";
-
-    Promise.all([mixPromise, micPromise, musicPromise]).then(
-      async ([mixBlob, micBlob, musicBlob]) => {
-        this.infoBar.showTemp(
-          "RECORDING",
-          "Processing audio stems and saving...",
-          60000,
-        );
-
-        try {
-          const mixVideoBuffer = await mixBlob.arrayBuffer();
-          const micWavBuffer = await processAudioBlobToWav(micBlob);
-          const musicWavBuffer = await processAudioBlobToWav(musicBlob);
-
-          const songTitle = recordedSongTitle;
-
-          const result = await window.desktopIntegration.ipc.invoke(
-            "save-recording",
-            {
-              videoBuffer: mixVideoBuffer,
-              micBuffer: micWavBuffer,
-              musicBuffer: musicWavBuffer,
-              songTitle,
-            },
-          );
-
-          if (result.success) {
-            this.infoBar.showTemp(
-              "RECORDING",
-              "Recording saved! See it on the Recordings menu.",
-              5000,
-            );
-          } else {
-            this.infoBar.showTemp(
-              "RECORDING",
-              "Failed to save recording.",
-              5000,
-            );
-          }
-        } catch (e) {
-          console.error("Save error:", e);
-          this.infoBar.showTemp(
-            "RECORDING",
-            "Failed to process audio stems.",
-            5000,
-          );
-        }
-      },
+    task.stopped = Promise.all(
+      [this.mediaRecorder, this.micRecorder, this.musicRecorder].map(
+        (recorder) =>
+          new Promise((resolve) => {
+            recorder.onstop = () => resolve();
+          }),
+      ),
     );
 
     this.recordingStartTime = Date.now();
 
-    this.mediaRecorder.start();
-    this.micRecorder.start();
-    this.musicRecorder.start();
+    try {
+      this.mediaRecorder.start(2000);
+      this.micRecorder.start(2000);
+      this.musicRecorder.start(2000);
+    } catch (e) {
+      console.error("Failed to start MediaRecorders:", e);
+      this.recordingTask = null;
+      this.isSessionRecording = false;
+      for (const recorder of [
+        this.mediaRecorder,
+        this.micRecorder,
+        this.musicRecorder,
+      ]) {
+        if (!recorder) continue;
+        recorder.ondataavailable = null;
+        try {
+          if (recorder.state !== "inactive") recorder.stop();
+        } catch {}
+      }
+      if (this.currentStream) {
+        this.currentStream.getTracks().forEach((track) => track.stop());
+        this.currentStream = null;
+      }
+      this.mediaRecorder = null;
+      this.micRecorder = null;
+      this.musicRecorder = null;
+      this._cancelRecordingTask(task);
+      this.infoBar.showTemp(
+        "RECORDING",
+        "Error: Could not start recorders.",
+        4000,
+      );
+      return;
+    }
 
     this.isRecording = true;
 
@@ -513,12 +529,15 @@ export class RecorderModule {
   }
 
   /**
-   * Stops all active recordings, triggering the encoding and export pipeline.
+   * Stops all active recordings.
    */
   stop() {
     if (!this.isRecording || !this.mediaRecorder) return;
 
-    this.mediaRecorder.stop();
+    const task = this.recordingTask;
+    this.recordingTask = null;
+
+    if (this.mediaRecorder.state !== "inactive") this.mediaRecorder.stop();
     if (this.micRecorder && this.micRecorder.state !== "inactive")
       this.micRecorder.stop();
     if (this.musicRecorder && this.musicRecorder.state !== "inactive")
@@ -546,6 +565,8 @@ export class RecorderModule {
     this._emitRecordingState();
 
     this.infoBar.showDefault();
+
+    if (task) void this._finalizeRecording(task);
   }
 
   /**
