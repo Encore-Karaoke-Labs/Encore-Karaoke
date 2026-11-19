@@ -29,6 +29,8 @@ export default class PlaybackManager {
     this.introCardTimer = null;
     this.introCardExitTimer = null;
 
+    this.scoreScreenSequence = 0;
+
     document.addEventListener(
       "Encore.Forte.Playback.Update",
       this.boundPlaybackUpdate,
@@ -966,6 +968,13 @@ export default class PlaybackManager {
     const Forte = this.ctx.services.Forte;
     const root = this.ctx.root;
 
+    const sequence = ++this.scoreScreenSequence;
+    const isSuperseded = () => sequence !== this.scoreScreenSequence;
+    const isCancelled = () => isSuperseded() || state.scoreSkipped;
+
+    if (state.isScoreScreenActive) this.dismissScoreScreen();
+    state.scoreSkipped = false;
+
     state.isScoreScreenActive = true;
     root.syncSetlistOverlay?.();
     window.obs?.triggerState?.("score");
@@ -984,24 +993,27 @@ export default class PlaybackManager {
     root.ui.setScoreBreakdown?.(hasHaranaBreakdown ? scoreData.details : null);
     root.ui.setScoreBreakdownMusic?.(null);
 
-    const revealBreakdown = () => {
-      if (!hasHaranaBreakdown || state.scoreSkipped) return;
-      dom.postSongScreen.classOn("show-breakdown");
-      this.ctx.modules.bgm
-        ?.play()
-        .then((track) => {
-          if (!track || !state.isScoreScreenActive) return;
-          root.ui.setScoreBreakdownMusic?.(track);
-        })
-        .catch(() => {});
-    };
-
     const isRemoteAudience =
       state.isSessionActive &&
       this.ctx.services.SessionsSvc &&
       this.ctx.services.SessionsSvc.state.mode === "performance" &&
       this.ctx.services.SessionsSvc.state.singerId !==
         this.ctx.services.SessionsSvc.peer?.id;
+
+    const revealBreakdown = () => {
+      if (!hasHaranaBreakdown || isCancelled()) return;
+      dom.postSongScreen.classOn("show-breakdown");
+
+      if (isRemoteAudience) return;
+
+      this.ctx.modules.bgm
+        ?.play()
+        .then((track) => {
+          if (!track || isCancelled()) return;
+          root.ui.setScoreBreakdownMusic?.(track);
+        })
+        .catch(() => {});
+    };
 
     if (state.isSessionActive) {
       const singerName = state.remoteScoreEntry
@@ -1090,14 +1102,13 @@ export default class PlaybackManager {
     // opacity 0 before fading in.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (state.isScoreScreenActive)
-          dom.postSongScreen.styleJs({ opacity: "1" });
+        if (!isCancelled()) dom.postSongScreen.styleJs({ opacity: "1" });
       });
     });
 
     const playAudioSequence = async () => {
       await new Promise((r) => setTimeout(r, 1000));
-      if (state.scoreSkipped) return;
+      if (isCancelled()) return;
 
       let fanfareUrl = "/assets/audio/fanfare-2.mid";
       if (s == 100) fanfareUrl = "/assets/audio/fanfare-4.mid";
@@ -1106,11 +1117,11 @@ export default class PlaybackManager {
 
       if (state.isScoreFanfareEnabled && !isRemoteAudience) {
         const fanfareFinished = await Forte.playSfx(fanfareUrl, 0.5);
-        if (!fanfareFinished || state.scoreSkipped) return;
+        if (!fanfareFinished || isCancelled()) return;
       } else {
         await new Promise((r) => setTimeout(r, 4000));
       }
-      if (state.scoreSkipped) return;
+      if (isCancelled()) return;
 
       let playedNarration = false;
       if (state.isScoreNarrationEnabled && !isRemoteAudience) {
@@ -1125,7 +1136,7 @@ export default class PlaybackManager {
             const narrationUrl = await NetworkingUtility.getFileLink(
               joinPath(libraryInfo.path, match.file),
             );
-            if (state.scoreSkipped) return;
+            if (isCancelled()) return;
             await Forte.playSfx(narrationUrl.href);
             playedNarration = true;
           }
@@ -1136,7 +1147,7 @@ export default class PlaybackManager {
           else if (s >= 70) defaultNarrationUrl = "/assets/audio/scores/70.wav";
           else if (s >= 50) defaultNarrationUrl = "/assets/audio/scores/50.wav";
           else if (s >= 20) defaultNarrationUrl = "/assets/audio/scores/20.wav";
-          if (state.scoreSkipped) return;
+          if (isCancelled()) return;
           await Forte.playSfx(defaultNarrationUrl);
         }
       } else {
@@ -1148,9 +1159,9 @@ export default class PlaybackManager {
       const dur = 3800;
       const start = performance.now();
       await new Promise((r) => {
-        if (state.scoreSkipped) return r();
+        if (isCancelled()) return r();
         const tick = () => {
-          if (state.scoreSkipped) return r();
+          if (isCancelled()) return r();
           const now = performance.now();
           const p = Math.min((now - start) / dur, 1);
           const ease = 1 - Math.pow(1 - p, 3);
@@ -1161,7 +1172,7 @@ export default class PlaybackManager {
         requestAnimationFrame(tick);
       });
 
-      if (state.scoreSkipped) return;
+      if (isCancelled()) return;
       dom.rankDisplay.text(rank).styleJs({
         transform: "scale(1)",
         opacity: "1",
@@ -1170,7 +1181,7 @@ export default class PlaybackManager {
 
       if (state.isSessionActive) {
         setTimeout(() => {
-          if (state.scoreSkipped) return;
+          if (isCancelled()) return;
           dom.postSongScreen.classOn("show-leaderboard");
           dom.scoreSessionLeaderboard.classOff("hidden");
         }, 1500);
@@ -1179,10 +1190,10 @@ export default class PlaybackManager {
 
     const scoreSequence = async () => {
       await Promise.all([animate(), playAudioSequence()]);
-      if (state.scoreSkipped || !hasHaranaBreakdown) return;
+      if (isCancelled() || !hasHaranaBreakdown) return;
 
       await new Promise((r) => setTimeout(r, 400));
-      if (state.scoreSkipped) return;
+      if (isCancelled()) return;
 
       revealBreakdown();
 
@@ -1196,12 +1207,15 @@ export default class PlaybackManager {
       }),
     ]);
 
+    if (isSuperseded()) return;
+
     dom.postSongScreen.styleJs({ opacity: "0", pointerEvents: "none" });
     dom.postSongScreen.classOff("show-breakdown");
     this.ctx.modules.bgm?.stop();
     root.ui.setScoreBreakdownMusic?.(null);
     state.isScoreScreenActive = false;
     state.scoreSkipResolver = null;
+    state.scoreSkipped = false;
     if (root.games) root.games.broadcastPlaybackState("score_screen_end", null);
 
     // Release the score overlay's compositor layers once the fade is done so

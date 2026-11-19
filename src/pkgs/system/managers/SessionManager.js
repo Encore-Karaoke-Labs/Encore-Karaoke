@@ -501,12 +501,17 @@ export default class SessionManager {
       SessionsSvc.state.mode === "performance" &&
       SessionsSvc.state.singerId !== SessionsSvc.peer.id
     ) {
+      const entry = e.detail.entry;
+
+      if (state.isScoreScreenActive && state.currentScoreEntryId === entry.id)
+        return;
+
       const mockScoreData = {
-        finalScore: e.detail.entry.score,
-        details: e.detail.entry.details,
+        finalScore: entry.score,
+        details: entry.details,
       };
-      state.remoteScoreEntry = e.detail.entry;
-      state.currentScoreEntryId = e.detail.entry.id;
+      state.remoteScoreEntry = entry;
+      state.currentScoreEntryId = entry.id;
 
       // Mirror the performer, whose piano roll and live score HUD close out
       // when the song ends.
@@ -517,8 +522,10 @@ export default class SessionManager {
 
       await this.ctx.root.playback.showPostSongScreen(mockScoreData);
 
-      state.remoteScoreEntry = null;
-      state.currentScoreEntryId = null;
+      if (state.remoteScoreEntry === entry) {
+        state.remoteScoreEntry = null;
+        state.currentScoreEntryId = null;
+      }
     }
   }
 
