@@ -522,13 +522,10 @@ export default class InputManager {
 
     if (state.isScoreScreenActive) {
       if (["Enter", " ", "Escape"].includes(e.key)) {
-        if (state.scoreSkipResolver) {
+        if (state.scoreSkipResolver && !state.isSessionActive) {
           this.ctx.services.Forte.stopSfx();
           state.scoreSkipped = true;
           state.scoreSkipResolver();
-          if (state.isSessionActive) {
-            this.ctx.services.SessionsSvc.broadcastSkipScore();
-          }
         }
         e.preventDefault();
       }
