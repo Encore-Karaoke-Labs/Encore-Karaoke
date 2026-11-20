@@ -482,11 +482,23 @@ export default class RetailManager {
     )}`;
   }
 
+  _isSongPlaying() {
+    const state = this.ctx.state || {};
+    return (
+      Boolean(state.currentSong) ||
+      Boolean(state.mode?.startsWith("player")) ||
+      state.isScoreScreenActive === true ||
+      state.lastPlaybackStatus === "playing" ||
+      state.lastPlaybackStatus === "paused"
+    );
+  }
+
   async _playBootVideoForCredits() {
     if (
       !this.enabled ||
       !this.playBootVideoOnCredits ||
-      this.bootVideoPlaying
+      this.bootVideoPlaying ||
+      this._isSongPlaying()
     ) {
       return;
     }
