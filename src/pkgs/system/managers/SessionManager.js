@@ -531,6 +531,7 @@ export default class SessionManager {
 
   handleSkipScore() {
     const state = this.ctx.state;
+    if (state.isSessionActive) return;
     if (state.isScoreScreenActive && state.scoreSkipResolver) {
       this.ctx.services.Forte.stopSfx();
       state.scoreSkipped = true;
