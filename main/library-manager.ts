@@ -5,7 +5,6 @@ import {
   shell,
   type IpcMainEvent,
   type IpcMainInvokeEvent,
-  type WebContentsView,
 } from "electron";
 import fs from "node:fs";
 import path from "node:path";
@@ -417,13 +416,11 @@ export function registerLibraryManagerIpc(): void {
         };
       }
       Config.setItem("libraryPath", folderPath);
-      const mainWin = BrowserWindow.getAllWindows().find(
-        (w) => w !== appState.libraryManagerWin,
-      );
-      if (mainWin) {
-        const view = mainWin.contentView.children[0] as
-          WebContentsView | undefined;
-        if (view) view.webContents.reload();
+      if (
+        appState.appViewWebContents &&
+        !appState.appViewWebContents.isDestroyed()
+      ) {
+        appState.appViewWebContents.reload();
       }
       return { success: true };
     },

@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, type IpcMainEvent } from "electron";
+import { BrowserWindow, ipcMain, session, type IpcMainEvent } from "electron";
 import path from "node:path";
 import Config from "../config-manager";
 import { logger } from "./logger";
@@ -41,6 +41,8 @@ export function registerCashierIpc(): void {
       return;
     }
 
+    const cashierSession = session.fromPartition("persist:cashier");
+
     appState.cashierWin = new BrowserWindow({
       title: "Encore Cashier",
       width: 1100,
@@ -59,6 +61,7 @@ export function registerCashierIpc(): void {
         preload: path.join(appState.appRoot, "preload.js"),
         contextIsolation: true,
         nodeIntegration: false,
+        session: cashierSession,
       },
     });
 
