@@ -43,7 +43,7 @@ const MIC_CLARITY_THRESHOLD = 0.85;
 const RMS_NOISE_GATE = 0.015;
 
 const KEY_AWARE_RMS_GATE = 0.015;
-const KEY_AWARE_CLARITY = 0.92;
+const KEY_AWARE_CLARITY = MIC_CLARITY_THRESHOLD;
 const MIN_FRAMES_FOR_FULL_SCORE = 900;
 const MIN_VOCAL_HZ = 75;
 const MAX_VOCAL_HZ = 1200;
@@ -76,8 +76,8 @@ function detectMusicalKey(chromaArray) {
       majorDot += val * NORMALIZED_MAJOR[j];
       minorDot += val * NORMALIZED_MINOR[j];
     }
-    const majorCorr = majorDot / 12;
-    const minorCorr = minorDot / 12;
+    const majorCorr = majorDot;
+    const minorCorr = minorDot;
 
     if (majorCorr > bestCorrelation) {
       bestCorrelation = majorCorr;
