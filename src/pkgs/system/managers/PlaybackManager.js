@@ -814,6 +814,7 @@ export default class PlaybackManager {
     if (!state.isScoreScreenActive || !state.scoreSkipResolver) return;
 
     this.ctx.services.Forte.stopSfx();
+    this.ctx.modules.bgm?.stop();
     state.scoreSkipped = true;
     state.scoreSkipResolver();
   }
@@ -970,7 +971,9 @@ export default class PlaybackManager {
 
     const sequence = ++this.scoreScreenSequence;
     const isSuperseded = () => sequence !== this.scoreScreenSequence;
-    const isCancelled = () => isSuperseded() || state.scoreSkipped;
+    let sequenceCancelled = false;
+    const isCancelled = () =>
+      sequenceCancelled || isSuperseded() || state.scoreSkipped;
 
     if (state.isScoreScreenActive) this.dismissScoreScreen();
     state.scoreSkipped = false;
@@ -1209,6 +1212,8 @@ export default class PlaybackManager {
 
     if (isSuperseded()) return;
 
+    // Stop the sequence for good before clearing the transient skip flag.
+    sequenceCancelled = true;
     dom.postSongScreen.styleJs({ opacity: "0", pointerEvents: "none" });
     dom.postSongScreen.classOff("show-breakdown");
     this.ctx.modules.bgm?.stop();
