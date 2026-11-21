@@ -11,7 +11,7 @@
 </div>
 
 <div align="center">
-  <img alt="Encore Header" src="readme/demo.jpg" style="border-radius: 15px; margin-bottom: 20px; margin-top: 20px;" />
+  <img alt="Encore Header" src="readme/demo.png" style="border-radius: 15px; margin-bottom: 20px; margin-top: 20px;" />
 </div>
 
 ---
