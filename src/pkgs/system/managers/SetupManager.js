@@ -375,6 +375,14 @@ export default class SetupManager {
       value: d.deviceId,
     }));
 
+    const libraryNumberSounds =
+      this.currentManifest?.additionalContents?.numberSounds;
+    const libraryNumberSoundCount = Array.isArray(libraryNumberSounds)
+      ? libraryNumberSounds.filter((value) => Boolean(value)).length
+      : Object.values(libraryNumberSounds || {}).filter((value) =>
+          Boolean(value),
+        ).length;
+
     const savedCameraDeviceId =
       this.ctx.config.videoConfig?.cameraDeviceId || "";
     const cameraOptions = [
@@ -948,6 +956,31 @@ export default class SetupManager {
                   this.ctx.config.audioConfig.enableNumberSfx = v;
                   this.ctx.state.isNumberSfxEnabled = v;
                   window.config.setItem("audioConfig.enableNumberSfx", v);
+                },
+              },
+              {
+                id: "number_sounds_source",
+                label: "Number Sounds Source",
+                type: "select",
+                options: [
+                  { value: "default", label: "Internal Default" },
+                  {
+                    value: "library",
+                    label:
+                      libraryNumberSoundCount > 0
+                        ? `Library Provided (${libraryNumberSoundCount}/10)`
+                        : "Library Provided (0/10)",
+                  },
+                ],
+                get: () => {
+                  const mode = this.ctx.config.audioConfig?.numberSoundsMode;
+                  if (mode) return mode;
+                  return libraryNumberSoundCount > 0 ? "library" : "default";
+                },
+                set: (v) => {
+                  this.ctx.config.audioConfig ??= {};
+                  this.ctx.config.audioConfig.numberSoundsMode = v;
+                  window.config.setItem("audioConfig.numberSoundsMode", v);
                 },
               },
               {
