@@ -1,4 +1,5 @@
 import Html from "../../../libs/html.js";
+import NetworkingUtility from "../../../libs/networkingUtility.js";
 import playNavSfx from "../../../libs/sfx.js";
 import { findSongByCode } from "../../../libs/songLookup.js";
 
@@ -32,6 +33,9 @@ export default class InputManager {
       savedGuideIndex < this.guideMelodyLevels.length
         ? savedGuideIndex
         : 2;
+
+    this._numberSoundUrlCache = new Map();
+    this._numberSfxToken = 0;
   }
 
   getGuideMelodyColor() {
@@ -76,6 +80,107 @@ export default class InputManager {
    */
   playNavSfx(sfxName) {
     return playNavSfx(this.ctx, sfxName);
+  }
+
+  /**
+   * Returns the currently loaded library metadata, if any.
+   * @returns {Object|null}
+   */
+  getLibraryInfo() {
+    return (
+      this.ctx.root.library?.libraryInfo ||
+      this.ctx.services.FsSvc?.getLibraryInfo?.() ||
+      null
+    );
+  }
+
+  /**
+   * Reads the library-provided sound path for a digit.
+   *
+   * @param {string|number} digit - Digit from 0 to 9.
+   * @returns {string|null}
+   */
+  getNumberSoundRelativePath(digit) {
+    const manifest = this.getLibraryInfo()?.manifest;
+    const numberSounds = manifest?.additionalContents?.numberSounds;
+    if (!numberSounds) return null;
+
+    if (Array.isArray(numberSounds)) {
+      const value = numberSounds[Number(digit)];
+      return typeof value === "string" && value.trim() ? value : null;
+    }
+
+    if (typeof numberSounds === "object") {
+      const value = numberSounds[String(digit)];
+      return typeof value === "string" && value.trim() ? value : null;
+    }
+
+    return null;
+  }
+
+  /**
+   * Resolves the URL for a keypad number sound.
+   *
+   * @param {string|number} digit - Digit from 0 to 9.
+   * @returns {Promise<string>}
+   */
+  async resolveNumberSoundUrl(digit) {
+    const defaultUrl = `/assets/audio/numbers/${digit}.wav`;
+    const mode = this.ctx.config.audioConfig?.numberSoundsMode || "library";
+
+    if (mode !== "library") return defaultUrl;
+
+    const libraryInfo = this.getLibraryInfo();
+    const relativePath = this.getNumberSoundRelativePath(digit);
+    if (!libraryInfo?.path || !relativePath) return defaultUrl;
+
+    const base = String(libraryInfo.path)
+      .replace(/\\/g, "/")
+      .replace(/\/+$/, "");
+    const rel = String(relativePath).replace(/\\/g, "/").replace(/^\/+/, "");
+    const cacheKey = `${base}|${rel}`;
+
+    if (this._numberSoundUrlCache.has(cacheKey)) {
+      return this._numberSoundUrlCache.get(cacheKey);
+    }
+
+    try {
+      const url = await NetworkingUtility.getFileLink(`${base}/${rel}`);
+      this._numberSoundUrlCache.set(cacheKey, url.href);
+      return url.href;
+    } catch (error) {
+      console.error("[Encore] Failed to resolve number sound:", error);
+      return defaultUrl;
+    }
+  }
+
+  /**
+   * Resolves URLs for all ten keypad sounds so they can be preloaded.
+   * @returns {Promise<string[]>}
+   */
+  async getNumberSoundUrls() {
+    return Promise.all(
+      Array.from({ length: 10 }, (_, digit) =>
+        this.resolveNumberSoundUrl(String(digit)),
+      ),
+    );
+  }
+
+  /**
+   * Plays the configured sound for a keypad digit.
+   *
+   * @param {string|number} digit - Digit from 0 to 9.
+   */
+  playNumberSfx(digit) {
+    const token = ++this._numberSfxToken;
+    this.resolveNumberSoundUrl(digit)
+      .then((url) => {
+        if (token !== this._numberSfxToken) return;
+        this.ctx.services.Forte.playSfx(url);
+      })
+      .catch((error) => {
+        console.error("[Encore] Failed to play number sound:", error);
+      });
   }
 
   /**
@@ -871,7 +976,7 @@ export default class InputManager {
     if (state.mode !== "player") {
       if (state.isNumberSfxEnabled !== false) {
         this.ctx.services.Forte.stopSfx();
-        this.ctx.services.Forte.playSfx(`/assets/audio/numbers/${digit}.wav`);
+        this.playNumberSfx(digit);
       }
       state.isTypingNumber = true;
       ui.updateMenuUI();
