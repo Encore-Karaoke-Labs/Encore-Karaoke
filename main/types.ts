@@ -84,6 +84,7 @@ export interface LibraryManifest {
     bumperImages?: string[];
     soundFont?: string;
     bootVideo?: string;
+    numberSounds?: Record<string, string> | string[];
   };
   [key: string]: unknown;
 }
