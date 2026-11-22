@@ -986,11 +986,12 @@ class EncoreController {
       "drive_disconnected.wav",
       "drive_mismatch.wav",
       "drive_reconnected.wav",
-      ...Array.from({ length: 10 }, (_, i) => `numbers/${i}.wav`),
     ];
-    await Promise.all(
-      sfx.map((s) => this.services.Forte.loadSfx(`/assets/audio/${s}`)),
-    );
+    const numberSfxUrls = await this.input.getNumberSoundUrls();
+    await Promise.all([
+      ...sfx.map((s) => this.services.Forte.loadSfx(`/assets/audio/${s}`)),
+      ...numberSfxUrls.map((url) => this.services.Forte.loadSfx(url)),
+    ]);
 
     this.versionInformation = await window.version.getVersionInformation();
     this.updateInformation = await this.services.Updates.getUpdateInformation();
