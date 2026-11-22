@@ -18,6 +18,9 @@ let bumperSaveTimeout = null;
 let bumperVirtualList = null;
 const imagePreviewCache = new Map();
 
+let numberSoundsData = {};
+let numberSoundsSaveTimeout = null;
+
 let songIndex = []; // Pre-normalized array of { raw: string, lower: string }
 let filteredIndices = null; // Int array of matched indices in songIndex, null = all
 let activeSongScanToken = 0;
@@ -430,12 +433,17 @@ function renderMainPane() {
   bgvData = selectedLib.manifest.additionalContents?.bgvCategories || [];
   bumperData =
     selectedLib.manifest.additionalContents?.bumperImages || [];
+  numberSoundsData = normalizeNumberSounds(
+    selectedLib.manifest.additionalContents?.numberSounds,
+  );
   renderFlags();
   setOverviewStatus("idle");
   setBgvStatus("idle");
   setBumperStatus("idle");
+  setNumbersStatus("idle");
   renderBgvs();
   renderBumpers();
+  renderNumberSounds();
   loadSongs();
 
   const activeTab = document.querySelector(".tab-content.active");
@@ -498,7 +506,7 @@ function switchTab(tabId) {
   if (clickedBtn) {
     clickedBtn.classList.add("active");
   } else {
-    const tabNames = ["overview", "songs", "bgvs", "bumpers"];
+    const tabNames = ["overview", "songs", "bgvs", "bumpers", "numbers"];
     const idx = tabNames.indexOf(tabId);
     if (idx !== -1 && tabButtons[idx]) {
       tabButtons[idx].classList.add("active");
@@ -1006,6 +1014,7 @@ function flushAllAutoSaves() {
   flushManifestAutoSave();
   flushBgvAutoSave();
   flushBumperAutoSave();
+  flushNumberSoundsAutoSave();
 }
 
 function addBgvCategory() {
@@ -1349,6 +1358,273 @@ async function saveBumpers() {
   }
 }
 
+function normalizeNumberSounds(raw) {
+  const normalized = {};
+
+  if (Array.isArray(raw)) {
+    raw.forEach((value, index) => {
+      if (index < 10 && typeof value === "string" && value.trim()) {
+        normalized[String(index)] = value;
+      }
+    });
+    return normalized;
+  }
+
+  if (raw && typeof raw === "object") {
+    for (let digit = 0; digit < 10; digit++) {
+      const value = raw[String(digit)];
+      if (typeof value === "string" && value.trim()) {
+        normalized[String(digit)] = value;
+      }
+    }
+  }
+
+  return normalized;
+}
+
+function detectDigitFromFilename(relativePath) {
+  const filename = String(relativePath)
+    .split(/[\\/]/)
+    .pop()
+    .replace(/\.[^.]+$/, "")
+    .toLowerCase();
+
+  const words = {
+    zero: "0",
+    oh: "0",
+    one: "1",
+    two: "2",
+    three: "3",
+    four: "4",
+    five: "5",
+    six: "6",
+    seven: "7",
+    eight: "8",
+    nine: "9",
+  };
+
+  const wordMatch = filename.match(
+    /\b(zero|oh|one|two|three|four|five|six|seven|eight|nine)\b/,
+  );
+  if (wordMatch) return words[wordMatch[1]];
+
+  const digitMatch = filename.match(/(?:^|[^0-9])([0-9])(?=[^0-9]|$)/);
+  return digitMatch ? digitMatch[1] : null;
+}
+
+function renderNumberSounds() {
+  const container = document.getElementById("number-sounds-list");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  for (let digit = 0; digit < 10; digit++) {
+    const key = String(digit);
+    const relativePath = numberSoundsData[key];
+
+    const row = document.createElement("div");
+    row.className = "number-sound-row";
+    row.innerHTML = `
+      <div class="number-sound-digit">${digit}</div>
+      <div class="number-sound-path ${relativePath ? "" : "is-default"}" title="${escapeHtml(relativePath || "Internal default sound")}">
+        ${relativePath ? escapeHtml(relativePath) : "Internal default"}
+      </div>
+      <button type="button" class="action-btn outline" onclick="chooseNumberSound('${digit}')">
+        ${relativePath ? "Replace" : "Select"}
+      </button>
+      ${
+        relativePath
+          ? `<button type="button" class="action-btn danger" onclick="clearNumberSound('${digit}')">Clear</button>`
+          : ""
+      }
+    `;
+
+    container.appendChild(row);
+  }
+}
+
+function setNumbersStatus(state) {
+  const el = document.getElementById("numbers-status");
+  if (!el) return;
+  if (state === "saving") {
+    el.style.color = "var(--accent)";
+    el.innerText = "SAVING...";
+  } else if (state === "saved") {
+    el.style.color = "var(--success)";
+    el.innerText = "CHANGES SAVED";
+    setTimeout(() => {
+      if (el.innerText === "CHANGES SAVED") {
+        el.style.color = "var(--text-muted)";
+        el.innerText = "AUTOSAVED";
+      }
+    }, 2500);
+  } else if (state === "error") {
+    el.style.color = "var(--danger)";
+    el.innerText = "SAVE FAILED";
+  } else {
+    el.style.color = "var(--text-muted)";
+    el.innerText = "AUTOSAVED";
+  }
+}
+
+function queueNumberSoundsAutoSave(immediate = false) {
+  if (numberSoundsSaveTimeout) {
+    clearTimeout(numberSoundsSaveTimeout);
+    numberSoundsSaveTimeout = null;
+  }
+
+  if (immediate) {
+    saveNumberSounds();
+  } else {
+    setNumbersStatus("saving");
+    numberSoundsSaveTimeout = setTimeout(() => {
+      numberSoundsSaveTimeout = null;
+      saveNumberSounds();
+    }, 600);
+  }
+}
+
+function flushNumberSoundsAutoSave() {
+  if (numberSoundsSaveTimeout) {
+    clearTimeout(numberSoundsSaveTimeout);
+    numberSoundsSaveTimeout = null;
+    saveNumberSounds();
+  }
+}
+
+async function chooseNumberSound(digit) {
+  if (!selectedLib) return;
+
+  const res = await ipc.invoke(
+    "libmgr-select-number-sound",
+    selectedLib.path,
+  );
+
+  if (res?.error) {
+    showToast(res.error, "var(--danger)");
+    return;
+  }
+
+  if (!res?.relativePath) return;
+
+  numberSoundsData[String(digit)] = res.relativePath;
+  renderNumberSounds();
+  queueNumberSoundsAutoSave(true);
+  showToast(`Number ${digit} sound updated.`, "var(--success)");
+}
+
+function clearNumberSound(digit) {
+  if (!selectedLib) return;
+
+  delete numberSoundsData[String(digit)];
+  renderNumberSounds();
+  queueNumberSoundsAutoSave(true);
+  showToast(`Number ${digit} sound reset to default.`, "var(--text-muted)");
+}
+
+async function importNumberSounds() {
+  if (!selectedLib) return;
+
+  const res = await ipc.invoke(
+    "libmgr-select-number-sounds",
+    selectedLib.path,
+  );
+
+  if (res && res.outsideCount > 0) {
+    showToast(
+      `${res.outsideCount} ${res.outsideCount > 1 ? "sounds" : "sound"} must be inside the library folder!`,
+      "var(--danger)",
+    );
+  }
+
+  if (!res || !res.relativePaths || res.relativePaths.length === 0) return;
+
+  const usedDigits = new Set(Object.keys(numberSoundsData));
+  let nextFreeDigit = 0;
+  let imported = 0;
+  let skipped = 0;
+
+  res.relativePaths.forEach((relativePath) => {
+    let digit = detectDigitFromFilename(relativePath);
+
+    if (digit === null) {
+      while (nextFreeDigit < 10 && usedDigits.has(String(nextFreeDigit))) {
+        nextFreeDigit++;
+      }
+      if (nextFreeDigit >= 10) {
+        skipped++;
+        return;
+      }
+      digit = String(nextFreeDigit);
+      nextFreeDigit++;
+    }
+
+    numberSoundsData[digit] = relativePath;
+    usedDigits.add(digit);
+    imported++;
+  });
+
+  if (imported > 0) {
+    renderNumberSounds();
+    queueNumberSoundsAutoSave(true);
+  }
+
+  if (imported === 0) {
+    showToast(
+      "No sounds could be assigned. All digit slots are already in use.",
+      "var(--danger)",
+    );
+    return;
+  }
+
+  showToast(
+    `Imported ${imported} sound${imported === 1 ? "" : "s"}${skipped > 0 ? `, skipped ${skipped}` : ""}.`,
+    "var(--success)",
+  );
+}
+
+async function saveNumberSounds() {
+  if (!selectedLib) return;
+
+  selectedLib.manifest.additionalContents =
+    selectedLib.manifest.additionalContents || {};
+
+  if (Object.keys(numberSoundsData).length > 0) {
+    selectedLib.manifest.additionalContents.numberSounds = {
+      ...numberSoundsData,
+    };
+  } else {
+    delete selectedLib.manifest.additionalContents.numberSounds;
+  }
+
+  setNumbersStatus("saving");
+
+  const res = await ipc.invoke("libmgr-update-manifest", {
+    folderPath: selectedLib.path,
+    manifestData: selectedLib.manifest,
+  });
+
+  if (res && res.success) {
+    setNumbersStatus("saved");
+    const libInConfig = appData.libraries.find(
+      (l) => l.path === selectedLib.path,
+    );
+    if (libInConfig) {
+      libInConfig.manifest = selectedLib.manifest;
+    }
+  } else {
+    setNumbersStatus("error");
+    console.error(
+      "Number Sounds Save Error:",
+      res ? res.error : "Unknown error",
+    );
+    showToast(
+      `Failed to autosave number sounds: ${res ? res.error : "Unknown error"}`,
+      "var(--danger)",
+    );
+  }
+}
+
 async function scanDrives() {
   showToast("Scanning drives...");
   const foundCount = await ipc.invoke("libmgr-scan-drives");
@@ -1395,6 +1671,10 @@ function confirmRemoveLibrary() {
   if (bumperSaveTimeout) {
     clearTimeout(bumperSaveTimeout);
     bumperSaveTimeout = null;
+  }
+  if (numberSoundsSaveTimeout) {
+    clearTimeout(numberSoundsSaveTimeout);
+    numberSoundsSaveTimeout = null;
   }
   openConfirmModal(
     "REMOVE LIBRARY",
@@ -1486,5 +1766,8 @@ window.removeVideoFromCategory = removeVideoFromCategory;
 window.setActive = setActive;
 window.addBumperImages = addBumperImages;
 window.removeBumperImage = removeBumperImage;
+window.importNumberSounds = importNumberSounds;
+window.chooseNumberSound = chooseNumberSound;
+window.clearNumberSound = clearNumberSound;
 
 loadData();
