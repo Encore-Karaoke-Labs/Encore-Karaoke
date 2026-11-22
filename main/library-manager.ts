@@ -6,16 +6,33 @@ import {
   type IpcMainEvent,
   type IpcMainInvokeEvent,
 } from "electron";
+import mime from "mime-types";
 import fs from "node:fs";
 import path from "node:path";
-import mime from "mime-types";
 import si from "systeminformation";
 import Config from "../config-manager";
-import { appState } from "./state";
+import { discordRpc } from "./discord-rpc";
 import { logger } from "./logger";
 import { platformHints } from "./runtime";
-import { discordRpc } from "./discord-rpc";
+import { appState } from "./state";
 import type { KnownLibraryItem, LibraryManifest } from "./types";
+
+/**
+ * Converts an absolute file path to a path relative to the library root.
+ */
+function toRelativeLibraryPath(
+  filePath: string,
+  folderPath: string,
+): string | null {
+  if (!filePath || !folderPath) return null;
+
+  const normalizedFile = filePath.replace(/\\/g, "/");
+  const normalizedFolder = folderPath.replace(/\\/g, "/").replace(/\/+$/, "");
+
+  if (!normalizedFile.startsWith(normalizedFolder + "/")) return null;
+
+  return normalizedFile.substring(normalizedFolder.length + 1);
+}
 
 export function registerLibraryManagerIpc(): void {
   ipcMain.on("open-library-manager", () => {
@@ -157,7 +174,11 @@ export function registerLibraryManagerIpc(): void {
             isSongHub: false,
             skipToFirstNoteOn: false,
           },
-          additionalContents: { bgvCategories: [], bumperImages: [] },
+          additionalContents: {
+            bgvCategories: [],
+            bumperImages: [],
+            numberSounds: {},
+          },
         };
         fs.writeFileSync(
           manifestPath,
@@ -337,6 +358,104 @@ export function registerLibraryManagerIpc(): void {
           outsideCount++;
         }
       }
+      return { relativePaths, outsideCount };
+    },
+  );
+
+  ipcMain.handle(
+    "libmgr-select-number-sound",
+    async (
+      event: IpcMainInvokeEvent,
+      folderPath: string,
+    ): Promise<{ relativePath?: string; error?: string }> => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win) return { error: "Window not found." };
+
+      const result = await dialog.showOpenDialog(win, {
+        title: "Select Number Sound",
+        defaultPath: folderPath,
+        properties: ["openFile"],
+        filters: [
+          {
+            name: "Audio Files",
+            extensions: [
+              "wav",
+              "mp3",
+              "ogg",
+              "m4a",
+              "flac",
+              "aac",
+              "opus",
+              "webm",
+            ],
+          },
+          { name: "MIDI Files", extensions: ["mid", "midi"] },
+          { name: "All Files", extensions: ["*"] },
+        ],
+      });
+
+      if (result.canceled || result.filePaths.length === 0) return {};
+
+      const relativePath = toRelativeLibraryPath(
+        result.filePaths[0],
+        folderPath,
+      );
+      if (!relativePath) {
+        return {
+          error: "The number sound must be located inside the library folder!",
+        };
+      }
+
+      return { relativePath };
+    },
+  );
+
+  ipcMain.handle(
+    "libmgr-select-number-sounds",
+    async (
+      event: IpcMainInvokeEvent,
+      folderPath: string,
+    ): Promise<{ relativePaths: string[]; outsideCount: number }> => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win) return { relativePaths: [], outsideCount: 0 };
+
+      const result = await dialog.showOpenDialog(win, {
+        title: "Select Number Sounds",
+        defaultPath: folderPath,
+        properties: ["openFile", "multiSelections"],
+        filters: [
+          {
+            name: "Audio Files",
+            extensions: [
+              "wav",
+              "mp3",
+              "ogg",
+              "m4a",
+              "flac",
+              "aac",
+              "opus",
+              "webm",
+            ],
+          },
+          { name: "MIDI Files", extensions: ["mid", "midi"] },
+          { name: "All Files", extensions: ["*"] },
+        ],
+      });
+
+      if (result.canceled) return { relativePaths: [], outsideCount: 0 };
+
+      const relativePaths: string[] = [];
+      let outsideCount = 0;
+
+      for (const filePath of result.filePaths) {
+        const relativePath = toRelativeLibraryPath(filePath, folderPath);
+        if (relativePath) {
+          relativePaths.push(relativePath);
+        } else {
+          outsideCount++;
+        }
+      }
+
       return { relativePaths, outsideCount };
     },
   );
