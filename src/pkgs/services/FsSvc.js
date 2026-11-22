@@ -391,6 +391,25 @@ const pkg = {
         }
       }
 
+      const manifestNumberSoundFiles = new Set();
+      const numberSounds = loadedManifest?.additionalContents?.numberSounds;
+      const numberSoundPaths = Array.isArray(numberSounds)
+        ? numberSounds
+        : numberSounds && typeof numberSounds === "object"
+          ? Object.values(numberSounds)
+          : [];
+
+      for (const item of numberSoundPaths) {
+        if (typeof item !== "string") continue;
+        const clean = nfc(item).replace(/\\/g, "/").trim().toLowerCase();
+        if (!clean) continue;
+        manifestNumberSoundFiles.add(clean);
+        const basename = clean.split("/").pop();
+        if (basename) {
+          manifestNumberSoundFiles.add(basename);
+        }
+      }
+
       const audioExtensions = new Set(["wav", "mp3", "m4a", "ogg"]);
       const videoExtensions = new Set(["mp4", "mkv", "webm", "avi"]);
       const validExts = new Set([
@@ -410,6 +429,7 @@ const pkg = {
           const name = nfc(f.name).toLowerCase();
           if (name === "songdb.json" || name === "manifest.json") return false;
           if (manifestBgvFiles.has(name)) return false;
+          if (manifestNumberSoundFiles.has(name)) return false;
           return validExts.has(name.split(".").pop());
         })
         .sort((a, b) => a.name.localeCompare(b.name))
@@ -417,7 +437,10 @@ const pkg = {
         .join("|");
 
       const isSongHub = Boolean(loadedManifest?.flags?.isSongHub);
-      const currentSignature = `${dbVersion}:${isSongHub ? "sh:1" : "sh:0"}:${fileSignatures}`;
+      const numberSoundSignature = [...manifestNumberSoundFiles]
+        .sort()
+        .join("|");
+      const currentSignature = `${dbVersion}:${isSongHub ? "sh:1" : "sh:0"}:${numberSoundSignature}:${fileSignatures}`;
 
       const hasSongDb = files.some(
         (f) =>
