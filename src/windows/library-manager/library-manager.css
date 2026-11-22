@@ -185,6 +185,8 @@ body.is-mac .window-controls {
   padding: 0 30px;
   background: rgba(0, 0, 0, 0.2);
   flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .tab-btn {
   background: transparent;
@@ -198,6 +200,8 @@ body.is-mac .window-controls {
   border-radius: 0;
   transition: 0.2s;
   cursor: default;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .tab-btn:hover {
   color: #fff;
@@ -928,3 +932,70 @@ textarea:focus {
 .flag-desc b {
   color: #fff;
 }
+
+.number-sounds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 12px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.number-sound-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  transition: background 0.12s ease;
+}
+
+.number-sound-row:hover {
+  background: rgba(137, 207, 240, 0.06);
+}
+
+.number-sound-digit {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(137, 207, 240, 0.1);
+  border: 1px solid rgba(137, 207, 240, 0.3);
+  border-radius: 6px;
+}
+
+.number-sound-path {
+  flex: 1;
+  min-width: 0;
+  font-family: monospace;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+
+.number-sound-path.is-default {
+  color: var(--text-muted);
+  font-family: "Rajdhani", sans-serif;
+  font-style: italic;
+}
+
+.number-sound-row .action-btn {
+  padding: 6px 12px;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+

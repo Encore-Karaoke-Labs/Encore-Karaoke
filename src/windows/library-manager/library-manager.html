@@ -78,14 +78,16 @@
           <button class="tab-btn" onclick="switchTab('bumpers')">
             Idle Images
           </button>
+          <button class="tab-btn" onclick="switchTab('numbers')">
+            Numbers
+          </button>
         </div>
 
         <div id="tab-overview" class="tab-content active">
           <div class="tab-scroll-body">
             <div class="pane-header-bar">
               <p class="pane-header-desc">
-                General metadata and configuration for this library. Changes are
-                saved automatically.
+                General metadata and configuration for this library.
               </p>
               <div class="pane-header-actions">
                 <div class="autosave-status-container">
@@ -240,7 +242,6 @@
           <div class="pane-header-bar">
             <p class="pane-header-desc">
               Background Videos must be located inside the library folder.
-              Changes are saved automatically.
             </p>
             <div class="pane-header-actions">
               <div class="autosave-status-container">
@@ -261,8 +262,7 @@
         <div id="tab-bumpers" class="tab-content">
           <div class="pane-header-bar">
             <p class="pane-header-desc">
-              Idle Images must be located inside the library folder. Changes are
-              saved automatically.
+              Idle Images must be located inside the library folder.
             </p>
             <div class="pane-header-actions">
               <div class="autosave-status-container">
@@ -280,6 +280,26 @@
             id="bumper-list-viewport"
             style="padding: 0; position: relative; overflow-y: auto"
           ></div>
+        </div>
+
+        <div id="tab-numbers" class="tab-content">
+          <div class="pane-header-bar">
+            <p class="pane-header-desc">
+              Assign custom keypad sounds for digits 0-9. Files must be located
+              inside the library folder.
+            </p>
+            <div class="pane-header-actions">
+              <div class="autosave-status-container">
+                <span id="numbers-status" class="autosave-status"
+                  >AUTOSAVED</span
+                >
+              </div>
+              <button onclick="importNumberSounds()" class="action-btn outline">
+                + Import Sounds
+              </button>
+            </div>
+          </div>
+          <div class="number-sounds-list" id="number-sounds-list"></div>
         </div>
       </div>
 
