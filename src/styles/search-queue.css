@@ -330,6 +330,8 @@
   width: 80px;
   color: #89cff0;
   flex-shrink: 0;
+  margin-left: auto;
+  text-align: right;
 }
 
 .search-thumbnail-wrapper {
