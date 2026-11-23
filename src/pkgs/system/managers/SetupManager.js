@@ -1,9 +1,9 @@
+import Button from "../../../components/Button.js";
+import ProgressBar from "../../../components/ProgressBar.js";
 import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
 import { hasPlatformHint } from "../../../libs/platformHints.js";
 import { findSongByCode as lookupSongByCode } from "../../../libs/songLookup.js";
-import Button from "../../../components/Button.js";
-import ProgressBar from "../../../components/ProgressBar.js";
 
 /**
  * Joins path parts with a given separator, normalizing leading and trailing slashes.
@@ -1512,6 +1512,25 @@ export default class SetupManager {
                   this.ctx.config.musicBoxConfig.waitSeconds = v;
                   window.config.setItem("musicBoxConfig.waitSeconds", v);
                   this.ctx.root.musicBox?.scheduleStart();
+                },
+              },
+              {
+                id: "musicbox_volume",
+                label: "Volume",
+                type: "range",
+                min: 0,
+                max: 100,
+                step: 5,
+                get: () =>
+                  Math.round(
+                    (this.ctx.root.musicBox?.getVolume() ?? 0.5) * 100,
+                  ),
+                set: (v) => {
+                  const val = v / 100;
+                  this.ctx.config.musicBoxConfig ??= {};
+                  this.ctx.config.musicBoxConfig.volume = val;
+                  window.config.setItem("musicBoxConfig.volume", val);
+                  this.ctx.root.musicBox?.applyVolume?.();
                 },
               },
             ],
