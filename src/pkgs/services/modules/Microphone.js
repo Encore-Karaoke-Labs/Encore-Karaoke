@@ -1,5 +1,6 @@
 import { PitchDetector } from "pitchy";
 import { logVerbose } from "../core/State.js";
+import { loadPluginChain } from "../libs/ChainLoader.js";
 
 export class ForteMicrophone {
   /**
@@ -161,69 +162,20 @@ export class ForteMicrophone {
    * @param {Array<Object>} chainConfig - Mapped representations configuring instances.
    */
   async loadVocalChain(chainConfig) {
-    this.state.effects.vocalChainConfig = JSON.parse(
-      JSON.stringify(chainConfig),
-    );
-    this.state.effects.vocalChain.forEach((plugin) => plugin.disconnect());
-    this.state.effects.vocalChain = [];
-
-    for (let i = 0; i < chainConfig.length; i++) {
-      const pluginConfig = chainConfig[i];
-      try {
-        logVerbose("Loading plugin configuration", pluginConfig);
-        const pluginModule = await import(pluginConfig.path);
-        const PluginClass = pluginModule.default;
-        let pluginInstance;
-
-        if (typeof PluginClass.create === "function") {
-          pluginInstance = await PluginClass.create(this.audioCore.context);
-        } else {
-          pluginInstance = new PluginClass(this.audioCore.context);
-        }
-
-        if (pluginConfig.params) {
-          for (const [key, value] of Object.entries(pluginConfig.params)) {
-            pluginInstance.setParameter(key, value);
-          }
-        }
-
-        const originalSetParameter = pluginInstance.setParameter;
-        const self = this;
-
-        if (typeof originalSetParameter === "function") {
-          pluginInstance.setParameter = function (paramName, value) {
-            originalSetParameter.call(this, paramName, value);
-
-            if (self.state.effects.vocalChainConfig[i]) {
-              if (!self.state.effects.vocalChainConfig[i].params) {
-                self.state.effects.vocalChainConfig[i].params = {};
-              }
-              self.state.effects.vocalChainConfig[i].params[paramName] = value;
-
-              if (self.saveVocalChainTimeout)
-                clearTimeout(self.saveVocalChainTimeout);
-              self.saveVocalChainTimeout = setTimeout(() => {
-                if (
-                  window.config &&
-                  typeof window.config.setItem === "function"
-                ) {
-                  window.config.setItem(
-                    "audioConfig.vocalChain",
-                    self.state.effects.vocalChainConfig,
-                  );
-                  logVerbose("Saved updated vocal chain config to disk.");
-                }
-              }, 300);
-            }
-          };
-        }
-
-        this.state.effects.vocalChain.push(pluginInstance);
-      } catch (e) {
-        console.error(`[FORTE SVC] Failed to load plugin.`, e);
-      }
-    }
-    this.rebuildVocalChain();
+    await loadPluginChain({
+      self: this,
+      audioCore: this.audioCore,
+      chainConfig,
+      effects: this.state.effects,
+      chainKey: "vocalChain",
+      chainConfigKey: "vocalChainConfig",
+      saveTimeoutField: "saveVocalChainTimeout",
+      saveKey: "audioConfig.vocalChain",
+      loadLog: "Loading plugin configuration",
+      saveLog: "Saved updated vocal chain config to disk.",
+      errorLog: "Failed to load plugin.",
+      rebuild: () => this.rebuildVocalChain(),
+    });
   }
 
   /**
