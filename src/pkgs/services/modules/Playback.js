@@ -920,6 +920,7 @@ export class FortePlayback {
     }
 
     const shouldShowPianoRoll =
+      !this.state.playback.isBackground &&
       (hasGuide || this.state.playback.isAnalyzing) &&
       this.state.ui.displayGuideMelody &&
       !isPreludeWait;
@@ -1154,7 +1155,7 @@ export class FortePlayback {
    * @param {string} url - The targeted local media.
    * @returns {Promise<boolean>} True if all media segments parsed cleanly.
    */
-  async loadTrack(url, chorusUrl = null, midiGuideUrl = null) {
+  async loadTrack(url, chorusUrl = null, midiGuideUrl = null, options = {}) {
     if (!this.audioCore.context) return false;
 
     const currentLoadId = ++this.loadId;
@@ -1169,6 +1170,7 @@ export class FortePlayback {
         chorusUrl,
         midiGuideUrl,
         currentLoadId,
+        options,
       );
       return result;
     } finally {
@@ -1184,10 +1186,12 @@ export class FortePlayback {
     chorusUrl = null,
     midiGuideUrl = null,
     currentLoadId,
+    options = {},
   ) {
     if (this.state.playback.status !== "stopped") this.stopTrack();
     this.rhythm?.stop();
 
+    this.state.playback.isBackground = Boolean(options.background);
     this.state.playback.hasMidiGuide = false;
     if (this.audioElement) {
       this.audioElement.pause();
@@ -1377,6 +1381,7 @@ export class FortePlayback {
 
         if (
           this.state.playback.isMultiplexed &&
+          !this.state.playback.isBackground &&
           typeof url === "string" &&
           !this.state.playback.hasMidiGuide
         ) {
@@ -1443,9 +1448,12 @@ export class FortePlayback {
       }
     }
 
-    this.state.scoring.enabled = true;
+    this.state.scoring.enabled = !this.state.playback.isBackground;
 
-    if (this.state.playback.status !== "paused") {
+    if (
+      !this.state.playback.isBackground &&
+      this.state.playback.status !== "paused"
+    ) {
       Object.assign(this.state.scoring, {
         finalScore: 0,
         totalScorableNotes: 0,
@@ -1535,13 +1543,16 @@ export class FortePlayback {
       this.audioElement.preservesPitch = true;
 
       if (this.state.playback.isMultiplexed) {
-        const vocalGuideAnalyser = this.audioCore.context.createAnalyser();
-        vocalGuideAnalyser.fftSize = 2048;
-        this.state.scoring.vocalGuideAnalyser = vocalGuideAnalyser;
+        let delayNode = null;
+        if (!this.state.playback.isBackground) {
+          const vocalGuideAnalyser = this.audioCore.context.createAnalyser();
+          vocalGuideAnalyser.fftSize = 2048;
+          this.state.scoring.vocalGuideAnalyser = vocalGuideAnalyser;
 
-        const delayNode = this.audioCore.context.createDelay();
-        delayNode.delayTime.value = this.state.scoring.measuredLatencyS;
-        this.state.scoring.guideVocalDelayNode = delayNode;
+          delayNode = this.audioCore.context.createDelay();
+          delayNode.delayTime.value = this.state.scoring.measuredLatencyS;
+          this.state.scoring.guideVocalDelayNode = delayNode;
+        }
 
         const splitter = this.audioCore.context.createChannelSplitter(2);
         const leftGain = this.audioCore.context.createGain();
@@ -1554,8 +1565,10 @@ export class FortePlayback {
         this.sourceNode.connect(splitter);
         splitter.connect(leftGain, 0); // Instrument
         splitter.connect(rightGain, 1); // Vocals
-        splitter.connect(delayNode, 1); // Delay vocals for guide analyzer
-        delayNode.connect(vocalGuideAnalyser);
+        if (delayNode) {
+          splitter.connect(delayNode, 1); // Delay vocals for guide analyzer
+          delayNode.connect(this.state.scoring.vocalGuideAnalyser);
+        }
 
         leftGain.connect(monoMixer);
         rightGain.connect(monoMixer);
@@ -1599,7 +1612,9 @@ export class FortePlayback {
           );
 
         this.sourceNode.connect(this.audioPitchNode);
-        this.sourceNode.connect(this.state.scoring.musicAnalyser);
+        if (!this.state.playback.isBackground) {
+          this.sourceNode.connect(this.state.scoring.musicAnalyser);
+        }
       }
 
       const resumeTime =
@@ -1635,6 +1650,7 @@ export class FortePlayback {
     }
 
     if (
+      !this.state.playback.isBackground &&
       !this.state.playback.isMidi &&
       !this.state.playback.isMultiplexed &&
       this.audioElement
@@ -1722,6 +1738,7 @@ export class FortePlayback {
   stopTrack() {
     this.pianoRoll.toggleVisibility(false);
     this.rhythm?.stop();
+    this.state.playback.isBackground = false;
 
     if (this.state.playback.status === "stopped") return;
     this.state.playback.status = "stopped";
