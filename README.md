@@ -12,6 +12,7 @@
 
 <div align="center">
   <img alt="Encore Header" src="readme/demo.png" style="border-radius: 15px; margin-bottom: 20px; margin-top: 20px;" />
+  <strong>Encore Sessions as featured by <a href="https://twitch.tv/randsss">Randsss</a>, <a href="https://twitch.tv/raintrevil">RainTrevil</a> & <a href="https://twitch.tv/xdkurayami">XDKurayami</a>.</strong>
 </div>
 
 ---
