@@ -649,7 +649,10 @@ export class ForteSynthesizer {
       this.sendExternalTranspose(this.state.playback.transpose);
     }
     if (this.state.playback.volume !== undefined) {
-      this.sendExternalMasterVolume(this.state.playback.volume);
+      this.sendExternalMasterVolume(
+        this.state.playback.volume *
+          (this.state.playback.backgroundVolume ?? 1),
+      );
     }
   }
 
@@ -1430,7 +1433,10 @@ export class ForteSynthesizer {
         }
       }
       this.sendExternalTranspose(0);
-      this.sendExternalMasterVolume(this.state.playback.volume ?? 1);
+      this.sendExternalMasterVolume(
+        (this.state.playback.volume ?? 1) *
+          (this.state.playback.backgroundVolume ?? 1),
+      );
     }
   }
 
