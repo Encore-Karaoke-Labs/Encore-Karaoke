@@ -1,5 +1,6 @@
 import Html from "../libs/html.js";
 import { findSongByCode } from "../libs/songLookup.js";
+import FormatBadge from "../components/FormatBadge.js";
 
 export const DEFAULT_INFO_BAR_ICON = "information-circle";
 
@@ -440,10 +441,8 @@ export class InfoBarModule {
 
     let fmtBadge = "";
     if (this.getFormatInfo) {
-      const fmt = this.getFormatInfo(song);
-      if (fmt) {
-        fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
-      }
+      const badge = FormatBadge.fromInfo(this.getFormatInfo(song));
+      if (badge) fmtBadge = badge.toHtml();
     }
 
     const singer = song.requesterNickname || song.singer;
@@ -477,10 +476,8 @@ export class InfoBarModule {
 
     let fmtBadge = "";
     if (this.getFormatInfo) {
-      const fmt = this.getFormatInfo(nextSong);
-      if (fmt) {
-        fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
-      }
+      const badge = FormatBadge.fromInfo(this.getFormatInfo(nextSong));
+      if (badge) fmtBadge = badge.toHtml();
     }
 
     const upcomingSongs = queue.slice(1);
