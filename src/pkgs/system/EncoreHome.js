@@ -7,6 +7,7 @@ import GamesManager from "./managers/GamesManager.js";
 import InputManager from "./managers/InputManager.js";
 import LibraryManager from "./managers/LibraryManager.js";
 import LyricsEngine from "./managers/LyricsEngine.js";
+import MusicBoxManager from "./managers/MusicBoxManager.js";
 import NetworkManager from "./managers/NetworkManager.js";
 import PlaybackManager from "./managers/PlaybackManager.js";
 import RecordingsManager from "./managers/RecordingsManager.js";
@@ -251,6 +252,9 @@ class EncoreController {
 
     this.driveRecovery = new DriveRecoveryManager(this.context);
     this.context.modules.driveRecovery = this.driveRecovery;
+
+    this.musicBox = new MusicBoxManager(this.context);
+    this.context.modules.musicBox = this.musicBox;
 
     this.ui = new UIManager(this.context);
     this.library = new LibraryManager(this.context);
@@ -1065,6 +1069,7 @@ class EncoreController {
     this.lyrics.init();
     this.setup.init();
     this.games.init();
+    this.musicBox.init();
 
     this.driveRecovery.buildUI();
     this.driveRecovery.captureLibraryFingerprint();
@@ -1225,6 +1230,7 @@ class EncoreController {
       window.removeEventListener("keydown", this.boundKeydown);
     if (this.stream) this.stream.destroy();
     this.playback.cleanupPlayerEvents();
+    this.musicBox.destroy();
     this.network.destroy();
     this.retail.destroy();
     this.sessions.destroy();
