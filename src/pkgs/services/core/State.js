@@ -77,6 +77,7 @@ export const state = {
     chorusGain: null,
     chorusPitchNode: null,
     volume: 1,
+    backgroundVolume: 1,
     sfxVolume: 1,
     smoothedTime: 0,
     lastFrameTime: 0,
