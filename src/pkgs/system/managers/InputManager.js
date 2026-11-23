@@ -2,6 +2,7 @@ import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
 import playNavSfx from "../../../libs/sfx.js";
 import { findSongByCode } from "../../../libs/songLookup.js";
+import FormatBadge from "../../../components/FormatBadge.js";
 
 /**
  * @param {Object} context - The shared context
@@ -1052,7 +1053,7 @@ export default class InputManager {
     let fmtBadge = "";
     if (song) {
       const fmt = this.ctx.root.library.getFormatInfo(song);
-      fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
+      fmtBadge = FormatBadge.fromInfo(fmt)?.toHtml() || "";
     }
 
     let songInfo = song
