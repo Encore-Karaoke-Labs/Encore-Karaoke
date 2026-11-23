@@ -170,6 +170,7 @@ export default class SetupManager {
   open() {
     this.bgvSuspended = !this._shouldKeepBgvRunning();
     if (this.bgvSuspended) this.ctx.modules.bgv.stop();
+    this.ctx.root.musicBox?.stop();
     this.ctx.services.Forte.stopTrack();
 
     this.setupState.view = "auth";
@@ -356,6 +357,7 @@ export default class SetupManager {
       { id: "audio", label: "Sound Settings", icon: "volume-high" },
       { id: "mic", label: "Mic & Scoring Settings", icon: "mic" },
       { id: "video", label: "Video Settings", icon: "tv" },
+      { id: "musicbox", label: "Music Box", icon: "musical-notes" },
       ...(isEmbedded
         ? []
         : [{ id: "retail", label: "Retail Settings", icon: "card" }]),
@@ -1467,6 +1469,49 @@ export default class SetupManager {
                   this.ctx.config.enableEasterEggInterludes = v;
                   this.ctx.state.isEasterEggInterludeEnabled = v;
                   window.config.setItem("enableEasterEggInterludes", v);
+                },
+              },
+            ],
+          },
+        ],
+      },
+      musicbox: {
+        title: "Music Box",
+        groups: [
+          {
+            title: "Automatic Playback",
+            items: [
+              {
+                id: "musicbox_enabled",
+                label: "Enable Music Box",
+                type: "select",
+                options: [
+                  { value: false, label: "Disabled" },
+                  { value: true, label: "Enabled" },
+                ],
+                get: () => this.ctx.config.musicBoxConfig?.enabled === true,
+                set: (v) => {
+                  this.ctx.config.musicBoxConfig ??= {};
+                  this.ctx.config.musicBoxConfig.enabled = v;
+                  window.config.setItem("musicBoxConfig.enabled", v);
+                  if (v) this.ctx.root.musicBox?.scheduleStart();
+                  else this.ctx.root.musicBox?.stop();
+                  this.renderView();
+                },
+              },
+              {
+                id: "musicbox_wait_time",
+                label: "Wait Time (seconds)",
+                type: "range",
+                min: 5,
+                max: 600,
+                step: 5,
+                get: () => this.ctx.root.musicBox?.getWaitSeconds() ?? 60,
+                set: (v) => {
+                  this.ctx.config.musicBoxConfig ??= {};
+                  this.ctx.config.musicBoxConfig.waitSeconds = v;
+                  window.config.setItem("musicBoxConfig.waitSeconds", v);
+                  this.ctx.root.musicBox?.scheduleStart();
                 },
               },
             ],
