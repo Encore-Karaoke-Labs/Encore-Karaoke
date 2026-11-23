@@ -1,5 +1,6 @@
 import Html from "../../../libs/html.js";
 import playNavSfx from "../../../libs/sfx.js";
+import ToggleSwitch from "../../../components/ToggleSwitch.js";
 
 const TWITCH_INGEST_URL = "rtmp://live.twitch.tv/app/";
 const TWITCH_MAX_TAGS = 10;
@@ -769,28 +770,15 @@ export default class StreamManager {
       .classOn("stream-toggle-row")
       .appendTo(configSection.content);
 
-    const autoRecSwitch = new Html("button")
-      .classOn("switch")
-      .attr({
-        type: "button",
-        role: "switch",
-        "aria-checked": this.obsAutoReconnect ? "true" : "false",
-        "aria-label": "Automatically reconnect if OBS starts later or restarts",
-      })
-      .appendTo(autoRecRow);
-
-    autoRecSwitch.on("click", () => {
-      this.obsAutoReconnect = !this.obsAutoReconnect;
-      autoRecSwitch.attr({
-        "aria-checked": this.obsAutoReconnect ? "true" : "false",
-      });
-      autoRecSwitch.classOff("switch-on-anim", "switch-off-anim");
-      void autoRecSwitch.elm.offsetWidth;
-      autoRecSwitch.classOn(
-        this.obsAutoReconnect ? "switch-on-anim" : "switch-off-anim",
-      );
-      this.saveObsConfig();
-    });
+    const autoRecSwitch = new ToggleSwitch({
+      checked: this.obsAutoReconnect,
+      ariaLabel:
+        "Automatically reconnect if OBS starts later or restarts",
+      onChange: (next) => {
+        this.obsAutoReconnect = next;
+        this.saveObsConfig();
+      },
+    }).appendTo(autoRecRow);
 
     new Html("span")
       .classOn("stream-toggle-label")
@@ -1166,32 +1154,21 @@ export default class StreamManager {
       .classOn("stream-toggle-row")
       .appendTo(chatSection.content);
 
-    const danmakuSwitch = new Html("button")
-      .classOn("switch")
-      .attr({
-        type: "button",
-        role: "switch",
-        "aria-checked": status.showChatAsDanmaku ? "true" : "false",
-        "aria-label": "Show chat on screen",
-      })
-      .appendTo(danmakuRow);
+    const danmakuSwitch = new ToggleSwitch({
+      checked: status.showChatAsDanmaku,
+      ariaLabel: "Show chat on screen",
+      onChange: (enabled) => {
+        this.twitchStatus.showChatAsDanmaku = enabled;
 
-    danmakuSwitch.on("click", () => {
-      const enabled = !this.twitchStatus.showChatAsDanmaku;
-      this.twitchStatus.showChatAsDanmaku = enabled;
-      danmakuSwitch.attr({ "aria-checked": enabled ? "true" : "false" });
-      danmakuSwitch.classOff("switch-on-anim", "switch-off-anim");
-      void danmakuSwitch.elm.offsetWidth;
-      danmakuSwitch.classOn(enabled ? "switch-on-anim" : "switch-off-anim");
-
-      this.ctx.config.twitchConfig = {
-        ...(this.ctx.config.twitchConfig || {}),
-        showChatAsDanmaku: enabled,
-      };
-      void window.twitch?.setPreferences?.({
-        showChatAsDanmaku: enabled,
-      });
-    });
+        this.ctx.config.twitchConfig = {
+          ...(this.ctx.config.twitchConfig || {}),
+          showChatAsDanmaku: enabled,
+        };
+        void window.twitch?.setPreferences?.({
+          showChatAsDanmaku: enabled,
+        });
+      },
+    }).appendTo(danmakuRow);
 
     new Html("span")
       .classOn("stream-toggle-label")
@@ -1202,25 +1179,14 @@ export default class StreamManager {
       .classOn("stream-toggle-row")
       .appendTo(chatSection.content);
 
-    const autoConnectSwitch = new Html("button")
-      .classOn("switch")
-      .attr({
-        type: "button",
-        role: "switch",
-        "aria-checked": status.autoConnect ? "true" : "false",
-        "aria-label": "Connect to Twitch automatically on startup",
-      })
-      .appendTo(autoConnectRow);
-
-    autoConnectSwitch.on("click", () => {
-      const enabled = !this.twitchStatus.autoConnect;
-      this.twitchStatus.autoConnect = enabled;
-      autoConnectSwitch.attr({ "aria-checked": enabled ? "true" : "false" });
-      autoConnectSwitch.classOff("switch-on-anim", "switch-off-anim");
-      void autoConnectSwitch.elm.offsetWidth;
-      autoConnectSwitch.classOn(enabled ? "switch-on-anim" : "switch-off-anim");
-      void window.twitch?.setPreferences?.({ autoConnect: enabled });
-    });
+    const autoConnectSwitch = new ToggleSwitch({
+      checked: status.autoConnect,
+      ariaLabel: "Connect to Twitch automatically on startup",
+      onChange: (enabled) => {
+        this.twitchStatus.autoConnect = enabled;
+        void window.twitch?.setPreferences?.({ autoConnect: enabled });
+      },
+    }).appendTo(autoConnectRow);
 
     new Html("span")
       .classOn("stream-toggle-label")
@@ -2606,15 +2572,16 @@ export default class StreamManager {
       const row = new Html("div").classOn("twitch-ccl-row");
 
       const enabled = draft.contentClassificationLabels.has(label.id);
-      const toggle = new Html("button")
-        .classOn("switch")
-        .attr({
-          type: "button",
-          role: "switch",
-          "aria-checked": enabled ? "true" : "false",
-          "aria-label": label.name,
-        })
-        .appendTo(row);
+      const toggle = new ToggleSwitch({
+        checked: enabled,
+        ariaLabel: label.name,
+        onChange: (next) => {
+          const set = this.twitchDraft.contentClassificationLabels;
+          if (next) set.add(label.id);
+          else set.delete(label.id);
+          this.markTwitchDirty();
+        },
+      }).appendTo(row);
 
       const text = new Html("div").classOn("twitch-ccl-text").appendTo(row);
 
@@ -2630,19 +2597,6 @@ export default class StreamManager {
           .appendTo(text);
       }
 
-      toggle.on("click", () => {
-        const set = this.twitchDraft.contentClassificationLabels;
-        const next = !set.has(label.id);
-        if (next) set.add(label.id);
-        else set.delete(label.id);
-
-        toggle.attr({ "aria-checked": next ? "true" : "false" });
-        toggle.classOff("switch-on-anim", "switch-off-anim");
-        void toggle.elm.offsetWidth;
-        toggle.classOn(next ? "switch-on-anim" : "switch-off-anim");
-        this.markTwitchDirty();
-      });
-
       row.appendTo(sectionContent);
     });
 
@@ -2650,15 +2604,14 @@ export default class StreamManager {
       .classOn("twitch-ccl-row")
       .appendTo(sectionContent);
 
-    const brandedToggle = new Html("button")
-      .classOn("switch")
-      .attr({
-        type: "button",
-        role: "switch",
-        "aria-checked": draft.isBrandedContent ? "true" : "false",
-        "aria-label": "This stream contains branded content",
-      })
-      .appendTo(brandedRow);
+    const brandedToggle = new ToggleSwitch({
+      checked: draft.isBrandedContent,
+      ariaLabel: "This stream contains branded content",
+      onChange: (next) => {
+        this.twitchDraft.isBrandedContent = next;
+        this.markTwitchDirty();
+      },
+    }).appendTo(brandedRow);
 
     const brandedText = new Html("div")
       .classOn("twitch-ccl-text")
@@ -2673,21 +2626,6 @@ export default class StreamManager {
       .classOn("twitch-ccl-desc")
       .text("This stream contains paid promotion or sponsored content.")
       .appendTo(brandedText);
-
-    brandedToggle.on("click", () => {
-      this.twitchDraft.isBrandedContent = !this.twitchDraft.isBrandedContent;
-      brandedToggle.attr({
-        "aria-checked": this.twitchDraft.isBrandedContent ? "true" : "false",
-      });
-      brandedToggle.classOff("switch-on-anim", "switch-off-anim");
-      void brandedToggle.elm.offsetWidth;
-      brandedToggle.classOn(
-        this.twitchDraft.isBrandedContent
-          ? "switch-on-anim"
-          : "switch-off-anim",
-      );
-      this.markTwitchDirty();
-    });
   }
 
   /**
