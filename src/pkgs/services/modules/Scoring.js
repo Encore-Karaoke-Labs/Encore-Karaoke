@@ -1,4 +1,5 @@
 import { logVerbose } from "../core/State.js";
+import { detectMusicalKey as detectSharedKey } from "./KeyDetection.js";
 
 const PITCH_CLASSES = [
   "C",
@@ -35,6 +36,33 @@ const MINOR_STD = Math.sqrt(
 const NORMALIZED_MAJOR = MAJOR_PROFILE.map((v) => (v - MAJOR_MEAN) / MAJOR_STD);
 const NORMALIZED_MINOR = MINOR_PROFILE.map((v) => (v - MINOR_MEAN) / MINOR_STD);
 
+const SCORING_KEY_CANDIDATES = (() => {
+  const candidates = [];
+  for (let root = 0; root < 12; root++) {
+    const majorWeights = new Float64Array(12);
+    const minorWeights = new Float64Array(12);
+    for (let i = 0; i < 12; i++) {
+      majorWeights[i] = NORMALIZED_MAJOR[(i - root + 12) % 12];
+      minorWeights[i] = NORMALIZED_MINOR[(i - root + 12) % 12];
+    }
+    candidates.push({
+      pitchClass: root,
+      scale: "Major",
+      key: `${PITCH_CLASSES[root]} Major`,
+      shortKey: PITCH_CLASSES[root],
+      weights: majorWeights,
+    });
+    candidates.push({
+      pitchClass: root,
+      scale: "Minor",
+      key: `${PITCH_CLASSES[root]} Minor`,
+      shortKey: `${PITCH_CLASSES[root]}m`,
+      weights: minorWeights,
+    });
+  }
+  return candidates;
+})();
+
 const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
 const MINOR_SCALE_INTERVALS = [0, 2, 3, 5, 7, 8, 10, 11];
 
@@ -49,53 +77,12 @@ const MIN_VOCAL_HZ = 75;
 const MAX_VOCAL_HZ = 1200;
 
 function detectMusicalKey(chromaArray) {
-  let sum = 0;
-  for (let i = 0; i < 12; i++) sum += chromaArray[i];
-  if (sum === 0)
-    return { root: 0, mode: "Major", name: "Unknown", correlation: 0 };
-
-  const mean = sum / 12;
-  let variance = 0;
-  for (let i = 0; i < 12; i++) variance += Math.pow(chromaArray[i] - mean, 2);
-  if (variance === 0)
-    return { root: 0, mode: "Major", name: "Unknown", correlation: 0 };
-
-  const std = Math.sqrt(variance);
-  const normChroma = new Float32Array(12);
-  for (let i = 0; i < 12; i++) normChroma[i] = (chromaArray[i] - mean) / std;
-
-  let bestCorrelation = -1;
-  let bestKeyIndex = 0;
-  let bestMode = "Major";
-
-  for (let rootIndex = 0; rootIndex < 12; rootIndex++) {
-    let majorDot = 0;
-    let minorDot = 0;
-    for (let j = 0; j < 12; j++) {
-      const val = normChroma[(rootIndex + j) % 12];
-      majorDot += val * NORMALIZED_MAJOR[j];
-      minorDot += val * NORMALIZED_MINOR[j];
-    }
-    const majorCorr = majorDot;
-    const minorCorr = minorDot;
-
-    if (majorCorr > bestCorrelation) {
-      bestCorrelation = majorCorr;
-      bestKeyIndex = rootIndex;
-      bestMode = "Major";
-    }
-    if (minorCorr > bestCorrelation) {
-      bestCorrelation = minorCorr;
-      bestKeyIndex = rootIndex;
-      bestMode = "Minor";
-    }
-  }
-
+  const detected = detectSharedKey(chromaArray, SCORING_KEY_CANDIDATES);
   return {
-    root: bestKeyIndex,
-    mode: bestMode,
-    name: `${PITCH_CLASSES[bestKeyIndex]} ${bestMode}`,
-    correlation: bestCorrelation,
+    root: detected.pitchClass,
+    mode: detected.scale,
+    name: detected.key,
+    correlation: detected.correlation,
   };
 }
 
