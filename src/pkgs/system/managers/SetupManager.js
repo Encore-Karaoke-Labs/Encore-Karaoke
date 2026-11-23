@@ -2,6 +2,8 @@ import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
 import { hasPlatformHint } from "../../../libs/platformHints.js";
 import { findSongByCode as lookupSongByCode } from "../../../libs/songLookup.js";
+import Button from "../../../components/Button.js";
+import ProgressBar from "../../../components/ProgressBar.js";
 
 /**
  * Joins path parts with a given separator, normalizing leading and trailing slashes.
@@ -90,7 +92,7 @@ export default class SetupManager {
         );
       }
       if (this.buildProgressBar) {
-        this.buildProgressBar.styleJs({ width: `${e.detail.percentage}%` });
+        this.buildProgressBar.setValue(e.detail.percentage);
       }
     };
     this.boundZoomChange = (event, newZoom) => {
@@ -1943,14 +1945,10 @@ export default class SetupManager {
     const progressContainer = new Html("div")
       .styleJs({ width: "80%", maxWidth: "600px", marginTop: "2rem" })
       .appendTo(overlay);
-    const barBg = new Html("div")
-      .classOn("setup-slider-bar")
-      .styleJs({ height: "20px" })
-      .appendTo(progressContainer);
-    this.buildProgressBar = new Html("div")
-      .classOn("setup-slider-fill")
-      .styleJs({ width: `${this.setupState.buildProgress.percentage}%` })
-      .appendTo(barBg);
+    this.buildProgressBar = new ProgressBar({
+      value: this.setupState.buildProgress.percentage,
+      height: "20px",
+    }).appendTo(progressContainer);
     this.buildProgressText = new Html("p")
       .styleJs({
         marginTop: "1rem",
@@ -2009,23 +2007,21 @@ export default class SetupManager {
       if (this.syncOverallText)
         this.syncOverallText.text(`File ${data.current} of ${data.total}`);
       if (this.syncProgressBarOverall)
-        this.syncProgressBarOverall.styleJs({ width: `${pctOverall}%` });
+        this.syncProgressBarOverall.setValue(pctOverall);
       if (this.syncProgressText) {
         this.syncProgressText.text(data.filename);
         if (data.status === "validating") {
           this.syncProgressText.styleJs({ color: "#ffd700" });
           this.syncFileBytesText.text("");
-          this.syncProgressBarFile.styleJs({
-            width: "100%",
-            backgroundColor: "#ffd700",
-            opacity: "0.4",
+          this.syncProgressBarFile.setValue(100, {
+            color: "#ffd700",
+            opacity: 0.4,
           });
         } else {
           this.syncProgressText.styleJs({ color: "#89cff0" });
-          this.syncProgressBarFile.styleJs({
-            width: `${pctFile}%`,
-            backgroundColor: "#89cff0",
-            opacity: "1",
+          this.syncProgressBarFile.setValue(pctFile, {
+            color: "#89cff0",
+            opacity: 1,
           });
           if (data.fileTotalBytes > 0)
             this.syncFileBytesText.text(
@@ -2101,14 +2097,12 @@ export default class SetupManager {
     this.syncOverallText = new Html("span")
       .text("0 / 0")
       .appendTo(overallLabel);
-    const barBgOverall = new Html("div")
-      .classOn("setup-slider-bar")
-      .styleJs({ height: "15px", background: "rgba(0,0,0,0.6)" })
-      .appendTo(overallWrap);
-    this.syncProgressBarOverall = new Html("div")
-      .classOn("setup-slider-fill")
-      .styleJs({ width: "0%", backgroundColor: "#ffd700" })
-      .appendTo(barBgOverall);
+    this.syncProgressBarOverall = new ProgressBar({
+      value: 0,
+      height: "15px",
+      background: "rgba(0,0,0,0.6)",
+      fillColor: "#ffd700",
+    }).appendTo(overallWrap);
 
     const fileWrap = new Html("div").appendTo(progressContainer);
     const fileLabel = new Html("div")
@@ -2133,14 +2127,12 @@ export default class SetupManager {
     this.syncFileBytesText = new Html("span")
       .text("0.00 MB / 0.00 MB")
       .appendTo(fileLabel);
-    const barBgFile = new Html("div")
-      .classOn("setup-slider-bar")
-      .styleJs({ height: "15px", background: "rgba(0,0,0,0.6)" })
-      .appendTo(fileWrap);
-    this.syncProgressBarFile = new Html("div")
-      .classOn("setup-slider-fill")
-      .styleJs({ width: "0%", backgroundColor: "#89cff0" })
-      .appendTo(barBgFile);
+    this.syncProgressBarFile = new ProgressBar({
+      value: 0,
+      height: "15px",
+      background: "rgba(0,0,0,0.6)",
+      fillColor: "#89cff0",
+    }).appendTo(fileWrap);
   }
 
   findSongByCode(rawCode) {
@@ -2890,28 +2882,30 @@ export default class SetupManager {
       this.setupState.view === "submenu" ||
       this.setupState.view === "pin_change"
     ) {
-      new Html("button")
-        .classOn("setup-header-btn")
-        .html(
-          `<span class="setup-header-btn-icon">◀</span><span class="setup-header-btn-text">Back (ESC)</span>`,
-        )
-        .on("click", () => {
+      new Button({
+        label: "Back (ESC)",
+        icon: "◀",
+        className: "setup-header-btn",
+        iconClassName: "setup-header-btn-icon",
+        labelClassName: "setup-header-btn-text",
+        onClick: () => {
           this.ctx.services.Forte.stopSfx();
           this.transitionTo("dashboard");
-        })
-        .appendTo(header);
+        },
+      }).appendTo(header);
     } else if (
       this.setupState.view === "dashboard" ||
       this.setupState.view === "auth" ||
       this.setupState.view === "loading"
     ) {
-      new Html("button")
-        .classOn("setup-header-btn")
-        .html(
-          `<span class="setup-header-btn-icon">✕</span><span class="setup-header-btn-text">Exit (ESC)</span>`,
-        )
-        .on("click", () => this.exitSetup())
-        .appendTo(header);
+      new Button({
+        label: "Exit (ESC)",
+        icon: "✕",
+        className: "setup-header-btn",
+        iconClassName: "setup-header-btn-icon",
+        labelClassName: "setup-header-btn-text",
+        onClick: () => this.exitSetup(),
+      }).appendTo(header);
     }
 
     const body = new Html("div")
@@ -3000,12 +2994,12 @@ export default class SetupManager {
           .text("Song not found in library.")
           .appendTo(overlay);
 
-      new Html("button")
-        .classOn("setup-header-btn")
-        .styleJs({ marginTop: "1.5rem" })
-        .text("Cancel (ESC)")
-        .on("click", () => this.exitManualCalibration())
-        .appendTo(overlay);
+      new Button({
+        label: "Cancel (ESC)",
+        className: "setup-header-btn",
+        style: { marginTop: "1.5rem" },
+        onClick: () => this.exitManualCalibration(),
+      }).appendTo(overlay);
 
       new Html("p")
         .styleJs({ marginTop: "2rem", opacity: "0.6" })
@@ -3120,16 +3114,16 @@ export default class SetupManager {
         .appendTo(overlay);
     }
 
-    new Html("button")
-      .classOn("setup-header-btn")
-      .styleJs({ marginTop: "1.5rem" })
-      .text("Back (ESC)")
-      .on("click", () => {
+    new Button({
+      label: "Back (ESC)",
+      className: "setup-header-btn",
+      style: { marginTop: "1.5rem" },
+      onClick: () => {
         this.setupState.lyricPickerInput = "";
         this.setupState.view = "submenu";
         this.renderView();
-      })
-      .appendTo(overlay);
+      },
+    }).appendTo(overlay);
 
     new Html("p")
       .styleJs({ marginTop: "2rem", opacity: "0.6" })
@@ -3171,11 +3165,11 @@ export default class SetupManager {
       }
     };
 
-    new Html("button")
-      .classOn("setup-header-btn")
-      .text("◀ -10ms")
-      .on("click", () => adjustOffset(-10))
-      .appendTo(offsetControls);
+    new Button({
+      label: "◀ -10ms",
+      className: "setup-header-btn",
+      onClick: () => adjustOffset(-10),
+    }).appendTo(offsetControls);
 
     this.offsetDisplay = new Html("div")
       .classOn("setup-preview-offset")
@@ -3183,11 +3177,11 @@ export default class SetupManager {
       .text(`${currentOffset > 0 ? "+" : ""}${currentOffset} ms`)
       .appendTo(offsetControls);
 
-    new Html("button")
-      .classOn("setup-header-btn")
-      .text("+10ms ▶")
-      .on("click", () => adjustOffset(10))
-      .appendTo(offsetControls);
+    new Button({
+      label: "+10ms ▶",
+      className: "setup-header-btn",
+      onClick: () => adjustOffset(10),
+    }).appendTo(offsetControls);
 
     new Html("button")
       .classOn("box", "positive")
@@ -3396,17 +3390,18 @@ export default class SetupManager {
       .classOn("setup-text-edit-actions")
       .appendTo(footer);
 
-    new Html("button")
-      .classOn("setup-header-btn")
-      .text("Cancel (ESC)")
-      .on("click", () => this.closeTextEditor())
-      .appendTo(actions);
+    new Button({
+      label: "Cancel (ESC)",
+      className: "setup-header-btn",
+      onClick: () => this.closeTextEditor(),
+    }).appendTo(actions);
 
-    new Html("button")
-      .classOn("setup-header-btn", "is-primary")
-      .text("Save (CTRL+ENTER)")
-      .on("click", () => this.saveTextEditor())
-      .appendTo(actions);
+    new Button({
+      label: "Save (CTRL+ENTER)",
+      className: "setup-header-btn",
+      variant: "is-primary",
+      onClick: () => this.saveTextEditor(),
+    }).appendTo(actions);
 
     const updatePreview = () => {
       const rawValue = String(this.setupState.textEditValue || "");
@@ -3797,20 +3792,14 @@ export default class SetupManager {
         } else if (item.type === "range") {
           const val = item.get();
           const p = ((val - item.min) / (item.max - item.min)) * 100;
-          const bar = new Html("div")
-            .classOn("setup-slider-bar")
-            .appendTo(valWrap);
-          const fill = new Html("div")
-            .classOn("setup-slider-fill")
-            .styleJs({ width: `${p}%` })
-            .appendTo(bar);
+          const bar = new ProgressBar({ value: p }).appendTo(valWrap);
           const numSpan = new Html("span").text(val).appendTo(valWrap);
 
           const updateRangeVisual = (newVal) => {
             const clamped = Math.max(item.min, Math.min(item.max, newVal));
             item.set(clamped);
             const newPct = ((clamped - item.min) / (item.max - item.min)) * 100;
-            fill.styleJs({ width: `${newPct}%` });
+            bar.setValue(newPct);
             numSpan.text(clamped);
           };
 
