@@ -44,6 +44,7 @@ export interface RetailDeviceEntry {
 export interface MusicBoxConfig {
   enabled: boolean;
   waitSeconds: number;
+  volume?: number;
 }
 
 export interface RetailConfig {
@@ -81,6 +82,7 @@ const DEFAULT_CONFIG: AppConfig = {
   musicBoxConfig: {
     enabled: false,
     waitSeconds: 60,
+    volume: 0.5,
   },
   retailConfig: {
     enabled: false,
