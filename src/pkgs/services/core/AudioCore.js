@@ -256,6 +256,35 @@ export class ForteAudioCore {
   }
 
   /**
+   * Recalculates the master music bus gain from the Music volume and any
+   * active background-playback multiplier.
+   */
+  applyMasterGain() {
+    if (!this.masterGain || !this.context) return;
+    const effectiveGain = this.getEffectiveVolume();
+    this.masterGain.gain.setValueAtTime(
+      effectiveGain,
+      this.context.currentTime,
+    );
+  }
+
+  /**
+   * Returns the master music bus gain, combining the Music volume with the
+   * background-playback multiplier.
+   *
+   * @returns {number} Gain volume factor from 0.0 to 1.0.
+   */
+  getEffectiveVolume() {
+    return Math.max(
+      0,
+      Math.min(
+        1,
+        this.state.playback.volume * this.state.playback.backgroundVolume,
+      ),
+    );
+  }
+
+  /**
    * Adjusts the overall music tracking output level via compressor thresholding.
    *
    * @param {number} level - Gain volume factor from 0.0 to 1.0.
@@ -263,10 +292,23 @@ export class ForteAudioCore {
   setTrackVolume(level) {
     if (!this.masterGain) return;
     const clampedLevel = Math.max(0, Math.min(1, level));
-    this.masterGain.gain.setValueAtTime(clampedLevel, this.context.currentTime);
     this.state.playback.volume = clampedLevel;
+    this.applyMasterGain();
     this.updateSfxGain();
     logVerbose("Track volume set", clampedLevel);
+  }
+
+  /**
+   * Scales background playback on top of the Music volume. A value of 1 plays
+   * background tracks at the full Music volume.
+   *
+   * @param {number} level - Gain volume factor from 0.0 to 1.0.
+   */
+  setBackgroundVolume(level) {
+    const clampedLevel = Math.max(0, Math.min(1, level));
+    this.state.playback.backgroundVolume = clampedLevel;
+    this.applyMasterGain();
+    logVerbose("Background playback volume set", clampedLevel);
   }
 
   /**
