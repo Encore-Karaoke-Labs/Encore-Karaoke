@@ -1521,6 +1521,7 @@ export default class UIManager {
 
     const prevMode = state.mode;
     state.mode = newMode;
+    this.ctx.root.musicBox?.onModeChanged?.(newMode);
     wrapper.classOff(
       "mode-menu",
       "mode-player",
