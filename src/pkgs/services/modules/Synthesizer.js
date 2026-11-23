@@ -316,6 +316,10 @@ export class ForteSynthesizer {
             e,
           );
         }
+
+        if (this.isExternalResetMessage(message)) {
+          this.syncExternalPlaybackState();
+        }
       },
     };
 
@@ -542,6 +546,28 @@ export class ForteSynthesizer {
   }
 
   /**
+   * Re-applies the current transposition and master volume to external MIDI
+   * devices.
+   */
+  syncExternalPlaybackState() {
+    if (!this.hasExternalMidiDevice()) return;
+
+    if (
+      this.state.playback.transpose !== undefined &&
+      this.state.playback.transpose !== 0
+    ) {
+      this.sendExternalTranspose(this.state.playback.transpose);
+    }
+
+    if (this.state.playback.volume !== undefined) {
+      this.sendExternalMasterVolume(
+        this.state.playback.volume *
+          (this.state.playback.backgroundVolume ?? 1),
+      );
+    }
+  }
+
+  /**
    * Connects an active sequencer to all configured external MIDI output ports.
    * @param {Object} sequencer - Active SpessaSynth Sequencer instance.
    */
@@ -570,6 +596,7 @@ export class ForteSynthesizer {
     }
 
     this.connectExtraSequencerRoutes(sequencer, true);
+    this.syncExternalPlaybackState();
   }
 
   /**
@@ -642,18 +669,7 @@ export class ForteSynthesizer {
       }
     }
 
-    if (
-      this.state.playback.transpose !== undefined &&
-      this.state.playback.transpose !== 0
-    ) {
-      this.sendExternalTranspose(this.state.playback.transpose);
-    }
-    if (this.state.playback.volume !== undefined) {
-      this.sendExternalMasterVolume(
-        this.state.playback.volume *
-          (this.state.playback.backgroundVolume ?? 1),
-      );
-    }
+    this.syncExternalPlaybackState();
   }
 
   /**
@@ -742,18 +758,21 @@ export class ForteSynthesizer {
       deviceId &&
       deviceId !== "none" &&
       deviceId !== "internal" &&
-      this.midiDeviceHandler &&
-      currentSequencer
+      this.midiDeviceHandler
     ) {
-      const newOutput = this.midiDeviceHandler.outputs.get(deviceId);
-      if (newOutput) {
+      if (currentSequencer) {
+        const newOutput = this.midiDeviceHandler.outputs.get(deviceId);
         if (
+          newOutput &&
           !this.connectSequencerOutput(currentSequencer, newOutput, portIndex)
         ) {
           return false;
         }
-        this.initExternalDevicePort(deviceId, portIndex);
       }
+
+      // Apply the current volume/transpose even before a song is loaded, so
+      // the device does not stay at its 100% default.
+      this.initExternalDevicePort(deviceId, portIndex);
     }
 
     this.dispatchUpdate();
@@ -1160,6 +1179,57 @@ export class ForteSynthesizer {
     logVerbose(
       `Sent external master volume: ${Math.round(clamped * 100)}% (${val7}/127)`,
     );
+  }
+
+  /**
+   * Detects GM/GS/XG reset SysEx messages. External devices restore their
+   * default master volume (100%) when one of these is received.
+   *
+   * @param {number[]|Uint8Array} data - Raw MIDI bytes.
+   * @returns {boolean}
+   */
+  isExternalResetMessage(data) {
+    if (!data || data.length < 6 || data[0] !== 0xf0) return false;
+
+    // Universal GM System On: F0 7E <device> 09 01 F7
+    if (data.length === 6) {
+      return (
+        data[1] === 0x7e &&
+        data[3] === 0x09 &&
+        data[4] === 0x01 &&
+        data[5] === 0xf7
+      );
+    }
+
+    // Roland GS Reset: F0 41 <device> 42 12 40 00 7F 00 41 F7
+    if (data.length === 11) {
+      return (
+        data[1] === 0x41 &&
+        data[3] === 0x42 &&
+        data[4] === 0x12 &&
+        data[5] === 0x40 &&
+        data[6] === 0x00 &&
+        data[7] === 0x7f &&
+        data[8] === 0x00 &&
+        data[9] === 0x41 &&
+        data[10] === 0xf7
+      );
+    }
+
+    // Yamaha XG System On: F0 43 <device> 4C 00 00 7E 00 F7
+    if (data.length === 9) {
+      return (
+        data[1] === 0x43 &&
+        data[3] === 0x4c &&
+        data[4] === 0x00 &&
+        data[5] === 0x00 &&
+        data[6] === 0x7e &&
+        data[7] === 0x00 &&
+        data[8] === 0xf7
+      );
+    }
+
+    return false;
   }
 
   /**
