@@ -41,6 +41,11 @@ export interface RetailDeviceEntry {
   timeRemainingMs: number;
 }
 
+export interface MusicBoxConfig {
+  enabled: boolean;
+  waitSeconds: number;
+}
+
 export interface RetailConfig {
   enabled: boolean;
   freePlay: boolean;
@@ -56,6 +61,7 @@ export interface AppConfig {
   audioConfig: AudioConfig;
   videoConfig: VideoConfig;
   retailConfig: RetailConfig;
+  musicBoxConfig: MusicBoxConfig;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -71,6 +77,10 @@ const DEFAULT_CONFIG: AppConfig = {
     syncOffset: 0,
     cameraSource: "remote",
     cameraDeviceId: "",
+  },
+  musicBoxConfig: {
+    enabled: false,
+    waitSeconds: 60,
   },
   retailConfig: {
     enabled: false,
