@@ -1,7 +1,7 @@
-import Html from "../../../libs/html.js";
-import playNavSfx from "../../../libs/sfx.js";
 import FormatBadge from "../../../components/FormatBadge.js";
 import ToggleSwitch from "../../../components/ToggleSwitch.js";
+import Html from "../../../libs/html.js";
+import playNavSfx from "../../../libs/sfx.js";
 
 // Remote Session audio uses a fixed mixing key so a new performance cleanly
 // replaces the previous performer without leaving a stale Web Audio source.
@@ -2522,6 +2522,8 @@ export default class SessionManager {
         state.sessionRoomId = room;
         this.updateDiscordSessionRPC();
       }
+
+      root.musicBox?.stop();
 
       if (isHost) {
         this._applySessionCreateOptions();
