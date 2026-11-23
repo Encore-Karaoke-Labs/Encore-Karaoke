@@ -2,6 +2,10 @@ import { logVerbose } from "../core/State.js";
 import {
   KEY_CANDIDATES,
   correlateChroma,
+  MAJOR_ROOT_NAMES,
+  MINOR_ROOT_NAMES,
+  MAJOR_SCALE_STEPS,
+  MINOR_SCALE_STEPS,
 } from "./KeyDetection.js";
 
 export class ForteHarana {
