@@ -232,25 +232,6 @@ export default class EchoPlugin extends BasePlugin {
   }
 
   /**
-   * Registers global mouse event handlers for fader dragging
-   * @private
-   */
-  _setupGlobalMouseEvents() {
-    this._mouseMoveHandler = (e) => {
-      if (!this.isDragging || this.currentDragIndex === -1) return;
-      this._handleMouseFader(e, this.currentDragIndex);
-    };
-
-    this._mouseUpHandler = () => {
-      this.isDragging = false;
-      this.currentDragIndex = -1;
-    };
-
-    window.addEventListener("mousemove", this._mouseMoveHandler);
-    window.addEventListener("mouseup", this._mouseUpHandler);
-  }
-
-  /**
    * Updates fader position based on mouse movement
    * @private
    * @param {MouseEvent} e - Mouse event with clientY position
@@ -296,37 +277,19 @@ export default class EchoPlugin extends BasePlugin {
   }
 
   /**
-   * Updates styling to highlight the active control and reset others
-   * @private
+   * Returns the array of control elements used for active-state highlighting.
+   * @returns {Array<Object>}
    */
-  _updatePluginHighlight() {
-    this.controlElements.forEach((elData, idx) => {
-      if (idx === this.activeControlIndex) {
-        elData.valLabel.styleJs({ color: "#ffd700" });
-        elData.faderThumb.styleJs({
-          backgroundColor: "#ffd700",
-          boxShadow: "0 0 15px rgba(255, 215, 0, 0.6)",
-        });
-        elData.trackFill.styleJs({ backgroundColor: "rgba(255, 215, 0, 0.2)" });
-        elData.nameLabel.styleJs({
-          color: "#010141",
-          backgroundColor: "#ffd700",
-        });
-      } else {
-        elData.valLabel.styleJs({ color: "#89cff0" });
-        elData.faderThumb.styleJs({
-          backgroundColor: "#89cff0",
-          boxShadow: "0 0 10px rgba(137, 207, 240, 0.4)",
-        });
-        elData.trackFill.styleJs({
-          backgroundColor: "rgba(137, 207, 240, 0.15)",
-        });
-        elData.nameLabel.styleJs({
-          color: "rgba(255, 255, 255, 0.5)",
-          backgroundColor: "transparent",
-        });
-      }
-    });
+  _getHighlightElements() {
+    return this.controlElements;
+  }
+
+  /**
+   * Returns the index of the currently active control.
+   * @returns {number}
+   */
+  _getActiveIndex() {
+    return this.activeControlIndex;
   }
 
   /**
@@ -379,12 +342,5 @@ export default class EchoPlugin extends BasePlugin {
     this.feedbackGain.disconnect();
     this.wetGain.disconnect();
     this.dryGain.disconnect();
-
-    if (this._mouseMoveHandler) {
-      window.removeEventListener("mousemove", this._mouseMoveHandler);
-    }
-    if (this._mouseUpHandler) {
-      window.removeEventListener("mouseup", this._mouseUpHandler);
-    }
   }
 }
