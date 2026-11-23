@@ -201,25 +201,6 @@ export default class EQ7BandPlugin extends BasePlugin {
   }
 
   /**
-   * Registers global mouse event handlers for fader dragging
-   * @private
-   */
-  _setupGlobalMouseEvents() {
-    this._mouseMoveHandler = (e) => {
-      if (!this.isDragging || this.currentDragIndex === -1) return;
-      this._handleMouseFader(e, this.currentDragIndex);
-    };
-
-    this._mouseUpHandler = () => {
-      this.isDragging = false;
-      this.currentDragIndex = -1;
-    };
-
-    window.addEventListener("mousemove", this._mouseMoveHandler);
-    window.addEventListener("mouseup", this._mouseUpHandler);
-  }
-
-  /**
    * Updates fader position based on mouse movement
    * @private
    * @param {MouseEvent} e - Mouse event with clientY position
@@ -265,33 +246,19 @@ export default class EQ7BandPlugin extends BasePlugin {
   }
 
   /**
-   * Updates styling to highlight the active band and reset others
-   * @private
+   * Returns the array of band elements used for active-state highlighting.
+   * @returns {Array<Object>}
    */
-  _updatePluginHighlight() {
-    this.bandElements.forEach((band, idx) => {
-      if (idx === this.activeBandIndex) {
-        band.valLabel.styleJs({ color: "#ffd700" });
-        band.faderThumb.styleJs({
-          backgroundColor: "#ffd700",
-          boxShadow: "0 0 15px rgba(255, 215, 0, 0.6)",
-        });
-        band.freqLabel.styleJs({
-          color: "#010141",
-          backgroundColor: "#ffd700",
-        });
-      } else {
-        band.valLabel.styleJs({ color: "#89cff0" });
-        band.faderThumb.styleJs({
-          backgroundColor: "#89cff0",
-          boxShadow: "0 0 10px rgba(137, 207, 240, 0.4)",
-        });
-        band.freqLabel.styleJs({
-          color: "rgba(255, 255, 255, 0.5)",
-          backgroundColor: "transparent",
-        });
-      }
-    });
+  _getHighlightElements() {
+    return this.bandElements;
+  }
+
+  /**
+   * Returns the index of the currently active band.
+   * @returns {number}
+   */
+  _getActiveIndex() {
+    return this.activeBandIndex;
   }
 
   /**
@@ -340,12 +307,5 @@ export default class EQ7BandPlugin extends BasePlugin {
   disconnect() {
     super.disconnect();
     this.filters.forEach((f) => f.disconnect());
-
-    if (this._mouseMoveHandler) {
-      window.removeEventListener("mousemove", this._mouseMoveHandler);
-    }
-    if (this._mouseUpHandler) {
-      window.removeEventListener("mouseup", this._mouseUpHandler);
-    }
   }
 }
