@@ -4,6 +4,7 @@ const DEFAULT_WAIT_SECONDS = 60;
 const MIN_WAIT_SECONDS = 5;
 const MAX_WAIT_SECONDS = 600;
 const NEXT_TRACK_DELAY_MS = 300;
+const DEFAULT_VOLUME = 0.5;
 
 /**
  * Music Box plays random library songs as background music for the Main Menu.
@@ -63,7 +64,27 @@ export default class MusicBoxManager {
     return {
       enabled: config.enabled === true,
       waitSeconds: this.getWaitSeconds(),
+      volume: this.getVolume(),
     };
+  }
+
+  /**
+   * Music Box volume as a fraction of the Music volume, clamped to 0-1.
+   *
+   * @returns {number}
+   */
+  getVolume() {
+    const configured = Number(this.ctx.config.musicBoxConfig?.volume);
+    if (!Number.isFinite(configured)) return DEFAULT_VOLUME;
+    return Math.max(0, Math.min(1, configured));
+  }
+
+  /**
+   * Applies the Music Box volume on top of the Music volume while playing.
+   */
+  applyVolume() {
+    if (!this.playing) return;
+    this.ctx.services.Forte.setBackgroundVolume?.(this.getVolume());
   }
 
   /**
@@ -151,6 +172,7 @@ export default class MusicBoxManager {
 
     this.playing = true;
     this.currentSong = song;
+    this.ctx.services.Forte.setBackgroundVolume?.(this.getVolume());
     this._playSong(song);
     return true;
   }
@@ -177,8 +199,9 @@ export default class MusicBoxManager {
 
     if (!wasPlaying) return;
 
-    this._restoreScoringPreference();
     this.ctx.services.Forte.stopTrack();
+    this.ctx.services.Forte.setBackgroundVolume?.(1);
+    this._restoreScoringPreference();
   }
 
   /**
