@@ -176,7 +176,11 @@ const pkg = {
 
     setTrackVolume: (level) => {
       audioCore.setTrackVolume(level);
-      synthesizer.sendExternalMasterVolume(level);
+      synthesizer.sendExternalMasterVolume(audioCore.getEffectiveVolume());
+    },
+    setBackgroundVolume: (level) => {
+      audioCore.setBackgroundVolume(level);
+      synthesizer.sendExternalMasterVolume(audioCore.getEffectiveVolume());
     },
     setSfxVolume: (level) => audioCore.setSfxVolume(level),
     setSessionVolume: (level) => audioCore.setSessionVolume(level),
