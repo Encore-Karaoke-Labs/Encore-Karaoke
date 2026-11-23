@@ -1,4 +1,5 @@
 import { logVerbose } from "../core/State.js";
+import { loadPluginChain } from "../libs/ChainLoader.js";
 
 /**
  * Manages the instrumental effects chain.
@@ -21,72 +22,20 @@ export class ForteMusicChain {
    * @param {Array<Object>} chainConfig - Plugin entries with `path` and `params`.
    */
   async loadMusicChain(chainConfig = []) {
-    const config = Array.isArray(chainConfig) ? chainConfig : [];
-
-    this.state.effects.musicChainConfig = JSON.parse(JSON.stringify(config));
-    this.state.effects.musicChain.forEach((plugin) => plugin.disconnect());
-    this.state.effects.musicChain = [];
-
-    for (let i = 0; i < config.length; i++) {
-      const pluginConfig = config[i];
-      try {
-        logVerbose("Loading instrumental plugin configuration", pluginConfig);
-        const pluginModule = await import(pluginConfig.path);
-        const PluginClass = pluginModule.default;
-        let pluginInstance;
-
-        if (typeof PluginClass.create === "function") {
-          pluginInstance = await PluginClass.create(this.audioCore.context);
-        } else {
-          pluginInstance = new PluginClass(this.audioCore.context);
-        }
-
-        if (pluginConfig.params) {
-          for (const [key, value] of Object.entries(pluginConfig.params)) {
-            pluginInstance.setParameter(key, value);
-          }
-        }
-
-        const originalSetParameter = pluginInstance.setParameter;
-        const self = this;
-
-        if (typeof originalSetParameter === "function") {
-          pluginInstance.setParameter = function (paramName, value) {
-            originalSetParameter.call(this, paramName, value);
-
-            if (self.state.effects.musicChainConfig[i]) {
-              if (!self.state.effects.musicChainConfig[i].params) {
-                self.state.effects.musicChainConfig[i].params = {};
-              }
-              self.state.effects.musicChainConfig[i].params[paramName] = value;
-
-              if (self.saveMusicChainTimeout)
-                clearTimeout(self.saveMusicChainTimeout);
-              self.saveMusicChainTimeout = setTimeout(() => {
-                if (
-                  window.config &&
-                  typeof window.config.setItem === "function"
-                ) {
-                  window.config.setItem(
-                    "audioConfig.musicChain",
-                    self.state.effects.musicChainConfig,
-                  );
-                  logVerbose(
-                    "Saved updated instrumental chain config to disk.",
-                  );
-                }
-              }, 300);
-            }
-          };
-        }
-
-        this.state.effects.musicChain.push(pluginInstance);
-      } catch (e) {
-        console.error(`[FORTE SVC] Failed to load instrumental plugin.`, e);
-      }
-    }
-
-    this.rebuildMusicChain();
+    await loadPluginChain({
+      self: this,
+      audioCore: this.audioCore,
+      chainConfig,
+      effects: this.state.effects,
+      chainKey: "musicChain",
+      chainConfigKey: "musicChainConfig",
+      saveTimeoutField: "saveMusicChainTimeout",
+      saveKey: "audioConfig.musicChain",
+      loadLog: "Loading instrumental plugin configuration",
+      saveLog: "Saved updated instrumental chain config to disk.",
+      errorLog: "Failed to load instrumental plugin.",
+      rebuild: () => this.rebuildMusicChain(),
+    });
   }
 
   /**
