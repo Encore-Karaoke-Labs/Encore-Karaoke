@@ -2,6 +2,16 @@ import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
 import { isEmbedded } from "../../../libs/platformHints.js";
 import { findSongByCode } from "../../../libs/songLookup.js";
+import {
+  ActionButton,
+  FormatBadge,
+  IconButton,
+  KeybindRow,
+  ProgressBar,
+  QueueListItem,
+  SearchResultItem,
+  SongListItem,
+} from "../../../components/index.js";
 import { COLOR_PALETTES } from "./LyricsEngine.js";
 
 const LYRIC_ROLES = [
@@ -229,22 +239,10 @@ export default class UIManager {
       const list = new Html("div").classOn("keybind-list").appendTo(secEl);
 
       sec.items.forEach((item) => {
-        const row = new Html("div").classOn("keybind-row").appendTo(list);
-
-        const kbdWrap = new Html("div")
-          .classOn("keybind-kbd-wrap")
-          .appendTo(row);
-
-        item.key.split(" / ").forEach((part, i) => {
-          if (i > 0)
-            new Html("span")
-              .text("/")
-              .styleJs({ opacity: "0.4", margin: "0 2px" })
-              .appendTo(kbdWrap);
-          new Html("kbd").text(part).appendTo(kbdWrap);
-        });
-
-        new Html("span").classOn("keybind-desc").text(item.desc).appendTo(row);
+        new KeybindRow({
+          keys: item.key,
+          description: item.desc,
+        }).appendTo(list);
       });
     });
 
@@ -415,11 +413,12 @@ export default class UIManager {
       .classOn("queue-header-title")
       .text("RESERVATION QUEUE")
       .appendTo(queueHeader);
-    new Html("button")
-      .classOn("queue-close-btn")
-      .html('<ion-icon name="close"></ion-icon>')
-      .appendTo(queueHeader)
-      .on("click", () => this.toggleQueueOverlay(false));
+    new IconButton({
+      icon: "close",
+      className: "queue-close-btn",
+      ariaLabel: "Close reservation queue",
+      onClick: () => this.toggleQueueOverlay(false),
+    }).appendTo(queueHeader);
 
     dom.queueList = new Html("div")
       .classOn("queue-list-container")
@@ -508,47 +507,43 @@ export default class UIManager {
       .classOn("bottom-actions")
       .appendTo(dom.overlay);
 
-    new Html("div")
-      .classOn("action-button")
-      .html('<ion-icon name="search"></ion-icon> <span>Search (Y)</span>')
-      .on("click", () => this.setMode("yt-search"))
-      .appendTo(dom.bottomActions);
+    new ActionButton({
+      icon: "search",
+      label: "Search (Y)",
+      onClick: () => this.setMode("yt-search"),
+    }).appendTo(dom.bottomActions);
 
-    new Html("div")
-      .classOn("action-button")
-      .html(
-        '<ion-icon name="radio-button-on"></ion-icon> <span>Recordings (R)</span>',
-      )
-      .on("click", () => this.ctx.root.recordings.toggleRecordingsList())
-      .appendTo(dom.bottomActions);
+    new ActionButton({
+      icon: "radio-button-on",
+      label: "Recordings (R)",
+      onClick: () => this.ctx.root.recordings.toggleRecordingsList(),
+    }).appendTo(dom.bottomActions);
 
-    new Html("div")
-      .classOn("action-button")
-      .html('<ion-icon name="options"></ion-icon> <span>Mixer (M)</span>')
-      .on("click", () => this.ctx.modules.mixer.toggle())
-      .appendTo(dom.bottomActions);
+    new ActionButton({
+      icon: "options",
+      label: "Mixer (M)",
+      onClick: () => this.ctx.modules.mixer.toggle(),
+    }).appendTo(dom.bottomActions);
 
-    new Html("div")
-      .classOn("action-button")
-      .html('<ion-icon name="people"></ion-icon> <span>Sessions (S)</span>')
-      .on("click", () => this.ctx.root.sessions.toggleSessionModal())
-      .appendTo(dom.bottomActions);
+    new ActionButton({
+      icon: "people",
+      label: "Sessions (S)",
+      onClick: () => this.ctx.root.sessions.toggleSessionModal(),
+    }).appendTo(dom.bottomActions);
 
     if (!this.embedded) {
-      new Html("div")
-        .classOn("action-button")
-        .html(
-          '<ion-icon name="radio-outline"></ion-icon> <span>Broadcast (B)</span>',
-        )
-        .on("click", () => this.ctx.modules.stream.toggleStreamModal())
-        .appendTo(dom.bottomActions);
+      new ActionButton({
+        icon: "radio-outline",
+        label: "Broadcast (B)",
+        onClick: () => this.ctx.modules.stream.toggleStreamModal(),
+      }).appendTo(dom.bottomActions);
     }
 
-    new Html("div")
-      .classOn("action-button")
-      .html('<ion-icon name="settings"></ion-icon> <span>Setup (F2)</span>')
-      .on("click", () => this.setMode("setup"))
-      .appendTo(dom.bottomActions);
+    new ActionButton({
+      icon: "settings",
+      label: "Setup (F2)",
+      onClick: () => this.setMode("setup"),
+    }).appendTo(dom.bottomActions);
 
     const vi = this.ctx.root.versionInformation || {
       channel: "Unknown",
@@ -568,25 +563,27 @@ export default class UIManager {
       .classOn("search-bar-container")
       .appendTo(dom.searchWindow);
 
-    dom.searchCloseBtn = new Html("button")
-      .classOn("search-icon-btn", "close-btn")
-      .html('<ion-icon name="close"></ion-icon>')
-      .appendTo(dom.searchBarContainer)
-      .on("click", () => {
+    dom.searchCloseBtn = new IconButton({
+      icon: "close",
+      className: ["search-icon-btn", "close-btn"],
+      ariaLabel: "Close search",
+      onClick: () => {
         this.ctx.root.input.handleEscape();
-      });
+      },
+    }).appendTo(dom.searchBarContainer);
     dom.searchInput = new Html("input")
       .classOn("search-input")
       .attr({ type: "text", placeholder: "Type here to search..." })
       .appendTo(dom.searchBarContainer);
 
-    dom.searchSubmitBtn = new Html("button")
-      .classOn("search-icon-btn", "submit-btn")
-      .html('<ion-icon name="search"></ion-icon>')
-      .appendTo(dom.searchBarContainer)
-      .on("click", () => {
+    dom.searchSubmitBtn = new IconButton({
+      icon: "search",
+      className: ["search-icon-btn", "submit-btn"],
+      ariaLabel: "Submit search",
+      onClick: () => {
         this.ctx.root.library.performSearch(dom.searchInput.getValue());
-      });
+      },
+    }).appendTo(dom.searchBarContainer);
 
     dom.searchResultsContainer = new Html("div")
       .classOn("search-results-container")
@@ -1728,11 +1725,10 @@ export default class UIManager {
 
       if (activeSong) {
         const fmt = this.ctx.root.library.getFormatInfo(activeSong);
-        new Html("span")
-          .classOn("format-badge")
-          .text(fmt.label)
-          .styleJs({
-            backgroundColor: fmt.color,
+        new FormatBadge({
+          label: fmt.label,
+          color: fmt.color,
+          style: {
             fontSize: "0.5em",
             fontFamily: "Rajdhani",
             verticalAlign: "middle",
@@ -1741,8 +1737,8 @@ export default class UIManager {
             display: "inline-block",
             paddingLeft: "0.5em",
             paddingRight: "0.5em",
-          })
-          .appendTo(dom.songTitle);
+          },
+        }).appendTo(dom.songTitle);
         new Html("span")
           .text(activeSong.title)
           .styleJs({ verticalAlign: "middle" })
@@ -1820,36 +1816,14 @@ export default class UIManager {
     for (let i = startIndex; i <= endIndex; i++) {
       if (!this.visibleItemsMap.has(i)) {
         const song = state.songList[i];
-        const item = new Html("div").classOn("song-item").styleJs({
-          position: "absolute",
-          top: `${i * this.ITEM_HEIGHT}px`,
-          left: "0",
-          right: "0",
-          height: `${this.ITEM_HEIGHT}px`,
-        });
-
-        new Html("div")
-          .classOn("song-item-code")
-          .text(String(song.code).padStart(6, "0"))
-          .appendTo(item);
         const fmt = this.ctx.root.library.getFormatInfo(song);
-        const titleContainer = new Html("div")
-          .classOn("song-item-title")
-          .appendTo(item);
-
-        new Html("span")
-          .classOn("format-badge")
-          .text(fmt.label)
-          .styleJs({ backgroundColor: fmt.color })
-          .appendTo(titleContainer);
-        new Html("span")
-          .text(song.title)
-          .classOn("song-title-text")
-          .appendTo(titleContainer);
-        new Html("div")
-          .classOn("song-item-artist")
-          .text(song.artist)
-          .appendTo(item);
+        const item = new SongListItem({
+          song,
+          format: fmt,
+          top: i * this.ITEM_HEIGHT,
+          height: this.ITEM_HEIGHT,
+          highlighted: i === state.highlightedIndex,
+        });
 
         item.on("click", () => {
           this.menuTransitionSource = "list";
@@ -1870,7 +1844,6 @@ export default class UIManager {
             this.ctx.modules.infoBar.showDefault();
           }
         });
-        if (i === state.highlightedIndex) item.classOn("highlighted");
 
         item.appendTo(dom.listInner);
         this.visibleItemsMap.set(i, item);
@@ -1915,74 +1888,26 @@ export default class UIManager {
     }
 
     queue.forEach((song, idx) => {
-      const item = new Html("div")
-        .classOn("queue-result-item")
-        .appendTo(dom.queueList);
-      item.on("click", () => {
-        state.highlightedQueueIndex = idx;
-        this.updateQueueHighlight();
-      });
-
       const fmt = this.ctx.root.library.getFormatInfo(song);
-      const info = new Html("div").classOn("queue-info").appendTo(item);
-      const titleRow = new Html("div").classOn("queue-title").appendTo(info);
 
-      if (song.code) {
-        new Html("span")
-          .classOn("queue-code")
-          .text(String(song.code).padStart(6, "0"))
-          .appendTo(titleRow);
-      } else {
-        new Html("span").classOn("queue-code").text("YT").appendTo(titleRow);
-      }
-
-      new Html("span")
-        .classOn("format-badge")
-        .text(fmt.label)
-        .styleJs({ backgroundColor: fmt.color })
-        .appendTo(titleRow);
-      new Html("span")
-        .classOn("queue-song-text")
-        .text(song.title)
-        .appendTo(titleRow);
-
-      const artistRow = new Html("div").classOn("queue-artist").appendTo(info);
-      new Html("span").text(song.artist).appendTo(artistRow);
-
-      if (!state.isSessionActive) {
-        const actions = new Html("div").classOn("queue-actions").appendTo(item);
-
-        const moveUpBtn = new Html("div")
-          .classOn("queue-move-btn")
-          .attr({ title: "Move up", "aria-label": "Move song up" })
-          .html('<ion-icon name="chevron-up"></ion-icon>')
-          .appendTo(actions);
-        if (idx === 0) moveUpBtn.classOn("disabled");
-
-        moveUpBtn.on("click", (e) => {
-          e.stopPropagation();
+      new QueueListItem({
+        song,
+        format: fmt,
+        index: idx,
+        total: queue.length,
+        showActions: !state.isSessionActive,
+        highlighted: idx === state.highlightedQueueIndex,
+        onClick: () => {
+          state.highlightedQueueIndex = idx;
+          this.updateQueueHighlight();
+        },
+        onMoveUp: () => {
           if (idx > 0) this.moveQueueSong(idx, idx - 1);
-        });
-
-        const moveDownBtn = new Html("div")
-          .classOn("queue-move-btn")
-          .attr({ title: "Move down", "aria-label": "Move song down" })
-          .html('<ion-icon name="chevron-down"></ion-icon>')
-          .appendTo(actions);
-        if (idx === queue.length - 1) moveDownBtn.classOn("disabled");
-
-        moveDownBtn.on("click", (e) => {
-          e.stopPropagation();
+        },
+        onMoveDown: () => {
           if (idx < queue.length - 1) this.moveQueueSong(idx, idx + 1);
-        });
-
-        const delBtn = new Html("div")
-          .classOn("queue-del-btn")
-          .html('<ion-icon name="trash"></ion-icon>')
-          .appendTo(actions);
-
-        delBtn.on("click", (e) => {
-          e.stopPropagation();
+        },
+        onDelete: () => {
           state.reservationQueue.splice(idx, 1);
           if (state.highlightedQueueIndex >= state.reservationQueue.length) {
             state.highlightedQueueIndex = Math.max(
@@ -1998,8 +1923,8 @@ export default class UIManager {
           this.ctx.modules.infoBar.showTemp("QUEUE", "Song removed.", 2000);
           setTimeout(() => this.ctx.modules.infoBar.showDefault(), 2000);
           this.renderQueue();
-        });
-      }
+        },
+      }).appendTo(dom.queueList);
     });
 
     if (state.highlightedQueueIndex >= queue.length) {
@@ -2089,83 +2014,17 @@ export default class UIManager {
     dom.searchWindow.classOn("has-results");
 
     state.searchResults.forEach((res, idx) => {
-      const item = new Html("div")
-        .classOn("search-result-item")
-        .appendTo(dom.searchResultsContainer);
-      item.on("click", () => {
-        state.highlightedSearchIndex = idx;
-        this.ctx.root.input.handleEnter();
-      });
-
-      const info = new Html("div").classOn("search-info").appendTo(item);
       const fmt = this.ctx.root.library.getFormatInfo(res);
 
-      if (res.type === "local") {
-        new Html("div")
-          .classOn("search-result-local-code")
-          .text(String(res.code).padStart(5, "0"))
-          .appendTo(item);
-        const titleRow = new Html("div").classOn("search-title").appendTo(info);
-        new Html("span")
-          .classOn("format-badge")
-          .text(fmt.label)
-          .styleJs({ backgroundColor: fmt.color })
-          .appendTo(titleRow);
-        new Html("span").text(res.title).appendTo(titleRow);
-
-        if (res.displayRomaTitle)
-          new Html("span")
-            .text(` (${res.displayRomaTitle})`)
-            .styleJs({ color: "#aaa", fontSize: "0.9em", marginLeft: "0.5rem" })
-            .appendTo(titleRow);
-
-        const artistRow = new Html("div")
-          .classOn("search-channel")
-          .appendTo(info);
-        new Html("span").text(res.artist).appendTo(artistRow);
-        if (res.displayRomaArtist)
-          new Html("span")
-            .text(` (${res.displayRomaArtist})`)
-            .styleJs({ color: "#aaa", fontSize: "0.9em", marginLeft: "0.5rem" })
-            .appendTo(artistRow);
-      } else {
-        const thumb = new Html("div")
-          .classOn("search-thumbnail-wrapper")
-          .appendTo(item);
-        const img = new Html("img")
-          .classOn("search-thumbnail")
-          .styleJs({ opacity: "0", transition: "opacity 0.3s ease" })
-          .appendTo(thumb);
-        img.elm.onload = () => img.styleJs({ opacity: "1" });
-        img.attr({
-          src:
-            res.thumbnail?.thumbnails?.[0]?.url ||
-            `https://img.youtube.com/vi/${res.id}/mqdefault.jpg`,
-        });
-
-        if (res.length?.simpleText)
-          new Html("span")
-            .classOn("search-duration")
-            .text(res.length.simpleText)
-            .appendTo(thumb);
-
-        const titleC = new Html("div")
-          .styleJs({ display: "flex", alignItems: "center" })
-          .appendTo(info);
-        new Html("span")
-          .classOn("format-badge")
-          .text(fmt.label)
-          .styleJs({ backgroundColor: fmt.color })
-          .appendTo(titleC);
-        new Html("div")
-          .classOn("search-title")
-          .text(res.title)
-          .appendTo(titleC);
-        new Html("div")
-          .classOn("search-channel")
-          .text(res.channelTitle)
-          .appendTo(info);
-      }
+      new SearchResultItem({
+        result: res,
+        format: fmt,
+        highlighted: idx === state.highlightedSearchIndex,
+        onClick: () => {
+          state.highlightedSearchIndex = idx;
+          this.ctx.root.input.handleEnter();
+        },
+      }).appendTo(dom.searchResultsContainer);
     });
 
     if (state.highlightedSearchIndex >= state.searchResults.length)
@@ -2427,11 +2286,11 @@ export default class UIManager {
           Math.min(100, ((opt.value - opt.min) / (opt.max - opt.min)) * 100),
         );
 
+        const slider = new ProgressBar({ value: pct });
+
         valArea.html(`
           <span class="customizer-arrow">◀</span>
-          <div class="setup-slider-bar">
-            <div class="setup-slider-fill" style="width: ${pct}%"></div>
-          </div>
+          ${slider.elm.outerHTML}
           <span class="customizer-val-text">${opt.display}</span>
           <span class="customizer-arrow">▶</span>
         `);
@@ -3167,11 +3026,10 @@ export default class UIManager {
             const titleCol = new Html("div")
               .classOn("ns-title-col")
               .appendTo(row);
-            new Html("span")
-              .classOn("format-badge")
-              .styleJs({ backgroundColor: fmt.color })
-              .text(fmt.label)
-              .appendTo(titleCol);
+            new FormatBadge({
+              label: fmt.label,
+              color: fmt.color,
+            }).appendTo(titleCol);
             new Html("span")
               .classOn("ns-title")
               .text(song.title)
