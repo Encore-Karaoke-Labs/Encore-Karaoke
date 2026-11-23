@@ -163,6 +163,8 @@ export default class PlaybackManager {
     const state = this.ctx.state;
     const root = this.ctx.root;
 
+    root.musicBox?.stop();
+
     if (state.isSessionActive) {
       root.sessions.reserveSongInSession(song);
       return "reserved";
