@@ -1,5 +1,7 @@
 import Html from "../../../libs/html.js";
 import playNavSfx from "../../../libs/sfx.js";
+import FormatBadge from "../../../components/FormatBadge.js";
+import ToggleSwitch from "../../../components/ToggleSwitch.js";
 
 // Remote Session audio uses a fixed mixing key so a new performance cleanly
 // replaces the previous performer without leaving a stale Web Audio source.
@@ -1737,7 +1739,7 @@ export default class SessionManager {
       ? `<span class="info-bar-code">${String(song.code).padStart(6, "0")}</span>`
       : `<span class="info-bar-code is-youtube">YT</span>`;
     const fmt = this.ctx.root.library.getFormatInfo(song);
-    const fmtBadge = `<span class="format-badge" style="background-color: ${fmt.color}">${fmt.label}</span>`;
+    const fmtBadge = FormatBadge.fromInfo(fmt)?.toHtml() || "";
 
     this.ctx.modules.infoBar.showTemp(
       "RESERVED",
@@ -1829,15 +1831,13 @@ export default class SessionManager {
       this._lastRenderedEveryoneAudible !== audibleValue;
     this._lastRenderedEveryoneAudible = audibleValue;
 
-    const audibleSwitch = new Html("button")
-      .classOn("switch")
-      .attr({
-        type: "button",
-        role: "switch",
-        "aria-checked": audibleValue ? "true" : "false",
-        "aria-label": "Everyone audible during performances",
-      })
-      .appendTo(audibleRow);
+    const audibleSwitch = new ToggleSwitch({
+      checked: audibleValue,
+      ariaLabel: "Everyone audible during performances",
+      onChange: (next) => {
+        SessionsSvc.setEveryoneAudible(next);
+      },
+    }).appendTo(audibleRow);
 
     if (audibleChanged) {
       audibleSwitch.classOn(
@@ -1845,12 +1845,8 @@ export default class SessionManager {
       );
     }
 
-    if (state.isSessionHost) {
-      audibleSwitch.on("click", () => {
-        SessionsSvc.setEveryoneAudible(!SessionsSvc.state.everyoneAudible);
-      });
-    } else {
-      audibleSwitch.attr({ disabled: "disabled" });
+    if (!state.isSessionHost) {
+      audibleSwitch.setDisabled(true);
       audibleRow.classOn("is-readonly");
     }
 
@@ -1885,32 +1881,28 @@ export default class SessionManager {
       )
       .appendTo(recordText);
 
-    const recordSwitch = new Html("button")
-      .classOn("switch")
-      .attr({
-        type: "button",
-        role: "switch",
-        "aria-checked": sessionRecording ? "true" : "false",
-        "aria-label": "Record the entire session",
-      })
-      .appendTo(recordRow);
+    const recordSwitch = new ToggleSwitch({
+      checked: sessionRecording,
+      ariaLabel: "Record the entire session",
+      onChange: (next) => {
+        if (!recorder) return;
+        if (next) {
+          if (recorder.startSessionRecording()) {
+            this.syncSessionRecorderInfo(
+              SessionsSvc.state.mode === "performance"
+                ? SessionsSvc.state.nowPlaying
+                : null,
+            );
+          }
+        } else if (recorder.isSessionRecording) {
+          recorder.stop();
+        }
+      },
+    }).appendTo(recordRow);
 
     if (recordingConflict) {
-      recordSwitch.attr({ disabled: "disabled" });
+      recordSwitch.setDisabled(true);
       recordRow.classOn("is-readonly");
-    } else {
-      recordSwitch.on("click", () => {
-        if (!recorder) return;
-        if (recorder.isSessionRecording) {
-          recorder.stop();
-        } else if (recorder.startSessionRecording()) {
-          this.syncSessionRecorderInfo(
-            SessionsSvc.state.mode === "performance"
-              ? SessionsSvc.state.nowPlaying
-              : null,
-          );
-        }
-      });
     }
   }
 
@@ -2036,19 +2028,13 @@ export default class SessionManager {
       .classOn("session-toggle-desc")
       .appendTo(text);
 
-    const toggle = new Html("button")
-      .classOn("switch")
-      .attr({
-        type: "button",
-        role: "switch",
-        "aria-checked": "false",
-        "aria-label": "Share your camera",
-      })
-      .appendTo(row);
-
-    toggle.on("click", () => {
-      void this._setSessionCameraPreviewEnabled(!this._previewCameraOn);
-    });
+    const toggle = new ToggleSwitch({
+      checked: Boolean(this._previewCameraOn),
+      ariaLabel: "Share your camera",
+      onChange: (next) => {
+        void this._setSessionCameraPreviewEnabled(next);
+      },
+    }).appendTo(row);
 
     const deviceRow = new Html("div")
       .classOn("session-camera-device-row")
@@ -2243,9 +2229,13 @@ export default class SessionManager {
       refs.badge.text("OFF").classOff("is-live");
     }
 
-    refs.toggle.attr({
-      "aria-checked": this._previewCameraOn ? "true" : "false",
-    });
+    if (typeof refs.toggle?.setChecked === "function") {
+      refs.toggle.setChecked(this._previewCameraOn, { animate: false });
+    } else {
+      refs.toggle.attr({
+        "aria-checked": this._previewCameraOn ? "true" : "false",
+      });
+    }
 
     if (!camera) {
       refs.description.text("Camera is unavailable on this device.");
@@ -2382,27 +2372,13 @@ export default class SessionManager {
       )
       .appendTo(audibleText);
 
-    const audibleSwitch = new Html("button")
-      .classOn("switch")
-      .attr({
-        type: "button",
-        role: "switch",
-        "aria-checked": options.everyoneAudible ? "true" : "false",
-        "aria-label": "Everyone audible during performances",
-      })
-      .appendTo(audibleRow);
-
-    audibleSwitch.on("click", () => {
-      options.everyoneAudible = !options.everyoneAudible;
-      audibleSwitch.attr({
-        "aria-checked": options.everyoneAudible ? "true" : "false",
-      });
-      audibleSwitch
-        .classOff("switch-on-anim", "switch-off-anim")
-        .classOn(
-          options.everyoneAudible ? "switch-on-anim" : "switch-off-anim",
-        );
-    });
+    const audibleSwitch = new ToggleSwitch({
+      checked: options.everyoneAudible,
+      ariaLabel: "Everyone audible during performances",
+      onChange: (next) => {
+        options.everyoneAudible = next;
+      },
+    }).appendTo(audibleRow);
 
     const recordingConflict =
       Boolean(recorder?.isRecording) && !recorder?.isSessionRecording;
@@ -2430,31 +2406,17 @@ export default class SessionManager {
       )
       .appendTo(recordText);
 
-    const recordSwitch = new Html("button")
-      .classOn("switch")
-      .attr({
-        type: "button",
-        role: "switch",
-        "aria-checked": options.recordSession ? "true" : "false",
-        "aria-label": "Record the entire session",
-      })
-      .appendTo(recordRow);
+    const recordSwitch = new ToggleSwitch({
+      checked: options.recordSession,
+      ariaLabel: "Record the entire session",
+      onChange: (next) => {
+        options.recordSession = next;
+      },
+    }).appendTo(recordRow);
 
     if (recordingConflict) {
-      recordSwitch.attr({ disabled: "disabled" });
+      recordSwitch.setDisabled(true);
       recordRow.classOn("is-readonly");
-    } else {
-      recordSwitch.on("click", () => {
-        options.recordSession = !options.recordSession;
-        recordSwitch.attr({
-          "aria-checked": options.recordSession ? "true" : "false",
-        });
-        recordSwitch
-          .classOff("switch-on-anim", "switch-off-anim")
-          .classOn(
-            options.recordSession ? "switch-on-anim" : "switch-off-anim",
-          );
-      });
     }
   }
 
