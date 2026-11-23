@@ -57,6 +57,7 @@ export const state = {
     midiOutputs: [],
     currentMidiDeviceId: "internal",
     isMultiplexed: false,
+    isBackground: false,
     decodedLyrics: [],
     guideNotes: [],
     guideChannels: [],
