@@ -294,6 +294,7 @@ export default class RecordingsManager {
     const dom = this.ctx.dom;
 
     state.isPlayingRecording = true;
+    this.ctx.root.musicBox?.stop();
     const videoUrl = await NetworkingUtility.getFileLink(rec.videoPath);
 
     const displayTitle =
