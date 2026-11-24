@@ -2,6 +2,7 @@ import Html from "../../libs/html.js";
 import NetworkingUtility from "../../libs/networkingUtility.js";
 import { findSongByCode } from "../../libs/songLookup.js";
 
+import AccountManager from "./managers/AccountManager.js";
 import DriveRecoveryManager from "./managers/DriveRecoveryManager.js";
 import GamesManager from "./managers/GamesManager.js";
 import InputManager from "./managers/InputManager.js";
@@ -65,6 +66,7 @@ class EncoreController {
       volume: config.audioConfig?.mix?.instrumental?.volume ?? 1,
       videoSyncOffset: config.videoConfig?.syncOffset || 0,
       isStreamModalOpen: false,
+      isAccountModalOpen: false,
       isHelpModalOpen: false,
 
       systemFonts: ["Radio Canada"],
@@ -264,6 +266,8 @@ class EncoreController {
     this.retail = new RetailManager(this.context);
     this.context.modules.retail = this.retail;
     this.sessions = new SessionManager(this.context);
+    this.account = new AccountManager(this.context);
+    this.context.modules.account = this.account;
     this.recordings = new RecordingsManager(this.context);
     this.input = new InputManager(this.context);
     this.setup = new SetupManager(this.context);
@@ -1065,6 +1069,7 @@ class EncoreController {
     await this.network.init();
     this.retail.init();
     this.sessions.init();
+    this.account.init();
     this.recordings.init();
     this.lyrics.init();
     this.setup.init();
