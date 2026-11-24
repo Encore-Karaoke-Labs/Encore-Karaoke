@@ -119,6 +119,7 @@ export default class MusicBoxManager {
       return false;
     }
     if (state.currentSong) return false;
+    if (state.isPlayingRecording) return false;
     return this._getPlayableSongs().length > 0;
   }
 
