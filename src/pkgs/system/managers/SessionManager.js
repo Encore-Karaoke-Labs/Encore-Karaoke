@@ -65,7 +65,7 @@ export default class SessionManager {
     this._previewCameraToken = 0;
     this._sessionPreviewRefs = null;
     this._sessionFlowIsHost = false;
-    this._sessionFormDraft = { view: null, nickname: null, room: null };
+    this._sessionFormDraft = { view: null, room: null };
 
     this._sessionCreateOptions = {
       everyoneAudible: false,
@@ -1907,6 +1907,22 @@ export default class SessionManager {
   }
 
   /**
+   * Re-renders the host/join step after the Account modal closes
+   */
+  handleAccountModalClosed() {
+    const state = this.ctx.state;
+    if (!state.isSessionModalOpen) return;
+    if (
+      state.sessionModalView !== "host" &&
+      state.sessionModalView !== "join"
+    ) {
+      return;
+    }
+
+    this.renderSessionView(state.sessionModalView, null, false);
+  }
+
+  /**
    * Refreshes the pre-Session camera preview after a camera stream change.
    */
   handleCameraServiceUpdate() {
@@ -1922,7 +1938,7 @@ export default class SessionManager {
    * visit to the menu starts from its defaults.
    */
   _resetSessionFlowState() {
-    this._sessionFormDraft = { view: null, nickname: null, room: null };
+    this._sessionFormDraft = { view: null, room: null };
     this._sessionCreateOptions = {
       everyoneAudible: false,
       recordSession: false,
@@ -1935,9 +1951,9 @@ export default class SessionManager {
    * @param {number} activeIndex - Zero-based index of the current step.
    */
   buildSessionStepper(container, activeIndex) {
-    const steps = this._sessionFlowIsHost
-      ? ["PROFILE", "SETTINGS", "CAMERA"]
-      : ["PROFILE", "CAMERA"];
+    const steps = this._sessionFlowIsHost ? ["SETUP", "CAMERA"] : ["CAMERA"];
+
+    if (steps.length < 2) return;
 
     const stepper = new Html("div")
       .classOn("session-stepper")
@@ -2489,24 +2505,38 @@ export default class SessionManager {
 
     const isHost = this._sessionFlowIsHost;
     const draft = this._sessionFormDraft;
-    const nickname = draft.nickname || "";
     const room = isHost ? null : (draft.room || "").trim();
+    const profile = Identity.getProfile();
 
     if (!isHost && !room) {
       this.renderSessionView("join");
       return;
     }
 
+    if (!Identity.hasProfile() || !profile.nickname) {
+      this.renderSessionView(isHost ? "host" : "join");
+      this.ctx.root.account.toggleAccountModal(true);
+      return;
+    }
+
     this.renderSessionView(isHost ? "creating" : "joining");
 
     try {
-      await Identity.updateProfile(nickname);
-      const updatedProfile = Identity.getProfile();
       const supportedGames = root.games.getAvailableGames().map((g) => ({
         id: g.id,
         version: g.version,
       }));
-      const sessionProfile = { ...updatedProfile, supportedGames };
+      const account = Identity.getAccount();
+      const sessionProfile = {
+        ...profile,
+        nickname: profile.nickname || "Singer",
+        userId: profile.userId || account.userId || null,
+        userIdVerified: Boolean(
+          account.signedIn && (profile.userId || account.userId),
+        ),
+        accountType: profile.source,
+        supportedGames,
+      };
 
       if (isHost) {
         const collisionFn = Identity.resolveCollision.bind(Identity);
@@ -2791,17 +2821,17 @@ export default class SessionManager {
       new Html("p")
         .text(
           isHost
-            ? "Set up your profile."
-            : "Enter a Room ID, and set up your profile.",
+            ? "Review your singer profile and get your room ready."
+            : "Enter a Room ID to join the session.",
         )
         .appendTo(dom.sessionHeader);
 
       const profile = Identity.getProfile();
+      const account = Identity.getAccount();
 
       const draft = this._sessionFormDraft;
       if (draft.view !== view) {
         draft.view = view;
-        draft.nickname = profile.nickname || "";
         draft.room = !isHost && typeof extraData === "string" ? extraData : "";
       } else if (!isHost && typeof extraData === "string" && extraData) {
         draft.room = extraData;
@@ -2809,57 +2839,141 @@ export default class SessionManager {
 
       this.buildSessionStepper(dom.sessionHeader, 0);
 
-      const formLayout = new Html("div")
-        .classOn("session-form-layout")
+      if (!Identity.hasProfile()) {
+        const gate = new Html("div")
+          .classOn("session-profile-gate")
+          .appendTo(dom.sessionContentArea);
+
+        new Html("div")
+          .classOn("session-tile-icon")
+          .append(
+            new Html("ion-icon")
+              .attr({ name: "person-circle-outline" })
+              .styleJs({ width: "64px", height: "64px", color: "#89cff0" }),
+          )
+          .appendTo(gate);
+
+        new Html("div")
+          .classOn("session-tile-title")
+          .text("PROFILE REQUIRED")
+          .appendTo(gate);
+
+        new Html("div")
+          .classOn("session-tile-desc")
+          .text(
+            "Sessions need a singer name. Set up a guest profile, or sign in to use your Encore account.",
+          )
+          .appendTo(gate);
+
+        const gateBtnRow = new Html("div")
+          .classOn("session-btn-row")
+          .styleJs({ marginTop: "1.5rem" })
+          .appendTo(gate);
+
+        new Html("button")
+          .classOn("session-btn")
+          .text("BACK")
+          .on("click", () => this.renderSessionView("select"))
+          .appendTo(gateBtnRow);
+
+        const setupBtn = new Html("button")
+          .classOn("session-btn", "primary")
+          .text("SET UP PROFILE")
+          .on("click", () => this.ctx.root.account.toggleAccountModal(true))
+          .appendTo(gateBtnRow);
+
+        setTimeout(() => setupBtn.elm.focus(), 100);
+        return;
+      }
+
+      const setupView = new Html("div")
+        .classOn("session-setup-view")
         .appendTo(dom.sessionContentArea);
 
-      const avatarCol = new Html("div")
-        .classOn("session-avatar-col")
+      const formLayout = new Html("div")
+        .classOn("session-form-layout", "session-profile-layout")
+        .appendTo(setupView);
+
+      const profileCard = new Html("div")
+        .classOn("session-profile-card")
         .appendTo(formLayout);
 
-      const avatarImgWrapper = new Html("div")
-        .classOn("session-avatar-wrapper")
-        .appendTo(avatarCol);
-      const avatarPreview = new Html("img")
-        .classOn("session-avatar-preview")
-        .appendTo(avatarImgWrapper);
-
-      if (profile.avatar) avatarPreview.attr({ src: profile.avatar });
-
-      const avatarBtn = new Html("button")
-        .classOn("session-btn")
-        .text(profile.avatar ? "Change Avatar" : "Upload Avatar")
-        .appendTo(avatarCol);
-      avatarBtn.on("click", () => {
-        const fileInput = document.createElement("input");
-        fileInput.type = "file";
-        fileInput.accept = "image/png, image/jpeg, image/webp";
-        fileInput.onchange = async (e) => {
-          const file = e.target.files[0];
-          if (file) {
-            try {
-              const b64 = await Identity.processAvatarFile(file);
-              await Identity.updateProfile(profile.nickname, b64);
-              avatarPreview.attr({ src: b64 });
-              avatarBtn.text("Avatar Selected!");
-            } catch (err) {
-              this.ctx.modules.infoBar.showTemp(
-                "AVATAR",
-                "Failed to process image.",
-                3000,
-              );
-            }
-          }
-        };
-        fileInput.click();
-      });
-
-      const inputCol = new Html("div")
-        .classOn("session-input-col")
+      const detailsCol = new Html("div")
+        .classOn("session-setup-details")
         .appendTo(formLayout);
+
+      const setupIntro = new Html("div")
+        .classOn("session-setup-intro")
+        .appendTo(detailsCol);
+
+      new Html("h2")
+        .classOn("session-setup-title")
+        .text("YOUR SINGER PROFILE")
+        .appendTo(setupIntro);
+
+      new Html("p")
+        .classOn("session-setup-desc")
+        .text(
+          isHost
+            ? "This is how guests will see you when they join your room."
+            : "This is how the room will see you once you join.",
+        )
+        .appendTo(setupIntro);
+
+      const avatarWrapper = new Html("div")
+        .classOn("session-avatar-wrapper", "session-profile-avatar")
+        .appendTo(profileCard);
+
+      if (profile.avatar) {
+        new Html("img")
+          .classOn("session-avatar-preview")
+          .attr({ src: profile.avatar, alt: profile.nickname })
+          .appendTo(avatarWrapper);
+      } else {
+        new Html("div")
+          .classOn("session-avatar-placeholder")
+          .html('<ion-icon name="person-outline"></ion-icon>')
+          .appendTo(avatarWrapper);
+      }
+
+      const profileMeta = new Html("div")
+        .classOn("session-profile-meta")
+        .appendTo(profileCard);
+
+      new Html("div")
+        .classOn("session-profile-name")
+        .text(profile.nickname || "Singer")
+        .appendTo(profileMeta);
+
+      new Html("div")
+        .classOn(
+          "session-profile-badge",
+          account.signedIn ? "is-account" : "is-guest",
+        )
+        .html(
+          account.signedIn
+            ? '<ion-icon name="checkmark-circle"></ion-icon><span>ENCORE ACCOUNT</span>'
+            : '<ion-icon name="person-outline"></ion-icon><span>GUEST</span>',
+        )
+        .appendTo(profileMeta);
+
+      new Html("button")
+        .classOn("session-btn", "session-profile-edit")
+        .text("GO TO ACCOUNT")
+        .on("click", () => this.ctx.root.account.toggleAccountModal(true))
+        .appendTo(profileCard);
 
       let roomInput = null;
       if (!isHost) {
+        const inputCol = new Html("div")
+          .classOn("session-input-col", "session-join-col")
+          .appendTo(detailsCol);
+
+        new Html("label")
+          .classOn("session-field-label")
+          .text("ROOM ID")
+          .appendTo(inputCol);
+
         roomInput = new Html("input")
           .classOn("session-input")
           .attr({ placeholder: "Room ID", value: draft.room })
@@ -2868,25 +2982,16 @@ export default class SessionManager {
         roomInput.on("input", () => {
           draft.room = roomInput.getValue();
         });
+
+        new Html("p")
+          .classOn("session-field-hint")
+          .text("Ask the host for the Room ID.")
+          .appendTo(inputCol);
       }
 
-      const nickInput = new Html("input")
-        .classOn("session-input")
-        .attr({
-          placeholder: "Your Nickname",
-          maxlength: 15,
-          value: draft.nickname,
-        })
-        .appendTo(inputCol);
-
-      nickInput.on("input", () => {
-        draft.nickname = nickInput.getValue();
-      });
-
       const btnRow = new Html("div")
-        .classOn("session-btn-row")
-        .styleJs({ width: "100%", marginTop: "1rem" })
-        .appendTo(inputCol);
+        .classOn("session-btn-row", "session-setup-actions")
+        .appendTo(setupView);
       new Html("button")
         .classOn("session-btn")
         .html(
@@ -2895,7 +3000,7 @@ export default class SessionManager {
         .on("click", () => this.renderSessionView("select"))
         .appendTo(btnRow);
 
-      new Html("button")
+      const nextBtn = new Html("button")
         .classOn("session-btn", "primary")
         .html(
           '<span>NEXT</span><ion-icon name="arrow-forward-outline" style="font-size: 1.2rem; vertical-align: middle; margin-left: 0.5rem;"></ion-icon>',
@@ -2916,27 +3021,11 @@ export default class SessionManager {
         .appendTo(btnRow);
 
       setTimeout(() => {
-        const modalEl = dom.sessionContentArea.elm;
-        if (view === "select") {
-          const firstTile = modalEl.querySelector(".session-tile");
-          if (firstTile) firstTile.focus();
-        } else if (view === "host") {
-          const nickInp = modalEl.querySelector(
-            'input[placeholder="Your Nickname"]',
-          );
-          if (nickInp) nickInp.focus();
-        } else if (view === "join") {
-          const roomInp = modalEl.querySelector('input[placeholder="Room ID"]');
-          if (roomInp) {
-            roomInp.focus();
-            if (extraData) {
-              const primaryBtn = modalEl.querySelector(".session-btn.primary");
-              if (primaryBtn) primaryBtn.focus();
-            }
-          }
-        } else if (view === "active") {
-          const firstBtn = modalEl.querySelector("button");
-          if (firstBtn) firstBtn.focus();
+        if (!isHost && roomInput) {
+          roomInput.elm.focus();
+          if (extraData) nextBtn.elm.focus();
+        } else {
+          nextBtn.elm.focus();
         }
       }, 100);
     } else if (view === "preview") {
@@ -2951,7 +3040,7 @@ export default class SessionManager {
         )
         .appendTo(dom.sessionHeader);
 
-      this.buildSessionStepper(dom.sessionHeader, isHost ? 2 : 1);
+      this.buildSessionStepper(dom.sessionHeader, isHost ? 1 : 0);
 
       const previewView = new Html("div")
         .classOn("session-preview-view")
@@ -2997,7 +3086,7 @@ export default class SessionManager {
         .text("Choose how your room behaves.")
         .appendTo(dom.sessionHeader);
 
-      this.buildSessionStepper(dom.sessionHeader, 1);
+      this.buildSessionStepper(dom.sessionHeader, 0);
 
       const optionsView = new Html("div")
         .classOn("session-options-view")
