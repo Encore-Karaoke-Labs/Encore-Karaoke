@@ -340,6 +340,9 @@ const pkg = {
         id: myId,
         nickname: profile.nickname,
         avatar: profile.avatar,
+        userId: profile.userId || null,
+        userIdVerified: Boolean(profile.userIdVerified),
+        accountType: profile.accountType || "guest",
         isHost: true,
         isRecording: false,
         isMuted: false,
@@ -404,6 +407,9 @@ const pkg = {
             id: conn.peer,
             nickname: uniqueName,
             avatar: incomingProfile.avatar || null,
+            userId: incomingProfile.userId || null,
+            userIdVerified: Boolean(incomingProfile.userIdVerified),
+            accountType: incomingProfile.accountType || "guest",
             isHost: false,
             isRecording: false,
             isMuted: false,
@@ -481,6 +487,24 @@ const pkg = {
             );
           }
           this.handleMediaRouting();
+        } else if (data.type === "profile_update" && this.isHost) {
+          const participant = this.state.participants.find(
+            (entry) => entry.id === conn.peer,
+          );
+          if (participant) {
+            const nickname =
+              typeof data.profile?.nickname === "string"
+                ? data.profile.nickname.trim().slice(0, 15)
+                : "";
+            const avatar =
+              typeof data.profile?.avatar === "string" && data.profile.avatar
+                ? data.profile.avatar
+                : null;
+
+            if (nickname) participant.nickname = nickname;
+            participant.avatar = avatar;
+            this.broadcastState();
+          }
         } else if (data.type === "recording_status" && this.isHost) {
           this.setParticipantRecording(conn.peer, data.recording);
         } else if (data.type === "camera_status" && this.isHost) {
@@ -1632,6 +1656,56 @@ const pkg = {
       this.broadcastState();
     },
 
+    /**
+     * Applies the locally saved singer profile to this participant and shares
+     * it with the active Session.
+     * @param {{nickname?: string, avatar?: string|null}} profile
+     */
+    updateLocalProfile: function (profile) {
+      const myId = this.peer?.id;
+      if (!myId) return;
+
+      const nickname =
+        typeof profile?.nickname === "string" ? profile.nickname.trim() : "";
+      if (!nickname) return;
+
+      const avatar =
+        typeof profile?.avatar === "string" && profile.avatar
+          ? profile.avatar
+          : null;
+
+      this.nickname = nickname.slice(0, 15);
+
+      const participant = this.state.participants.find((p) => p.id === myId);
+      if (!participant) return;
+      if (
+        participant.nickname === this.nickname &&
+        participant.avatar === avatar
+      ) {
+        return;
+      }
+
+      participant.nickname = this.nickname;
+      participant.avatar = avatar;
+
+      if (this.isHost) {
+        this.broadcastState();
+      } else {
+        const hostConn = this.connections.get(this.roomId);
+        if (hostConn && hostConn.open) {
+          hostConn.send({
+            type: "profile_update",
+            profile: { nickname: this.nickname, avatar },
+          });
+        }
+        document.dispatchEvent(
+          new CustomEvent("Encore.Sessions.StateUpdate", {
+            detail: this.state,
+          }),
+        );
+      }
+    },
+
     advanceQueue: function () {
       if (!this.isHost) return;
 
@@ -1973,6 +2047,7 @@ const pkg = {
           this.nickname ||
           "Singer",
         avatar: p?.avatar || profile?.avatar || null,
+        userId: p?.userId || profile?.userId || null,
         songTitle: songTitle || "Unknown Song",
         score: score,
         details: details,
