@@ -31,6 +31,7 @@ import { registerSyncIpc } from "./main/ipc/sync";
 import { registerSongbookIpc } from "./main/songbook";
 import { registerLibraryManagerIpc } from "./main/library-manager";
 import { registerCashierIpc } from "./main/cashier";
+import { registerClerkIpc } from "./main/clerk-auth";
 import {
   killAllProcesses,
   registerEmbeddedTerminalIpc,
@@ -161,6 +162,7 @@ void app.whenReady().then(async () => {
   registerSongbookIpc();
   registerLibraryManagerIpc();
   registerCashierIpc();
+  registerClerkIpc();
   registerWindowIpc();
   deepLinks.registerIpc();
   discordRpc.registerIpc();

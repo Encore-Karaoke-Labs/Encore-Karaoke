@@ -74,6 +74,17 @@ contextBridge.exposeInMainWorld("config", {
   merge: (dataObject) => ipcRenderer.send("config-merge", dataObject),
 });
 
+contextBridge.exposeInMainWorld("clerk", {
+  getState: () => ipcRenderer.invoke("clerk:get-state"),
+  signIn: () => ipcRenderer.invoke("clerk:sign-in"),
+  signUp: () => ipcRenderer.invoke("clerk:sign-up"),
+  signOut: () => ipcRenderer.invoke("clerk:sign-out"),
+  getSessionToken: () => ipcRenderer.invoke("clerk:get-token"),
+  updateProfile: (update) =>
+    ipcRenderer.invoke("clerk:update-profile", update),
+  openAccount: () => ipcRenderer.invoke("clerk:open-account"),
+});
+
 contextBridge.exposeInMainWorld("romanization", {
   romanize: async (rawJapanese) => ipcRenderer.invoke("romanize", rawJapanese),
 });
