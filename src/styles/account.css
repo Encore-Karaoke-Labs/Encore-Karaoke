@@ -1,0 +1,380 @@
+/* -- Account & Profile Modal -- */
+.account-modal {
+  z-index: 66000;
+}
+
+.account-box {
+  position: relative;
+  width: 78vw;
+  max-width: 684px;
+  height: auto;
+  max-height: 86vh;
+  transition:
+    height 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.28s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-box {
+    transition: none;
+  }
+}
+
+.account-header {
+  padding: 1.25rem 2rem 1rem;
+}
+
+.account-content-area {
+  justify-content: flex-start;
+  padding: 1.25rem 2rem 1.25rem;
+}
+
+.account-view {
+  width: 100%;
+  max-width: 620px;
+}
+
+.account-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+/* -- Singer identity (photo + editable name) -- */
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.account-avatar-button {
+  position: relative;
+  flex: 0 0 auto;
+  width: 88px;
+  height: 88px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  cursor: var(--cursor-pointer);
+}
+
+.account-avatar-wrapper {
+  width: 100%;
+  height: 100%;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.account-avatar-button:hover .account-avatar-wrapper,
+.account-avatar-button:focus-visible .account-avatar-wrapper {
+  border-color: #89cff0;
+  box-shadow: 0 0 18px rgba(137, 207, 240, 0.25);
+}
+
+.account-avatar-button:focus-visible {
+  outline: 2px solid rgba(137, 207, 240, 0.6);
+  outline-offset: 4px;
+}
+
+.account-avatar-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(137, 207, 240, 0.5);
+  background: #0b0f1a;
+  color: #89cff0;
+  font-size: 0.95rem;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.account-avatar-button:hover .account-avatar-badge,
+.account-avatar-button:focus-visible .account-avatar-badge {
+  color: #ffd700;
+  border-color: rgba(255, 215, 0, 0.7);
+}
+
+.account-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(137, 207, 240, 0.08);
+  color: rgba(137, 207, 240, 0.6);
+  font-size: 2.4rem;
+}
+
+.account-identity-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.account-name-heading {
+  margin: 0;
+  min-width: 0;
+}
+
+.account-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0.05rem 0.3rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+  text-align: left;
+  cursor: text;
+  transition: background 0.15s ease;
+}
+
+.account-name:hover .account-name-text,
+.account-name:focus-visible .account-name-text {
+  text-decoration: underline dashed rgba(137, 207, 240, 0.55);
+  text-underline-offset: 6px;
+}
+
+.account-name:focus-visible {
+  outline: 2px solid rgba(137, 207, 240, 0.45);
+  outline-offset: 4px;
+}
+
+.account-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-name-pencil {
+  flex: 0 0 auto;
+  font-size: 1.05rem;
+  color: #89cff0;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.account-name:hover .account-name-pencil,
+.account-name:focus-visible .account-name-pencil {
+  opacity: 1;
+}
+
+.account-name-input {
+  width: min(320px, 100%);
+  padding: 0.25rem 0.6rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: left;
+}
+
+.account-status {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.15rem 0 0;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.account-status ion-icon {
+  font-size: 1rem;
+}
+
+.account-status.is-connected {
+  color: #7ee2a8;
+}
+
+.account-status.is-offline {
+  color: #ffd700;
+}
+
+.account-status.is-guest {
+  color: #89cff0;
+}
+
+.account-card-desc {
+  margin: 0;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.62);
+  text-wrap: pretty;
+}
+
+.account-error {
+  margin: 0;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: #ff9c9c;
+}
+
+.account-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.account-action-row .session-btn {
+  flex: 0 1 auto;
+  padding: 0.7rem 1.35rem;
+  font-size: 1rem;
+}
+
+/* Keep sign-out away from the account's primary actions. */
+.account-action-row .session-btn.danger {
+  margin-left: auto;
+}
+
+/* -- Profile picture screen -- */
+.account-avatar-view {
+  align-items: center;
+  gap: 1.35rem;
+}
+
+.account-avatar-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+}
+
+.account-avatar-large {
+  width: 200px;
+  height: 200px;
+}
+
+.account-avatar-large .account-avatar-placeholder {
+  font-size: 5rem;
+}
+
+.account-avatar-note {
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.account-avatar-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.account-avatar-actions-row .session-btn {
+  flex: 0 0 auto;
+  padding: 0.7rem 1.3rem;
+  font-size: 1rem;
+}
+
+.account-back-btn {
+  margin-right: auto;
+}
+
+/* Shorter viewports (720p TVs) need the whole view inside the modal. */
+@media (max-height: 780px) {
+  .account-header {
+    padding: 1rem 2rem 0.85rem;
+  }
+
+  .account-content-area {
+    padding: 1rem 2rem;
+  }
+
+  .account-card {
+    gap: 1rem;
+  }
+
+  .account-avatar-button {
+    width: 76px;
+    height: 76px;
+  }
+
+  .account-name {
+    font-size: 1.6rem;
+  }
+
+  .account-name-input {
+    font-size: 1.4rem;
+  }
+
+  .account-card-desc {
+    line-height: 1.4;
+  }
+
+  .account-avatar-large {
+    width: 170px;
+    height: 170px;
+  }
+
+  .account-avatar-view {
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .account-content-area {
+    padding: 1.25rem;
+  }
+
+  .account-identity {
+    gap: 1rem;
+  }
+
+  .account-avatar-actions-row {
+    justify-content: center;
+  }
+
+  .account-back-btn {
+    margin-right: 0;
+  }
+
+  .account-action-row .session-btn.danger {
+    margin-left: 0;
+  }
+}
+
+.account-card-centered {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 240px;
+  gap: 0.75rem;
+}
+
+.account-card-centered .loading {
+  width: 64px;
+  height: 64px;
+}
