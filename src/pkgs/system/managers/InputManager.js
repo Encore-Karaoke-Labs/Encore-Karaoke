@@ -1,8 +1,8 @@
+import FormatBadge from "../../../components/FormatBadge.js";
 import Html from "../../../libs/html.js";
 import NetworkingUtility from "../../../libs/networkingUtility.js";
 import playNavSfx from "../../../libs/sfx.js";
 import { findSongByCode } from "../../../libs/songLookup.js";
-import FormatBadge from "../../../components/FormatBadge.js";
 
 /**
  * @param {Object} context - The shared context
@@ -289,6 +289,11 @@ export default class InputManager {
       return;
     }
 
+    if (state.isAccountModalOpen) {
+      this.ctx.root.account.handleKeyDown(e);
+      return;
+    }
+
     if (state.isSessionModalOpen) {
       sessions.handleKeyDown(e);
       return;
@@ -317,6 +322,17 @@ export default class InputManager {
         sessions.toggleSessionModal();
         return;
       }
+    }
+
+    if (
+      e.key.toLowerCase() === "a" &&
+      state.mode === "menu" &&
+      !state.isTypingNumber &&
+      !state.isSearchOverlayVisible
+    ) {
+      e.preventDefault();
+      this.ctx.root.account.toggleAccountModal();
+      return;
     }
 
     if (state.isPlayingRecording) {
