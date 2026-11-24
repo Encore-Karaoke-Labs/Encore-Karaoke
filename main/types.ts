@@ -230,3 +230,68 @@ export interface TwitchBroadcastInfo {
   live: TwitchLiveInfo;
   contentClassificationLabels: TwitchContentClassificationLabel[];
 }
+
+export interface ClerkUserSummary {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  username: string | null;
+  fullName: string | null;
+  imageUrl: string | null;
+  primaryEmail: string | null;
+}
+
+export interface ClerkAccountState {
+  signedIn: boolean;
+  user: ClerkUserSummary | null;
+  sessionId: string | null;
+  error?: string;
+  cancelled?: boolean;
+}
+
+export interface ClerkSessionToken {
+  token: string;
+  sessionId: string;
+  userId: string | null;
+  expiresAt: number | null;
+}
+
+export interface ClerkProfileUpdate {
+  nickname?: string;
+  avatar?: string | null;
+}
+
+export interface ClerkSessionResource {
+  id: string;
+  status?: string;
+  user?: ClerkUserResource;
+  public_user_data?: { user_id?: string };
+}
+
+export interface ClerkUserResource {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  username?: string | null;
+  image_url?: string | null;
+  primary_email_address_id?: string | null;
+  email_addresses?: Array<{ id: string; email_address: string }>;
+}
+
+export interface ClerkClientResource {
+  id: string;
+  sessions?: ClerkSessionResource[];
+  last_active_session_id?: string | null;
+}
+
+export interface ClerkClientResponse {
+  response?: ClerkClientResource;
+}
+
+export interface ClerkTokenResponse {
+  jwt?: string | { raw?: string; getRawString?: () => string } | null;
+}
+
+export interface ClerkErrorResponse {
+  errors?: Array<{ message?: string; long_message?: string }>;
+}
