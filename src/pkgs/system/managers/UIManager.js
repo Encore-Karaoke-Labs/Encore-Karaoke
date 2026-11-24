@@ -65,6 +65,7 @@ export default class UIManager {
     this.buildPostSongScreen();
     this.buildRecordingsUI();
     this.buildSessionsUI();
+    this.buildAccountUI();
     this.buildStreamUI();
     this.buildSessionChatUI();
     this.buildQR();
@@ -215,6 +216,7 @@ export default class UIManager {
             desc: "Instant song recording / see saved session takes",
           },
           { key: "S", desc: "Open Sessions menu" },
+          { key: "A", desc: "Open Account & singer profile" },
           ...(this.embedded
             ? []
             : [{ key: "B", desc: "Broadcast karaoke stream" }]),
@@ -529,6 +531,12 @@ export default class UIManager {
       icon: "people",
       label: "Sessions (S)",
       onClick: () => this.ctx.root.sessions.toggleSessionModal(),
+    }).appendTo(dom.bottomActions);
+
+    new ActionButton({
+      icon: "person-circle",
+      label: "Account (A)",
+      onClick: () => this.ctx.root.account.toggleAccountModal(),
     }).appendTo(dom.bottomActions);
 
     if (!this.embedded) {
@@ -1375,6 +1383,27 @@ export default class UIManager {
     dom.sessionContentArea = new Html("div")
       .classOn("session-content-area")
       .appendTo(dom.sessionBox);
+  }
+
+  buildAccountUI() {
+    const dom = this.ctx.dom;
+    dom.accountModal = new Html("div")
+      .classOn("session-modal", "account-modal", "hidden")
+      .appendTo(this.ctx.wrapper);
+    dom.accountModal.on("click", (e) => {
+      if (e.target === dom.accountModal.elm)
+        this.ctx.root.account.toggleAccountModal(false);
+    });
+
+    dom.accountBox = new Html("div")
+      .classOn("session-box", "account-box")
+      .appendTo(dom.accountModal);
+    dom.accountHeader = new Html("div")
+      .classOn("session-header")
+      .appendTo(dom.accountBox);
+    dom.accountContentArea = new Html("div")
+      .classOn("session-content-area", "account-content-area")
+      .appendTo(dom.accountBox);
   }
 
   buildStreamUI() {
