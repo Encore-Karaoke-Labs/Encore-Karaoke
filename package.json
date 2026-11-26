@@ -70,6 +70,7 @@
     "globals": "^17.11.0",
     "ionicons": "^8.1.0",
     "kuroshiro": "^1.2.0",
+    "livekit-client": "^2.25.0",
     "localforage": "^1.10.0",
     "mime-types": "^3.0.2",
     "obs-websocket-js": "^5.0.8",
