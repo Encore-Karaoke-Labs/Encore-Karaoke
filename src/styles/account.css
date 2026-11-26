@@ -11,8 +11,19 @@
   max-height: 86vh;
   transition:
     height 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+    max-width 0.34s cubic-bezier(0.16, 1, 0.3, 1),
     transform 0.32s cubic-bezier(0.16, 1, 0.3, 1),
     opacity 0.28s ease;
+}
+
+.account-box.is-auth {
+  width: 88vw;
+  max-width: 560px;
+}
+
+.account-box.is-auth .account-view {
+  max-width: 100%;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -377,4 +388,366 @@
 .account-card-centered .loading {
   width: 64px;
   height: 64px;
+}
+
+/* -- Sign-in -- */
+.account-auth {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.account-auth-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  align-self: flex-start;
+  min-width: 0;
+  padding: 0.2rem 0.1rem;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  cursor: var(--cursor-pointer);
+  transition: color 0.15s ease;
+}
+
+.account-auth-back ion-icon {
+  font-size: 0.95rem;
+}
+
+.account-auth-back:hover,
+.account-auth-back:focus-visible {
+  color: #89cff0;
+}
+
+.account-auth-back:focus-visible {
+  outline: 2px solid rgba(137, 207, 240, 0.55);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.account-auth-grid {
+  display: block;
+}
+
+.account-auth-form {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.account-auth-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.72rem;
+  margin: 0;
+}
+
+.account-auth-lede {
+  margin: 0 0 0.15rem;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.66);
+  text-wrap: pretty;
+}
+
+.account-auth-field {
+  display: block;
+  pointer-events: auto;
+}
+
+.account-auth-label {
+  display: block;
+  margin: 0 0 0.32rem 0.1rem;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(137, 207, 240, 0.78);
+}
+
+.account-auth-control {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 3rem;
+  padding: 0 0.8rem;
+  border: 1px solid rgba(137, 207, 240, 0.24);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.42);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
+}
+
+.account-auth-control:focus-within {
+  border-color: rgba(137, 207, 240, 0.72);
+  background: rgba(0, 0, 0, 0.56);
+  box-shadow: 0 0 0 3px rgba(137, 207, 240, 0.12);
+}
+
+.account-auth-control > ion-icon {
+  flex: 0 0 auto;
+  font-size: 1.05rem;
+  color: rgba(137, 207, 240, 0.62);
+}
+
+.account-auth-input {
+  flex: 1;
+  min-width: 0;
+  height: 2.9rem;
+  user-select: text;
+  -webkit-user-select: text;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #fff;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 1rem;
+  line-height: 1.2;
+  caret-color: #ffd700;
+}
+
+.account-auth-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.account-auth-input:-webkit-autofill {
+  -webkit-text-fill-color: #fff;
+  transition: background-color 9999s ease-out;
+}
+
+.account-auth-code-field {
+  text-align: center;
+}
+
+.account-auth-code {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 20.5rem;
+  margin-inline: auto;
+}
+
+.account-auth-code input.account-auth-code-box {
+  width: 100%;
+  min-width: 0;
+  height: 3.1rem;
+  padding: 0;
+  border: 1px solid rgba(137, 207, 240, 0.24);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.42);
+  display: block;
+  text-align: center;
+  color: #fff;
+  caret-color: #ffd700;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
+}
+
+.account-auth-code input.account-auth-code-box:focus {
+  border-color: rgba(137, 207, 240, 0.72);
+  background: rgba(0, 0, 0, 0.56);
+  box-shadow: 0 0 0 3px rgba(137, 207, 240, 0.12);
+}
+
+.account-auth-reveal {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.05rem;
+  cursor: var(--cursor-pointer);
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.account-auth-reveal:hover,
+.account-auth-reveal:focus-visible {
+  color: #89cff0;
+  background: rgba(137, 207, 240, 0.1);
+}
+
+.account-auth-reveal:focus-visible {
+  outline: 2px solid rgba(137, 207, 240, 0.6);
+  outline-offset: 1px;
+}
+
+.account-auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.9rem;
+  margin-top: 0.1rem;
+}
+
+.account-auth-link {
+  min-width: 0;
+  padding: 0.15rem 0;
+  border: none;
+  background: transparent;
+  color: rgba(137, 207, 240, 0.88);
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.83rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  cursor: var(--cursor-pointer);
+  border-bottom: 1px dotted transparent;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.account-auth-link:hover,
+.account-auth-link:focus-visible {
+  color: #fff;
+  border-bottom-color: rgba(137, 207, 240, 0.6);
+}
+
+.account-auth-link:focus-visible {
+  outline: 2px solid rgba(137, 207, 240, 0.55);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.account-auth-link:disabled {
+  cursor: default;
+  color: rgba(255, 255, 255, 0.4);
+  border-bottom-color: transparent;
+}
+
+.account-auth-error {
+  margin: 0.1rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 7px;
+  background: rgba(255, 85, 85, 0.1);
+  color: #ffc4c4;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.account-auth-error.hidden {
+  display: none;
+}
+
+.account-auth-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 7px;
+  background: rgba(137, 207, 240, 0.08);
+  color: rgba(255, 255, 255, 0.82);
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.account-auth-notice ion-icon {
+  flex: 0 0 auto;
+  margin-top: 0.12rem;
+  color: #89cff0;
+  font-size: 0.95rem;
+}
+
+.account-auth-submit {
+  width: 100%;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 3.05rem;
+  margin-top: 0.35rem;
+  padding: 0.7rem 1rem;
+  font-size: 1.02rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.account-auth-submit ion-icon {
+  font-size: 1.05rem;
+  transition: transform 0.16s ease;
+}
+
+.account-auth-submit:hover ion-icon,
+.account-auth-submit:focus-visible ion-icon {
+  transform: translateX(3px);
+}
+
+.account-auth-submit:disabled,
+.account-auth-submit:disabled:hover {
+  cursor: progress;
+  background: rgba(255, 215, 0, 0.12);
+  color: rgba(255, 215, 0, 0.7);
+  border-color: rgba(255, 215, 0, 0.45);
+}
+
+.account-auth-alt {
+  margin: 0.15rem 0 0;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.86rem;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.account-auth-alt .account-auth-link {
+  font-size: 0.86rem;
+  padding: 0;
+}
+
+.account-auth-security {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.2rem 0 0;
+  font-family: "Radio Canada", sans-serif;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.account-auth-security ion-icon {
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  color: rgba(137, 207, 240, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-auth-submit ion-icon {
+    transition: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .account-box.is-auth {
+    width: 92vw;
+  }
 }
