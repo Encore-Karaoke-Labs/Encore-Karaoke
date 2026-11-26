@@ -78,6 +78,16 @@ contextBridge.exposeInMainWorld("clerk", {
   getState: () => ipcRenderer.invoke("clerk:get-state"),
   signIn: () => ipcRenderer.invoke("clerk:sign-in"),
   signUp: () => ipcRenderer.invoke("clerk:sign-up"),
+  signInWithPassword: (payload) =>
+    ipcRenderer.invoke("clerk:sign-in-password", payload),
+  requestSignInCode: (payload) =>
+    ipcRenderer.invoke("clerk:sign-in-request-code", payload),
+  verifySignInCode: (payload) =>
+    ipcRenderer.invoke("clerk:sign-in-verify-code", payload),
+  requestPasswordReset: (payload) =>
+    ipcRenderer.invoke("clerk:reset-request-code", payload),
+  submitPasswordReset: (payload) =>
+    ipcRenderer.invoke("clerk:reset-submit", payload),
   signOut: () => ipcRenderer.invoke("clerk:sign-out"),
   getSessionToken: () => ipcRenderer.invoke("clerk:get-token"),
   updateProfile: (update) =>

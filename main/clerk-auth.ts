@@ -3,15 +3,20 @@ import { logger } from "./logger";
 import { appState } from "./state";
 import {
   type ClerkAccountState,
+  type ClerkAuthPayload,
   type ClerkClientResource,
   type ClerkClientResponse,
   type ClerkErrorResponse,
   type ClerkProfileUpdate,
   type ClerkSessionResource,
   type ClerkSessionToken,
+  type ClerkSignInChallenge,
+  type ClerkSignInAttempt,
+  type ClerkSignInResponse,
   type ClerkTokenResponse,
   type ClerkUserResource,
   type ClerkUserSummary,
+  type ClerkVerificationResult,
 } from "./types";
 
 const CLERK_FRONTEND_API = "https://clerk.encorekaraoke.org";
@@ -29,16 +34,23 @@ const ACCOUNT_PROFILE_URL = `${ACCOUNT_PORTAL_URL}/user`;
 
 const PORTAL_POLL_INTERVAL_MS = 1500;
 const PORTAL_TIMEOUT_MS = 10 * 60 * 1000;
+const CLERK_REQUEST_TIMEOUT_MS = 20_000;
 
 function getClerkSession(): Session {
   return session.fromPartition(CLERK_PARTITION);
 }
 
-function buildClerkHeaders(cookie: string): Record<string, string> {
+function buildBaseHeaders(): Record<string, string> {
   return {
-    Cookie: `${CLERK_CLIENT_COOKIE}=${cookie}`,
     Origin: CLERK_ORIGIN,
     Referer: `${CLERK_ORIGIN}/`,
+  };
+}
+
+function buildClerkHeaders(cookie: string): Record<string, string> {
+  return {
+    ...buildBaseHeaders(),
+    Cookie: `${CLERK_CLIENT_COOKIE}=${cookie}`,
   };
 }
 
@@ -75,9 +87,11 @@ async function readClerkError(response: Response): Promise<string> {
 async function readClientCookie(ses: Session): Promise<string | null> {
   const cookies = await ses.cookies.get({ name: CLERK_CLIENT_COOKIE });
   const match =
+    cookies.find((cookie) => cookie.domain === "clerk.encorekaraoke.org") ??
     cookies.find((cookie) =>
       cookie.domain?.includes("clerk.encorekaraoke.org"),
-    ) ?? cookies[0];
+    ) ??
+    cookies[0];
   return match?.value || null;
 }
 
@@ -104,7 +118,7 @@ async function persistRotatedClientCookie(
       url: `${CLERK_FRONTEND_API}/`,
       name: CLERK_CLIENT_COOKIE,
       value,
-      domain: ".clerk.encorekaraoke.org",
+      domain: "clerk.encorekaraoke.org",
       path: "/",
       secure: true,
       httpOnly: true,
@@ -228,6 +242,413 @@ async function fetchAccountState(): Promise<ClerkAccountState> {
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+async function ensureClientCookie(ses: Session): Promise<string> {
+  const existing = await readClientCookie(ses);
+  if (existing) return existing;
+
+  const response = await fetch(fapiUrl("/v1/client"), {
+    headers: buildBaseHeaders(),
+    signal: AbortSignal.timeout(CLERK_REQUEST_TIMEOUT_MS),
+  });
+  await persistRotatedClientCookie(ses, response.headers.getSetCookie());
+
+  const cookie = await readClientCookie(ses);
+  if (!cookie) {
+    throw new Error(
+      "Could not start a secure sign-in. Check your connection and try again.",
+    );
+  }
+  return cookie;
+}
+
+function fapiUrl(path: string): string {
+  const url = new URL(`${CLERK_FRONTEND_API}${path}`);
+  url.searchParams.set("__clerk_api_version", CLERK_API_VERSION);
+  url.searchParams.set("_clerk_js_version", CLERK_JS_VERSION);
+  return url.toString();
+}
+
+function describePayloadError(
+  payload: ClerkErrorResponse,
+  status: number,
+): string {
+  const first = payload.errors?.[0];
+  return (
+    first?.long_message ||
+    first?.message ||
+    `Encore sign-in failed (${status}).`
+  );
+}
+
+async function clerkFormRequest(
+  ses: Session,
+  cookie: string,
+  path: string,
+  body: Record<string, string> = {},
+): Promise<ClerkSignInResponse> {
+  const response = await fetch(fapiUrl(path), {
+    method: "POST",
+    headers: {
+      ...buildClerkHeaders(cookie),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams(body).toString(),
+    signal: AbortSignal.timeout(CLERK_REQUEST_TIMEOUT_MS),
+  });
+  await persistRotatedClientCookie(ses, response.headers.getSetCookie());
+
+  let payload: ClerkSignInResponse = {};
+  try {
+    payload = (await response.json()) as ClerkSignInResponse;
+  } catch {
+    // A non-JSON body still carries the status code below.
+  }
+
+  if (!response.ok) {
+    throw new Error(describePayloadError(payload, response.status));
+  }
+  return payload;
+}
+
+function getSignInAttempt(
+  payload: ClerkSignInResponse,
+): ClerkSignInAttempt | null {
+  return payload.response ?? payload.meta?.client?.sign_in ?? null;
+}
+
+function requireEmail(value: unknown): string {
+  const email = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("Enter a valid email address.");
+  }
+  return email;
+}
+
+function requirePassword(value: unknown, label: string): string {
+  const password = typeof value === "string" ? value : "";
+  if (!password) throw new Error(label);
+  return password;
+}
+
+function requireCode(value: unknown): string {
+  const code = typeof value === "string" ? value.replace(/\s+/g, "") : "";
+  if (!/^\d{6}$/.test(code)) {
+    throw new Error("Enter the 6-digit code from your email.");
+  }
+  return code;
+}
+
+async function activateSession(
+  ses: Session,
+  attempt: ClerkSignInAttempt,
+): Promise<ClerkAccountState> {
+  const sessionId = attempt.created_session_id;
+  if (!sessionId) {
+    throw new Error("Clerk did not finish the sign-in. Try again.");
+  }
+
+  const cookie = await readClientCookie(ses);
+  if (cookie) {
+    const response = await fetch(
+      fapiUrl(`/v1/client/sessions/${sessionId}/touch`),
+      {
+        method: "POST",
+        headers: {
+          ...buildClerkHeaders(cookie),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: "intent=select_session",
+        signal: AbortSignal.timeout(CLERK_REQUEST_TIMEOUT_MS),
+      },
+    );
+    await persistRotatedClientCookie(ses, response.headers.getSetCookie());
+  }
+
+  cachedToken = null;
+  const state = await fetchAccountState();
+  if (state.signedIn) return state;
+
+  const freshCookie = await readClientCookie(ses);
+  if (freshCookie) {
+    const client = await requestClient(ses, freshCookie);
+    const fallback = stateFromClient(client);
+    if (fallback.signedIn) {
+      cachedToken = null;
+      return fallback;
+    }
+  }
+
+  throw new Error(
+    state.error ||
+      "Sign-in completed, but Encore could not load your account. Try again.",
+  );
+}
+
+interface PendingSignIn {
+  id: string;
+  email: string;
+  mode: "code" | "reset" | "second-factor";
+  emailAddressId?: string;
+}
+
+let pendingSignIn: PendingSignIn | null = null;
+
+/**
+ * Emails a second-factor code (MFA or Clerk Client Trust) and tells the
+ * renderer to open the code screen instead of failing the sign-in.
+ */
+async function prepareEmailSecondFactor(
+  ses: Session,
+  cookie: string,
+  attempt: ClerkSignInAttempt,
+  email: string,
+): Promise<ClerkAccountState> {
+  if (!attempt.id) {
+    throw new Error("Clerk did not return a sign-in attempt. Try again.");
+  }
+
+  const secondFactors = attempt.supported_second_factors ?? [];
+  const emailFactor = secondFactors.find(
+    (entry) => entry.strategy === "email_code",
+  );
+
+  if (!emailFactor) {
+    const hasPhoneCode = secondFactors.some(
+      (entry) => entry.strategy === "phone_code",
+    );
+    const hasAuthenticator = secondFactors.some(
+      (entry) => entry.strategy === "totp" || entry.strategy === "backup_code",
+    );
+    throw new Error(
+      hasAuthenticator
+        ? "This account uses an authenticator app for extra verification. Finish signing in from the account portal."
+        : hasPhoneCode
+          ? "This account needs a text-message code for extra verification. Finish signing in from the account portal."
+          : "This account needs an extra verification step Encore can't complete. Finish signing in from the account portal.",
+    );
+  }
+
+  const body: Record<string, string> = { strategy: "email_code" };
+  if (emailFactor.email_address_id) {
+    body.email_address_id = emailFactor.email_address_id;
+  }
+
+  await clerkFormRequest(
+    ses,
+    cookie,
+    `/v1/client/sign_ins/${attempt.id}/prepare_second_factor`,
+    body,
+  );
+
+  pendingSignIn = {
+    id: attempt.id,
+    email,
+    mode: "second-factor",
+    emailAddressId: emailFactor.email_address_id,
+  };
+
+  const challenge: ClerkSignInChallenge = {
+    type: "email_code",
+    email,
+    message: `We emailed a 6-digit code to ${email}. Enter it to finish signing in.`,
+  };
+
+  return {
+    signedIn: false,
+    user: null,
+    sessionId: null,
+    challenge,
+  };
+}
+
+async function finishSignInAttempt(
+  ses: Session,
+  cookie: string,
+  attempt: ClerkSignInAttempt | null,
+  email: string,
+): Promise<ClerkAccountState> {
+  if (!attempt) {
+    throw new Error("Clerk did not return a sign-in attempt. Try again.");
+  }
+
+  if (attempt.status === "complete") {
+    return activateSession(ses, attempt);
+  }
+
+  if (
+    attempt.status === "needs_second_factor" ||
+    attempt.status === "needs_client_trust"
+  ) {
+    return prepareEmailSecondFactor(ses, cookie, attempt, email);
+  }
+
+  if (attempt.status === "needs_new_password") {
+    throw new Error("Reset your password and try again.");
+  }
+
+  throw new Error("Clerk could not complete the sign-in. Try again.");
+}
+
+async function createEmailSignIn(
+  ses: Session,
+  cookie: string,
+  email: string,
+  mode: "code" | "reset",
+): Promise<ClerkSignInAttempt> {
+  const created = await clerkFormRequest(ses, cookie, "/v1/client/sign_ins", {
+    identifier: email,
+  });
+  const attempt = getSignInAttempt(created);
+  if (!attempt?.id) {
+    throw new Error("Clerk could not start the sign-in. Try again.");
+  }
+
+  const strategy =
+    mode === "reset" ? "reset_password_email_code" : "email_code";
+  const factor = attempt.supported_first_factors?.find(
+    (entry) => entry.strategy === strategy,
+  );
+  if (!factor?.email_address_id) {
+    throw new Error("This account has no email address available for a code.");
+  }
+
+  await clerkFormRequest(
+    ses,
+    cookie,
+    `/v1/client/sign_ins/${attempt.id}/prepare_first_factor`,
+    { strategy, email_address_id: factor.email_address_id },
+  );
+
+  pendingSignIn = { id: attempt.id, email, mode };
+  return attempt;
+}
+
+async function signInWithPassword(
+  payload: ClerkAuthPayload | undefined,
+): Promise<ClerkAccountState> {
+  const email = requireEmail(payload?.email);
+  const password = requirePassword(
+    payload?.password,
+    "Enter your password to sign in.",
+  );
+
+  const ses = getClerkSession();
+  const cookie = await ensureClientCookie(ses);
+  const result = await clerkFormRequest(ses, cookie, "/v1/client/sign_ins", {
+    identifier: email,
+    password,
+  });
+  return finishSignInAttempt(ses, cookie, getSignInAttempt(result), email);
+}
+
+async function requestEmailCode(
+  payload: ClerkAuthPayload | undefined,
+): Promise<ClerkVerificationResult> {
+  const email = requireEmail(payload?.email);
+  const ses = getClerkSession();
+  const cookie = await ensureClientCookie(ses);
+
+  // A pending second-factor (MFA / client trust) challenge has to be re-sent
+  // on the same sign-in attempt, not restarted as a new sign-in.
+  if (
+    pendingSignIn?.mode === "second-factor" &&
+    pendingSignIn.email === email
+  ) {
+    const body: Record<string, string> = { strategy: "email_code" };
+    if (pendingSignIn.emailAddressId) {
+      body.email_address_id = pendingSignIn.emailAddressId;
+    }
+    await clerkFormRequest(
+      ses,
+      cookie,
+      `/v1/client/sign_ins/${pendingSignIn.id}/prepare_second_factor`,
+      body,
+    );
+    return { sent: true, email };
+  }
+
+  await createEmailSignIn(ses, cookie, email, "code");
+  return { sent: true, email };
+}
+
+async function verifyEmailCode(
+  payload: ClerkAuthPayload | undefined,
+): Promise<ClerkAccountState> {
+  const code = requireCode(payload?.code);
+  if (
+    !pendingSignIn ||
+    (pendingSignIn.mode !== "code" && pendingSignIn.mode !== "second-factor")
+  ) {
+    throw new Error("Request a new sign-in code to continue.");
+  }
+
+  const ses = getClerkSession();
+  const cookie = await ensureClientCookie(ses);
+  const action =
+    pendingSignIn.mode === "code"
+      ? "attempt_first_factor"
+      : "attempt_second_factor";
+  const { id, email } = pendingSignIn;
+  const result = await clerkFormRequest(
+    ses,
+    cookie,
+    `/v1/client/sign_ins/${id}/${action}`,
+    { strategy: "email_code", code },
+  );
+  pendingSignIn = null;
+  return finishSignInAttempt(ses, cookie, getSignInAttempt(result), email);
+}
+
+async function requestPasswordReset(
+  payload: ClerkAuthPayload | undefined,
+): Promise<ClerkVerificationResult> {
+  const email = requireEmail(payload?.email);
+  const ses = getClerkSession();
+  const cookie = await ensureClientCookie(ses);
+  await createEmailSignIn(ses, cookie, email, "reset");
+  return { sent: true, email };
+}
+
+async function submitPasswordReset(
+  payload: ClerkAuthPayload | undefined,
+): Promise<ClerkAccountState> {
+  const code = requireCode(payload?.code);
+  const password = requirePassword(
+    payload?.password,
+    "Enter a new password.",
+  );
+  if (password.length < 8) {
+    throw new Error("Use at least 8 characters for your new password.");
+  }
+  if (!pendingSignIn || pendingSignIn.mode !== "reset") {
+    throw new Error("Request a new reset code to continue.");
+  }
+
+  const ses = getClerkSession();
+  const cookie = await ensureClientCookie(ses);
+  const email = pendingSignIn.email;
+  const verified = await clerkFormRequest(
+    ses,
+    cookie,
+    `/v1/client/sign_ins/${pendingSignIn.id}/attempt_first_factor`,
+    { strategy: "reset_password_email_code", code },
+  );
+
+  let attempt = getSignInAttempt(verified);
+  if (attempt?.status !== "complete") {
+    const reset = await clerkFormRequest(
+      ses,
+      cookie,
+      `/v1/client/sign_ins/${pendingSignIn.id}/reset_password`,
+      { password },
+    );
+    attempt = getSignInAttempt(reset);
+  }
+
+  pendingSignIn = null;
+  return finishSignInAttempt(ses, cookie, attempt, email);
 }
 
 function decodeTokenExpiry(token: string): number | null {
@@ -589,6 +1010,34 @@ export function registerClerkIpc(): void {
 
   ipcMain.handle("clerk:sign-up", () =>
     openPortalWindow({ url: ACCOUNT_SIGN_UP_URL, awaitSignIn: true }),
+  );
+
+  ipcMain.handle(
+    "clerk:sign-in-password",
+    (_event, payload: ClerkAuthPayload | undefined) =>
+      signInWithPassword(payload),
+  );
+
+  ipcMain.handle(
+    "clerk:sign-in-request-code",
+    (_event, payload: ClerkAuthPayload | undefined) => requestEmailCode(payload),
+  );
+
+  ipcMain.handle(
+    "clerk:sign-in-verify-code",
+    (_event, payload: ClerkAuthPayload | undefined) => verifyEmailCode(payload),
+  );
+
+  ipcMain.handle(
+    "clerk:reset-request-code",
+    (_event, payload: ClerkAuthPayload | undefined) =>
+      requestPasswordReset(payload),
+  );
+
+  ipcMain.handle(
+    "clerk:reset-submit",
+    (_event, payload: ClerkAuthPayload | undefined) =>
+      submitPasswordReset(payload),
   );
 
   ipcMain.handle("clerk:sign-out", () => signOut());
