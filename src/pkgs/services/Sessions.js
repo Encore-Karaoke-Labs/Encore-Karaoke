@@ -1,4 +1,10 @@
 import { Peer } from "peerjs";
+import {
+  createSessionTransport,
+  getSessionTransportOptions,
+  normalizeSessionTransport,
+} from "./sessionTransports/index.js";
+import { DEFAULT_LIVEKIT_TOKEN_URL } from "./sessionTransports/LiveKitTransport.js";
 
 const pkg = {
   name: "Encore Sessions Service",
@@ -21,7 +27,7 @@ const pkg = {
   data: {
     // Increment this ONLY when network structures, event behaviors,
     // or state payloads change in a way that breaks compatibility.
-    PROTOCOL_VERSION: 4,
+    PROTOCOL_VERSION: 5,
     SESSION_ID_LENGTH: 16,
     CHECKSUM_LENGTH: 4,
     LYRICS_CHUNK_SIZE: 48000,
@@ -32,10 +38,16 @@ const pkg = {
     isHost: false,
     nickname: "Guest",
     connections: new Map(),
-    mediaCalls: new Map(),
-    micCalls: new Map(),
-    cameraCalls: new Map(),
-    incomingCameraCalls: new Map(),
+
+    transportName: "peerjs",
+    transport: null,
+    _transportStartToken: 0,
+    _transportStarting: false,
+    _transportFailedName: null,
+    _transportRetryAt: 0,
+    _transportFailureCount: 0,
+    _transportSyncPending: false,
+
     cameraStreams: {},
     cameraEnabled: false,
     cameraOwnsLocal: false,
@@ -49,8 +61,6 @@ const pkg = {
     _lastPlayTrigger: null,
     _lastRoutedEveryoneAudible: null,
     _routing: false,
-    _loungeRetryTimers: new Map(),
-    _loungeRetryCounts: new Map(),
 
     state: {
       mode: "lounge",
@@ -58,6 +68,7 @@ const pkg = {
       nowPlaying: null,
       playTrigger: null,
       everyoneAudible: false,
+      transport: "peerjs",
       queue: [],
       participants: [],
       leaderboard: [],
@@ -123,13 +134,207 @@ const pkg = {
       };
     },
 
-    enhanceSDP: function (sdp) {
-      let newSdp = sdp;
-      newSdp = newSdp.replace(
-        /useinbandfec=1/g,
-        "useinbandfec=1; stereo=1; sprop-stereo=1; maxaveragebitrate=160000",
+    /**
+     * Returns metadata for every media transport the host can choose from.
+     * @returns {Array<Object>}
+     */
+    getTransportOptions: function () {
+      return getSessionTransportOptions();
+    },
+
+    /**
+     * Returns the Identity service.
+     * @returns {object|null}
+     */
+    getIdentityService: function () {
+      return pkg.root?.Processes?.getService("IdentitySvc")?.data || null;
+    },
+
+    /**
+     * Maps a transport participant identity onto a Session participant id.
+     *
+     * @param {string|null} identity
+     * @returns {string|null}
+     */
+    getParticipantIdForTransportIdentity: function (identity) {
+      if (!identity) return null;
+
+      const value = String(identity);
+      if (this.peer?.id === value) return value;
+
+      const participant = this.state.participants.find(
+        (entry) => entry.userId && String(entry.userId) === value,
       );
-      return newSdp;
+      return participant?.id || null;
+    },
+
+    /**
+     * Reads the LiveKit token endpoint.
+     * @returns {Promise<string>}
+     */
+    getLiveKitTokenUrl: async function () {
+      try {
+        return (
+          (await window.config?.getItem?.("sessionsConfig.livekitTokenUrl")) ||
+          DEFAULT_LIVEKIT_TOKEN_URL
+        );
+      } catch (error) {
+        console.warn("[SESSIONS] Could not read the LiveKit token URL:", error);
+        return DEFAULT_LIVEKIT_TOKEN_URL;
+      }
+    },
+
+    /**
+     * Replaces the active media transport.
+     *
+     * @param {string} name - Transport id from getTransportOptions().
+     * @returns {Promise<boolean>} Whether the requested transport is active.
+     */
+    startTransport: async function (name) {
+      const id = normalizeSessionTransport(name);
+      const token = ++this._transportStartToken;
+
+      const previous = this.transport;
+      this.transport = null;
+      this._transportStarting = true;
+      if (previous) {
+        try {
+          await previous.destroy();
+        } catch (error) {
+          console.warn(
+            "[SESSIONS] Could not stop the previous media transport:",
+            error,
+          );
+        }
+      }
+
+      if (token !== this._transportStartToken) return false;
+
+      this.transportName = id;
+      const transport = createSessionTransport(id, this);
+      this.transport = transport;
+
+      try {
+        await transport.connect();
+        if (token !== this._transportStartToken) {
+          await transport.destroy();
+          return false;
+        }
+
+        this._transportStarting = false;
+        this._transportFailedName = null;
+        this._transportRetryAt = 0;
+        this._transportFailureCount = 0;
+        this.handleMediaRouting();
+        return true;
+      } catch (error) {
+        if (token !== this._transportStartToken) return false;
+
+        this._transportStarting = false;
+        this.transport = null;
+
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(
+          `[SESSIONS] Could not start the ${id} media transport:`,
+          error,
+        );
+        transport.setStatus("error", message);
+
+        this._transportFailedName = id;
+        const permanent = Boolean(error && error.permanent);
+        this._transportFailureCount += 1;
+        if (permanent) this._transportFailureCount = 3;
+        this._transportRetryAt = permanent
+          ? Date.now() + 60 * 60 * 1000
+          : Date.now() +
+            Math.min(30000 * 2 ** (this._transportFailureCount - 1), 120000);
+
+        if (id !== "peerjs" && this.isHost) {
+          document.dispatchEvent(
+            new CustomEvent("Encore.Sessions.TransportFallback", {
+              detail: {
+                requested: id,
+                transport: "peerjs",
+                error: message,
+              },
+            }),
+          );
+          this.state.transport = "peerjs";
+          return this.startTransport("peerjs");
+        }
+
+        return false;
+      }
+    },
+
+    /**
+     * Stops the active media transport without ending the Session.
+     * @returns {Promise<void>}
+     */
+    stopTransport: async function () {
+      this._transportStartToken++;
+      this._transportStarting = false;
+      this._transportFailedName = null;
+      this._transportRetryAt = 0;
+      this._transportFailureCount = 0;
+      this._transportSyncPending = false;
+
+      const transport = this.transport;
+      this.transport = null;
+      if (!transport) return;
+
+      try {
+        await transport.destroy();
+      } catch (error) {
+        console.warn("[SESSIONS] Could not stop the media transport:", error);
+      }
+    },
+
+    /**
+     * Aligns the local media transport with the transport stored in Session
+     * state.
+     * @returns {Promise<void>}
+     */
+    syncTransportFromState: async function () {
+      if (this.isDisconnecting) return;
+
+      const desired = normalizeSessionTransport(this.state.transport);
+      if (desired === this.transportName && this.transport) return;
+
+      if (this._transportStarting) {
+        this._transportSyncPending = true;
+        return;
+      }
+
+      if (desired === this._transportFailedName) {
+        if (this._transportFailureCount >= 3) return;
+        if (Date.now() < this._transportRetryAt) return;
+      }
+
+      await this.startTransport(desired);
+
+      if (this._transportSyncPending) {
+        this._transportSyncPending = false;
+        void this.syncTransportFromState();
+      }
+    },
+
+    /**
+     * Changes the room media transport.
+     * @param {string} name
+     * @returns {Promise<boolean>} Whether the requested transport is active.
+     */
+    setTransport: async function (name) {
+      if (!this.isHost) return false;
+
+      const id = normalizeSessionTransport(name);
+      if (id === this.transportName) return true;
+
+      const started = await this.startTransport(id);
+      this.state.transport = this.transportName;
+      this.broadcastState();
+      this.handleMediaRouting();
+      return started;
     },
 
     /**
@@ -209,8 +414,7 @@ const pkg = {
           const previous = this.cameraStreams[source];
           this.cameraStreams[source] = stream;
 
-          // Rebuild outgoing calls so peers receive the replacement stream.
-          if (previous) this.closeOutgoingCameraCallsForSource(source);
+          if (previous) this.transport?.handleCameraSourceChanged?.(source);
           this.publishCameraStatus();
         };
 
@@ -229,7 +433,7 @@ const pkg = {
 
           delete this.cameraStreams[source];
           if (source === "local") this.cameraOwnsLocal = false;
-          this.closeOutgoingCameraCallsForSource(source);
+          this.transport?.handleCameraSourceChanged?.(source);
 
           if (this.getLocalCameraSources().length === 0) {
             this.stopCamera(false, false);
@@ -275,54 +479,20 @@ const pkg = {
 
         this.peer.on("connection", (conn) => this.setupConnection(conn));
 
-        this.peer.on("call", (call) => {
-          const callKind = call.metadata?.kind;
-
-          if (callKind === "camera") {
-            call.answer();
-            this.attachCameraCall(call.peer, call);
-            return;
-          }
-
-          const isPerformanceCall =
-            callKind === "performance" ||
-            (this.state.mode === "performance" &&
-              call.peer === this.state.singerId);
-          const isMicCall =
-            this.state.mode === "performance" &&
-            this.state.everyoneAudible &&
-            (callKind === "mic" || !isPerformanceCall);
-
-          if (isPerformanceCall) {
-            call.answer(undefined, {
-              sdpTransform: (sdp) => this.enhanceSDP(sdp),
-            });
-            call.on("stream", (remoteStream) => {
-              document.dispatchEvent(
-                new CustomEvent("Encore.Sessions.RemoteStream", {
-                  detail: { id: call.peer, stream: remoteStream },
-                }),
-              );
-            });
-            this.mediaCalls.set(call.peer, call);
-            this.trackCallClose(call.peer, call);
-          } else if (isMicCall) {
-            const micStream =
-              this.peer.id === this.state.singerId
-                ? null
-                : this.createSessionCallStream();
-            call.answer(micStream || undefined);
-            this.attachMicCall(call.peer, call, micStream);
-          } else {
-            const micStream = this.createSessionCallStream();
-            call.answer(micStream || undefined);
-            this.attachLoungeCall(call.peer, call, micStream);
-          }
-        });
+        this.peer.on("call", (call) =>
+          this.transport?.handleIncomingCall(call),
+        );
       });
     },
 
-    hostRoom: async function (profile, collisionResolverFn) {
+    /**
+     * Creates a Session room.
+     * @param {Object} profile - Singer profile.
+     * @param {Function} collisionResolverFn - Nickname collision resolver.
+     * @param {{transport?: string}} [options] - Room options.
+     * @returns {Promise<string>} The room id.
+     */
+    hostRoom: async function (profile, collisionResolverFn, options = {}) {
       this.isHost = true;
       this.collisionResolver = collisionResolverFn;
       this.isMuted = false;
@@ -336,6 +506,10 @@ const pkg = {
       const { code } = await this.createSessionCode(profile.nickname);
       const myId = await this.initPeer(profile.nickname, code);
       this.roomId = myId;
+
+      this.transportName = normalizeSessionTransport(options.transport);
+      this.state.transport = this.transportName;
+
       this.state.participants.push({
         id: myId,
         nickname: profile.nickname,
@@ -351,6 +525,10 @@ const pkg = {
         cameraSources: [],
         supportedGames: profile.supportedGames || [],
       });
+
+      await this.startTransport(this.transportName);
+      this.state.transport = this.transportName;
+
       this.broadcastState();
       this.handleMediaRouting();
       return myId;
@@ -395,6 +573,20 @@ const pkg = {
           const incomingProfile = conn.metadata.profile || {
             nickname: conn.metadata.nickname || "Guest",
           };
+
+          if (
+            this.state.transport === "livekit" &&
+            !incomingProfile.userIdVerified
+          ) {
+            console.warn(
+              `[SESSIONS] Rejected peer ${conn.peer}: this LiveKit Session requires an Encore account.`,
+            );
+            this.connections.delete(conn.peer);
+            conn.send({ type: "kicked", reason: "account_required" });
+            setTimeout(() => conn.close(), 500);
+            return;
+          }
+
           const existingNames = this.state.participants.map((p) => p.nickname);
 
           let uniqueName = incomingProfile.nickname || "Guest";
@@ -486,6 +678,8 @@ const pkg = {
               }),
             );
           }
+
+          void this.syncTransportFromState();
           this.handleMediaRouting();
         } else if (data.type === "profile_update" && this.isHost) {
           const participant = this.state.participants.find(
@@ -743,450 +937,6 @@ const pkg = {
     },
 
     /**
-     * Creates an isolated audio stream for a single media call by cloning the
-     * Session microphone track
-     *
-     * @returns {MediaStream|null}
-     */
-    createSessionCallStream: function () {
-      const source = this.getSessionMicStream();
-      const sourceTrack = source?.getAudioTracks?.()[0];
-      if (!sourceTrack) return null;
-
-      if (sourceTrack.readyState === "ended") {
-        console.warn(
-          "[SESSIONS] Session microphone track has ended; outgoing voice will be silent.",
-        );
-        return null;
-      }
-
-      const track = sourceTrack.clone();
-      if ("contentHint" in track) track.contentHint = "speech";
-      return new MediaStream([track]);
-    },
-
-    /**
-     * Stops every track in a stream this service created for a call.
-     *
-     * @param {MediaStream|null} stream - Stream to release.
-     */
-    stopCallStream: function (stream) {
-      if (!stream) return;
-
-      for (const track of stream.getTracks()) {
-        try {
-          track.stop();
-        } catch (error) {
-          console.warn("[SESSIONS] Could not stop a call track:", error);
-        }
-      }
-    },
-
-    /**
-     * Stops the track this service cloned for a media call, if any. Streams
-     * owned by other services (for example the performance stream) are left
-     * untouched.
-     *
-     * @param {Object|null} call - PeerJS media connection.
-     */
-    releaseCallStream: function (call) {
-      if (!call) return;
-
-      clearTimeout(call._encoreStreamTimer);
-
-      const stream = call._encoreOwnedStream;
-      if (!stream) return;
-
-      call._encoreOwnedStream = null;
-      this.stopCallStream(stream);
-    },
-
-    /**
-     * Returns whether a media call can no longer carry audio.
-     *
-     * @param {Object|null} call - PeerJS media connection.
-     * @returns {boolean}
-     */
-    isMediaCallDead: function (call) {
-      if (!call) return true;
-
-      const pc = call.peerConnection;
-      if (!pc) return false;
-
-      const createdAt = Number(call._encoreCreatedAt) || 0;
-      const age = createdAt > 0 ? Date.now() - createdAt : 0;
-      const connection = pc.connectionState;
-
-      if (connection === "connected") {
-        return call._encoreGotStream === false && age > 10000;
-      }
-      if (connection === "failed" || connection === "closed") return true;
-
-      const ice = pc.iceConnectionState;
-      if (ice === "failed" || ice === "closed") return true;
-
-      return age > 12000;
-    },
-
-    /**
-     * Closes a tracked media call on purpose, releasing its cloned track. An
-     * intentional close never schedules a reconnect.
-     *
-     * @param {Object|null} call - PeerJS media connection.
-     */
-    shutdownMediaCall: function (call) {
-      if (!call) return;
-
-      call._encoreIntentionalClose = true;
-      this.releaseCallStream(call);
-      try {
-        call.close();
-      } catch (error) {
-        console.warn("[SESSIONS] Could not close media call:", error);
-      }
-    },
-
-    /**
-     * Forgets and closes a tracked outgoing media call.
-     *
-     * @param {string} peerId - Participant peer id.
-     */
-    dropMediaCall: function (peerId) {
-      const call = this.mediaCalls.get(peerId);
-      if (!call) return;
-
-      this.mediaCalls.delete(peerId);
-      this.shutdownMediaCall(call);
-    },
-
-    /**
-     * Removes a performance call from the routing map when it closes so a
-     * later routing pass can recreate it.
-     *
-     * @param {string} peerId - Participant peer id.
-     * @param {Object} call - PeerJS media connection.
-     */
-    trackCallClose: function (peerId, call) {
-      if (!call) return;
-
-      call._encoreCreatedAt = call._encoreCreatedAt || Date.now();
-
-      const cleanup = () => {
-        if (this.mediaCalls.get(peerId) !== call) return;
-        this.mediaCalls.delete(peerId);
-      };
-
-      call.on("close", cleanup);
-      call.on("error", cleanup);
-    },
-
-    /**
-     * Tracks a Lounge (or fallback) voice call and re-routes when it fails.
-     *
-     * @param {string} peerId - Unique ID of the peer on the call.
-     * @param {Object} call - PeerJS media connection.
-     * @param {MediaStream|null} [ownedStream] - Stream cloned for this call.
-     */
-    attachLoungeCall: function (peerId, call, ownedStream = null) {
-      if (!call) return;
-
-      call._encoreOwnedStream = ownedStream || null;
-      call._encoreCreatedAt = call._encoreCreatedAt || Date.now();
-      call._encoreGotStream = false;
-      this.mediaCalls.set(peerId, call);
-
-      const markConnected = () => {
-        this._loungeRetryCounts.delete(peerId);
-      };
-
-      call.on("stream", (remoteStream) => {
-        call._encoreGotStream = true;
-        markConnected();
-        document.dispatchEvent(
-          new CustomEvent("Encore.Sessions.LoungeStream", {
-            detail: { id: peerId, stream: remoteStream },
-          }),
-        );
-      });
-
-      call._encoreStreamTimer = setTimeout(() => {
-        if (this.mediaCalls.get(peerId) !== call) return;
-        if (call._encoreGotStream) return;
-
-        const attempts = this._loungeRetryCounts.get(peerId) || 0;
-        if (attempts >= 5) {
-          console.warn(
-            `[SESSIONS] Lounge call with ${peerId} stayed silent; giving up reconnecting.`,
-          );
-          return;
-        }
-
-        console.warn(
-          `[SESSIONS] Lounge call with ${peerId} never delivered audio; recreating.`,
-        );
-        this.dropMediaCall(peerId);
-        this.scheduleLoungeRetry(peerId);
-      }, 10000);
-
-      const cleanup = () => {
-        if (this.mediaCalls.get(peerId) !== call) return;
-        this.mediaCalls.delete(peerId);
-        clearTimeout(call._encoreStreamTimer);
-        this.releaseCallStream(call);
-        document.dispatchEvent(
-          new CustomEvent("Encore.Sessions.PeerDisconnected", {
-            detail: peerId,
-          }),
-        );
-        if (!call._encoreIntentionalClose) this.scheduleLoungeRetry(peerId);
-      };
-
-      call.on("close", cleanup);
-      call.on("error", cleanup);
-
-      const pc = call.peerConnection;
-      if (pc && typeof pc.addEventListener === "function") {
-        pc.addEventListener("connectionstatechange", () => {
-          if (pc.connectionState === "connected") {
-            markConnected();
-          } else if (
-            pc.connectionState === "failed" ||
-            pc.connectionState === "closed"
-          ) {
-            cleanup();
-          }
-        });
-      }
-    },
-
-    /**
-     * Rebuilds a dead Lounge call after a short, growing delay.
-     *
-     * @param {string} peerId - Unique ID of the peer to reconnect to.
-     */
-    scheduleLoungeRetry: function (peerId) {
-      if (this.isDisconnecting) return;
-      if (this.state.mode !== "lounge") return;
-      if (!this.state.participants.some((p) => p.id === peerId)) return;
-      if (this._loungeRetryTimers.has(peerId)) return;
-
-      const attempt = this._loungeRetryCounts.get(peerId) || 0;
-      this._loungeRetryCounts.set(peerId, attempt + 1);
-      const delay = Math.min(1500 * Math.pow(2, Math.min(attempt, 4)), 20000);
-
-      const timer = setTimeout(() => {
-        this._loungeRetryTimers.delete(peerId);
-        if (this.isDisconnecting) return;
-        if (this.state.mode !== "lounge") return;
-        if (!this.state.participants.some((p) => p.id === peerId)) return;
-        this.handleMediaRouting();
-      }, delay);
-
-      this._loungeRetryTimers.set(peerId, timer);
-    },
-
-    /**
-     * Cancels any pending Lounge reconnect for a peer.
-     *
-     * @param {string} peerId - Unique ID of the peer.
-     */
-    clearLoungeRetry: function (peerId) {
-      const timer = this._loungeRetryTimers.get(peerId);
-      if (timer) clearTimeout(timer);
-      this._loungeRetryTimers.delete(peerId);
-      this._loungeRetryCounts.delete(peerId);
-    },
-
-    /**
-     * Tracks an audience microphone call and routes its remote stream to the
-     * local audio output.
-     * @param {string} peerId - Unique ID of the peer sending the microphone.
-     * @param {Object} call - PeerJS media connection.
-     * @param {MediaStream|null} [ownedStream] - Stream cloned for this call.
-     */
-    attachMicCall: function (peerId, call, ownedStream = null) {
-      if (!call) return;
-
-      call._encoreOwnedStream = ownedStream || null;
-      call._encoreCreatedAt = call._encoreCreatedAt || Date.now();
-      this.micCalls.set(peerId, call);
-
-      call.on("stream", (remoteStream) => {
-        document.dispatchEvent(
-          new CustomEvent("Encore.Sessions.LoungeStream", {
-            detail: { id: peerId, stream: remoteStream },
-          }),
-        );
-      });
-
-      const cleanup = () => {
-        if (this.micCalls.get(peerId) !== call) return;
-        this.micCalls.delete(peerId);
-        this.releaseCallStream(call);
-        document.dispatchEvent(
-          new CustomEvent("Encore.Sessions.PeerDisconnected", {
-            detail: peerId,
-          }),
-        );
-      };
-
-      call.on("close", cleanup);
-      call.on("error", cleanup);
-    },
-
-    /**
-     * Builds the map key for one participant camera source.
-     * @param {"local"|"remote"} source
-     * @param {string} peerId
-     * @returns {string}
-     */
-    cameraCallKey: function (source, peerId) {
-      return `${source}:${peerId}`;
-    },
-
-    /**
-     * Splits a camera call key back into its source and peer id.
-     * @param {string} key
-     * @returns {{source: "local"|"remote", peerId: string}}
-     */
-    parseCameraCallKey: function (key) {
-      const separator = key.indexOf(":");
-      return {
-        source: key.slice(0, separator) === "remote" ? "remote" : "local",
-        peerId: key.slice(separator + 1),
-      };
-    },
-
-    /**
-     * Tracks an incoming participant camera call.
-     * @param {string} peerId - Unique ID of the peer sending their camera.
-     * @param {Object} call - PeerJS media connection.
-     */
-    attachCameraCall: function (peerId, call) {
-      const source =
-        call.metadata?.cameraSource === "remote" ? "remote" : "local";
-      const key = this.cameraCallKey(source, peerId);
-
-      const existing = this.incomingCameraCalls.get(key);
-      if (existing && existing !== call) {
-        try {
-          existing.close();
-        } catch (error) {
-          console.warn("[SESSIONS] Could not replace camera call:", error);
-        }
-      }
-
-      this.incomingCameraCalls.set(key, call);
-
-      const publishStream = (stream) => {
-        document.dispatchEvent(
-          new CustomEvent("Encore.Sessions.CameraStream", {
-            detail: { id: peerId, source, stream },
-          }),
-        );
-      };
-
-      call.on("stream", publishStream);
-
-      const cleanup = () => {
-        if (this.incomingCameraCalls.get(key) !== call) return;
-        this.incomingCameraCalls.delete(key);
-        document.dispatchEvent(
-          new CustomEvent("Encore.Sessions.CameraStreamEnded", {
-            detail: { id: peerId, source },
-          }),
-        );
-      };
-
-      call.on("close", cleanup);
-      call.on("error", cleanup);
-    },
-
-    /**
-     * Creates outgoing camera calls for every other room participant and every
-     * published camera.
-     */
-    handleCameraRouting: function () {
-      if (!this.peer) return;
-
-      const sources = this.cameraEnabled ? this.getLocalCameraSources() : [];
-      if (sources.length === 0) {
-        this.closeOutgoingCameraCalls();
-        return;
-      }
-
-      const validPeers = new Set(
-        this.state.participants
-          .map((participant) => participant.id)
-          .filter((id) => id !== this.peer.id),
-      );
-
-      for (const key of [...this.cameraCalls.keys()]) {
-        const { source, peerId } = this.parseCameraCallKey(key);
-        if (!validPeers.has(peerId) || !sources.includes(source)) {
-          this.closeOutgoingCameraCall(key);
-        }
-      }
-
-      for (const peerId of validPeers) {
-        for (const source of sources) {
-          const key = this.cameraCallKey(source, peerId);
-          if (this.cameraCalls.has(key)) continue;
-
-          const call = this.peer.call(peerId, this.cameraStreams[source], {
-            metadata: { kind: "camera", cameraSource: source },
-          });
-
-          if (!call) continue;
-
-          this.cameraCalls.set(key, call);
-
-          const cleanup = () => {
-            if (this.cameraCalls.get(key) !== call) return;
-            this.cameraCalls.delete(key);
-          };
-
-          call.on("close", cleanup);
-          call.on("error", cleanup);
-        }
-      }
-    },
-
-    closeOutgoingCameraCall: function (key) {
-      const call = this.cameraCalls.get(key);
-      if (!call) return;
-
-      this.cameraCalls.delete(key);
-      try {
-        call.close();
-      } catch (error) {
-        console.warn("[SESSIONS] Could not close camera call:", error);
-      }
-    },
-
-    closeOutgoingCameraCallsForSource: function (source) {
-      for (const key of [...this.cameraCalls.keys()]) {
-        if (this.parseCameraCallKey(key).source === source) {
-          this.closeOutgoingCameraCall(key);
-        }
-      }
-    },
-
-    closeOutgoingCameraCallsForPeer: function (peerId) {
-      for (const key of [...this.cameraCalls.keys()]) {
-        if (this.parseCameraCallKey(key).peerId === peerId) {
-          this.closeOutgoingCameraCall(key);
-        }
-      }
-    },
-
-    closeOutgoingCameraCalls: function () {
-      for (const key of [...this.cameraCalls.keys()]) {
-        this.closeOutgoingCameraCall(key);
-      }
-    },
-
-    /**
      * Enables or disables the local Session camera.
      * @param {boolean} enabled - Whether to start the camera.
      * @returns {Promise<boolean>} Whether the requested state was applied.
@@ -1281,7 +1031,7 @@ const pkg = {
      */
     stopCamera: function (notify = true, releaseSource = true) {
       this.cameraStartToken += 1;
-      this.closeOutgoingCameraCalls();
+      this.transport?.closeOutgoingCameraCalls?.();
 
       const cameraSvc = this.getCameraService();
       const ownsLocal = this.cameraOwnsLocal;
@@ -1432,7 +1182,7 @@ const pkg = {
         }),
       );
 
-      this.handleCameraRouting();
+      this.handleMediaRouting();
     },
 
     /**
@@ -1509,39 +1259,7 @@ const pkg = {
       if (conn) conn.close();
       this.connections.delete(peerId);
 
-      if (this.mediaCalls.has(peerId)) {
-        const call = this.mediaCalls.get(peerId);
-        this.mediaCalls.delete(peerId);
-        this.shutdownMediaCall(call);
-      }
-
-      if (this.micCalls.has(peerId)) {
-        const call = this.micCalls.get(peerId);
-        this.micCalls.delete(peerId);
-        this.shutdownMediaCall(call);
-      }
-
-      this.clearLoungeRetry(peerId);
-
-      this.closeOutgoingCameraCallsForPeer(peerId);
-
-      for (const key of [...this.incomingCameraCalls.keys()]) {
-        if (this.parseCameraCallKey(key).peerId !== peerId) continue;
-
-        const incomingCameraCall = this.incomingCameraCalls.get(key);
-        this.incomingCameraCalls.delete(key);
-        try {
-          incomingCameraCall.close();
-        } catch (error) {
-          console.warn("[SESSIONS] Could not close camera call:", error);
-        }
-
-        document.dispatchEvent(
-          new CustomEvent("Encore.Sessions.CameraStreamEnded", {
-            detail: { id: peerId, source: this.parseCameraCallKey(key).source },
-          }),
-        );
-      }
+      this.transport?.handlePeerLeft(peerId);
 
       document.dispatchEvent(
         new CustomEvent("Encore.Sessions.PeerDisconnected", {
@@ -2109,14 +1827,6 @@ const pkg = {
       this._lastRoutedEveryoneAudible = this.state.everyoneAudible;
 
       if (modeChanged || playTriggerChanged) {
-        for (let call of this.mediaCalls.values()) {
-          this.shutdownMediaCall(call);
-        }
-        this.mediaCalls.clear();
-        for (let call of this.micCalls.values()) {
-          this.shutdownMediaCall(call);
-        }
-        this.micCalls.clear();
         document.dispatchEvent(new CustomEvent("Encore.Sessions.ClearStreams"));
         document.dispatchEvent(
           new CustomEvent("Encore.Sessions.LyricsData", { detail: null }),
@@ -2125,123 +1835,13 @@ const pkg = {
           new CustomEvent("Encore.Sessions.PianoRollData", { detail: null }),
         );
         this.currentPerformanceStream = null;
-      } else if (audibleChanged) {
-        for (let [peerId, call] of this.micCalls) {
-          this.shutdownMediaCall(call);
-          document.dispatchEvent(
-            new CustomEvent("Encore.Sessions.PeerDisconnected", {
-              detail: peerId,
-            }),
-          );
-        }
-        this.micCalls.clear();
       }
 
-      if (this.state.mode === "lounge") {
-        if (this.getSessionMicStream()) {
-          for (let p of this.state.participants) {
-            if (p.id === this.peer.id) continue;
-
-            const existing = this.mediaCalls.get(p.id);
-            if (existing && !this.isMediaCallDead(existing)) continue;
-            if (existing) this.dropMediaCall(p.id);
-
-            if (!(this.peer.id > p.id)) continue;
-
-            const callStream = this.createSessionCallStream();
-            if (!callStream) continue;
-
-            const call = this.peer.call(p.id, callStream);
-            if (!call) {
-              this.stopCallStream(callStream);
-              continue;
-            }
-            this.attachLoungeCall(p.id, call, callStream);
-          }
-        }
-      } else if (this.state.mode === "performance") {
-        if (
-          this.state.singerId === this.peer.id &&
-          this.currentPerformanceStream
-        ) {
-          for (let p of this.state.participants) {
-            if (p.id === this.peer.id) continue;
-
-            const existing = this.mediaCalls.get(p.id);
-            if (existing && !this.isMediaCallDead(existing)) continue;
-            if (existing) this.dropMediaCall(p.id);
-
-            const call = this.peer.call(p.id, this.currentPerformanceStream, {
-              sdpTransform: (sdp) => this.enhanceSDP(sdp),
-              metadata: { kind: "performance" },
-            });
-            if (!call) continue;
-
-            this.mediaCalls.set(p.id, call);
-            this.trackCallClose(p.id, call);
-          }
-        }
-
-        if (this.state.everyoneAudible) {
-          this.routeAudienceMicStreams();
-        }
-      }
-
-      for (let peerId of this.mediaCalls.keys()) {
-        if (!this.state.participants.find((p) => p.id === peerId)) {
-          this.dropMediaCall(peerId);
-        }
-      }
-
-      for (let peerId of this.micCalls.keys()) {
-        if (!this.state.participants.find((p) => p.id === peerId)) {
-          const call = this.micCalls.get(peerId);
-          this.micCalls.delete(peerId);
-          this.shutdownMediaCall(call);
-        }
-      }
-
-      this.handleCameraRouting();
-    },
-
-    /**
-     * Routes audience microphones during a performance when the host enables
-     * the "everyone audible" option.
-     */
-    routeAudienceMicStreams: function () {
-      if (this.state.mode !== "performance" || !this.state.everyoneAudible) {
-        return;
-      }
-      if (!this.peer || this.peer.id === this.state.singerId) return;
-
-      if (!this.getSessionMicStream()) return;
-
-      for (let p of this.state.participants) {
-        if (p.id === this.peer.id) continue;
-
-        const shouldInitiate =
-          p.id === this.state.singerId || this.peer.id > p.id;
-        if (!shouldInitiate) continue;
-
-        const existing = this.micCalls.get(p.id);
-        if (existing && !this.isMediaCallDead(existing)) continue;
-        if (existing) {
-          this.micCalls.delete(p.id);
-          this.shutdownMediaCall(existing);
-        }
-
-        const callStream = this.createSessionCallStream();
-        if (!callStream) continue;
-
-        const call = this.peer.call(p.id, callStream, {
-          metadata: { kind: "mic" },
-        });
-        if (!call) {
-          this.stopCallStream(callStream);
-          continue;
-        }
-        this.attachMicCall(p.id, call, callStream);
-      }
+      this.transport?.reconcile({
+        modeChanged,
+        playTriggerChanged,
+        audibleChanged,
+      });
     },
 
     broadcastPerformance: function (mediaStream) {
@@ -2253,13 +1853,12 @@ const pkg = {
       this.roomId = null;
       this.isHost = false;
       this.connections.clear();
-      for (const call of this.mediaCalls.values()) this.releaseCallStream(call);
-      this.mediaCalls.clear();
-      for (const call of this.micCalls.values()) this.releaseCallStream(call);
-      this.micCalls.clear();
-      for (const timer of this._loungeRetryTimers.values()) clearTimeout(timer);
-      this._loungeRetryTimers.clear();
-      this._loungeRetryCounts.clear();
+
+      void this.stopTransport();
+      this.transportName = "peerjs";
+      this.transport = null;
+      this.state.transport = "peerjs";
+
       this.currentPerformanceStream = null;
       this._lastRoutedMode = null;
       this._lastPlayTrigger = null;
@@ -2269,22 +1868,6 @@ const pkg = {
       this.collisionResolver = null;
 
       this.stopCamera(false);
-      for (const [key, call] of this.incomingCameraCalls) {
-        try {
-          call.close();
-        } catch (error) {
-          console.warn("[SESSIONS] Could not close camera call:", error);
-        }
-        document.dispatchEvent(
-          new CustomEvent("Encore.Sessions.CameraStreamEnded", {
-            detail: {
-              id: this.parseCameraCallKey(key).peerId,
-              source: this.parseCameraCallKey(key).source,
-            },
-          }),
-        );
-      }
-      this.incomingCameraCalls.clear();
       this.isMuted = false;
       this.applySessionMute(false);
       this.isDeafened = false;
@@ -2299,6 +1882,7 @@ const pkg = {
         nowPlaying: null,
         playTrigger: null,
         everyoneAudible: false,
+        transport: "peerjs",
         queue: [],
         participants: [],
         chatHistory: [],
