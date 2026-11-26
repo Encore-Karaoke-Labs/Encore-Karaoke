@@ -58,6 +58,8 @@ export default class SessionManager {
     this.handleSessionMediaStateUpdate =
       this.handleSessionMediaStateUpdate.bind(this);
     this.handleCameraServiceUpdate = this.handleCameraServiceUpdate.bind(this);
+    this.handleTransportStatus = this.handleTransportStatus.bind(this);
+    this.handleTransportFallback = this.handleTransportFallback.bind(this);
 
     this._previewCameraOn = false;
     this._previewCameraBusy = false;
@@ -66,10 +68,12 @@ export default class SessionManager {
     this._sessionPreviewRefs = null;
     this._sessionFlowIsHost = false;
     this._sessionFormDraft = { view: null, room: null };
+    this._lastTransportNotice = 0;
 
     this._sessionCreateOptions = {
       everyoneAudible: false,
       recordSession: false,
+      transport: "peerjs",
     };
 
     this._lastPianoRollBroadcast = 0;
@@ -259,6 +263,14 @@ export default class SessionManager {
     document.addEventListener(
       "Encore.Sessions.DeafenStateUpdate",
       this.handleSessionMediaStateUpdate,
+    );
+    document.addEventListener(
+      "Encore.Sessions.TransportStatus",
+      this.handleTransportStatus,
+    );
+    document.addEventListener(
+      "Encore.Sessions.TransportFallback",
+      this.handleTransportFallback,
     );
     document.addEventListener(
       "Encore.Camera.StreamReceived",
@@ -1512,6 +1524,36 @@ export default class SessionManager {
     );
   }
 
+  /**
+   * Shows media transport failures without ending the Session.
+   * @param {CustomEvent} e - `Encore.Sessions.TransportStatus` event.
+   */
+  handleTransportStatus(e) {
+    const detail = e.detail || {};
+    if (!detail.error) return;
+
+    const now = Date.now();
+    if (now - this._lastTransportNotice < 6000) return;
+    this._lastTransportNotice = now;
+
+    this.ctx.modules.infoBar.showTemp("SESSION MEDIA", detail.error, 6000);
+  }
+
+  /**
+   * Explains why the room fell back to peer-to-peer media.
+   * @param {CustomEvent} e - `Encore.Sessions.TransportFallback` event.
+   */
+  handleTransportFallback(e) {
+    const detail = e.detail || {};
+    this._lastTransportNotice = Date.now();
+
+    this.ctx.modules.infoBar.showTemp(
+      "SESSION MEDIA",
+      `${detail.error || "Server-side media is unavailable."} Using direct connections instead.`,
+      7000,
+    );
+  }
+
   handleKicked(e) {
     const reason = e.detail;
     this.ctx.services.SessionsSvc.leaveRoom();
@@ -1522,6 +1564,12 @@ export default class SessionManager {
         "SESSIONS",
         "Session protocol mismatch. Please ensure both you and the host are on the latest update.",
         6000,
+      );
+    } else if (reason === "account_required") {
+      this.ctx.modules.infoBar.showTemp(
+        "SESSIONS",
+        "THis Session requires an Encore account. Please sign in to continue.",
+        8000,
       );
     } else {
       this.ctx.modules.infoBar.showTemp(
@@ -1942,6 +1990,7 @@ export default class SessionManager {
     this._sessionCreateOptions = {
       everyoneAudible: false,
       recordSession: false,
+      transport: "peerjs",
     };
   }
 
@@ -2434,6 +2483,59 @@ export default class SessionManager {
       recordSwitch.setDisabled(true);
       recordRow.classOn("is-readonly");
     }
+
+    const SessionsSvc = this.ctx.services.SessionsSvc;
+    const transports = SessionsSvc?.getTransportOptions?.() || [];
+    const account = this.ctx.services.Identity?.getAccount?.();
+    const signedIn = Boolean(account?.signedIn || account?.userId);
+
+    const serverTransport = transports.find(
+      (transport) => transport.requiresAccount,
+    );
+    const directTransport = transports.find(
+      (transport) => !transport.requiresAccount,
+    );
+
+    if (serverTransport && directTransport) {
+      if (!signedIn && options.transport === serverTransport.id) {
+        options.transport = directTransport.id;
+      }
+
+      const serverRow = new Html("div")
+        .classOn("session-toggle-row", "session-transport-row")
+        .appendTo(card);
+
+      const serverText = new Html("span")
+        .classOn("session-toggle-text")
+        .appendTo(serverRow);
+
+      new Html("span")
+        .classOn("session-toggle-label")
+        .text("SERVER-SIDE MEDIA")
+        .appendTo(serverText);
+
+      new Html("span")
+        .classOn("session-toggle-desc")
+        .text(
+          "Route Session media through Encore's servers for more reliable connectivity.",
+        )
+        .appendTo(serverText);
+
+      new ToggleSwitch({
+        checked: options.transport === serverTransport.id,
+        disabled: !signedIn,
+        ariaLabel: "Server-side media",
+        onChange: (next) => {
+          options.transport = next ? serverTransport.id : directTransport.id;
+        },
+      }).appendTo(serverRow);
+
+      if (!signedIn) {
+        serverRow.classOn("is-readonly").attr({
+          title: "Sign in to an Encore account to use server-side media.",
+        });
+      }
+    }
   }
 
   /**
@@ -2490,6 +2592,7 @@ export default class SessionManager {
     this._sessionCreateOptions = {
       everyoneAudible: false,
       recordSession: false,
+      transport: "peerjs",
     };
   }
 
@@ -2540,7 +2643,9 @@ export default class SessionManager {
 
       if (isHost) {
         const collisionFn = Identity.resolveCollision.bind(Identity);
-        const roomId = await SessionsSvc.hostRoom(sessionProfile, collisionFn);
+        const roomId = await SessionsSvc.hostRoom(sessionProfile, collisionFn, {
+          transport: this._sessionCreateOptions.transport,
+        });
         state.isSessionActive = true;
         state.isSessionHost = true;
         state.sessionRoomId = roomId;
@@ -4180,6 +4285,14 @@ export default class SessionManager {
     document.removeEventListener(
       "Encore.Sessions.DeafenStateUpdate",
       this.handleSessionMediaStateUpdate,
+    );
+    document.removeEventListener(
+      "Encore.Sessions.TransportStatus",
+      this.handleTransportStatus,
+    );
+    document.removeEventListener(
+      "Encore.Sessions.TransportFallback",
+      this.handleTransportFallback,
     );
     document.removeEventListener(
       "Encore.Camera.StreamReceived",
