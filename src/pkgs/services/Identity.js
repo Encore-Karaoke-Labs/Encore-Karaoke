@@ -330,6 +330,143 @@ const pkg = {
       return this._authenticate("signUp");
     },
 
+    /**
+     * Turns a raw IPC/Clerk failure into copy a singer can act on.
+     * @param {unknown} error
+     * @returns {string}
+     */
+    describeAuthError: function (error) {
+      const message = describeClerkError(error);
+      if (
+        /fetch failed|network|ENOTFOUND|ECONNREFUSED|timed? ?out|aborted/i.test(
+          message,
+        )
+      ) {
+        return "Couldn't reach Encore. Check your connection and try again.";
+      }
+      return message;
+    },
+
+    /**
+     * Signs in with email + password through the native sign-in screen.
+     * @param {string} email
+     * @param {string} password
+     */
+    signInWithPassword: async function (email, password) {
+      return this._authenticateRequest(
+        () => window.clerk.signInWithPassword({ email, password }),
+        "Clerk sign-in is not available in this build.",
+      );
+    },
+
+    /**
+     * Emails a one-time sign-in code.
+     * @param {string} email
+     */
+    requestSignInCode: async function (email) {
+      if (!window.clerk?.requestSignInCode) {
+        throw new Error("Clerk sign-in is not available in this build.");
+      }
+      try {
+        return await window.clerk.requestSignInCode({ email });
+      } catch (error) {
+        throw new Error(this.describeAuthError(error));
+      }
+    },
+
+    /**
+     * Verifies a one-time sign-in code.
+     * @param {string} code
+     */
+    verifySignInCode: async function (code) {
+      return this._authenticateRequest(
+        () => window.clerk.verifySignInCode({ code }),
+        "Clerk sign-in is not available in this build.",
+      );
+    },
+
+    /**
+     * Emails a password-reset code.
+     * @param {string} email
+     */
+    requestPasswordReset: async function (email) {
+      if (!window.clerk?.requestPasswordReset) {
+        throw new Error("Clerk sign-in is not available in this build.");
+      }
+      try {
+        return await window.clerk.requestPasswordReset({ email });
+      } catch (error) {
+        throw new Error(this.describeAuthError(error));
+      }
+    },
+
+    /**
+     * Sets a new password with a reset code and signs the singer in.
+     * @param {string} code
+     * @param {string} password
+     */
+    submitPasswordReset: async function (code, password) {
+      return this._authenticateRequest(
+        () => window.clerk.submitPasswordReset({ code, password }),
+        "Clerk sign-in is not available in this build.",
+      );
+    },
+
+    /**
+     * Runs a native Clerk auth call and folds the result into the profile.
+     * @param {() => Promise<Object>} run
+     * @param {string} unavailableMessage
+     */
+    _authenticateRequest: async function (run, unavailableMessage) {
+      if (!window.clerk) {
+        throw new Error(unavailableMessage);
+      }
+
+      const previous = { ...this.account };
+      this.account = { ...previous, status: "authorizing", error: null };
+      this._emitChange();
+
+      try {
+        const result = await run();
+
+        if (result?.signedIn && result.user) {
+          if (!previous.userId) {
+            this.guestProfile = normalizeProfile({
+              ...this.profile,
+              source: "guest",
+              userId: null,
+            });
+          }
+
+          await this.applyClerkUser(result.user, result.sessionId, {
+            adoptRemoteAvatar: true,
+          });
+          return this.account;
+        }
+
+        if (result?.challenge) {
+          this.account = {
+            ...previous,
+            status: previous.userId ? "offline" : "guest",
+            error: null,
+          };
+          this._emitChange();
+          return { challenge: result.challenge };
+        }
+
+        throw new Error(result?.error || "Sign-in did not finish.");
+      } catch (error) {
+        const message = this.describeAuthError(error);
+        this.account = {
+          ...previous,
+          status: previous.userId ? "offline" : "guest",
+          error: message,
+        };
+        this._emitChange();
+        throw new Error(message);
+      }
+    },
+
     _authenticate: async function (method) {
       if (!window.clerk || typeof window.clerk[method] !== "function") {
         throw new Error("Clerk is not available in this build.");
