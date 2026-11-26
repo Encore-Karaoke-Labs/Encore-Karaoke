@@ -211,7 +211,11 @@ async function fetchAccountState(): Promise<ClerkAccountState> {
 
     if (!state.signedIn) {
       cachedToken = null;
-    } else if (cachedToken && cachedToken.userId !== state.user?.id) {
+    } else if (
+      cachedToken &&
+      (cachedToken.userId !== state.user?.id ||
+        cachedToken.sessionId !== state.sessionId)
+    ) {
       cachedToken = null;
     }
 
@@ -246,12 +250,15 @@ function decodeTokenExpiry(token: string): number | null {
 }
 
 let cachedToken: ClerkSessionToken | null = null;
+let cachedTokenAt = 0;
 
 async function fetchSessionToken(): Promise<ClerkSessionToken | null> {
   if (cachedToken) {
+    const now = Date.now();
     const stillValid =
-      cachedToken.expiresAt === null ||
-      cachedToken.expiresAt - Date.now() > 15_000;
+      cachedToken.expiresAt === null
+        ? now - cachedTokenAt < 30_000
+        : cachedToken.expiresAt - now > 15_000;
     if (stillValid) return cachedToken;
   }
 
@@ -287,6 +294,7 @@ async function fetchSessionToken(): Promise<ClerkSessionToken | null> {
     userId: activeSession.user?.id ?? null,
     expiresAt: decodeTokenExpiry(token),
   };
+  cachedTokenAt = Date.now();
   return cachedToken;
 }
 
