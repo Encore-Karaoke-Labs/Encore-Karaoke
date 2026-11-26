@@ -18,8 +18,22 @@ export default class AccountManager {
     this._focusDescriptor = null;
     this._screen = "profile";
     this._nameEditor = null;
+    this._auth = this._blankAuth();
+    this._focusSelector = null;
 
     this.ctx.state.isAccountModalOpen = false;
+  }
+
+  _blankAuth() {
+    return {
+      step: "credentials",
+      email: "",
+      error: null,
+      notice: null,
+      submitting: false,
+      resendUntil: 0,
+      values: {},
+    };
   }
 
   init() {
@@ -27,6 +41,10 @@ export default class AccountManager {
     if (identity?.onChange) {
       this._unsubscribe = identity.onChange(() => {
         this._syncLiveProfile();
+        if (this._screen === "signin" && identity.isSignedIn()) {
+          this._screen = "profile";
+          this._auth = this._blankAuth();
+        }
         if (this.ctx.state.isAccountModalOpen) this.render();
       });
     }
@@ -63,7 +81,10 @@ export default class AccountManager {
     if (isOpening) {
       this._screen = "profile";
       this._nameEditor = null;
+      this._auth = this._blankAuth();
+      this._focusSelector = null;
       this.ctx.dom.accountModal.classOff("hidden");
+      this.ctx.dom.accountBox.classOff("is-auth");
       this.render();
       void this._refreshInBackground();
     } else {
@@ -76,7 +97,10 @@ export default class AccountManager {
       this._focusDescriptor = null;
       this._screen = "profile";
       this._nameEditor = null;
+      this._auth = this._blankAuth();
+      this._focusSelector = null;
       this.ctx.dom.accountModal.classOn("hidden");
+      this.ctx.dom.accountBox.classOff("is-auth");
       this._busy = false;
       this._busyMessage = "";
       this.ctx.root.sessions?.handleAccountModalClosed?.();
@@ -121,6 +145,12 @@ export default class AccountManager {
 
     if (e.key === "Escape") {
       e.preventDefault();
+      if (this._screen === "signin" && !this._auth.submitting) {
+        this._screen = "profile";
+        this._auth = this._blankAuth();
+        this.render();
+        return;
+      }
       this.toggleAccountModal(false);
       return;
     }
@@ -337,9 +367,23 @@ export default class AccountManager {
   _scheduleFocus() {
     const descriptor = this._focusDescriptor;
     this._focusDescriptor = null;
+    const selector = this._focusSelector;
+    this._focusSelector = null;
 
     setTimeout(() => {
       if (!this.ctx.state.isAccountModalOpen) return;
+      if (selector) {
+        const target =
+          this.ctx.dom.accountContentArea?.elm?.querySelector(selector);
+        if (target) {
+          target.focus();
+          if (target.setSelectionRange && target.value) {
+            const end = target.value.length;
+            target.setSelectionRange(end, end);
+          }
+          return;
+        }
+      }
       if (descriptor && this._restoreFocus(descriptor)) return;
       const first = this._getFocusables()[0];
       if (first) first.focus();
@@ -348,6 +392,7 @@ export default class AccountManager {
 
   _getViewKey() {
     if (this._busy) return "busy";
+    if (this._screen === "signin") return `auth-${this._auth.step}`;
     if (this._screen === "avatar") return "avatar";
     const account = this.identity.getAccount();
     if (account.signedIn) return "signed-in";
@@ -370,7 +415,11 @@ export default class AccountManager {
       avatar: 3,
       busy: 4,
     };
-    return (order[toView] ?? 0) >= (order[fromView] ?? 0) ? 1 : -1;
+    const rank = (view) => {
+      if (typeof view === "string" && view.startsWith("auth-")) return 1.5;
+      return order[view] ?? 0;
+    };
+    return rank(toView) >= rank(fromView) ? 1 : -1;
   }
 
   _clearViewTransition() {
@@ -493,20 +542,29 @@ export default class AccountManager {
     const identity = this.identity;
     const account = identity.getAccount();
     const isAvatarScreen = !this._busy && this._screen === "avatar";
+    const isAuthScreen = !this._busy && this._screen === "signin";
 
-    new Html("h1")
-      .text(isAvatarScreen ? "PROFILE PICTURE" : "ACCOUNT")
-      .appendTo(dom.accountHeader);
+    dom.accountBox.classOn(isAuthScreen ? "is-auth" : "is-profile");
+    dom.accountBox.classOff(isAuthScreen ? "is-profile" : "is-auth");
 
-    new Html("p")
-      .text(
-        isAvatarScreen
-          ? "This is how other singers see you in Sessions."
-          : account.signedIn
-            ? "Your Encore identity follows you into Sessions."
-            : "Sign in to sync your identity, or sing as a guest.",
-      )
-      .appendTo(dom.accountHeader);
+    if (isAuthScreen) {
+      const copy = this._authHeaderCopy();
+      new Html("h1").text(copy.title).appendTo(dom.accountHeader);
+      new Html("p").text(copy.subtitle).appendTo(dom.accountHeader);
+    } else {
+      new Html("h1")
+        .text(isAvatarScreen ? "PROFILE PICTURE" : "ACCOUNT")
+        .appendTo(dom.accountHeader);
+      new Html("p")
+        .text(
+          isAvatarScreen
+            ? "This is how other singers see you in Sessions."
+            : account.signedIn
+              ? "Your Encore identity follows you into Sessions."
+              : "Sign in to sync your identity, or sing as a guest.",
+        )
+        .appendTo(dom.accountHeader);
+    }
 
     const view = new Html("div")
       .classOn("account-view")
@@ -517,10 +575,46 @@ export default class AccountManager {
       return;
     }
 
+    if (isAuthScreen) {
+      this._renderSignIn(view);
+      return;
+    }
+
     if (isAvatarScreen) {
       this._renderAvatarEditor(view);
     } else {
       this._renderProfile(view, account);
+    }
+  }
+
+  _authHeaderCopy() {
+    switch (this._auth.step) {
+      case "code-request":
+        return {
+          title: "SIGN IN WITH A CODE",
+          subtitle:
+            "No password needed. We'll email a 6-digit code to your Encore address.",
+        };
+      case "code-verify":
+        return {
+          title: "CHECK YOUR EMAIL",
+          subtitle: "Enter the code we sent to finish signing in.",
+        };
+      case "reset-request":
+        return {
+          title: "RESET PASSWORD",
+          subtitle: "We'll email you a code so you can choose a new password.",
+        };
+      case "reset-verify":
+        return {
+          title: "SET A NEW PASSWORD",
+          subtitle: "Enter the reset code, then choose a new password.",
+        };
+      default:
+        return {
+          title: "SIGN IN",
+          subtitle: "Link this singer profile to your Encore account.",
+        };
     }
   }
 
@@ -543,6 +637,666 @@ export default class AccountManager {
       .classOn("account-card-desc")
       .text("This should only take a moment.")
       .appendTo(card);
+  }
+
+  _openAuth(step, options = {}) {
+    const account = this.identity.getAccount();
+    this._screen = "signin";
+    this._auth = {
+      ...this._blankAuth(),
+      step,
+      email: options.email || this._auth.email || account.email || "",
+      notice: options.notice || null,
+    };
+    this._focusSelector = options.focus || null;
+    this.render();
+  }
+
+  _authBackToProfile(email) {
+    if (this._auth.submitting) return;
+    if (this._auth.step !== "credentials") {
+      this._openAuth("credentials", {
+        email: email || this._auth.email,
+        focus: 'input[name="password"]',
+      });
+      return;
+    }
+    this._screen = "profile";
+    this._auth = this._blankAuth();
+    this.render();
+  }
+
+  _renderSignIn(container) {
+    const wrap = new Html("div").classOn("account-auth").appendTo(container);
+    const backLabel =
+      this._auth.step === "credentials" ? "BACK TO PROFILE" : "BACK TO SIGN IN";
+
+    new Html("button")
+      .classOn("account-auth-back")
+      .attr({ type: "button" })
+      .html(
+        `<ion-icon name="arrow-back-outline" aria-hidden="true"></ion-icon><span>${backLabel}</span>`,
+      )
+      .on("click", () => {
+        const emailField = wrap.elm.querySelector('input[name="email"]');
+        this._authBackToProfile(emailField?.value.trim());
+      })
+      .appendTo(wrap);
+
+    const grid = new Html("div").classOn("account-auth-grid").appendTo(wrap);
+    const formPane = new Html("div")
+      .classOn("account-auth-form")
+      .appendTo(grid);
+
+    switch (this._auth.step) {
+      case "code-request":
+        this._renderRequestStep(formPane, "code");
+        break;
+      case "code-verify":
+        this._renderVerifyStep(formPane, "code");
+        break;
+      case "reset-request":
+        this._renderRequestStep(formPane, "reset");
+        break;
+      case "reset-verify":
+        this._renderVerifyStep(formPane, "reset");
+        break;
+      default:
+        this._renderCredentialStep(formPane);
+    }
+  }
+
+  _renderCredentialStep(parent) {
+    const form = new Html("form")
+      .classOn("account-auth-fields")
+      .attr({ novalidate: "" })
+      .appendTo(parent);
+    form.on("submit", (event) => {
+      event.preventDefault();
+      void this._submitCredentials(form.elm);
+    });
+
+    this._authField(form, {
+      name: "email",
+      label: "Email",
+      type: "email",
+      icon: "mail-outline",
+      autocomplete: "email",
+      placeholder: "you@example.com",
+      value: this._auth.email,
+    });
+
+    this._authField(form, {
+      name: "password",
+      label: "Password",
+      type: "password",
+      icon: "lock-closed-outline",
+      autocomplete: "current-password",
+      placeholder: "Your password",
+      decorate: (control, input) => this._addRevealToggle(control, input),
+    });
+
+    this._authError(form);
+    this._authLinks(form, [
+      {
+        label: "Forgot password?",
+        onClick: () =>
+          this._openAuth("reset-request", {
+            focus: 'input[name="email"]',
+          }),
+      },
+      {
+        label: "Email me a code instead",
+        onClick: () =>
+          this._openAuth("code-request", {
+            focus: 'input[name="email"]',
+          }),
+      },
+    ]);
+
+    this._authSubmit(form, "SIGN IN");
+
+    const alt = new Html("p").classOn("account-auth-alt").appendTo(form);
+    new Html("span").text("New to Encore? ").appendTo(alt);
+    new Html("button")
+      .classOn("account-auth-link")
+      .attr({ type: "button" })
+      .text("Create an account")
+      .on("click", () => void this._runAuth("signUp", "OPENING SIGN-UP…"))
+      .appendTo(alt);
+
+    new Html("p")
+      .classOn("account-auth-security")
+      .html(
+        '<ion-icon name="lock-closed-outline" aria-hidden="true"></ion-icon><span>Secured by Clerk. Encore never sees your password.</span>',
+      )
+      .appendTo(form);
+  }
+
+  _renderRequestStep(parent, mode) {
+    const isReset = mode === "reset";
+    const form = new Html("form")
+      .classOn("account-auth-fields")
+      .attr({ novalidate: "" })
+      .appendTo(parent);
+    form.on("submit", (event) => {
+      event.preventDefault();
+      void this._submitRequest(form.elm, mode);
+    });
+
+    new Html("p")
+      .classOn("account-auth-lede")
+      .text(
+        isReset
+          ? "Enter the email on your Encore account and we'll send a reset code."
+          : "Enter the email on your Encore account and we'll send a sign-in code.",
+      )
+      .appendTo(form);
+
+    this._authField(form, {
+      name: "email",
+      label: "Email",
+      type: "email",
+      icon: "mail-outline",
+      autocomplete: "email",
+      placeholder: "you@example.com",
+      value: this._auth.email,
+    });
+
+    this._authError(form);
+    this._authSubmit(form, isReset ? "SEND RESET CODE" : "SEND SIGN-IN CODE");
+  }
+
+  _renderVerifyStep(parent, mode) {
+    const isReset = mode === "reset";
+    const form = new Html("form")
+      .classOn("account-auth-fields")
+      .attr({ novalidate: "" })
+      .appendTo(parent);
+    form.on("submit", (event) => {
+      event.preventDefault();
+      void this._submitCode(form.elm, mode);
+    });
+
+    this._authNotice(form);
+
+    this._codeField(form, { autoSubmit: !isReset });
+
+    if (isReset) {
+      this._authField(form, {
+        name: "new-password",
+        label: "New password",
+        type: "password",
+        icon: "lock-closed-outline",
+        autocomplete: "new-password",
+        placeholder: "At least 8 characters",
+        decorate: (control, input) => this._addRevealToggle(control, input),
+      });
+
+      this._authField(form, {
+        name: "confirm-password",
+        label: "Confirm new password",
+        type: "password",
+        icon: "lock-closed-outline",
+        autocomplete: "new-password",
+        placeholder: "Repeat your new password",
+        decorate: (control, input) => this._addRevealToggle(control, input),
+      });
+    }
+
+    this._authError(form);
+    this._authSubmit(
+      form,
+      isReset ? "SET PASSWORD & SIGN IN" : "VERIFY & SIGN IN",
+    );
+
+    const row = new Html("div").classOn("account-auth-links").appendTo(form);
+
+    const resend = new Html("button")
+      .classOn("account-auth-link")
+      .attr({ type: "button" })
+      .text("Email a new code")
+      .appendTo(row);
+
+    resend.on("click", () => void this._resendCode(mode, resend.elm));
+
+    new Html("button")
+      .classOn("account-auth-link")
+      .attr({ type: "button" })
+      .text("Use a different email")
+      .on("click", () =>
+        this._openAuth(isReset ? "reset-request" : "code-request", {
+          focus: 'input[name="email"]',
+        }),
+      )
+      .appendTo(row);
+  }
+
+  _codeField(parent, options = {}) {
+    const field = new Html("div")
+      .classOn("account-auth-field", "account-auth-code-field")
+      .appendTo(parent);
+
+    new Html("span")
+      .classOn("account-auth-label")
+      .text("6-digit code")
+      .appendTo(field);
+
+    const group = new Html("div").classOn("account-auth-code").appendTo(field);
+
+    const hidden = new Html("input")
+      .attr({ type: "hidden", name: "code" })
+      .appendTo(field);
+
+    const boxes = [];
+    for (let index = 0; index < 6; index += 1) {
+      const box = new Html("input")
+        .classOn("account-auth-input", "account-auth-code-box")
+        .attr({
+          type: "text",
+          inputmode: "numeric",
+          maxlength: "1",
+          autocomplete: index === 0 ? "one-time-code" : "off",
+          "aria-label": `Code digit ${index + 1} of 6`,
+        })
+        .appendTo(group);
+      boxes.push(box.elm);
+    }
+
+    const sync = () => {
+      hidden.elm.value = boxes.map((box) => box.value).join("");
+    };
+
+    const focusBox = (index) => {
+      const target = boxes[Math.min(Math.max(index, 0), boxes.length - 1)];
+      target.focus();
+      target.select();
+    };
+
+    const spread = (digits, start) => {
+      digits
+        .slice(0, boxes.length - start)
+        .split("")
+        .forEach((digit, offset) => {
+          boxes[start + offset].value = digit;
+        });
+    };
+
+    const submitIfComplete = () => {
+      if (!options.autoSubmit || this._auth.submitting) return;
+      if (boxes.some((box) => !box.value)) return;
+      const form = field.elm.closest("form");
+      if (form) form.requestSubmit();
+    };
+
+    boxes.forEach((box, index) => {
+      box.addEventListener("input", () => {
+        const digits = box.value.replace(/\D/g, "");
+
+        if (digits.length > 1) {
+          spread(digits, index);
+          sync();
+          focusBox(index + digits.length);
+          submitIfComplete();
+          return;
+        }
+
+        box.value = digits;
+        if (box.value && index < boxes.length - 1) focusBox(index + 1);
+        sync();
+        submitIfComplete();
+      });
+
+      box.addEventListener("keydown", (event) => {
+        if (event.key === "Backspace" && !box.value && index > 0) {
+          event.preventDefault();
+          boxes[index - 1].value = "";
+          sync();
+          focusBox(index - 1);
+        } else if (event.key === "ArrowLeft" && index > 0) {
+          event.preventDefault();
+          focusBox(index - 1);
+        } else if (event.key === "ArrowRight" && index < boxes.length - 1) {
+          event.preventDefault();
+          focusBox(index + 1);
+        }
+      });
+
+      box.addEventListener("paste", (event) => {
+        const digits = (event.clipboardData?.getData("text") || "").replace(
+          /\D/g,
+          "",
+        );
+        if (!digits) return;
+        event.preventDefault();
+        spread(digits, index);
+        sync();
+        focusBox(index + digits.length);
+        submitIfComplete();
+      });
+    });
+
+    const saved = this._auth.values?.code || "";
+    saved.split("").forEach((digit, index) => {
+      if (boxes[index]) boxes[index].value = digit;
+    });
+
+    sync();
+    return field;
+  }
+
+  _authField(parent, options) {
+    const field = new Html("label")
+      .classOn("account-auth-field")
+      .appendTo(parent);
+    new Html("span")
+      .classOn("account-auth-label")
+      .text(options.label)
+      .appendTo(field);
+
+    const control = new Html("span")
+      .classOn("account-auth-control")
+      .appendTo(field);
+    new Html("ion-icon")
+      .attr({ name: options.icon, "aria-hidden": "true" })
+      .appendTo(control);
+
+    const input = new Html("input")
+      .classOn("account-auth-input")
+      .attr({
+        type: options.type || "text",
+        name: options.name,
+        placeholder: options.placeholder || "",
+        autocomplete: options.autocomplete || "off",
+        "aria-label": options.label,
+        inputmode: options.inputmode || null,
+        maxlength: options.maxlength || null,
+      })
+      .appendTo(control);
+
+    const value = options.value || this._auth.values?.[options.name];
+    if (value) input.val(value);
+    if (options.decorate) options.decorate(control, input);
+    return { field, control, input };
+  }
+
+  _addRevealToggle(control, input) {
+    const reveal = new Html("button")
+      .classOn("account-auth-reveal")
+      .attr({
+        type: "button",
+        "aria-label": "Show password",
+        "aria-pressed": "false",
+      })
+      .html('<ion-icon name="eye-outline" aria-hidden="true"></ion-icon>')
+      .appendTo(control);
+
+    reveal.on("click", () => {
+      const show = input.elm.type === "password";
+      input.elm.type = show ? "text" : "password";
+      reveal.attr({
+        "aria-label": show ? "Hide password" : "Show password",
+        "aria-pressed": show ? "true" : "false",
+      });
+      reveal.html(
+        `<ion-icon name="${show ? "eye-off-outline" : "eye-outline"}" aria-hidden="true"></ion-icon>`,
+      );
+      input.elm.focus();
+    });
+  }
+
+  _authError(parent) {
+    const error = new Html("p")
+      .classOn("account-auth-error")
+      .attr({ role: "alert", "aria-live": "polite" })
+      .appendTo(parent);
+    if (this._auth.error) error.text(this._auth.error);
+    else error.classOn("hidden");
+    return error;
+  }
+
+  _authNotice(parent) {
+    if (!this._auth.notice) return;
+    const notice = new Html("p")
+      .classOn("account-auth-notice")
+      .html('<ion-icon name="mail-outline" aria-hidden="true"></ion-icon>')
+      .appendTo(parent);
+    new Html("span").text(this._auth.notice).appendTo(notice);
+  }
+
+  _authLinks(parent, links) {
+    const row = new Html("div").classOn("account-auth-links").appendTo(parent);
+    for (const link of links) {
+      new Html("button")
+        .classOn("account-auth-link")
+        .attr({ type: "button" })
+        .text(link.label)
+        .on("click", link.onClick)
+        .appendTo(row);
+    }
+    return row;
+  }
+
+  _authSubmit(parent, label) {
+    const button = new Html("button")
+      .classOn("session-btn", "primary", "account-auth-submit")
+      .attr({ type: "submit" })
+      .appendTo(parent);
+    new Html("span")
+      .classOn("account-auth-submit-label")
+      .attr({ "data-idle": label })
+      .text(label)
+      .appendTo(button);
+    new Html("ion-icon")
+      .attr({ name: "arrow-forward-outline", "aria-hidden": "true" })
+      .appendTo(button);
+    return button;
+  }
+
+  _setAuthBusy(formEl, busy, label) {
+    this._auth.submitting = busy;
+    formEl.classList.toggle("is-busy", busy);
+    formEl.setAttribute("aria-busy", busy ? "true" : "false");
+    for (const element of formEl.querySelectorAll("input, button")) {
+      element.disabled = busy;
+    }
+    const submitLabel = formEl.querySelector(".account-auth-submit-label");
+    if (submitLabel) {
+      submitLabel.textContent = busy ? label : submitLabel.dataset.idle;
+    }
+  }
+
+  _authFail(message, selector) {
+    this._auth.error = message;
+    this._focusSelector = selector;
+    this.render();
+  }
+
+  /**
+   * Keeps what the user typed (or pasted) across the re-render that shows a
+   * validation or server error, so a failed attempt never wipes the form.
+   * @param {HTMLFormElement} formEl
+   */
+  _captureAuthValues(formEl) {
+    if (!formEl) return;
+    const values = {};
+    for (const input of formEl.querySelectorAll("input[name]")) {
+      if (input.type === "hidden") continue;
+      values[input.name] = input.value;
+    }
+    const boxes = formEl.querySelectorAll(".account-auth-code-box");
+    if (boxes.length) {
+      values.code = Array.from(boxes, (box) => box.value).join("");
+    }
+    this._auth.values = values;
+  }
+
+  async _submitCredentials(formEl) {
+    this._captureAuthValues(formEl);
+    const email = formEl.querySelector('input[name="email"]').value.trim();
+    const password = formEl.querySelector('input[name="password"]').value;
+    this._auth.email = email;
+
+    if (!email) {
+      this._authFail("Enter your email address.", 'input[name="email"]');
+      return;
+    }
+    if (!password) {
+      this._authFail("Enter your password.", 'input[name="password"]');
+      return;
+    }
+
+    this._setAuthBusy(formEl, true, "SIGNING IN…");
+    try {
+      const result = await this.identity.signInWithPassword(email, password);
+      if (result?.challenge) {
+        this._showChallenge(result.challenge, email);
+        return;
+      }
+      this._auth = this._blankAuth();
+      this._screen = "profile";
+      this.ctx.modules.infoBar.showTemp("ACCOUNT", "Signed in.", 2500);
+      this.render();
+    } catch (error) {
+      this._auth.error = error instanceof Error ? error.message : String(error);
+      this._auth.submitting = false;
+      this._focusSelector = 'input[name="password"]';
+      this.render();
+    }
+  }
+
+  async _submitRequest(formEl, mode) {
+    this._captureAuthValues(formEl);
+    const email = formEl.querySelector('input[name="email"]').value.trim();
+    this._auth.email = email;
+
+    if (!email) {
+      this._authFail("Enter your email address.", 'input[name="email"]');
+      return;
+    }
+
+    this._setAuthBusy(formEl, true, "SENDING CODE…");
+    try {
+      if (mode === "reset") {
+        await this.identity.requestPasswordReset(email);
+      } else {
+        await this.identity.requestSignInCode(email);
+      }
+
+      this._auth.step = mode === "reset" ? "reset-verify" : "code-verify";
+      this._auth.values = {};
+      this._auth.notice = `We sent a 6-digit code to ${email}.`;
+      this._auth.error = null;
+      this._auth.submitting = false;
+      this._focusSelector = ".account-auth-code-box";
+      this.render();
+    } catch (error) {
+      this._auth.error = error instanceof Error ? error.message : String(error);
+      this._auth.submitting = false;
+      this._focusSelector = 'input[name="email"]';
+      this.render();
+    }
+  }
+
+  async _submitCode(formEl, mode) {
+    this._captureAuthValues(formEl);
+    const code = formEl.querySelector('input[name="code"]').value.trim();
+
+    if (!/^\d{6}$/.test(code)) {
+      this._authFail(
+        "Enter the 6-digit code from your email.",
+        ".account-auth-code-box",
+      );
+      return;
+    }
+
+    let password = null;
+    if (mode === "reset") {
+      password = formEl.querySelector('input[name="new-password"]').value;
+      const confirm = formEl.querySelector(
+        'input[name="confirm-password"]',
+      ).value;
+
+      if (password.length < 8) {
+        this._authFail(
+          "Use at least 8 characters for your new password.",
+          'input[name="new-password"]',
+        );
+        return;
+      }
+      if (password !== confirm) {
+        this._authFail(
+          "The new passwords do not match.",
+          'input[name="confirm-password"]',
+        );
+        return;
+      }
+    }
+
+    this._setAuthBusy(formEl, true, "VERIFYING…");
+    try {
+      const result =
+        mode === "reset"
+          ? await this.identity.submitPasswordReset(code, password)
+          : await this.identity.verifySignInCode(code);
+      if (result?.challenge) {
+        this._showChallenge(result.challenge, this._auth.email);
+        return;
+      }
+
+      this._auth = this._blankAuth();
+      this._screen = "profile";
+      this.ctx.modules.infoBar.showTemp("ACCOUNT", "Signed in.", 2500);
+      this.render();
+    } catch (error) {
+      this._auth.error = error instanceof Error ? error.message : String(error);
+      this._auth.submitting = false;
+      this._focusSelector = ".account-auth-code-box";
+      this.render();
+    }
+  }
+
+  /**
+   * Moves the auth screen onto the existing code-verification step when Clerk
+   * asks for a second-factor email code (MFA or new-device trust).
+   * @param {{email: string, message: string}} challenge
+   * @param {string} email
+   */
+  _showChallenge(challenge, email) {
+    this._auth.step = "code-verify";
+    this._auth.email = challenge.email || email || this._auth.email;
+    this._auth.notice = challenge.message;
+    this._auth.error = null;
+    this._auth.submitting = false;
+    this._auth.values = {};
+    this._focusSelector = ".account-auth-code-box";
+    this.render();
+  }
+
+  async _resendCode(mode, button) {
+    if (button.disabled) return;
+
+    this._captureAuthValues(button.closest("form"));
+    button.disabled = true;
+    button.textContent = "SENDING…";
+    try {
+      if (mode === "reset") {
+        await this.identity.requestPasswordReset(this._auth.email);
+      } else {
+        await this.identity.requestSignInCode(this._auth.email);
+      }
+      this._auth.error = null;
+      button.textContent = "CODE SENT";
+      setTimeout(() => {
+        if (!button.isConnected) return;
+        button.disabled = false;
+        button.textContent = "Email a new code";
+      }, 20_000);
+    } catch (error) {
+      this._auth.error = error instanceof Error ? error.message : String(error);
+      this._focusSelector = ".account-auth-code-box";
+      this.render();
+    }
   }
 
   _renderProfile(container, account) {
@@ -686,7 +1440,7 @@ export default class AccountManager {
     new Html("button")
       .classOn("session-btn", "primary")
       .text("SIGN IN")
-      .on("click", () => void this._runAuth("signIn", "OPENING SIGN-IN…"))
+      .on("click", () => this._openAuth("credentials"))
       .appendTo(actions);
 
     new Html("button")
@@ -881,6 +1635,10 @@ export default class AccountManager {
 
     try {
       await this.identity[method]();
+      if (this.identity.isSignedIn()) {
+        this._screen = "profile";
+        this._auth = this._blankAuth();
+      }
     } catch (error) {
       this.ctx.modules.infoBar.showTemp(
         "ACCOUNT",
