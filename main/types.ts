@@ -241,12 +241,19 @@ export interface ClerkUserSummary {
   primaryEmail: string | null;
 }
 
+export interface ClerkSignInChallenge {
+  type: "email_code";
+  email: string;
+  message: string;
+}
+
 export interface ClerkAccountState {
   signedIn: boolean;
   user: ClerkUserSummary | null;
   sessionId: string | null;
   error?: string;
   cancelled?: boolean;
+  challenge?: ClerkSignInChallenge | null;
 }
 
 export interface ClerkSessionToken {
@@ -293,5 +300,38 @@ export interface ClerkTokenResponse {
 }
 
 export interface ClerkErrorResponse {
-  errors?: Array<{ message?: string; long_message?: string }>;
+  errors?: Array<{ message?: string; long_message?: string; code?: string }>;
+}
+
+export interface ClerkAuthPayload {
+  email?: string;
+  password?: string;
+  code?: string;
+}
+
+export interface ClerkSignInFactor {
+  strategy?: string;
+  email_address_id?: string;
+}
+
+export interface ClerkSignInAttempt {
+  id?: string;
+  status?: string;
+  created_session_id?: string | null;
+  supported_first_factors?: ClerkSignInFactor[] | null;
+  supported_second_factors?: ClerkSignInFactor[] | null;
+  first_factor_verification?: { status?: string } | null;
+  second_factor_verification?: { status?: string } | null;
+}
+
+export interface ClerkSignInResponse extends ClerkErrorResponse {
+  response?: ClerkSignInAttempt;
+  meta?: {
+    client?: ClerkClientResource & { sign_in?: ClerkSignInAttempt | null };
+  };
+}
+
+export interface ClerkVerificationResult {
+  sent: boolean;
+  email: string;
 }
