@@ -660,6 +660,12 @@ export default class UIManager {
     dom.interludeTipBox = new Html("div")
       .classOn("interlude-tip-box")
       .appendTo(dom.interludeOverlay);
+    const interludeProgressTrack = new Html("div")
+      .classOn("interlude-progress")
+      .appendTo(dom.interludeOverlay);
+    dom.interludeProgress = new Html("div")
+      .classOn("interlude-progress-fill")
+      .appendTo(interludeProgressTrack);
 
     // Player Bottom Section
     dom.playerBottomSection = new Html("div")

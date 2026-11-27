@@ -256,6 +256,8 @@ export default class LyricsEngine {
     if (this.ctx.state.isInterludeActive) {
       this.ctx.state.isInterludeActive = false;
       this.ctx.dom.interludeOverlay.classOff("visible");
+      if (this.ctx.dom.interludeProgress)
+        this.ctx.dom.interludeProgress.styleJs({ width: "0%" });
     }
 
     if (this.remoteTimeRafId) cancelAnimationFrame(this.remoteTimeRafId);
@@ -2257,10 +2259,28 @@ export default class LyricsEngine {
             this.ctx.dom.lyricsCanvas.styleJs({ opacity: "0" });
             this.broadcastOverlayLyrics();
           }
+
+          const interludeDuration = inInterlude.end - inInterlude.start;
+          const interludeProgress =
+            interludeDuration > 0
+              ? Math.min(
+                  1,
+                  Math.max(
+                    0,
+                    (currentTime - inInterlude.start) / interludeDuration,
+                  ),
+                )
+              : 0;
+          if (this.ctx.dom.interludeProgress)
+            this.ctx.dom.interludeProgress.styleJs({
+              width: `${(interludeProgress * 100).toFixed(2)}%`,
+            });
         } else {
           if (this.ctx.state.isInterludeActive) {
             this.ctx.state.isInterludeActive = false;
             this.ctx.dom.interludeOverlay.classOff("visible");
+            if (this.ctx.dom.interludeProgress)
+              this.ctx.dom.interludeProgress.styleJs({ width: "0%" });
             this.ctx.dom.lyricsCanvas.styleJs({ opacity: "1" });
             this.broadcastOverlayLyrics();
           }
