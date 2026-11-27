@@ -563,10 +563,6 @@ export class FortePianoRoll {
     return note._modState;
   }
 
-  isNoteModulated(note) {
-    return this.getNoteModulationState(note).isModulated;
-  }
-
   drawNote(ctxToUse, note, startX, y, noteWidth, isActive) {
     ctxToUse.save();
     ctxToUse.translate(startX | 0, y | 0);
