@@ -320,7 +320,6 @@ export class ForteScoring {
     ) {
       this.initHaranaSession(notes);
     }
-    const session = this.state.scoring.haranaSession;
     const transpose = this.state.playback.transpose || 0;
 
     const activeKey = this.harana
