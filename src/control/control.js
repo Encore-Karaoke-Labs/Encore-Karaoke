@@ -767,9 +767,6 @@ async function init() {
   async function reserveSong(song) {
     if (!appReady || !window.karaoke?.playOrReserveSong) return false;
 
-    const label =
-      typeof song === "string" ? song : song?.title || song?.code || "song";
-
     try {
       const response = await window.karaoke.playOrReserveSong(song);
       if (response?.success) {
