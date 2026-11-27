@@ -351,7 +351,6 @@ export default class UIManager {
 
   buildUI() {
     const dom = this.ctx.dom;
-    const state = this.ctx.state;
     const wrapper = this.ctx.wrapper;
 
     dom.bgvContainer = new Html("div")
