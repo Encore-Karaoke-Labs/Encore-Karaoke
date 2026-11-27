@@ -11,7 +11,7 @@ import FormatBadge from "./FormatBadge.js";
  *   onClick: () => submit(),
  * }).appendTo(resultsContainer);
  */
-export class SearchResultItem extends Html {
+class SearchResultItem extends Html {
   /**
    * @param {Object} options
    * @param {Object} options.result - Search result entry.
