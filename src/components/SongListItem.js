@@ -12,7 +12,7 @@ import FormatBadge from "./FormatBadge.js";
  *   onClick: () => requestSong(song),
  * }).appendTo(listInner);
  */
-export class SongListItem extends Html {
+class SongListItem extends Html {
   /**
    * @param {Object} options
    * @param {Object} options.song - Song metadata.
