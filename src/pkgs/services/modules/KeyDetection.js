@@ -150,14 +150,11 @@ function detectMusicalKey(chromaArray, candidates) {
 }
 
 export {
-  MAJOR_PROFILE,
-  MINOR_PROFILE,
   MAJOR_ROOT_NAMES,
   MINOR_ROOT_NAMES,
   MAJOR_SCALE_STEPS,
   MINOR_SCALE_STEPS,
   KEY_CANDIDATES,
   correlateChroma,
-  normalizeChroma,
   detectMusicalKey,
 };
