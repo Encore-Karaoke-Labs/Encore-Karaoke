@@ -9,7 +9,7 @@ import Html from "../libs/html.js";
  *   description: "Move song in Reservations menu",
  * }).appendTo(list);
  */
-export class KeybindRow extends Html {
+class KeybindRow extends Html {
   /**
    * @param {Object} options
    * @param {string|string[]} options.keys - Key or keys. Strings are split on " / ".
