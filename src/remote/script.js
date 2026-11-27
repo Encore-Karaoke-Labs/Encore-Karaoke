@@ -142,7 +142,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const tabLocal = document.getElementById("tab-local");
   const tabYt = document.getElementById("tab-yt");
-  const songViewContainer = document.getElementById("song-view-container");
 
   const chatView = document.getElementById("chat-view");
   const tabChat = document.getElementById("tab-chat");
