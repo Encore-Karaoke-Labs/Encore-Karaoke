@@ -12,7 +12,7 @@ import { normalizeClasses } from "./helpers.js";
  *   onClick: () => closeQueue(),
  * }).appendTo(header);
  */
-export class IconButton extends Html {
+class IconButton extends Html {
   /**
    * @param {Object} options
    * @param {string} options.icon - IonIcon name.
