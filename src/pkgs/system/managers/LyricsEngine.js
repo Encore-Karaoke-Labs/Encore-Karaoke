@@ -198,19 +198,19 @@ export default class LyricsEngine {
     this.romajiCache = {};
     this.pendingRomajiFetches = new Set();
 
-    this.lineCaches = [];
-    for (let i = 0; i < 2; i++) {
-      const dim = document.createElement("canvas");
-      const main = document.createElement("canvas");
-      this.lineCaches.push({
-        dim,
-        dimCtx: dim.getContext("2d", { alpha: true }),
-        main,
-        mainCtx: main.getContext("2d", { alpha: true }),
-      });
-    }
+    this.lineCaches = [this._createLineCache(), this._createLineCache()];
 
-    this.requestCanvasCacheUpdate = false;
+    this._requestCanvasCacheUpdate = false;
+    this._layoutEpoch = 0;
+    Object.defineProperty(this, "requestCanvasCacheUpdate", {
+      configurable: true,
+      get: () => this._requestCanvasCacheUpdate,
+      set: (value) => {
+        const next = Boolean(value);
+        if (next && !this._requestCanvasCacheUpdate) this._layoutEpoch++;
+        this._requestCanvasCacheUpdate = next;
+      },
+    });
 
     this.parsedLrc = [];
     this.interludes = [];
@@ -789,8 +789,9 @@ export default class LyricsEngine {
       this._resolveRomajiForLine(1);
       this._resolveRomajiForLine(2);
 
+      // resizeLyricsCanvas() already recalculates the layout in player mode.
       this.resizeLyricsCanvas();
-      this.calculateLyricLayout();
+      if (this.renderableLines.length === 0) this.calculateLyricLayout();
       this.broadcastOverlayLyrics();
       this._hasBroadcastInitialLyrics = true;
 
@@ -812,7 +813,7 @@ export default class LyricsEngine {
         this.nextLineFadeDurationMs = 500;
 
         this.resizeLyricsCanvas();
-        this.calculateLyricLayout();
+        if (this.renderableLines.length === 0) this.calculateLyricLayout();
         this.broadcastOverlayLyrics();
         this._hasBroadcastInitialLyrics = true;
 
@@ -1116,25 +1117,46 @@ export default class LyricsEngine {
   async parseLrc(text) {
     const regex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
     if (!text) return [];
-    const lines = text.split("\n");
-    const promises = lines.map(async (line) => {
+
+    const entries = [];
+    for (const line of text.split("\n")) {
       const match = line.match(regex);
-      if (!match) return null;
+      if (!match) continue;
       const time =
         parseInt(match[1]) * 60 +
         parseInt(match[2]) +
         parseInt(match[3].padEnd(3, "0")) / 1000;
       const txt = line.replace(regex, "").trim();
-      if (!txt) return null;
+      if (!txt) continue;
+      entries.push({ time, text: txt, romanized: "" });
+    }
 
-      let romanized = "";
-      if (this.asianRegex.test(txt)) {
-        romanized = await Romanizer.romanize(txt);
-        this.romajiCache[txt] = romanized;
+    const ROMANIZE_CONCURRENCY = 4;
+    let nextIndex = 0;
+    const worker = async () => {
+      while (nextIndex < entries.length) {
+        const entry = entries[nextIndex++];
+        if (!this.asianRegex.test(entry.text)) continue;
+
+        const cached = this.romajiCache[entry.text];
+        if (cached !== undefined) {
+          entry.romanized = cached;
+          continue;
+        }
+
+        entry.romanized = (await Romanizer.romanize(entry.text)) || "";
+        this.romajiCache[entry.text] = entry.romanized;
       }
-      return { time, text: txt, romanized };
-    });
-    return (await Promise.all(promises)).filter(Boolean);
+    };
+
+    await Promise.all(
+      Array.from(
+        { length: Math.min(ROMANIZE_CONCURRENCY, entries.length) },
+        worker,
+      ),
+    );
+
+    return entries;
   }
 
   async _resolveRomajiForLine(lineIndex) {
@@ -1730,240 +1752,343 @@ export default class LyricsEngine {
         }
       }
     }
+    this._layoutEpoch++;
     this.requestCanvasCacheUpdate = true;
   }
 
-  updateCanvasCache() {
-    const canvas = this.ctx.dom.lyricsCanvas.elm;
-    const width = canvas.width,
-      height = canvas.height;
+  _createLineCache() {
+    const dim = document.createElement("canvas");
+    const main = document.createElement("canvas");
+    return {
+      dim,
+      dimCtx: dim.getContext("2d", { alpha: true }),
+      main,
+      mainCtx: main.getContext("2d", { alpha: true }),
+      _epoch: -1,
+      _dpr: 0,
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 0,
+    };
+  }
+
+  /**
+   * Returns the logical bounding box of a rendered line.
+   */
+  _getLineCacheBounds(line, mainFontSize, subFontSize) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+    for (const s of line.syllables) {
+      if (s.isHidden) continue;
+      if (s.layoutX < minX) minX = s.layoutX;
+      if (s.layoutX + s.blockWidth > maxX) maxX = s.layoutX + s.blockWidth;
+      const top = s.layoutY - mainFontSize * 1.75;
+      const bottom = s.layoutY + mainFontSize * 1.1;
+      if (top < minY) minY = top;
+      if (bottom > maxY) maxY = bottom;
+    }
+
+    if (this.lyricsCtx) {
+      this.lyricsCtx.font = `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}"`;
+      for (const r of line.rows) {
+        if (!r.romajiChunks || r.romajiChunks.length === 0) continue;
+        for (const chunk of r.romajiChunks) {
+          if (!chunk.romaji) continue;
+          const firstS = chunk.syllables[0];
+          const lastS = chunk.syllables[chunk.syllables.length - 1];
+          const centerX =
+            (firstS.layoutX +
+              (firstS.indicatorWidth || 0) +
+              (lastS.layoutX + lastS.blockWidth)) /
+            2;
+          const halfWidth = this.lyricsCtx.measureText(chunk.romaji).width / 2;
+          if (centerX - halfWidth < minX) minX = centerX - halfWidth;
+          if (centerX + halfWidth > maxX) maxX = centerX + halfWidth;
+        }
+        const bottom = r.layoutY + mainFontSize * 1.1;
+        if (bottom > maxY) maxY = bottom;
+      }
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
+
+    const pad = mainFontSize * 0.35;
+    return {
+      x: Math.floor(minX - pad),
+      y: Math.floor(minY - pad),
+      w: Math.max(1, Math.ceil(maxX - minX + pad * 2)),
+      h: Math.max(1, Math.ceil(maxY - minY + pad * 2)),
+    };
+  }
+
+  /**
+   * Rebuilds the cached lyric layers. When `incremental` is set only a single
+   * dirty line is rebuilt per call.
+   */
+  updateCanvasCache({ incremental = false } = {}) {
+    const canvas = this.ctx.dom.lyricsCanvas?.elm;
+    if (!canvas || !this.lyricsCtx) return;
+    if (!this.renderableLines || this.renderableLines.length === 0) return;
+
     const dpr = window.devicePixelRatio || 1;
     const logicalWidth =
       parseFloat(canvas.style.width) || window.innerWidth * 0.9;
 
     while (this.lineCaches.length < this.renderableLines.length) {
-      const dim = document.createElement("canvas"),
-        main = document.createElement("canvas");
-      this.lineCaches.push({
-        dim,
-        dimCtx: dim.getContext("2d", { alpha: true }),
-        main,
-        mainCtx: main.getContext("2d", { alpha: true }),
-      });
+      this.lineCaches.push(this._createLineCache());
     }
 
     const fontScale = this.ctx.state.lyricFontSizeScale ?? 1.0;
     const mainFontSize = Math.floor(logicalWidth * 0.045 * fontScale);
     const subFontSize = Math.floor(logicalWidth * 0.018 * fontScale);
 
-    this.renderableLines.forEach((line, lineIdx) => {
+    let built = 0;
+    let pending = false;
+
+    for (let lineIdx = 0; lineIdx < this.renderableLines.length; lineIdx++) {
       const cache = this.lineCaches[lineIdx];
+      if (cache._epoch === this._layoutEpoch && cache._dpr === dpr) continue;
 
-      if (
-        cache.dim.width !== width ||
-        cache.dim.height !== height ||
-        cache._dpr !== dpr
-      ) {
-        cache.dim.width = width;
-        cache.dim.height = height;
-        cache.main.width = width;
-        cache.main.height = height;
-        cache.dimCtx.setTransform(1, 0, 0, 1, 0, 0);
-        cache.mainCtx.setTransform(1, 0, 0, 1, 0, 0);
-        cache.dimCtx.scale(dpr, dpr);
-        cache.mainCtx.scale(dpr, dpr);
-        cache._dpr = dpr;
-      } else {
-        cache.dimCtx.save();
-        cache.dimCtx.setTransform(1, 0, 0, 1, 0, 0);
-        cache.dimCtx.clearRect(0, 0, width, height);
-        cache.dimCtx.restore();
-        cache.mainCtx.save();
-        cache.mainCtx.setTransform(1, 0, 0, 1, 0, 0);
-        cache.mainCtx.clearRect(0, 0, width, height);
-        cache.mainCtx.restore();
+      if (incremental && built > 0) {
+        pending = true;
+        continue;
       }
-      cache.dimCtx.textBaseline = "alphabetic";
-      cache.mainCtx.textBaseline = "alphabetic";
-      cache.dimCtx.lineJoin = "round";
-      cache.mainCtx.lineJoin = "round";
 
-      line.syllables.forEach((s) => {
-        if (s.isHidden) return;
+      this._renderLineCache(
+        this.renderableLines[lineIdx],
+        cache,
+        mainFontSize,
+        subFontSize,
+        dpr,
+      );
+      cache._epoch = this._layoutEpoch;
+      cache._dpr = dpr;
+      built++;
+    }
 
-        const textStartX = s.layoutX + (s.indicatorWidth || 0);
-        const textBlockWidth = s.blockWidth - (s.indicatorWidth || 0);
-        const centerX = textStartX + textBlockWidth / 2;
+    this.requestCanvasCacheUpdate = pending;
+  }
 
-        const colors = this.ctx.state.isDuet
-          ? this.getDuetColors(s.duetRole)
-          : this.getDuetColors("default");
+  _renderLineCache(line, cache, mainFontSize, subFontSize, dpr) {
+    const bounds = this._getLineCacheBounds(line, mainFontSize, subFontSize);
+    if (!bounds) {
+      cache.w = 0;
+      cache.h = 0;
+      return;
+    }
+    cache.x = bounds.x;
+    cache.y = bounds.y;
+    cache.w = bounds.w;
+    cache.h = bounds.h;
 
-        if (s.showRoleIndicator && s.indicatorText) {
-          const indHeight = mainFontSize * 0.65;
-          const indY = s.layoutY - mainFontSize * 0.35;
-          const indX = s.layoutX + (s.indicatorLeftMargin || 0);
-          const pad = subFontSize * 0.6;
-          const pillW =
-            (s.indicatorWidth || 0) - (s.indicatorLeftMargin || 0) - pad;
-          const fontSize = subFontSize * 0.85;
+    const physWidth = Math.max(1, Math.round(bounds.w * dpr));
+    const physHeight = Math.max(1, Math.round(bounds.h * dpr));
 
-          const drawPill = (c) => {
-            c.save();
-            c.fillStyle = colors.main;
-            c.strokeStyle = colors.stroke;
-            c.lineWidth = mainFontSize * 0.04;
-            c.beginPath();
+    if (cache.dim.width !== physWidth || cache.dim.height !== physHeight) {
+      cache.dim.width = physWidth;
+      cache.dim.height = physHeight;
+      cache.main.width = physWidth;
+      cache.main.height = physHeight;
+    } else {
+      cache.dimCtx.save();
+      cache.dimCtx.setTransform(1, 0, 0, 1, 0, 0);
+      cache.dimCtx.clearRect(0, 0, physWidth, physHeight);
+      cache.dimCtx.restore();
+      cache.mainCtx.save();
+      cache.mainCtx.setTransform(1, 0, 0, 1, 0, 0);
+      cache.mainCtx.clearRect(0, 0, physWidth, physHeight);
+      cache.mainCtx.restore();
+    }
 
-            if (c.roundRect) {
-              c.roundRect(
-                indX,
-                indY - indHeight / 2,
-                pillW,
-                indHeight,
-                indHeight / 2,
-              );
-            } else {
-              const r = indHeight / 2;
-              c.moveTo(indX + r, indY - r);
-              c.lineTo(indX + pillW - r, indY - r);
-              c.arc(indX + pillW - r, indY, r, -Math.PI / 2, Math.PI / 2);
-              c.lineTo(indX + r, indY + r);
-              c.arc(indX + r, indY, r, Math.PI / 2, Math.PI * 1.5);
-            }
-            c.fill();
-            c.stroke();
+    cache.dimCtx.setTransform(dpr, 0, 0, dpr, -bounds.x * dpr, -bounds.y * dpr);
+    cache.mainCtx.setTransform(
+      dpr,
+      0,
+      0,
+      dpr,
+      -bounds.x * dpr,
+      -bounds.y * dpr,
+    );
+    cache.dimCtx.textBaseline = "alphabetic";
+    cache.mainCtx.textBaseline = "alphabetic";
+    cache.dimCtx.lineJoin = "round";
+    cache.mainCtx.lineJoin = "round";
 
-            c.fillStyle = colors.stroke;
-            c.font = `800 ${fontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
-            c.textAlign = "center";
-            c.textBaseline = "middle";
-            c.fillText(
-              s.indicatorText,
-              indX + pillW / 2,
-              indY + fontSize * 0.05,
+    line.syllables.forEach((s) => {
+      if (s.isHidden) return;
+
+      const textStartX = s.layoutX + (s.indicatorWidth || 0);
+      const textBlockWidth = s.blockWidth - (s.indicatorWidth || 0);
+      const centerX = textStartX + textBlockWidth / 2;
+
+      const colors = this.ctx.state.isDuet
+        ? this.getDuetColors(s.duetRole)
+        : this.getDuetColors("default");
+
+      if (s.showRoleIndicator && s.indicatorText) {
+        const indHeight = mainFontSize * 0.65;
+        const indY = s.layoutY - mainFontSize * 0.35;
+        const indX = s.layoutX + (s.indicatorLeftMargin || 0);
+        const pad = subFontSize * 0.6;
+        const pillW =
+          (s.indicatorWidth || 0) - (s.indicatorLeftMargin || 0) - pad;
+        const fontSize = subFontSize * 0.85;
+
+        const drawPill = (c) => {
+          c.save();
+          c.fillStyle = colors.main;
+          c.strokeStyle = colors.stroke;
+          c.lineWidth = mainFontSize * 0.04;
+          c.beginPath();
+
+          if (c.roundRect) {
+            c.roundRect(
+              indX,
+              indY - indHeight / 2,
+              pillW,
+              indHeight,
+              indHeight / 2,
             );
-            c.restore();
-          };
+          } else {
+            const r = indHeight / 2;
+            c.moveTo(indX + r, indY - r);
+            c.lineTo(indX + pillW - r, indY - r);
+            c.arc(indX + pillW - r, indY, r, -Math.PI / 2, Math.PI / 2);
+            c.lineTo(indX + r, indY + r);
+            c.arc(indX + r, indY, r, Math.PI / 2, Math.PI * 1.5);
+          }
+          c.fill();
+          c.stroke();
 
-          drawPill(cache.dimCtx);
-          drawPill(cache.mainCtx);
-        }
-
-        const renderTextToCtx = (
-          ctx,
-          text,
-          y,
-          font,
-          w,
-          isMain,
-          isRuby = false,
-        ) => {
-          if (!text) return;
-          ctx.font = font;
-
-          const palette = isRuby ? colors.ruby : colors;
-          ctx.fillStyle = isMain ? palette.main : palette.dim;
-          ctx.strokeStyle = isMain ? palette.stroke : palette.dimStroke;
-
-          const strokeMultiplier = isRuby ? 0.12 : 0.15;
-          const fontSize = font.includes(mainFontSize)
-            ? mainFontSize
-            : subFontSize;
-          ctx.lineWidth = fontSize * strokeMultiplier;
-
-          ctx.strokeText(text, centerX - w / 2, y);
-          ctx.fillText(text, centerX - w / 2, y);
+          c.fillStyle = colors.stroke;
+          c.font = `800 ${fontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
+          c.textAlign = "center";
+          c.textBaseline = "middle";
+          c.fillText(s.indicatorText, indX + pillW / 2, indY + fontSize * 0.05);
+          c.restore();
         };
 
+        drawPill(cache.dimCtx);
+        drawPill(cache.mainCtx);
+      }
+
+      const renderTextToCtx = (
+        ctx,
+        text,
+        y,
+        font,
+        w,
+        isMain,
+        isRuby = false,
+      ) => {
+        if (!text) return;
+        ctx.font = font;
+
+        const palette = isRuby ? colors.ruby : colors;
+        ctx.fillStyle = isMain ? palette.main : palette.dim;
+        ctx.strokeStyle = isMain ? palette.stroke : palette.dimStroke;
+
+        const strokeMultiplier = isRuby ? 0.12 : 0.15;
+        const fontSize = font.includes(mainFontSize)
+          ? mainFontSize
+          : subFontSize;
+        ctx.lineWidth = fontSize * strokeMultiplier;
+
+        ctx.strokeText(text, centerX - w / 2, y);
+        ctx.fillText(text, centerX - w / 2, y);
+      };
+
+      renderTextToCtx(
+        cache.dimCtx,
+        s.furigana,
+        s.layoutY - mainFontSize * 1.1,
+        `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}"`,
+        s.furiW,
+        false,
+        true,
+      );
+      renderTextToCtx(
+        cache.mainCtx,
+        s.furigana,
+        s.layoutY - mainFontSize * 1.1,
+        `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}"`,
+        s.furiW,
+        true,
+        true,
+      );
+
+      if (s.isPartOfContinuousWord) {
+        if (s.isContinuousWordStart && s.continuousWordText) {
+          const wordX = textStartX;
+          cache.dimCtx.font = `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
+          cache.dimCtx.fillStyle = colors.dim;
+          cache.dimCtx.strokeStyle = colors.dimStroke;
+          cache.dimCtx.lineWidth = mainFontSize * 0.15;
+          cache.dimCtx.strokeText(s.continuousWordText, wordX, s.layoutY);
+          cache.dimCtx.fillText(s.continuousWordText, wordX, s.layoutY);
+
+          cache.mainCtx.font = `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
+          cache.mainCtx.fillStyle = colors.main;
+          cache.mainCtx.strokeStyle = colors.stroke;
+          cache.mainCtx.lineWidth = mainFontSize * 0.15;
+          cache.mainCtx.strokeText(s.continuousWordText, wordX, s.layoutY);
+          cache.mainCtx.fillText(s.continuousWordText, wordX, s.layoutY);
+        }
+      } else {
         renderTextToCtx(
           cache.dimCtx,
-          s.furigana,
-          s.layoutY - mainFontSize * 1.1,
-          `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}"`,
-          s.furiW,
+          s.casedText || s.text || "",
+          s.layoutY,
+          `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`,
+          s.origW,
           false,
-          true,
         );
         renderTextToCtx(
           cache.mainCtx,
-          s.furigana,
-          s.layoutY - mainFontSize * 1.1,
-          `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}"`,
-          s.furiW,
-          true,
+          s.casedText || s.text || "",
+          s.layoutY,
+          `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`,
+          s.origW,
           true,
         );
-
-        if (s.isPartOfContinuousWord) {
-          if (s.isContinuousWordStart && s.continuousWordText) {
-            const wordX = textStartX;
-            cache.dimCtx.font = `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
-            cache.dimCtx.fillStyle = colors.dim;
-            cache.dimCtx.strokeStyle = colors.dimStroke;
-            cache.dimCtx.lineWidth = mainFontSize * 0.15;
-            cache.dimCtx.strokeText(s.continuousWordText, wordX, s.layoutY);
-            cache.dimCtx.fillText(s.continuousWordText, wordX, s.layoutY);
-
-            cache.mainCtx.font = `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`;
-            cache.mainCtx.fillStyle = colors.main;
-            cache.mainCtx.strokeStyle = colors.stroke;
-            cache.mainCtx.lineWidth = mainFontSize * 0.15;
-            cache.mainCtx.strokeText(s.continuousWordText, wordX, s.layoutY);
-            cache.mainCtx.fillText(s.continuousWordText, wordX, s.layoutY);
-          }
-        } else {
-          renderTextToCtx(
-            cache.dimCtx,
-            s.casedText || s.text || "",
-            s.layoutY,
-            `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`,
-            s.origW,
-            false,
-          );
-          renderTextToCtx(
-            cache.mainCtx,
-            s.casedText || s.text || "",
-            s.layoutY,
-            `900 ${mainFontSize}px "${this.ctx.state.lyricFontFamily}", sans-serif`,
-            s.origW,
-            true,
-          );
-        }
-      });
-
-      cache.dimCtx.textAlign = "center";
-
-      line.rows.forEach((r) => {
-        if (r.romajiChunks && r.romajiChunks.length > 0) {
-          r.romajiChunks.forEach((chunk) => {
-            if (!chunk.romaji) return;
-
-            const colors = this.ctx.state.isDuet
-              ? this.getDuetColors(chunk.role)
-              : this.getDuetColors("default");
-
-            const firstS = chunk.syllables[0];
-            const lastS = chunk.syllables[chunk.syllables.length - 1];
-
-            const firstX = firstS.layoutX + (firstS.indicatorWidth || 0);
-            const lastX = lastS.layoutX + lastS.blockWidth;
-            const chunkCenterX = (firstX + lastX) / 2;
-            const romajiY = r.layoutY + mainFontSize * 0.6;
-
-            cache.dimCtx.font = `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}"`;
-            cache.dimCtx.fillStyle = colors.romaji.text;
-            cache.dimCtx.strokeStyle = colors.romaji.stroke;
-            cache.dimCtx.lineWidth = subFontSize * 0.12;
-
-            cache.dimCtx.strokeText(chunk.romaji, chunkCenterX, romajiY);
-            cache.dimCtx.fillText(chunk.romaji, chunkCenterX, romajiY);
-          });
-        }
-      });
-
-      cache.dimCtx.textAlign = "left";
+      }
     });
+
+    cache.dimCtx.textAlign = "center";
+
+    line.rows.forEach((r) => {
+      if (r.romajiChunks && r.romajiChunks.length > 0) {
+        r.romajiChunks.forEach((chunk) => {
+          if (!chunk.romaji) return;
+
+          const colors = this.ctx.state.isDuet
+            ? this.getDuetColors(chunk.role)
+            : this.getDuetColors("default");
+
+          const firstS = chunk.syllables[0];
+          const lastS = chunk.syllables[chunk.syllables.length - 1];
+
+          const firstX = firstS.layoutX + (firstS.indicatorWidth || 0);
+          const lastX = lastS.layoutX + lastS.blockWidth;
+          const chunkCenterX = (firstX + lastX) / 2;
+          const romajiY = r.layoutY + mainFontSize * 0.6;
+
+          cache.dimCtx.font = `700 ${subFontSize}px "${this.ctx.state.lyricFontFamily}"`;
+          cache.dimCtx.fillStyle = colors.romaji.text;
+          cache.dimCtx.strokeStyle = colors.romaji.stroke;
+          cache.dimCtx.lineWidth = subFontSize * 0.12;
+
+          cache.dimCtx.strokeText(chunk.romaji, chunkCenterX, romajiY);
+          cache.dimCtx.fillText(chunk.romaji, chunkCenterX, romajiY);
+        });
+      }
+    });
+
+    cache.dimCtx.textAlign = "left";
   }
 
   drawLyricsFrame() {
@@ -1972,20 +2097,8 @@ export default class LyricsEngine {
       return;
     }
 
-    if (this.ctx.state.isTransitioning) {
-      this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
-      return;
-    }
-
-    if (this.ctx.state.isInterludeActive) {
-      this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
-      return;
-    }
-
     const ctx = this.lyricsCtx;
     const canvas = this.ctx.dom.lyricsCanvas.elm;
-    const logicalWidth =
-      parseFloat(canvas.style.width) || window.innerWidth * 0.9;
 
     if (this.pendingCanvasHeight) {
       const dpr = window.devicePixelRatio || 1;
@@ -1999,7 +2112,22 @@ export default class LyricsEngine {
       this.requestCanvasCacheUpdate = true;
     }
 
-    const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
+    if (this.ctx.state.isTransitioning) {
+      if (this.requestCanvasCacheUpdate) {
+        this.updateCanvasCache({ incremental: true });
+      }
+      this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
+      return;
+    }
+
+    if (this.ctx.state.isInterludeActive) {
+      this.lyricsRafId = requestAnimationFrame(() => this.drawLyricsFrame());
+      return;
+    }
+
+    const logicalWidth =
+      parseFloat(canvas.style.width) || window.innerWidth * 0.9;
+
     const fontScale = this.ctx.state.lyricFontSizeScale ?? 1.0;
     const mainFontSize = Math.floor(logicalWidth * 0.045 * fontScale);
 
@@ -2084,9 +2212,9 @@ export default class LyricsEngine {
 
       this.renderableLines.forEach((line, lineIdx) => {
         const cache = this.lineCaches[lineIdx];
-        if (!cache) return;
+        if (!cache || cache.w <= 0) return;
         ctx.globalAlpha = lineAlphas[lineIdx];
-        ctx.drawImage(cache.dim, 0, 0, logicalWidth, logicalHeight);
+        ctx.drawImage(cache.dim, cache.x, cache.y, cache.w, cache.h);
       });
 
       ctx.globalAlpha = 1.0;
@@ -2102,7 +2230,7 @@ export default class LyricsEngine {
           return;
         }
         const cache = this.lineCaches[lineIdx];
-        if (!cache) return;
+        if (!cache || cache.w <= 0) return;
 
         ctx.save();
         const isFirstLineGroup = isLrcMode
@@ -2159,7 +2287,7 @@ export default class LyricsEngine {
           }
         });
         ctx.clip();
-        ctx.drawImage(cache.main, 0, 0, logicalWidth, logicalHeight);
+        ctx.drawImage(cache.main, cache.x, cache.y, cache.w, cache.h);
         ctx.restore();
       });
     }
