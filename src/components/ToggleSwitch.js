@@ -11,7 +11,7 @@ import { normalizeClasses } from "./helpers.js";
  *   onChange: (checked) => { options.recordSession = checked; },
  * }).appendTo(row);
  */
-export class ToggleSwitch extends Html {
+class ToggleSwitch extends Html {
   /**
    * @param {Object} [options]
    * @param {boolean} [options.checked] - Initial state.
