@@ -9,7 +9,7 @@ import { clampPercent, normalizeClasses } from "./helpers.js";
  * const bar = new ProgressBar({ value: 42, height: "15px" }).appendTo(wrap);
  * bar.setValue(80);
  */
-export class ProgressBar extends Html {
+class ProgressBar extends Html {
   /**
    * @param {Object} [options]
    * @param {number} [options.value] - Progress percentage (0-100).
