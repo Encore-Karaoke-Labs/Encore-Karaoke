@@ -18,7 +18,7 @@ import IconButton from "./IconButton.js";
  *   onDelete: () => remove(index),
  * }).appendTo(queueList);
  */
-export class QueueListItem extends Html {
+class QueueListItem extends Html {
   /**
    * @param {Object} options
    * @param {Object} options.song - Song metadata.
@@ -114,19 +114,6 @@ export class QueueListItem extends Html {
    */
   setHighlighted(highlighted) {
     this[highlighted ? "classOn" : "classOff"]("highlighted");
-    return this;
-  }
-
-  /**
-   * Toggles the focused state of the delete control.
-   * @param {boolean} focused
-   * @returns {QueueListItem}
-   */
-  setDeleteFocused(focused) {
-    const deleteBtn = this.elm.querySelector(".queue-del-btn");
-    if (deleteBtn) {
-      deleteBtn.classList[focused ? "add" : "remove"]("focused");
-    }
     return this;
   }
 }
