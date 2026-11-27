@@ -239,8 +239,6 @@ export default class DriveRecoveryManager {
     this.dom.overlay.classOff("hidden");
 
     const driveLabel = this.cachedTarget?.driveLabel || "External Drive";
-    const expectedTitle =
-      this.cachedTarget?.manifest?.title || "Encore Library";
 
     if (type === "disconnected") {
       this.dom.modal.classOff("is-mismatch").classOn("is-disconnected");
