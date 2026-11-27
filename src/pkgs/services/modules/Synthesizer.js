@@ -5,7 +5,7 @@ import {
 } from "spessasynth_lib";
 import { logVerbose, logVerboseWarn } from "../core/State.js";
 
-export const STANDARD_GM_DRUM_PRESETS = [
+const STANDARD_GM_DRUM_PRESETS = [
   {
     program: 0,
     bankMSB: 0,
