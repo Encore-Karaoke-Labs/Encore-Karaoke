@@ -429,10 +429,6 @@ export default class PlaybackManager {
         if (guideLevel) Forte.setGuideTrackVolume(guideLevel.value);
       }
 
-      const trackHasNotes =
-        state.currentSongIsMultiplexed ||
-        (state.currentSongIsMIDI && pbState.hasGuideNotes);
-
       Forte.togglePianoRollVisibility(false);
 
       let icon = pbState.hasChorus
