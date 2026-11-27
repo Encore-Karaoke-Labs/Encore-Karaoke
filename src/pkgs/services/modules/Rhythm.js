@@ -50,7 +50,7 @@ function beatsPerBarFromTimeSignature(data) {
  * @param {number} ppq - Ticks per quarter note.
  * @returns {{segments: Array<Object>, ppq: number}}
  */
-export function buildMeterMap(midi, ppq) {
+function buildMeterMap(midi, ppq) {
   const signatures = [];
 
   for (const track of midi.tracks || []) {
@@ -113,7 +113,7 @@ export function buildMeterMap(midi, ppq) {
  * @param {number} tick
  * @returns {number}
  */
-export function getBarIndexAtTick(meterMap, tick) {
+function getBarIndexAtTick(meterMap, tick) {
   const segments = meterMap?.segments;
   if (!segments || segments.length === 0) return 0;
 
@@ -137,7 +137,7 @@ export function getBarIndexAtTick(meterMap, tick) {
  * @param {number} barIndex
  * @returns {{startTick: number, beatsPerBar: number}|null}
  */
-export function getBarInfo(meterMap, barIndex) {
+function getBarInfo(meterMap, barIndex) {
   const segments = meterMap?.segments;
   if (!segments || segments.length === 0 || barIndex < 0) return null;
 
@@ -210,7 +210,7 @@ function readRhythmKit(midi) {
  * @param {Object} midi - Parsed BasicMIDI instance.
  * @returns {Object|null}
  */
-export function buildRhythmDefinition(name, path, midi) {
+function buildRhythmDefinition(name, path, midi) {
   const ppq =
     midi.timeDivision && midi.timeDivision > 0 ? midi.timeDivision : 480;
   const meterMap = buildMeterMap(midi, ppq);
@@ -762,14 +762,6 @@ export class ForteRhythm {
         original: false,
       })),
     ];
-  }
-
-  getCurrentIndex() {
-    return this.currentIndex;
-  }
-
-  getCurrentRhythm() {
-    return this.currentIndex >= 0 ? this.rhythms[this.currentIndex] : null;
   }
 
   getCurrentRhythmName() {
