@@ -39,7 +39,7 @@ export function sendAppStateToControl(ready: boolean): void {
   }
 }
 
-export function popOutAppView(): void {
+function popOutAppView(): void {
   if (kioskEnabled || platformHints.has("no-popout")) return;
   if (isPoppedOut || !appState.mainWindow || !appState.appView) return;
 
@@ -171,7 +171,7 @@ export function popOutAppView(): void {
   logger.info("POPOUT", "Encore popped out to secondary window.");
 }
 
-export function dockBackAppView(userInitiated: boolean = true): void {
+function dockBackAppView(userInitiated: boolean = true): void {
   if (
     appState.isAppQuitting ||
     !appState.mainWindow ||
