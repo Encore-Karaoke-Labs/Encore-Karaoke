@@ -8,9 +8,6 @@ import Html from "./libs/html.js";
 (async () => {
   let Security = {
     vars: new Map(),
-    getSecureVariable(key) {
-      return this.vars.get(key);
-    },
     setSecureVariable(key, value) {
       return this.vars.set(key, value);
     },
