@@ -532,7 +532,7 @@ export class ForteSFX {
    */
   clearRemoteStreams() {
     if (this.state.playback.remoteSources) {
-      for (let [id, source] of this.state.playback.remoteSources.entries()) {
+      for (let source of this.state.playback.remoteSources.values()) {
         source.disconnect();
       }
       this.state.playback.remoteSources.clear();
