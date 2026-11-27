@@ -4,14 +4,13 @@ import playBootVideo from "../../libs/bootVideo.js";
 import NetworkingUtility from "../../libs/networkingUtility.js";
 import { hasPlatformHint, isEmbedded } from "../../libs/platformHints.js";
 
-let wrapper, Ui, Pid, Sfx;
+let wrapper, Ui, Pid;
 let root;
 let statusP;
 let progressFill;
 let progressSheen;
 let progressAnim;
 let progressIndeterminate = false;
-let actualPort = 9864;
 
 let BOOT_BG_URL = "/assets/img/boot/bg.png";
 
@@ -422,7 +421,6 @@ const pkg = {
    */
   start: async function (Root) {
     root = Root;
-    actualPort = await NetworkingUtility.getPort();
     window.desktopIntegration?.ipc.send("setRPC", {
       details: "Booting up...",
     });
