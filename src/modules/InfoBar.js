@@ -1,13 +1,12 @@
 import Html from "../libs/html.js";
-import { findSongByCode } from "../libs/songLookup.js";
 import FormatBadge from "../components/FormatBadge.js";
 
-export const DEFAULT_INFO_BAR_ICON = "information-circle";
+const DEFAULT_INFO_BAR_ICON = "information-circle";
 
 /**
  * IonIcon name mapping for standard Encore InfoBar message labels.
  */
-export const INFO_BAR_LABEL_ICONS = {
+const INFO_BAR_LABEL_ICONS = {
   // Playback & Queue
   CURRENT: "musical-notes",
   "UP NEXT": "play-forward",
@@ -432,9 +431,6 @@ export class InfoBarModule {
    */
   renderNowPlayingContent(song) {
     if (!song) return "";
-    const isYt =
-      !song.code ||
-      (typeof song.path === "string" && song.path.startsWith("yt://"));
     const codeSpan = song.code
       ? `<span class="info-bar-code">${String(song.code).padStart(6, "0")}</span>`
       : `<span class="info-bar-code is-youtube">YT</span>`;
@@ -467,9 +463,6 @@ export class InfoBarModule {
   renderUpNextContent(queue) {
     if (!queue || queue.length === 0) return "—";
     const nextSong = queue[0];
-    const isYt =
-      !nextSong.code ||
-      (typeof nextSong.path === "string" && nextSong.path.startsWith("yt://"));
     const codeSpan = nextSong.code
       ? `<span class="info-bar-code">${String(nextSong.code).padStart(6, "0")}</span>`
       : `<span class="info-bar-code is-youtube">YT</span>`;
@@ -594,28 +587,6 @@ export class InfoBarModule {
     this.stopCycle();
     this.hideBar();
     this.show("UP NEXT", "—");
-  }
-
-  /**
-   * Display a song reservation being entered
-   * @param {string} reservationNumber - The song code being reserved
-   */
-  showReservation(reservationNumber) {
-    const displayCode = reservationNumber.padStart(6, "0");
-    const { songMap } = this.getState() || {};
-    const song = findSongByCode(songMap, reservationNumber);
-
-    let songInfo = song
-      ? `<span class="info-bar-title">${song.title}</span><span class="info-bar-artist">- ${song.artist}</span>`
-      : reservationNumber.length === 6
-        ? `<span style="opacity: 0.5;">No song found.</span>`
-        : "";
-
-    this.showTemp(
-      "RESERVING",
-      `<span class="info-bar-code">${displayCode}</span> ${songInfo}`,
-      3000,
-    );
   }
 
   /**
