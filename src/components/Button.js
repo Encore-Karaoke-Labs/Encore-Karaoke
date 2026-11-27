@@ -15,7 +15,7 @@ import { normalizeClasses } from "./helpers.js";
  *   onClick: () => goBack(),
  * }).appendTo(header);
  */
-export class Button extends Html {
+class Button extends Html {
   /**
    * @param {Object} options
    * @param {string} [options.label] - Visible label.
