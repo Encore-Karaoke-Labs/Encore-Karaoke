@@ -10,8 +10,6 @@ import { ForteScoring } from "./modules/Scoring.js";
 import { ForteSFX } from "./modules/SFX.js";
 import { ForteSynthesizer } from "./modules/Synthesizer.js";
 
-let root;
-
 // DI Container instances
 let audioCore;
 let pianoRoll;
@@ -49,7 +47,6 @@ const pkg = {
    */
   start: async function (Root) {
     logVerbose("Starting Forte Sound Engine Service for Encore.");
-    root = Root;
 
     const config = await window.config.getAll();
     state.ui.displayGuideMelody = config.displayGuide ?? true;
