@@ -11,7 +11,7 @@ import { normalizeClasses } from "./helpers.js";
  *   onClick: () => openSearch(),
  * }).appendTo(bottomActions);
  */
-export class ActionButton extends Html {
+class ActionButton extends Html {
   /**
    * @param {Object} options
    * @param {string} options.icon - IonIcon name.
