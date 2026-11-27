@@ -8,14 +8,93 @@ import { Sequencer } from "spessasynth_lib";
 import { logVerbose } from "../core/State.js";
 import { bindSpessaEvent } from "./Synthesizer.js";
 
-import {
-  KEY_CANDIDATES,
-  correlateChroma,
-} from "./KeyDetection.js";
+import { KEY_CANDIDATES, correlateChroma } from "./KeyDetection.js";
 
 const GUIDE_CLARITY_THRESHOLD = 0.5;
 const MIN_VOCAL_HZ = 75;
 const MAX_VOCAL_HZ = 1200;
+
+/**
+ * Counts how many lyric timestamps have a matching note.
+ *
+ * @param {Array<Object>} notes - Notes of one channel, sorted by start time.
+ * @param {Array<number>} lyricTimes - Lyric timestamps in seconds.
+ * @returns {number} Number of lyric timestamps with a matching note.
+ */
+function countLyricNoteMatches(notes, lyricTimes) {
+  const noteCount = notes.length;
+  if (noteCount === 0 || lyricTimes.length === 0) return 0;
+
+  for (let i = 1; i < noteCount; i++) {
+    if (notes[i].start < notes[i - 1].start) {
+      let matches = 0;
+      for (let l = 0; l < lyricTimes.length; l++) {
+        const lTime = lyricTimes[l];
+        const hasNote = notes.some(
+          (n) =>
+            Math.abs(n.start - lTime) < 0.15 ||
+            (n.start <= lTime && n.start + n.length >= lTime + 0.05),
+        );
+        if (hasNote) matches++;
+      }
+      return matches;
+    }
+  }
+
+  const starts = new Float64Array(noteCount);
+  const prefixMaxEnd = new Float64Array(noteCount);
+  let maxEnd = -Infinity;
+  for (let i = 0; i < noteCount; i++) {
+    const note = notes[i];
+    starts[i] = note.start;
+    const end = note.start + note.length;
+    if (end > maxEnd) maxEnd = end;
+    prefixMaxEnd[i] = maxEnd;
+  }
+
+  const firstStartAfter = (value) => {
+    let low = 0;
+    let high = noteCount;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (starts[mid] <= value) low = mid + 1;
+      else high = mid;
+    }
+    return low;
+  };
+
+  const lastStartAtOrBefore = (value) => {
+    let low = 0;
+    let high = noteCount;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (starts[mid] <= value) low = mid + 1;
+      else high = mid;
+    }
+    return low - 1;
+  };
+
+  let matches = 0;
+  for (const lTime of lyricTimes) {
+    let matched = false;
+
+    const nearIndex = firstStartAfter(lTime - 0.15);
+    if (nearIndex < noteCount && starts[nearIndex] < lTime + 0.15) {
+      matched = true;
+    }
+
+    if (!matched) {
+      const activeIndex = lastStartAtOrBefore(lTime);
+      if (activeIndex >= 0 && prefixMaxEnd[activeIndex] >= lTime + 0.05) {
+        matched = true;
+      }
+    }
+
+    if (matched) matches++;
+  }
+
+  return matches;
+}
 
 /**
  * Detects the musical key of a parsed MIDI file using duration-weighted chroma
@@ -634,16 +713,7 @@ export class FortePlayback {
               const avgInterval = totalInterval / Math.max(1, notes.length - 1);
               const shortNoteRatio = shortNotes / notes.length;
 
-              let matches = 0;
-              for (let l = 0; l < lyricTimes.length; l++) {
-                const lTime = lyricTimes[l];
-                const noteForLyric = notes.find(
-                  (n) =>
-                    Math.abs(n.start - lTime) < 0.15 ||
-                    (n.start <= lTime && n.start + n.length >= lTime + 0.05),
-                );
-                if (noteForLyric) matches++;
-              }
+              const matches = countLyricNoteMatches(notes, lyricTimes);
 
               const matchRatio = matches / lyricTimes.length;
               const densityRatio = notes.length / lyricTimes.length;
