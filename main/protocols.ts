@@ -6,7 +6,7 @@ import {
   platformHints,
 } from "./runtime";
 
-export function registerProtocols(): void {
+function registerProtocols(): void {
   const protocols = [PROTOCOL_PREFIX, DISCORD_PROTOCOL_PREFIX];
 
   protocols.forEach((proto) => {
