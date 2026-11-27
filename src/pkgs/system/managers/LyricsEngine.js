@@ -514,19 +514,6 @@ export default class LyricsEngine {
       let ppqm = midiInfo.timeDivision || 480;
       let lyricsToParse = [...pbState.decodedLyrics];
 
-      let displayBpm = 120;
-      if (midiInfo.tempoChanges && midiInfo.tempoChanges.length > 0) {
-        let initialChanges = midiInfo.tempoChanges.filter(
-          (t) => (t.ticks !== undefined ? t.ticks : t.tick) === 0,
-        );
-        let firstTc =
-          initialChanges.length > 0
-            ? initialChanges[0]
-            : midiInfo.tempoChanges[0];
-        let val = firstTc.tempo || firstTc.bpm || 120;
-        displayBpm = val > 1000 ? Math.round(60000000 / val) : Math.round(val);
-      }
-
       let fullMetadataString = "";
       while (
         lyricsToParse.length > 0 &&
