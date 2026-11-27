@@ -256,6 +256,8 @@ export default class LyricsEngine {
     if (this.ctx.state.isInterludeActive) {
       this.ctx.state.isInterludeActive = false;
       this.ctx.dom.interludeOverlay.classOff("visible");
+      this.ctx.dom.lyricsCanvas.styleJs({ opacity: "1" });
+      this.ctx.dom.lyricsCanvas.classOff("interlude-hidden");
       if (this.ctx.dom.interludeProgress)
         this.ctx.dom.interludeProgress.styleJs({ width: "0%" });
     }
@@ -300,6 +302,32 @@ export default class LyricsEngine {
     this.parsedLrc = [];
     this.interludes = [];
     this.countdowns = [];
+  }
+
+  isInterludeBoxHidden() {
+    return Boolean(this.ctx.config.videoConfig?.hideInterludeBox);
+  }
+
+  /**
+   * Shows or hides the Interlude box to match the current setting and state.
+   */
+  applyInterludeBoxVisibility() {
+    const overlay = this.ctx.dom.interludeOverlay;
+    if (!overlay) return;
+    if (this.ctx.state.isInterludeActive && !this.isInterludeBoxHidden()) {
+      const tipEl = this.ctx.dom.interludeTipBox?.elm;
+      if (tipEl && !tipEl.textContent.trim()) {
+        const tip =
+          this.tempTips[Math.floor(Math.random() * this.tempTips.length)];
+        this.ctx.dom.interludeTipBox.text(tip);
+        this.tempTips.splice(this.tempTips.indexOf(tip), 1);
+        if (this.tempTips.length === 0)
+          this.tempTips = structuredClone(INTERLUDE_TIPS);
+      }
+      overlay.classOn("visible");
+    } else {
+      overlay.classOff("visible");
+    }
   }
 
   cleanupEvents() {
@@ -2249,36 +2277,44 @@ export default class LyricsEngine {
         if (inInterlude) {
           if (!this.ctx.state.isInterludeActive) {
             this.ctx.state.isInterludeActive = true;
-            const tip =
-              this.tempTips[Math.floor(Math.random() * this.tempTips.length)];
-            this.ctx.dom.interludeTipBox.text(tip);
-            this.tempTips.splice(this.tempTips.indexOf(tip), 1);
-            if (this.tempTips.length === 0)
-              this.tempTips = structuredClone(INTERLUDE_TIPS);
-            this.ctx.dom.interludeOverlay.classOn("visible");
-            this.ctx.dom.lyricsCanvas.styleJs({ opacity: "0" });
+            const hideBox = this.isInterludeBoxHidden();
+            if (!hideBox) {
+              const tip =
+                this.tempTips[Math.floor(Math.random() * this.tempTips.length)];
+              this.ctx.dom.interludeTipBox.text(tip);
+              this.tempTips.splice(this.tempTips.indexOf(tip), 1);
+              if (this.tempTips.length === 0)
+                this.tempTips = structuredClone(INTERLUDE_TIPS);
+            }
+            this.applyInterludeBoxVisibility();
+            this.ctx.dom.lyricsCanvas
+              .classOn("interlude-hidden")
+              .styleJs({ opacity: "0" });
             this.broadcastOverlayLyrics();
           }
 
-          const interludeDuration = inInterlude.end - inInterlude.start;
-          const interludeProgress =
-            interludeDuration > 0
-              ? Math.min(
-                  1,
-                  Math.max(
-                    0,
-                    (currentTime - inInterlude.start) / interludeDuration,
-                  ),
-                )
-              : 0;
-          if (this.ctx.dom.interludeProgress)
-            this.ctx.dom.interludeProgress.styleJs({
-              width: `${(interludeProgress * 100).toFixed(2)}%`,
-            });
+          if (!this.isInterludeBoxHidden()) {
+            const interludeDuration = inInterlude.end - inInterlude.start;
+            const interludeProgress =
+              interludeDuration > 0
+                ? Math.min(
+                    1,
+                    Math.max(
+                      0,
+                      (currentTime - inInterlude.start) / interludeDuration,
+                    ),
+                  )
+                : 0;
+            if (this.ctx.dom.interludeProgress)
+              this.ctx.dom.interludeProgress.styleJs({
+                width: `${(interludeProgress * 100).toFixed(2)}%`,
+              });
+          }
         } else {
           if (this.ctx.state.isInterludeActive) {
             this.ctx.state.isInterludeActive = false;
             this.ctx.dom.interludeOverlay.classOff("visible");
+            this.ctx.dom.lyricsCanvas.classOff("interlude-hidden");
             if (this.ctx.dom.interludeProgress)
               this.ctx.dom.interludeProgress.styleJs({ width: "0%" });
             this.ctx.dom.lyricsCanvas.styleJs({ opacity: "1" });

@@ -1457,8 +1457,25 @@ export default class SetupManager {
                 action: () => this.startVideoPreview(),
               },
               {
+                id: "hide_interlude_box",
+                label: "Show Interlude Box",
+                type: "select",
+                options: [
+                  { value: false, label: "Yes" },
+                  { value: true, label: "No" },
+                ],
+                get: () =>
+                  this.ctx.config.videoConfig?.hideInterludeBox ?? false,
+                set: (v) => {
+                  this.ctx.config.videoConfig ??= {};
+                  this.ctx.config.videoConfig.hideInterludeBox = v;
+                  window.config.setItem("videoConfig.hideInterludeBox", v);
+                  this.ctx.modules.lyrics?.applyInterludeBoxVisibility?.();
+                },
+              },
+              {
                 id: "enable_extra_interludes",
-                label: "Easter Egg Interludes (Requires Restart)",
+                label: "Potentially NSFW Interludes (Requires Restart)",
                 type: "select",
                 options: [
                   { value: false, label: "No" },

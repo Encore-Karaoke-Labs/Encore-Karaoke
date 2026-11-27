@@ -32,6 +32,7 @@ export interface VideoConfig {
   syncOffset: number;
   cameraSource?: "remote" | "local" | "off";
   cameraDeviceId?: string;
+  hideInterludeBox?: boolean;
 }
 
 export interface RetailDeviceEntry {

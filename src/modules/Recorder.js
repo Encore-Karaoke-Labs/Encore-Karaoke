@@ -56,6 +56,7 @@ export class RecorderModule {
 
     this.frameCounter = 0;
     this.isInterludeVisible = false;
+    this.isLyricsCut = false;
     this.cachedInterludeTip = "";
 
     this.scoreScreenOpacity = 0.0;
@@ -805,6 +806,10 @@ export class RecorderModule {
       const interludeEl = document.querySelector(".interlude-overlay");
       this.isInterludeVisible =
         interludeEl && interludeEl.classList.contains("visible");
+      const lyricsEl = this.uiRefs?.lyricsCanvas?.elm;
+      this.isLyricsCut = Boolean(
+        lyricsEl && lyricsEl.classList.contains("interlude-hidden"),
+      );
       if (this.isInterludeVisible) {
         const tipEl = interludeEl.querySelector(".interlude-tip-box");
         this.cachedInterludeTip = tipEl ? tipEl.textContent : "";
@@ -899,7 +904,9 @@ export class RecorderModule {
     }
 
     this.lyricOpacity +=
-      ((this.isInterludeVisible ? 0 : 1) - this.lyricOpacity) * 0.15;
+      ((this.isInterludeVisible || this.isLyricsCut ? 0 : 1) -
+        this.lyricOpacity) *
+      0.15;
 
     if (this.isInterludeVisible) {
       const iw = w * 0.6;
