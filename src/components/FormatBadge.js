@@ -7,7 +7,7 @@ import { normalizeClasses } from "./helpers.js";
  * @example
  * new FormatBadge({ label: "MIDI", color: "#D12F9E" }).appendTo(container);
  */
-export class FormatBadge extends Html {
+class FormatBadge extends Html {
   /**
    * @param {Object} [options]
    * @param {string} [options.label] - Badge text.
