@@ -101,7 +101,7 @@ const DEFAULT_CONFIG: AppConfig = {
   },
 };
 
-export class ConfigManager {
+class ConfigManager {
   private configPath: string | null;
   private data: Record<string, unknown>;
   public isLoaded: boolean;
