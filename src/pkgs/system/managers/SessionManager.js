@@ -2437,7 +2437,7 @@ export default class SessionManager {
       )
       .appendTo(audibleText);
 
-    const audibleSwitch = new ToggleSwitch({
+    new ToggleSwitch({
       checked: options.everyoneAudible,
       ariaLabel: "Everyone audible during performances",
       onChange: (next) => {
@@ -3363,7 +3363,7 @@ export default class SessionManager {
         .appendTo(mediaCard);
 
       const muted = Boolean(SessionsSvc.isMuted);
-      const muteBtn = new Html("button")
+      new Html("button")
         .classOn("invite-action-btn", muted ? "danger" : "secondary")
         .attr({
           type: "button",
@@ -3384,7 +3384,7 @@ export default class SessionManager {
       const deafenState =
         this.ctx.services.Forte.getSessionMonitorState?.() || {};
       const deafened = Boolean(deafenState.deafened);
-      const deafenBtn = new Html("button")
+      new Html("button")
         .classOn("invite-action-btn", deafened ? "danger" : "secondary")
         .attr({
           type: "button",
@@ -3403,7 +3403,7 @@ export default class SessionManager {
         .appendTo(mediaRow);
 
       const cameraOn = Boolean(SessionsSvc.cameraEnabled);
-      const cameraBtn = new Html("button")
+      new Html("button")
         .classOn("invite-action-btn", cameraOn ? "secondary" : "danger")
         .attr({
           type: "button",

@@ -770,7 +770,7 @@ export default class StreamManager {
       .classOn("stream-toggle-row")
       .appendTo(configSection.content);
 
-    const autoRecSwitch = new ToggleSwitch({
+    new ToggleSwitch({
       checked: this.obsAutoReconnect,
       ariaLabel:
         "Automatically reconnect if OBS starts later or restarts",
@@ -1154,7 +1154,7 @@ export default class StreamManager {
       .classOn("stream-toggle-row")
       .appendTo(chatSection.content);
 
-    const danmakuSwitch = new ToggleSwitch({
+    new ToggleSwitch({
       checked: status.showChatAsDanmaku,
       ariaLabel: "Show chat on screen",
       onChange: (enabled) => {
@@ -1179,7 +1179,7 @@ export default class StreamManager {
       .classOn("stream-toggle-row")
       .appendTo(chatSection.content);
 
-    const autoConnectSwitch = new ToggleSwitch({
+    new ToggleSwitch({
       checked: status.autoConnect,
       ariaLabel: "Connect to Twitch automatically on startup",
       onChange: (enabled) => {
@@ -2572,7 +2572,7 @@ export default class StreamManager {
       const row = new Html("div").classOn("twitch-ccl-row");
 
       const enabled = draft.contentClassificationLabels.has(label.id);
-      const toggle = new ToggleSwitch({
+      new ToggleSwitch({
         checked: enabled,
         ariaLabel: label.name,
         onChange: (next) => {
@@ -2604,7 +2604,7 @@ export default class StreamManager {
       .classOn("twitch-ccl-row")
       .appendTo(sectionContent);
 
-    const brandedToggle = new ToggleSwitch({
+    new ToggleSwitch({
       checked: draft.isBrandedContent,
       ariaLabel: "This stream contains branded content",
       onChange: (next) => {
